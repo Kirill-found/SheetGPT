@@ -1,4 +1,4 @@
-from openai import AsyncOpenAI
+from openai import AsyncOpenAI, RateLimitError
 import json
 import time
 import asyncio
@@ -17,6 +17,11 @@ import numpy as np
 MAX_HEAL_ATTEMPTS = 3
 TOTAL_GENERATION_TIMEOUT = 30.0  # секунд
 PER_ATTEMPT_TIMEOUT = 10.0  # секунд на одну попытку healing
+
+# Retry settings for OpenAI rate limits
+MAX_RETRIES = 3
+INITIAL_RETRY_DELAY = 1.0  # секунд
+MAX_RETRY_DELAY = 10.0  # макс задержка между попытками
 
 
 class AIService:
@@ -1222,13 +1227,15 @@ CORRECT RESPONSE:
 
 Be CONCISE, SPECIFIC, SCANNABLE!"""
 
-        try:
-            response = await self.client.chat.completions.create(
-                model=self.model,
-                messages=[
-                    {
-                        "role": "system",
-                        "content": """You are a data analyst who creates STRUCTURED, SCANNABLE reports.
+        # Retry logic for rate limiting
+        for attempt in range(MAX_RETRIES):
+            try:
+                response = await self.client.chat.completions.create(
+                    model=self.model,
+                    messages=[
+                        {
+                            "role": "system",
+                            "content": """You are a data analyst who creates STRUCTURED, SCANNABLE reports.
 
 CRITICAL:
 - NO walls of text - users won't read them
@@ -1238,46 +1245,69 @@ CRITICAL:
 - All text in Russian with emojis for visual structure
 - DETERMINISTIC: Always sort data the same way (descending by value, then alphabetically by name)
 - CONSISTENCY: Same query MUST return same results every time"""
-                    },
-                    {"role": "user", "content": prompt}
-                ],
-                response_format={"type": "json_object"},
+                        },
+                        {"role": "user", "content": prompt}
+                    ],
+                    response_format={"type": "json_object"},
                 temperature=0.0,
                 max_tokens=1000,
             )
 
-            result = json.loads(response.choices[0].message.content)
+                result = json.loads(response.choices[0].message.content)
 
-            # DEBUG: Log GPT response
-            print(f"📤 GPT-4o response keys: {list(result.keys())}")
-            print(f"📤 Has methodology: {('methodology' in result)}")
-            if 'methodology' in result:
-                print(f"📤 methodology value: {result['methodology']}")
+                # DEBUG: Log GPT response
+                print(f"📤 GPT-4o response keys: {list(result.keys())}")
+                print(f"📤 Has methodology: {('methodology' in result)}")
+                if 'methodology' in result:
+                    print(f"📤 methodology value: {result['methodology']}")
 
-            result["processing_time"] = time.time() - start_time
-            result["type"] = "analysis"
+                result["processing_time"] = time.time() - start_time
+                result["type"] = "analysis"
 
-            # CRITICAL FIX: If GPT-4o didn't return methodology, generate default one
-            if not result.get("methodology"):
-                print("⚠️  GPT didn't return methodology, generating fallback...")
-                column_list = ", ".join([f"'{col}'" for col in column_names[:5]])  # First 5 columns
-                if len(column_names) > 5:
-                    column_list += f" и ещё {len(column_names) - 5}"
-                result["methodology"] = f"🔍 Как посчитано: проанализированы данные из таблицы (колонки: {column_list})"
-                print(f"✅ Fallback methodology: {result['methodology']}")
+                # CRITICAL FIX: If GPT-4o didn't return methodology, generate default one
+                if not result.get("methodology"):
+                    print("⚠️  GPT didn't return methodology, generating fallback...")
+                    column_list = ", ".join([f"'{col}'" for col in column_names[:5]])  # First 5 columns
+                    if len(column_names) > 5:
+                        column_list += f" и ещё {len(column_names) - 5}"
+                    result["methodology"] = f"🔍 Как посчитано: проанализированы данные из таблицы (колонки: {column_list})"
+                    print(f"✅ Fallback methodology: {result['methodology']}")
 
-            print(f"✅ Final result keys before return: {list(result.keys())}")
-            return result
+                print(f"✅ Final result keys before return: {list(result.keys())}")
+                return result
 
-        except Exception as e:
-            return {
-                "type": "error",
-                "answer": f"Ошибка анализа: {str(e)}",
-                "insights": [],
-                "suggested_actions": [],
-                "confidence": 0.0,
-                "processing_time": time.time() - start_time
-            }
+            except RateLimitError as e:
+                if attempt < MAX_RETRIES - 1:
+                    # Exponential backoff
+                    delay = min(INITIAL_RETRY_DELAY * (2 ** attempt), MAX_RETRY_DELAY)
+                    print(f"⚠️  Rate limit hit (attempt {attempt + 1}/{MAX_RETRIES}). Retrying in {delay}s...")
+                    await asyncio.sleep(delay)
+                    continue
+                else:
+                    print(f"❌ Rate limit exceeded after {MAX_RETRIES} attempts")
+                    return {
+                        "type": "error",
+                        "answer": "Превышен лимит запросов к AI. Пожалуйста, подождите 1 минуту и попробуйте снова.",
+                        "insights": [],
+                        "suggested_actions": ["Подождите 60 секунд перед следующим запросом"],
+                        "confidence": 0.0,
+                        "processing_time": time.time() - start_time
+                    }
+            except Exception as e:
+                if attempt < MAX_RETRIES - 1:
+                    print(f"⚠️  Error on attempt {attempt + 1}/{MAX_RETRIES}: {e}")
+                    delay = INITIAL_RETRY_DELAY * (attempt + 1)
+                    await asyncio.sleep(delay)
+                    continue
+                else:
+                    return {
+                        "type": "error",
+                        "answer": f"Ошибка анализа: {str(e)}",
+                        "insights": [],
+                        "suggested_actions": [],
+                        "confidence": 0.0,
+                        "processing_time": time.time() - start_time
+                    }
 
     async def answer_question(
         self, query: str, sample_data: List[List[Any]], column_names: List[str]

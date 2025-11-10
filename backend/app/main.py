@@ -8,7 +8,7 @@ from app.api import formula, actions
 # Создаем FastAPI приложение
 app = FastAPI(
     title=settings.PROJECT_NAME,
-    version="2.2.1-DEBUG-LOGS",  # v2.2.1: Added detailed logging to debug column detection
+    version="2.2.2-RETRY-LOGIC",  # v2.2.2: Added retry logic with exponential backoff for rate limiting (HTTP 429)
     description="AI-powered assistant for Google Sheets with conversation memory",
     docs_url="/docs",
     redoc_url="/redoc"
