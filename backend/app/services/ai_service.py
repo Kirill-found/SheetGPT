@@ -1,6 +1,6 @@
 """
-AI Service for SheetGPT - ФИНАЛЬНАЯ ВЕРСИЯ 3.0
-Гарантированно правильная агрегация данных
+AI Service for SheetGPT - VERSION 3.0 FIXED
+Fixed aggregation with Python calculations
 """
 
 import json
@@ -10,21 +10,25 @@ from openai import OpenAI
 from app.config import settings
 import pandas as pd
 import numpy as np
+import logging
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 class AIService:
     def __init__(self):
         self.client = OpenAI(api_key=settings.OPENAI_API_KEY)
         self.model = "gpt-4o"
-        print("🚀 AI Service v3.0 FINAL initialized")
+        logger.info("AI Service v3.0 initialized")
 
     def _detect_aggregation_need(self, query: str) -> Tuple[bool, str]:
         """
-        Определяет нужна ли агрегация данных
+        Detects if aggregation is needed
         Returns: (needs_aggregation, aggregation_type)
         """
         query_lower = query.lower()
 
-        # Паттерны для определения агрегации
         patterns = {
             'sum': [
                 r'сумм[аы]?\s',
@@ -51,11 +55,10 @@ class AIService:
             ]
         }
 
-        # Проверяем паттерны
         for pattern_type, pattern_list in patterns.items():
             for pattern in pattern_list:
                 if re.search(pattern, query_lower):
-                    print(f"🎯 Detected aggregation need: {pattern_type} (pattern: {pattern})")
+                    logger.info(f"Detected aggregation need: {pattern_type} (pattern: {pattern})")
                     return True, pattern_type
 
         return False, ""
@@ -65,120 +68,106 @@ class AIService:
                                    data: List[List[Any]],
                                    query: str) -> Dict[str, Any]:
         """
-        КРИТИЧЕСКИ ВАЖНАЯ ФУНКЦИЯ - выполняет агрегацию в Python
+        Performs aggregation using Python/pandas
         """
-        print("\n" + "="*60)
-        print("🔥 PYTHON AGGREGATION v3.0 STARTED")
-        print("="*60)
-
+        logger.info("Starting Python aggregation")
         query_lower = query.lower()
 
-        # Создаём DataFrame
-        df = pd.DataFrame(data, columns=column_names)
-        print(f"📊 DataFrame shape: {df.shape}")
-        print(f"📋 Columns: {list(df.columns)}")
-
-        # Определяем тип данных в колонках
-        column_types = {}
-        for col in df.columns:
-            sample_values = df[col].dropna().head(5)
-            if sample_values.empty:
-                column_types[col] = 'empty'
-                continue
-
-            # Проверяем на числа
-            try:
-                pd.to_numeric(sample_values, errors='raise')
-                column_types[col] = 'numeric'
-            except:
-                # Проверяем на компании
-                if any('ООО' in str(v) or 'ИП' in str(v) for v in sample_values):
-                    column_types[col] = 'company'
-                else:
-                    column_types[col] = 'text'
-
-        print(f"🔍 Column types detected: {column_types}")
-
-        # КРИТИЧНО: Находим колонку с поставщиками
-        supplier_column = None
-        sales_column = None
-
-        # 1. Ищем колонку с компаниями
-        for col_name, col_type in column_types.items():
-            if col_type == 'company':
-                supplier_column = col_name
-                print(f"✅ Found supplier column: {supplier_column}")
-                break
-
-        # 2. Если не нашли по типу, ищем по позиции (обычно колонка B)
-        if not supplier_column:
-            if 'Колонка B' in column_names:
-                supplier_column = 'Колонка B'
-                print(f"📍 Using position-based supplier column: {supplier_column}")
-            elif 'Поставщик' in column_names:
-                supplier_column = 'Поставщик'
-                print(f"📍 Using named supplier column: {supplier_column}")
-
-        # 3. Находим колонку с продажами
-        # Ищем последнюю числовую колонку (обычно это продажи)
-        numeric_columns = [col for col, typ in column_types.items() if typ == 'numeric']
-        if numeric_columns:
-            # Берём последнюю числовую колонку
-            sales_column = numeric_columns[-1]
-            print(f"✅ Found sales column: {sales_column} (last numeric)")
-
-        # Альтернативные названия для продаж
-        for col in ['Продажи', 'Колонка E', 'Сумма', 'Итого']:
-            if col in column_names:
-                sales_column = col
-                print(f"📍 Using named sales column: {sales_column}")
-                break
-
-        if not supplier_column or not sales_column:
-            print(f"❌ Critical columns not found! Supplier: {supplier_column}, Sales: {sales_column}")
-            return {
-                "error": "Не могу найти нужные колонки для анализа",
-                "details": f"Supplier column: {supplier_column}, Sales column: {sales_column}"
-            }
-
-        print(f"\n🎯 AGGREGATION SETUP:")
-        print(f"   Group by: {supplier_column}")
-        print(f"   Sum column: {sales_column}")
-
-        # ВЫПОЛНЯЕМ АГРЕГАЦИЮ
         try:
-            # Преобразуем продажи в числа
-            df[sales_column] = pd.to_numeric(df[sales_column], errors='coerce').fillna(0)
+            # Create DataFrame
+            df = pd.DataFrame(data, columns=column_names)
+            logger.info(f"DataFrame shape: {df.shape}")
+            logger.info(f"Columns: {list(df.columns)}")
 
-            # Группируем и суммируем
+            # Detect column types
+            column_types = {}
+            for col in df.columns:
+                sample_values = df[col].dropna().head(5)
+                if sample_values.empty:
+                    column_types[col] = 'empty'
+                    continue
+
+                # Check for numeric
+                try:
+                    pd.to_numeric(sample_values, errors='raise')
+                    column_types[col] = 'numeric'
+                except:
+                    # Check for companies
+                    if any('ООО' in str(v) or 'ИП' in str(v) for v in sample_values):
+                        column_types[col] = 'company'
+                    else:
+                        column_types[col] = 'text'
+
+            logger.info(f"Column types detected: {column_types}")
+
+            # Find supplier and sales columns
+            supplier_column = None
+            sales_column = None
+
+            # Find supplier column
+            for col_name, col_type in column_types.items():
+                if col_type == 'company':
+                    supplier_column = col_name
+                    logger.info(f"Found supplier column: {supplier_column}")
+                    break
+
+            # If not found by type, try position
+            if not supplier_column:
+                if 'Колонка B' in column_names:
+                    supplier_column = 'Колонка B'
+                elif 'Поставщик' in column_names:
+                    supplier_column = 'Поставщик'
+                logger.info(f"Using position-based supplier column: {supplier_column}")
+
+            # Find sales column (last numeric column)
+            numeric_columns = [col for col, typ in column_types.items() if typ == 'numeric']
+            if numeric_columns:
+                sales_column = numeric_columns[-1]
+                logger.info(f"Found sales column: {sales_column} (last numeric)")
+
+            # Alternative names for sales
+            for col in ['Продажи', 'Колонка E', 'Сумма', 'Итого']:
+                if col in column_names:
+                    sales_column = col
+                    logger.info(f"Using named sales column: {sales_column}")
+                    break
+
+            if not supplier_column or not sales_column:
+                logger.error(f"Critical columns not found! Supplier: {supplier_column}, Sales: {sales_column}")
+                return {
+                    "error": "Cannot find required columns for analysis",
+                    "details": f"Supplier column: {supplier_column}, Sales column: {sales_column}"
+                }
+
+            logger.info(f"AGGREGATION SETUP: Group by {supplier_column}, Sum {sales_column}")
+
+            # Perform aggregation
+            df[sales_column] = pd.to_numeric(df[sales_column], errors='coerce').fillna(0)
             aggregated = df.groupby(supplier_column)[sales_column].sum().reset_index()
             aggregated.columns = ['Поставщик', 'Общие продажи']
-
-            # Сортируем по убыванию
             aggregated = aggregated.sort_values('Общие продажи', ascending=False)
 
-            print(f"\n📊 AGGREGATION RESULTS:")
+            logger.info("AGGREGATION RESULTS:")
             for idx, row in aggregated.iterrows():
-                print(f"   {row['Поставщик']}: {row['Общие продажи']:,.2f}")
+                logger.info(f"  {row['Поставщик']}: {row['Общие продажи']:,.2f}")
 
-            # Находим топ поставщика
+            # Find top supplier
             top_supplier = aggregated.iloc[0]
             top_name = top_supplier['Поставщик']
             top_sales = top_supplier['Общие продажи']
 
-            print(f"\n🏆 TOP SUPPLIER: {top_name} with {top_sales:,.2f}")
+            logger.info(f"TOP SUPPLIER: {top_name} with {top_sales:,.2f}")
 
-            # Проверяем правильность (должно быть ООО Время)
+            # Check correctness
             if top_name == "ООО Время":
-                print("✅✅✅ CORRECT RESULT! ООО Время is the top supplier!")
+                logger.info("CORRECT RESULT! OOO Vremya is the top supplier!")
             else:
-                print(f"⚠️⚠️⚠️ WARNING: Got {top_name} instead of ООО Время")
-                # Принудительно проверяем ООО Время
+                logger.warning(f"WARNING: Got {top_name} instead of OOO Vremya")
                 vremya_sales = aggregated[aggregated['Поставщик'] == 'ООО Время']['Общие продажи'].values
                 if len(vremya_sales) > 0:
-                    print(f"    ООО Время actual sales: {vremya_sales[0]:,.2f}")
+                    logger.info(f"  OOO Vremya actual sales: {vremya_sales[0]:,.2f}")
 
-            # Формируем детальный ответ
+            # Create response
             methodology = f"""Анализ данных по продажам:
 1. Использована колонка '{supplier_column}' для группировки по поставщикам
 2. Просуммированы значения из колонки '{sales_column}' для каждого поставщика
@@ -191,14 +180,7 @@ class AIService:
 
             summary = f"Поставщик с наибольшими продажами - {top_name} с общей суммой {top_sales:,.2f} руб."
 
-            # Детальная разбивка для ООО Время
-            vremya_detail = df[df[supplier_column] == 'ООО Время'][[supplier_column, sales_column]]
-            print(f"\n📝 ООО Время detail:")
-            print(vremya_detail.to_string())
-
-            print("\n" + "="*60)
-            print("✅ AGGREGATION COMPLETED SUCCESSFULLY")
-            print("="*60 + "\n")
+            logger.info("AGGREGATION COMPLETED SUCCESSFULLY")
 
             return {
                 "summary": summary,
@@ -210,16 +192,15 @@ class AIService:
                     f"Общая сумма продаж лидера: {top_sales:,.2f} руб.",
                     f"Всего проанализировано поставщиков: {len(aggregated)}"
                 ],
-                "confidence": 0.95,
-                "raw_data": aggregated.to_dict('records')
+                "confidence": 0.95
             }
 
         except Exception as e:
-            print(f"❌ Aggregation error: {str(e)}")
+            logger.error(f"Aggregation error: {str(e)}")
             import traceback
             traceback.print_exc()
             return {
-                "error": f"Ошибка агрегации: {str(e)}",
+                "error": f"Aggregation error: {str(e)}",
                 "details": traceback.format_exc()
             }
 
@@ -227,34 +208,31 @@ class AIService:
                         column_names: List[str],
                         sheet_data: List[List[Any]],
                         history: List[Dict[str, Any]]) -> str:
-        """Подготавливает контекст для GPT"""
-
-        # Ограничиваем количество строк
+        """Prepares context for GPT"""
         sample_data = sheet_data[:10] if sheet_data else []
-
-        # Форматируем данные для отображения
         formatted_data = []
+
         for row_idx, row in enumerate(sample_data, 1):
             row_dict = {}
             for col_idx, value in enumerate(row):
                 if col_idx < len(column_names):
                     row_dict[column_names[col_idx]] = value
-            formatted_data.append(f"Строка {row_idx}: {row_dict}")
+            formatted_data.append(f"Row {row_idx}: {row_dict}")
 
-        context = f"""Ты SheetGPT - помощник для работы с таблицами.
+        context = f"""You are SheetGPT - an assistant for working with spreadsheets.
 
-Названия колонок: {', '.join(column_names)}
+Column names: {', '.join(column_names)}
 
-Данные таблицы:
+Table data:
 {chr(10).join(formatted_data)}
 
-История диалога:
-{json.dumps(history[-3:], ensure_ascii=False) if history else 'Пусто'}
+Chat history:
+{json.dumps(history[-3:], ensure_ascii=False) if history else 'Empty'}
 
-ВАЖНО:
-- Если нужна агрегация (сумма, группировка), она уже выполнена в Python
-- Отвечай на русском языке
-- Будь конкретным и используй числа из данных
+IMPORTANT:
+- If aggregation is needed (sum, grouping), it's already done in Python
+- Reply in Russian
+- Be specific and use numbers from the data
 """
         return context
 
@@ -263,34 +241,32 @@ class AIService:
                                column_names: List[str],
                                sheet_data: List[List[Any]],
                                history: List[Dict[str, Any]]) -> Dict[str, Any]:
-        """Главная функция обработки запроса"""
+        """Main request processing function"""
 
-        print(f"\n{'='*60}")
-        print(f"📥 PROCESSING QUERY: {query}")
-        print(f"📊 Data shape: {len(sheet_data)} rows, {len(column_names)} columns")
-        print(f"📋 Columns: {column_names}")
-        print(f"{'='*60}\n")
+        logger.info(f"Processing query: {query}")
+        logger.info(f"Data shape: {len(sheet_data)} rows, {len(column_names)} columns")
+        logger.info(f"Columns: {column_names}")
 
-        # Проверяем нужна ли агрегация
+        # Check if aggregation is needed
         needs_aggregation, agg_type = self._detect_aggregation_need(query)
 
         if needs_aggregation:
-            print(f"🔥 AGGREGATION REQUIRED! Type: {agg_type}")
+            logger.info(f"AGGREGATION REQUIRED! Type: {agg_type}")
 
-            # Выполняем агрегацию в Python
+            # Perform Python aggregation
             aggregation_result = self._perform_python_aggregation(
                 column_names, sheet_data, query
             )
 
-            # Если агрегация успешна, возвращаем результат
+            # If successful, return result
             if "error" not in aggregation_result:
-                print(f"✅ Returning aggregation result")
+                logger.info("Returning aggregation result")
                 return aggregation_result
             else:
-                print(f"❌ Aggregation failed: {aggregation_result.get('error')}")
+                logger.error(f"Aggregation failed: {aggregation_result.get('error')}")
 
-        # Если агрегация не нужна или не удалась, используем GPT
-        print(f"🤖 Using GPT-4o for response")
+        # If no aggregation needed or failed, use GPT
+        logger.info("Using GPT-4o for response")
         context = self._prepare_context(column_names, sheet_data, history)
 
         try:
@@ -307,11 +283,8 @@ class AIService:
             )
 
             gpt_response = response.choices[0].message.content
-
-            # Парсим ответ GPT
             result = self._parse_gpt_response(gpt_response, query)
 
-            # Добавляем методологию
             result["methodology"] = f"""Анализ выполнен с использованием:
 - Модель: GPT-4o
 - Колонки: {', '.join(column_names)}
@@ -320,16 +293,14 @@ class AIService:
             return result
 
         except Exception as e:
-            print(f"❌ GPT Error: {str(e)}")
+            logger.error(f"GPT Error: {str(e)}")
             return {
                 "error": str(e),
                 "response_type": "error"
             }
 
     def _parse_gpt_response(self, response_text: str, query: str) -> Dict[str, Any]:
-        """Парсит ответ от GPT"""
-
-        # Базовый результат
+        """Parses GPT response"""
         result = {
             "formula": None,
             "explanation": response_text,
@@ -343,14 +314,14 @@ class AIService:
             "key_findings": []
         }
 
-        # Пытаемся извлечь формулу если она есть
+        # Try to extract formula
         formula_pattern = r'=\w+\([^)]*\)'
         formula_match = re.search(formula_pattern, response_text)
         if formula_match:
             result["formula"] = formula_match.group()
             result["response_type"] = "formula"
 
-        # Извлекаем summary из первого предложения
+        # Extract summary from first sentence
         sentences = response_text.split('.')
         if sentences:
             result["summary"] = sentences[0].strip() + '.'
@@ -358,9 +329,9 @@ class AIService:
         return result
 
 
-# Создаём единственный экземпляр сервиса
+# Create service instance
 ai_service = AIService()
 
 def get_ai_service() -> AIService:
-    """Возвращает экземпляр AI сервиса"""
+    """Returns AI service instance"""
     return ai_service
