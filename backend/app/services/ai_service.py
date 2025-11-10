@@ -882,32 +882,82 @@ If request is unclear, set confidence < 0.6 and explain what's missing."""
             print(f"Columns: {column_names}")
 
             # Определяем по каким колонкам группировать и агрегировать
-            # Ищем колонки по ключевым словам
+            # КРИТИЧЕСКИ ВАЖНО: анализируем ЗАПРОС, а не просто берём первую колонку!
             group_column = None
             value_column = None
+            query_lower = query.lower()
 
-            # Определяем колонку для группировки (поставщик, товар, менеджер и т.д.)
-            group_keywords = ['поставщик', 'товар', 'продукт', 'менеджер', 'регион', 'категор', 'клиент']
-            for col in column_names:
-                col_lower = col.lower()
-                if any(keyword in col_lower for keyword in group_keywords):
-                    if 'справочник' not in col_lower:  # Игнорируем справочные колонки
-                        group_column = col
+            # Определяем колонку для группировки - ищем упоминание в ЗАПРОСЕ
+            group_keywords = {
+                'поставщик': ['поставщик'],
+                'товар': ['товар', 'продукт'],
+                'менеджер': ['менеджер', 'продавец'],
+                'регион': ['регион', 'город', 'область'],
+                'категор': ['категор'],
+                'клиент': ['клиент', 'покупател']
+            }
+
+            # Находим какое ключевое слово упомянуто в запросе
+            for keyword_group, synonyms in group_keywords.items():
+                if any(syn in query_lower for syn in synonyms):
+                    # Ищем колонку с этим ключевым словом
+                    for col in column_names:
+                        col_lower = col.lower()
+                        if any(syn in col_lower for syn in synonyms) and 'справочник' not in col_lower:
+                            group_column = col
+                            print(f"✅ Found group column by query keyword '{keyword_group}': '{col}'")
+                            break
+                    if group_column:
                         break
 
-            # Определяем колонку для агрегации (продажи, сумма, выручка и т.д.)
-            value_keywords = ['продаж', 'сумм', 'выручк', 'количеств', 'объем', 'цена']
-            for col in column_names:
-                col_lower = col.lower()
-                if any(keyword in col_lower for keyword in value_keywords):
-                    # Проверяем что это числовая колонка
-                    try:
-                        df[col] = pd.to_numeric(df[col], errors='coerce')
-                        if df[col].notna().any():
-                            value_column = col
+            # Если не нашли по запросу - берём первую подходящую
+            if not group_column:
+                all_group_keywords = ['поставщик', 'товар', 'продукт', 'менеджер', 'регион', 'категор', 'клиент']
+                for col in column_names:
+                    col_lower = col.lower()
+                    if any(keyword in col_lower for keyword in all_group_keywords):
+                        if 'справочник' not in col_lower:
+                            group_column = col
+                            print(f"⚠️  Group column by fallback: '{col}'")
                             break
-                    except:
-                        continue
+
+            # Определяем колонку для агрегации - приоритет "продажам" если упомянуты
+            value_priority_keywords = [
+                (['продаж', 'продал'], ['продаж']),
+                (['сумм', 'выручк'], ['сумм', 'выручк']),
+                (['количеств', 'объем'], ['количеств', 'объем']),
+            ]
+
+            # Ищем по запросу
+            for query_keywords, column_keywords in value_priority_keywords:
+                if any(kw in query_lower for kw in query_keywords):
+                    for col in column_names:
+                        col_lower = col.lower()
+                        if any(kw in col_lower for kw in column_keywords):
+                            try:
+                                df[col] = pd.to_numeric(df[col], errors='coerce')
+                                if df[col].notna().any():
+                                    value_column = col
+                                    print(f"✅ Found value column by query keyword: '{col}'")
+                                    break
+                            except:
+                                continue
+                    if value_column:
+                        break
+
+            # Если не нашли по запросу - берём первую числовую подходящую
+            if not value_column:
+                for col in column_names:
+                    col_lower = col.lower()
+                    if any(kw in col_lower for kw in ['продаж', 'сумм', 'выручк', 'количеств', 'объем']):
+                        try:
+                            df[col] = pd.to_numeric(df[col], errors='coerce')
+                            if df[col].notna().any():
+                                value_column = col
+                                print(f"⚠️  Value column by fallback: '{col}'")
+                                break
+                        except:
+                            continue
 
             if not group_column or not value_column:
                 print(f"⚠️  Could not detect columns: group={group_column}, value={value_column}")
