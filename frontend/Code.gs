@@ -269,7 +269,7 @@ function processQuery(query) {
     const payload = {
       query: query,
       column_names: sheetData.columnNames,
-      sheet_data: sheetData.data.slice(0, 10),
+      sheet_data: sheetData.data.slice(1, 11),  // CRITICAL FIX: Skip headers (row 0), send rows 1-10
       history: history  // Добавляем историю в запрос
     };
 
