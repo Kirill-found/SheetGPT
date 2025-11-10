@@ -8,7 +8,7 @@ from app.api import formula, actions
 # Создаем FastAPI приложение
 app = FastAPI(
     title=settings.PROJECT_NAME,
-    version="1.6.0-GPT4O-PROD",  # v1.6.0: GPT-4o Production Release
+    version="1.7.0-METHODOLOGY-FIX",  # v1.7.0: Fixed methodology field in analyze_data
     description="AI-powered assistant for Google Sheets with conversation memory",
     docs_url="/docs",
     redoc_url="/redoc"
@@ -48,7 +48,7 @@ async def root():
     """Корневой эндпоинт"""
     return {
         "app": settings.PROJECT_NAME,
-        "version": "1.6.0-GPT4O-PROD",
+        "version": "1.7.0-METHODOLOGY-FIX",
         "status": "running",
         "features": ["conversation_history", "english_formulas", "interactive_builder"],
         "docs": "/docs"
@@ -60,7 +60,7 @@ async def health_check():
     """Health check для мониторинга"""
     return {
         "status": "healthy",
-        "version": "1.6.0-GPT4O-PROD",
+        "version": "1.7.0-METHODOLOGY-FIX",
         "environment": settings.ENVIRONMENT,
         "features": ["conversation_history", "english_formulas"]
     }
