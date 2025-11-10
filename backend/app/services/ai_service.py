@@ -70,8 +70,9 @@ class AIService:
         Returns:
             dict с типом ответа и данными
         """
-        # Убираем заголовки из sample_data (первая строка)
-        data_without_headers = sample_data[1:] if sample_data and len(sample_data) > 1 else []
+        # CRITICAL: column_names передаются отдельно, поэтому sample_data УЖЕ без заголовков!
+        # НЕ удаляем первую строку - это реальные данные!
+        data_without_headers = sample_data if sample_data else []
 
         # Используем AI для определения намерения (вместо хардкодных ключевых слов)
         intent_analysis = await self._analyze_intent(query, column_names, data_without_headers, history)
