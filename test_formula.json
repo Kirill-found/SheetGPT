@@ -1,0 +1,11 @@
+{
+  "query": "сумма столбца A",
+  "column_names": ["A"],
+  "data_sample": [
+    ["Продажи"],
+    ["100"],
+    ["200"],
+    ["300"]
+  ],
+  "user_id": "test_gemini_user"
+}

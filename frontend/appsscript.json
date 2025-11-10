@@ -1,0 +1,34 @@
+{
+  "timeZone": "Europe/Moscow",
+  "dependencies": {
+    "enabledAdvancedServices": []
+  },
+  "exceptionLogging": "STACKDRIVER",
+  "runtimeVersion": "V8",
+  "oauthScopes": [
+    "https://www.googleapis.com/auth/spreadsheets.currentonly",
+    "https://www.googleapis.com/auth/script.external_request",
+    "https://www.googleapis.com/auth/script.container.ui"
+  ],
+  "urlFetchWhitelist": [
+    "https://sheetgpt-production.up.railway.app/"
+  ],
+  "addOns": {
+    "common": {
+      "name": "SheetGPT",
+      "logoUrl": "https://www.gstatic.com/images/branding/product/1x/sheets_48dp.png",
+      "layoutProperties": {
+        "primaryColor": "#0f9d58",
+        "secondaryColor": "#0b8043"
+      },
+      "homepageTrigger": {
+        "runFunction": "showSidebar"
+      }
+    },
+    "sheets": {
+      "homepageTrigger": {
+        "runFunction": "showSidebar"
+      }
+    }
+  }
+}

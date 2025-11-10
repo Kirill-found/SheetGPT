@@ -1,0 +1,28 @@
+# FastAPI и веб-сервер
+fastapi==0.109.0
+uvicorn[standard]==0.27.0
+pydantic==2.5.3
+pydantic-settings==2.1.0
+
+# База данных
+sqlalchemy==2.0.25
+asyncpg==0.29.0
+alembic==1.13.1
+
+# AI модели
+google-generativeai==0.3.2  # Gemini API
+openai==1.10.0              # GPT fallback
+
+# Аутентификация
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+python-multipart==0.0.6
+
+# Google OAuth
+google-auth==2.27.0
+google-auth-oauthlib==1.2.0
+google-auth-httplib2==0.2.0
+
+# Утилиты
+python-dotenv==1.0.0
+httpx==0.26.0

@@ -1,0 +1,5 @@
+{
+  "query": "Calculate sum of sales",
+  "column_names": ["Product", "Sales"],
+  "sheet_data": [["Product","Sales"],["Laptop",1000],["Mouse",500]]
+}

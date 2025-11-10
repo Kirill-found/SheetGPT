@@ -1,0 +1,1 @@
+{"formula":null,"explanation":"Вписать оклад по отделу и стажу","target_cell":null,"confidence":0.85,"response_type":"action","insights":[{"type":"insert_formula","config":{"cell":"H2","formula":"=ARRAYFORMULA(IF(C2:C<5; INDEX(H:H; MATCH(B2:B; G:G; 0)); INDEX(H:H; MATCH(B2:B; G:G; 0))*1.05))"}}],"suggested_actions":null}
