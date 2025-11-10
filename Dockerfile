@@ -1,11 +1,11 @@
 FROM python:3.11-slim
 
-# EMERGENCY REBUILD - Railway caching issue fix
-ARG BUILD_DATE=2025-11-10-15-00-v1.5.0-EMERGENCY-GPT4O-ONLY
+# FORCE REBUILD - Break Railway cache
+ARG BUILD_DATE=2025-11-10-20-30-v1.6.0-PROD-GPT4O
 LABEL build_date=$BUILD_DATE
-LABEL version="1.5.0"
+LABEL version="1.6.0-GPT4O-PROD"
 LABEL model="gpt-4o"
-LABEL rebuild="emergency-2025-11-10-15-00"
+LABEL rebuild="production-2025-11-10-20-30"
 
 WORKDIR /app
 
