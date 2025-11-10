@@ -2,12 +2,15 @@ from openai import AsyncOpenAI
 import json
 import time
 import asyncio
+import re
 from typing import List, Any, Dict, Optional
 from app.core.config import settings
 from app.services.formula_validator import FormulaValidator
 from app.services.formula_fixer import FormulaFixer
 from app.services.formula_executor import MockFormulaExecutor
 from app.services.healing_service import HealingService
+import pandas as pd
+import numpy as np
 
 # PHASE 1.3: Константы для timeout и limits
 # EMERGENCY DEPLOYMENT: 2025-11-10 15:00 UTC - v1.5.0 - GPT-4o ONLY (Railway cache issue)
@@ -825,6 +828,169 @@ If request is unclear, set confidence < 0.6 and explain what's missing."""
 
         return prompt
 
+    def _detect_aggregation_need(self, query: str) -> Optional[Dict[str, str]]:
+        """
+        Определяет нужна ли Python-агрегация по ключевым словам в запросе
+
+        Returns:
+            Dict с типом агрегации и параметрами, или None если агрегация не нужна
+        """
+        query_lower = query.lower()
+
+        # Паттерны для определения агрегации
+        aggregation_patterns = [
+            (r'(какой|который|кто|что)\s+\S+\s+(продал|продаж|выручк|сумм|количеств).*(больше всего|меньше всего|максимум|минимум)', 'group_sum'),
+            (r'(у\s+кого|где)\s+(больше всего|меньше всего|максимум|минимум)', 'group_sum'),
+            (r'топ\s+\d+\s+\S+\s+по\s+(продаж|сумм|выручк|количеств)', 'group_sum_top'),
+            (r'(сколько|количество)\s+\S+\s+(у|от|по)\s+\S+', 'group_count'),
+            (r'средн.+\s+(продаж|сумм|выручк)\s+(у|от|по)\s+\S+', 'group_avg'),
+        ]
+
+        for pattern, agg_type in aggregation_patterns:
+            if re.search(pattern, query_lower):
+                return {'type': agg_type, 'query': query}
+
+        return None
+
+    def _perform_python_aggregation(
+        self,
+        query: str,
+        sample_data: List[List[Any]],
+        column_names: List[str],
+        agg_config: Dict[str, str]
+    ) -> Optional[Dict]:
+        """
+        Выполняет реальную Python-агрегацию данных с pandas
+
+        Args:
+            query: Запрос пользователя
+            sample_data: Данные таблицы
+            column_names: Названия колонок
+            agg_config: Конфигурация агрегации из _detect_aggregation_need
+
+        Returns:
+            Dict с результатами агрегации или None если не удалось
+        """
+        try:
+            # Создаём DataFrame
+            df = pd.DataFrame(sample_data, columns=column_names)
+
+            print(f"\n🔢 Python aggregation started:")
+            print(f"Query: {query}")
+            print(f"Agg type: {agg_config['type']}")
+            print(f"DataFrame shape: {df.shape}")
+            print(f"Columns: {column_names}")
+
+            # Определяем по каким колонкам группировать и агрегировать
+            # Ищем колонки по ключевым словам
+            group_column = None
+            value_column = None
+
+            # Определяем колонку для группировки (поставщик, товар, менеджер и т.д.)
+            group_keywords = ['поставщик', 'товар', 'продукт', 'менеджер', 'регион', 'категор', 'клиент']
+            for col in column_names:
+                col_lower = col.lower()
+                if any(keyword in col_lower for keyword in group_keywords):
+                    if 'справочник' not in col_lower:  # Игнорируем справочные колонки
+                        group_column = col
+                        break
+
+            # Определяем колонку для агрегации (продажи, сумма, выручка и т.д.)
+            value_keywords = ['продаж', 'сумм', 'выручк', 'количеств', 'объем', 'цена']
+            for col in column_names:
+                col_lower = col.lower()
+                if any(keyword in col_lower for keyword in value_keywords):
+                    # Проверяем что это числовая колонка
+                    try:
+                        df[col] = pd.to_numeric(df[col], errors='coerce')
+                        if df[col].notna().any():
+                            value_column = col
+                            break
+                    except:
+                        continue
+
+            if not group_column or not value_column:
+                print(f"⚠️  Could not detect columns: group={group_column}, value={value_column}")
+                return None
+
+            print(f"✅ Detected: group_by='{group_column}', aggregate='{value_column}'")
+
+            # Выполняем агрегацию
+            if agg_config['type'] in ['group_sum', 'group_sum_top']:
+                # GROUP BY + SUM
+                result_df = df.groupby(group_column, as_index=False)[value_column].sum()
+                result_df = result_df.sort_values(value_column, ascending=False)
+
+                # Для топ-N берём только нужное количество
+                if agg_config['type'] == 'group_sum_top':
+                    top_match = re.search(r'топ\s+(\d+)', query.lower())
+                    if top_match:
+                        top_n = int(top_match.group(1))
+                        result_df = result_df.head(top_n)
+
+                print(f"📊 Aggregation result:\n{result_df}")
+
+                # Формируем ответ
+                top_entity = result_df.iloc[0]
+                summary = f"{top_entity[group_column]} продал больше всего: {top_entity[value_column]:,.2f}"
+
+                key_findings = []
+                for idx, row in result_df.head(5).iterrows():
+                    key_findings.append(
+                        f"{idx+1}️⃣ {row[group_column]}: {row[value_column]:,.2f}"
+                    )
+
+                return {
+                    'summary': summary,
+                    'methodology': f"🔍 Как посчитано: сгруппировал данные по колонке '{group_column}', просуммировал все значения в колонке '{value_column}' для каждой группы, отсортировал по убыванию",
+                    'key_findings': key_findings,
+                    'explanation': f"Проанализировал {len(df)} строк данных. Для каждого значения в '{group_column}' просуммировал все продажи.",
+                    'confidence': 0.98,
+                    'source': 'python_aggregation'
+                }
+
+            elif agg_config['type'] == 'group_count':
+                # GROUP BY + COUNT
+                result_df = df.groupby(group_column, as_index=False)[value_column].count()
+                result_df = result_df.sort_values(value_column, ascending=False)
+
+                top_entity = result_df.iloc[0]
+                summary = f"{top_entity[group_column]}: {top_entity[value_column]} записей"
+
+                return {
+                    'summary': summary,
+                    'methodology': f"🔍 Как посчитано: подсчитал количество записей для каждого '{group_column}'",
+                    'key_findings': [f"{row[group_column]}: {row[value_column]} шт" for _, row in result_df.head(5).iterrows()],
+                    'explanation': f"Подсчитано количество строк для каждого значения '{group_column}'",
+                    'confidence': 0.98,
+                    'source': 'python_aggregation'
+                }
+
+            elif agg_config['type'] == 'group_avg':
+                # GROUP BY + AVG
+                result_df = df.groupby(group_column, as_index=False)[value_column].mean()
+                result_df = result_df.sort_values(value_column, ascending=False)
+
+                top_entity = result_df.iloc[0]
+                summary = f"{top_entity[group_column]}: среднее {top_entity[value_column]:,.2f}"
+
+                return {
+                    'summary': summary,
+                    'methodology': f"🔍 Как посчитано: вычислил среднее значение '{value_column}' для каждого '{group_column}'",
+                    'key_findings': [f"{row[group_column]}: {row[value_column]:,.2f} (среднее)" for _, row in result_df.head(5).iterrows()],
+                    'explanation': f"Посчитано среднее арифметическое для каждого '{group_column}'",
+                    'confidence': 0.98,
+                    'source': 'python_aggregation'
+                }
+
+            return None
+
+        except Exception as e:
+            print(f"❌ Python aggregation error: {e}")
+            import traceback
+            traceback.print_exc()
+            return None
+
     async def analyze_data(
         self, query: str, sample_data: List[List[Any]], column_names: List[str]
     ) -> dict:
@@ -844,6 +1010,19 @@ If request is unclear, set confidence < 0.6 and explain what's missing."""
         print(f"Query: {query}")
         print(f"Columns: {column_names}")
         print(f"Sample data (first 5): {sample_rows[:5]}")
+
+        # CRITICAL: Check if Python aggregation is needed
+        agg_config = self._detect_aggregation_need(query)
+        if agg_config and sample_data:
+            print(f"🔢 Python aggregation detected: {agg_config['type']}")
+            python_result = self._perform_python_aggregation(query, sample_data, column_names, agg_config)
+            if python_result:
+                print(f"✅ Python aggregation successful!")
+                python_result["processing_time"] = time.time() - start_time
+                python_result["type"] = "analysis"
+                return python_result
+            else:
+                print(f"⚠️  Python aggregation failed, falling back to GPT")
 
         prompt = f"""Analyze this Google Sheets data.
 
