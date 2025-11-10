@@ -11,6 +11,10 @@ class FormulaResponse(BaseModel):
     response_type: str = Field("formula", description="Тип ответа: formula | analysis | action")
     insights: Optional[List[Any]] = Field(None, description="Инсайты для анализа или action plan")
     suggested_actions: Optional[List[str]] = Field(None, description="Рекомендации")
+    # Analysis fields (for response_type='analysis')
+    summary: Optional[str] = Field(None, description="Краткий вывод анализа")
+    methodology: Optional[str] = Field(None, description="Объяснение какие данные использовались для расчёта")
+    key_findings: Optional[List[str]] = Field(None, description="Ключевые находки с цифрами")
 
     class Config:
         json_schema_extra = {
