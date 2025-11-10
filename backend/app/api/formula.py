@@ -110,6 +110,7 @@ async def generate_formula(request: FormulaRequest):
             # Добавляем структурированные поля
             response_dict = response_data.model_dump()
             response_dict["summary"] = result.get("summary")
+            response_dict["methodology"] = result.get("methodology")  # CRITICAL: Show which data was used
             response_dict["key_findings"] = result.get("key_findings", [])
             if result.get("conversation_id"):
                 response_dict["conversation_id"] = result["conversation_id"]
