@@ -1,11 +1,11 @@
 FROM python:3.11-slim
 
 # FORCE REBUILD - Break Railway cache
-ARG BUILD_DATE=2025-11-10-20-30-v1.6.0-PROD-GPT4O
+ARG BUILD_DATE=2025-11-10-22-20-v2.2.2-COLUMN-FIX
 LABEL build_date=$BUILD_DATE
-LABEL version="1.6.0-GPT4O-PROD"
+LABEL version="2.2.2-RETRY-LOGIC"
 LABEL model="gpt-4o"
-LABEL rebuild="production-2025-11-10-20-30"
+LABEL rebuild="production-2025-11-10-22-20-COLUMN-DETECTION-FIX"
 
 WORKDIR /app
 
