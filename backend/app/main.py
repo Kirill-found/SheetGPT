@@ -8,7 +8,7 @@ from app.api import formula, actions
 # Создаем FastAPI приложение
 app = FastAPI(
     title=settings.PROJECT_NAME,
-    version="1.5.0-GPT4O-EMERGENCY",  # v1.5.0: EMERGENCY FIX - Railway не деплоит правильный код!
+    version="1.6.0-GPT4O-PROD",  # v1.6.0: GPT-4o Production Release
     description="AI-powered assistant for Google Sheets with conversation memory",
     docs_url="/docs",
     redoc_url="/redoc"
@@ -48,7 +48,7 @@ async def root():
     """Корневой эндпоинт"""
     return {
         "app": settings.PROJECT_NAME,
-        "version": "2.0.0",
+        "version": "1.6.0-GPT4O-PROD",
         "status": "running",
         "features": ["conversation_history", "english_formulas", "interactive_builder"],
         "docs": "/docs"
@@ -60,7 +60,7 @@ async def health_check():
     """Health check для мониторинга"""
     return {
         "status": "healthy",
-        "version": "2.0.0",
+        "version": "1.6.0-GPT4O-PROD",
         "environment": settings.ENVIRONMENT,
         "features": ["conversation_history", "english_formulas"]
     }
