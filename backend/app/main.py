@@ -39,11 +39,11 @@ app.add_middleware(
 async def startup_event():
     """Log startup information"""
     logger.info("="*60)
-    logger.info("🚀 SheetGPT API v3.0.0 STARTING")
-    logger.info(f"🕐 Started at: {datetime.now()}")
-    logger.info("✅ Python aggregation enabled")
-    logger.info("✅ Methodology field enabled")
-    logger.info("✅ Auto-header detection enabled")
+    logger.info("SheetGPT API v3.0.0 STARTING")
+    logger.info(f"Started at: {datetime.now()}")
+    logger.info("Python aggregation enabled")
+    logger.info("Methodology field enabled")
+    logger.info("Auto-header detection enabled")
     logger.info("="*60)
 
 @app.get("/")
