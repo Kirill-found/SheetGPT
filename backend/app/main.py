@@ -8,7 +8,7 @@ from app.api import formula, actions
 # Создаем FastAPI приложение
 app = FastAPI(
     title=settings.PROJECT_NAME,
-    version="1.7.2-METHODOLOGY-FALLBACK",  # v1.7.2: Methodology fallback + debug logs
+    version="1.8.0-DATA-FIX",  # v1.8.0: Fixed data row deletion bug
     description="AI-powered assistant for Google Sheets with conversation memory",
     docs_url="/docs",
     redoc_url="/redoc"
@@ -48,7 +48,7 @@ async def root():
     """Корневой эндпоинт"""
     return {
         "app": settings.PROJECT_NAME,
-        "version": "1.7.2-METHODOLOGY-FALLBACK",
+        "version": "1.8.0-DATA-FIX",
         "status": "running",
         "features": ["conversation_history", "english_formulas", "interactive_builder"],
         "docs": "/docs"
@@ -60,7 +60,7 @@ async def health_check():
     """Health check для мониторинга"""
     return {
         "status": "healthy",
-        "version": "1.7.2-METHODOLOGY-FALLBACK",
+        "version": "1.8.0-DATA-FIX",
         "environment": settings.ENVIRONMENT,
         "features": ["conversation_history", "english_formulas"]
     }
