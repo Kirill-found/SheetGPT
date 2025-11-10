@@ -271,26 +271,56 @@ function processQuery(query) {
       throw new Error('Запрос пустой. Пожалуйста, введите вопрос.');
     }
 
-    // КРИТИЧЕСКОЕ ИСПРАВЛЕНИЕ: Проверяем есть ли заголовки
-    const firstCell = sheetData.columnNames[0];
-    const hasHeaders = typeof firstCell === 'string' && firstCell.length > 0 &&
-                       typeof firstCell !== 'number' && !(firstCell instanceof Date);
+    // КРИТИЧЕСКОЕ ИСПРАВЛЕНИЕ: НОВАЯ ЛОГИКА ОБРАБОТКИ
+    console.log('=== DATA DETECTION START ===');
+    console.log('First row:', sheetData.columnNames);
+    console.log('Total rows:', sheetData.data.length);
 
     let columnNames, dataToSend;
 
-    if (hasHeaders) {
-      // Есть заголовки - используем их и пропускаем первую строку
-      columnNames = sheetData.columnNames;
-      dataToSend = sheetData.data.slice(1, 11);  // Строки 2-11 (пропускаем заголовки)
-    } else {
-      // НЕТ заголовков - генерируем автоматические и отправляем ВСЕ данные включая первую строку
-      const numColumns = sheetData.data.length > 0 ? sheetData.data[0].length : 0;
+    // УНИВЕРСАЛЬНАЯ ПРОВЕРКА: смотрим ПЕРВУЮ СТРОКУ ДАННЫХ
+    // Если она содержит строки вида "ООО", "ИП" - это ДАННЫЕ, НЕ заголовки!
+    const firstDataRow = sheetData.data.length > 0 ? sheetData.data[0] : [];
+    const hasCompanyNames = firstDataRow.some(cell =>
+      typeof cell === 'string' && (cell.includes('ООО') || cell.includes('ИП'))
+    );
+
+    if (hasCompanyNames) {
+      // ПЕРВАЯ СТРОКА - ЭТО ДАННЫЕ! Нет заголовков!
+      console.log('⚠️ DETECTED: First row contains data (companies), NO headers!');
+      const numColumns = firstDataRow.length;
       columnNames = [];
       for (let i = 0; i < numColumns; i++) {
-        columnNames.push(`Колонка ${String.fromCharCode(65 + i)}`);  // A, B, C, D, ...
+        columnNames.push(`Колонка ${String.fromCharCode(65 + i)}`);  // A, B, C, D, E
       }
-      dataToSend = sheetData.data.slice(0, 10);  // Строки 1-10 (включая первую)
+      dataToSend = sheetData.data.slice(0, 10);  // Берём ВСЕ строки включая первую
+    } else {
+      // Возможно есть заголовки
+      const firstCell = sheetData.columnNames[0];
+      const looksLikeHeaders = typeof firstCell === 'string' &&
+                                !(/^\d+$/.test(firstCell)) &&  // Не число
+                                firstCell.length > 0 &&
+                                firstCell !== '' &&
+                                !firstCell.includes('Товар ');  // Не "Товар 1", а просто "Товар"
+
+      if (looksLikeHeaders) {
+        console.log('✅ DETECTED: Headers found in first row');
+        columnNames = sheetData.columnNames;
+        dataToSend = sheetData.data.slice(1, 11);  // Пропускаем заголовки
+      } else {
+        console.log('⚠️ DETECTED: No clear headers, using automatic columns');
+        const numColumns = firstDataRow.length || 5;
+        columnNames = [];
+        for (let i = 0; i < numColumns; i++) {
+          columnNames.push(`Колонка ${String.fromCharCode(65 + i)}`);
+        }
+        dataToSend = sheetData.data.slice(0, 10);  // Берём все строки
+      }
     }
+
+    console.log('Final columnNames:', columnNames);
+    console.log('Rows to send:', dataToSend.length);
+    console.log('First data row:', dataToSend[0]);
 
     const payload = {
       query: query,
