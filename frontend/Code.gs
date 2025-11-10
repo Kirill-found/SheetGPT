@@ -266,6 +266,17 @@ function processQuery(query) {
     // Получаем историю предыдущих запросов
     const history = getConversationHistory();
 
+    // КРИТИЧЕСКАЯ ПРОВЕРКА: query не должен быть undefined/null
+    if (!query || query === 'undefined' || typeof query === 'undefined') {
+      throw new Error('Запрос пустой. Пожалуйста, введите вопрос.');
+    }
+
+    // Проверка: первая строка должна содержать текстовые заголовки
+    const firstCell = sheetData.columnNames[0];
+    if (typeof firstCell === 'number' || firstCell instanceof Date) {
+      throw new Error('ОШИБКА: Первая строка таблицы должна содержать ЗАГОЛОВКИ колонок (текст), а не данные!');
+    }
+
     const payload = {
       query: query,
       column_names: sheetData.columnNames,
