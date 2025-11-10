@@ -838,6 +838,12 @@ If request is unclear, set confidence < 0.6 and explain what's missing."""
             for row in sample_data[:10]:  # Берем больше данных для анализа
                 sample_rows.append(row)
 
+        # DEBUG: Log input data
+        print(f"\n🔍 DEBUG analyze_data:")
+        print(f"Query: {query}")
+        print(f"Columns: {column_names}")
+        print(f"Sample data (first 5): {sample_rows[:5]}")
+
         prompt = f"""Analyze this Google Sheets data.
 
 📋 TABLE:
@@ -960,6 +966,13 @@ CRITICAL:
             result = json.loads(response.choices[0].message.content)
             result["processing_time"] = time.time() - start_time
             result["type"] = "analysis"
+
+            # CRITICAL FIX: If GPT-4o didn't return methodology, generate default one
+            if not result.get("methodology"):
+                column_list = ", ".join([f"'{col}'" for col in column_names[:5]])  # First 5 columns
+                if len(column_names) > 5:
+                    column_list += f" и ещё {len(column_names) - 5}"
+                result["methodology"] = f"🔍 Как посчитано: проанализированы данные из таблицы (колонки: {column_list})"
 
             return result
 
