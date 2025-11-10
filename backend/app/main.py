@@ -8,7 +8,7 @@ from app.api import formula, actions
 # Создаем FastAPI приложение
 app = FastAPI(
     title=settings.PROJECT_NAME,
-    version="2.1.0-PANDAS-AGG",  # v2.1.0: Real Python pandas aggregation
+    version="2.2.0-COLUMN-DETECTION-FIX",  # v2.2.0: Fixed column detection - analyze query instead of picking first column
     description="AI-powered assistant for Google Sheets with conversation memory",
     docs_url="/docs",
     redoc_url="/redoc"
