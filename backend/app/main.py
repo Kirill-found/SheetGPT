@@ -8,7 +8,7 @@ from app.api import formula, actions
 # Создаем FastAPI приложение
 app = FastAPI(
     title=settings.PROJECT_NAME,
-    version="2.0.0-GROUPBY-FIX",  # v2.0.0: Added GROUP BY/aggregation logic
+    version="2.1.0-PANDAS-AGG",  # v2.1.0: Real Python pandas aggregation
     description="AI-powered assistant for Google Sheets with conversation memory",
     docs_url="/docs",
     redoc_url="/redoc"
@@ -48,7 +48,7 @@ async def root():
     """Корневой эндпоинт"""
     return {
         "app": settings.PROJECT_NAME,
-        "version": "2.0.0-GROUPBY-FIX",
+        "version": "2.1.0-PANDAS-AGG",
         "status": "running",
         "features": ["conversation_history", "english_formulas", "interactive_builder"],
         "docs": "/docs"
@@ -60,7 +60,7 @@ async def health_check():
     """Health check для мониторинга"""
     return {
         "status": "healthy",
-        "version": "2.0.0-GROUPBY-FIX",
+        "version": "2.1.0-PANDAS-AGG",
         "environment": settings.ENVIRONMENT,
         "features": ["conversation_history", "english_formulas"]
     }
