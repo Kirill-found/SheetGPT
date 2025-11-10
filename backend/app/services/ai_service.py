@@ -887,6 +887,10 @@ If request is unclear, set confidence < 0.6 and explain what's missing."""
             value_column = None
             query_lower = query.lower()
 
+            print(f"\n🔍 COLUMN DETECTION DEBUG:")
+            print(f"📝 Query (lowercase): '{query_lower}'")
+            print(f"📊 Available columns: {column_names}")
+
             # Определяем колонку для группировки - ищем упоминание в ЗАПРОСЕ
             group_keywords = {
                 'поставщик': ['поставщик'],
@@ -899,13 +903,17 @@ If request is unclear, set confidence < 0.6 and explain what's missing."""
 
             # Находим какое ключевое слово упомянуто в запросе
             for keyword_group, synonyms in group_keywords.items():
-                if any(syn in query_lower for syn in synonyms):
+                query_has_keyword = any(syn in query_lower for syn in synonyms)
+                if query_has_keyword:
+                    print(f"🔑 Found keyword '{keyword_group}' in query (synonyms: {synonyms})")
                     # Ищем колонку с этим ключевым словом
                     for col in column_names:
                         col_lower = col.lower()
-                        if any(syn in col_lower for syn in synonyms) and 'справочник' not in col_lower:
+                        col_has_keyword = any(syn in col_lower for syn in synonyms)
+                        print(f"  Checking column '{col}': keyword match = {col_has_keyword}, has 'справочник' = {'справочник' in col_lower}")
+                        if col_has_keyword and 'справочник' not in col_lower:
                             group_column = col
-                            print(f"✅ Found group column by query keyword '{keyword_group}': '{col}'")
+                            print(f"✅ SELECTED group column: '{col}' (matched keyword '{keyword_group}')")
                             break
                     if group_column:
                         break
@@ -922,6 +930,7 @@ If request is unclear, set confidence < 0.6 and explain what's missing."""
                             break
 
             # Определяем колонку для агрегации - приоритет "продажам" если упомянуты
+            print(f"\n🔢 VALUE COLUMN DETECTION:")
             value_priority_keywords = [
                 (['продаж', 'продал'], ['продаж']),
                 (['сумм', 'выручк'], ['сумм', 'выручк']),
@@ -930,17 +939,24 @@ If request is unclear, set confidence < 0.6 and explain what's missing."""
 
             # Ищем по запросу
             for query_keywords, column_keywords in value_priority_keywords:
-                if any(kw in query_lower for kw in query_keywords):
+                query_has_value_keyword = any(kw in query_lower for kw in query_keywords)
+                if query_has_value_keyword:
+                    print(f"🔑 Found value keyword in query: {[kw for kw in query_keywords if kw in query_lower]}")
                     for col in column_names:
                         col_lower = col.lower()
-                        if any(kw in col_lower for kw in column_keywords):
+                        col_has_keyword = any(kw in col_lower for kw in column_keywords)
+                        print(f"  Checking column '{col}': keyword match = {col_has_keyword}")
+                        if col_has_keyword:
                             try:
                                 df[col] = pd.to_numeric(df[col], errors='coerce')
-                                if df[col].notna().any():
+                                has_values = df[col].notna().any()
+                                print(f"  '{col}' is numeric: {has_values}")
+                                if has_values:
                                     value_column = col
-                                    print(f"✅ Found value column by query keyword: '{col}'")
+                                    print(f"✅ SELECTED value column: '{col}' (matched keywords {column_keywords})")
                                     break
-                            except:
+                            except Exception as e:
+                                print(f"  '{col}' conversion error: {e}")
                                 continue
                     if value_column:
                         break
@@ -964,12 +980,16 @@ If request is unclear, set confidence < 0.6 and explain what's missing."""
                 return None
 
             print(f"✅ Detected: group_by='{group_column}', aggregate='{value_column}'")
+            print(f"\n📋 DataFrame before aggregation (first 5 rows):")
+            print(df[[group_column, value_column]].head())
 
             # Выполняем агрегацию
             if agg_config['type'] in ['group_sum', 'group_sum_top']:
                 # GROUP BY + SUM
+                print(f"\n🔄 Executing: df.groupby('{group_column}')['{value_column}'].sum()")
                 result_df = df.groupby(group_column, as_index=False)[value_column].sum()
                 result_df = result_df.sort_values(value_column, ascending=False)
+                print(f"✅ Aggregation complete. Top result: {result_df.iloc[0][group_column]} = {result_df.iloc[0][value_column]}")
 
                 # Для топ-N берём только нужное количество
                 if agg_config['type'] == 'group_sum_top':
