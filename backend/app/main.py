@@ -8,7 +8,7 @@ from app.api import formula, actions
 # Создаем FastAPI приложение
 app = FastAPI(
     title=settings.PROJECT_NAME,
-    version="2.3.0-PATTERN-FIX",  # v2.3.0: Fixed aggregation pattern to catch "у какого/какой/каких X больше всего Y"
+    version="2.4.0-AUTO-HEADERS-FIX",  # v2.4.0: Fixed aggregation for tables without headers using position-based detection
     description="AI-powered assistant for Google Sheets with conversation memory",
     docs_url="/docs",
     redoc_url="/redoc"

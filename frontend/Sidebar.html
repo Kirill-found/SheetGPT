@@ -553,6 +553,18 @@
           content.appendChild(answer);
         }
 
+        // Methodology (как посчитано)
+        if (result.methodology) {
+          const methodologyDiv = document.createElement('div');
+          methodologyDiv.style.padding = '10px';
+          methodologyDiv.style.backgroundColor = '#e3f2fd';
+          methodologyDiv.style.borderRadius = '6px';
+          methodologyDiv.style.marginBottom = '12px';
+          methodologyDiv.style.fontSize = '13px';
+          methodologyDiv.innerHTML = `${result.methodology}`;
+          content.appendChild(methodologyDiv);
+        }
+
         // Key findings (ключевые находки)
         if (result.key_findings && result.key_findings.length > 0) {
           const findingsTitle = document.createElement('p');

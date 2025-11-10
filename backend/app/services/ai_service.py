@@ -903,32 +903,61 @@ If request is unclear, set confidence < 0.6 and explain what's missing."""
             print(f"📝 Query (lowercase): '{query_lower}'")
             print(f"📊 Available columns: {column_names}")
 
-            # Определяем колонку для группировки - ищем упоминание в ЗАПРОСЕ
-            group_keywords = {
-                'поставщик': ['поставщик'],
-                'товар': ['товар', 'продукт'],
-                'менеджер': ['менеджер', 'продавец'],
-                'регион': ['регион', 'город', 'область'],
-                'категор': ['категор'],
-                'клиент': ['клиент', 'покупател']
-            }
+            # КРИТИЧЕСКАЯ ПРОВЕРКА: если заголовки автоматические (Колонка A, B, C...)
+            has_auto_headers = all(col.startswith('Колонка ') for col in column_names[:5] if col)
 
-            # Находим какое ключевое слово упомянуто в запросе
-            for keyword_group, synonyms in group_keywords.items():
-                query_has_keyword = any(syn in query_lower for syn in synonyms)
-                if query_has_keyword:
-                    print(f"🔑 Found keyword '{keyword_group}' in query (synonyms: {synonyms})")
-                    # Ищем колонку с этим ключевым словом
-                    for col in column_names:
-                        col_lower = col.lower()
-                        col_has_keyword = any(syn in col_lower for syn in synonyms)
-                        print(f"  Checking column '{col}': keyword match = {col_has_keyword}, has 'справочник' = {'справочник' in col_lower}")
-                        if col_has_keyword and 'справочник' not in col_lower:
-                            group_column = col
-                            print(f"✅ SELECTED group column: '{col}' (matched keyword '{keyword_group}')")
+            if has_auto_headers:
+                print(f"🤖 DETECTED AUTOMATIC HEADERS! Using position-based detection")
+
+                # Анализируем запрос для понимания что ищем
+                if 'поставщик' in query_lower or 'кто' in query_lower or 'какого' in query_lower:
+                    # Для поставщиков: ищем текстовые колонки со второй позиции
+                    for i, col in enumerate(column_names):
+                        if i > 0 and i < len(sample_data[0]):  # Пропускаем первую колонку
+                            # Проверяем что это текстовая колонка
+                            first_val = sample_data[0][i] if sample_data else None
+                            if first_val and isinstance(first_val, str) and 'ООО' in str(first_val):
+                                group_column = col
+                                print(f"✅ SELECTED group column by position {i}: '{col}' (found company names)")
+                                break
+                    # Если не нашли ООО, берём вторую колонку (обычно поставщик)
+                    if not group_column and len(column_names) > 1:
+                        group_column = column_names[1]
+                        print(f"✅ SELECTED group column by default position 1: '{group_column}'")
+
+                elif 'товар' in query_lower or 'что' in query_lower:
+                    # Для товаров: первая колонка
+                    group_column = column_names[0] if column_names else None
+                    print(f"✅ SELECTED group column for products: '{group_column}'")
+
+            else:
+                # Обычная логика для нормальных заголовков
+                # Определяем колонку для группировки - ищем упоминание в ЗАПРОСЕ
+                group_keywords = {
+                    'поставщик': ['поставщик'],
+                    'товар': ['товар', 'продукт'],
+                    'менеджер': ['менеджер', 'продавец'],
+                    'регион': ['регион', 'город', 'область'],
+                    'категор': ['категор'],
+                    'клиент': ['клиент', 'покупател']
+                }
+
+                # Находим какое ключевое слово упомянуто в запросе
+                for keyword_group, synonyms in group_keywords.items():
+                    query_has_keyword = any(syn in query_lower for syn in synonyms)
+                    if query_has_keyword:
+                        print(f"🔑 Found keyword '{keyword_group}' in query (synonyms: {synonyms})")
+                        # Ищем колонку с этим ключевым словом
+                        for col in column_names:
+                            col_lower = col.lower()
+                            col_has_keyword = any(syn in col_lower for syn in synonyms)
+                            print(f"  Checking column '{col}': keyword match = {col_has_keyword}, has 'справочник' = {'справочник' in col_lower}")
+                            if col_has_keyword and 'справочник' not in col_lower:
+                                group_column = col
+                                print(f"✅ SELECTED group column: '{col}' (matched keyword '{keyword_group}')")
+                                break
+                        if group_column:
                             break
-                    if group_column:
-                        break
 
             # Если не нашли по запросу - берём первую подходящую
             if not group_column:
@@ -943,35 +972,70 @@ If request is unclear, set confidence < 0.6 and explain what's missing."""
 
             # Определяем колонку для агрегации - приоритет "продажам" если упомянуты
             print(f"\n🔢 VALUE COLUMN DETECTION:")
-            value_priority_keywords = [
-                (['продаж', 'продал'], ['продаж']),
-                (['сумм', 'выручк'], ['сумм', 'выручк']),
-                (['количеств', 'объем'], ['количеств', 'объем']),
-            ]
 
-            # Ищем по запросу
-            for query_keywords, column_keywords in value_priority_keywords:
-                query_has_value_keyword = any(kw in query_lower for kw in query_keywords)
-                if query_has_value_keyword:
-                    print(f"🔑 Found value keyword in query: {[kw for kw in query_keywords if kw in query_lower]}")
-                    for col in column_names:
-                        col_lower = col.lower()
-                        col_has_keyword = any(kw in col_lower for kw in column_keywords)
-                        print(f"  Checking column '{col}': keyword match = {col_has_keyword}")
-                        if col_has_keyword:
-                            try:
-                                df[col] = pd.to_numeric(df[col], errors='coerce')
-                                has_values = df[col].notna().any()
-                                print(f"  '{col}' is numeric: {has_values}")
-                                if has_values:
-                                    value_column = col
-                                    print(f"✅ SELECTED value column: '{col}' (matched keywords {column_keywords})")
-                                    break
-                            except Exception as e:
-                                print(f"  '{col}' conversion error: {e}")
-                                continue
-                    if value_column:
-                        break
+            if has_auto_headers:
+                # Для автоматических заголовков - используем позиционное определение
+                print(f"🤖 Using position-based value column detection")
+
+                if 'продаж' in query_lower or 'продал' in query_lower or 'больше всего' in query_lower:
+                    # Ищем последнюю числовую колонку (обычно продажи в конце)
+                    for i in range(len(column_names) - 1, -1, -1):
+                        col = column_names[i]
+                        try:
+                            # Проверяем что колонка числовая
+                            df[col] = pd.to_numeric(df[col], errors='coerce')
+                            if df[col].notna().sum() > len(df) * 0.5:  # Хотя бы 50% числовых значений
+                                value_column = col
+                                print(f"✅ SELECTED value column by position {i}: '{col}' (last numeric column)")
+                                break
+                        except:
+                            continue
+
+                elif 'объем' in query_lower or 'количеств' in query_lower:
+                    # Для объёмов - предпоследняя числовая колонка
+                    numeric_cols = []
+                    for i, col in enumerate(column_names):
+                        try:
+                            df[col] = pd.to_numeric(df[col], errors='coerce')
+                            if df[col].notna().sum() > len(df) * 0.5:
+                                numeric_cols.append((i, col))
+                        except:
+                            continue
+                    if len(numeric_cols) >= 2:
+                        value_column = numeric_cols[-2][1]  # Предпоследняя числовая
+                        print(f"✅ SELECTED value column for volume: '{value_column}'")
+
+            else:
+                # Обычная логика для нормальных заголовков
+                value_priority_keywords = [
+                    (['продаж', 'продал'], ['продаж']),
+                    (['сумм', 'выручк'], ['сумм', 'выручк']),
+                    (['количеств', 'объем'], ['количеств', 'объем']),
+                ]
+
+                # Ищем по запросу
+                for query_keywords, column_keywords in value_priority_keywords:
+                    query_has_value_keyword = any(kw in query_lower for kw in query_keywords)
+                    if query_has_value_keyword:
+                        print(f"🔑 Found value keyword in query: {[kw for kw in query_keywords if kw in query_lower]}")
+                        for col in column_names:
+                            col_lower = col.lower()
+                            col_has_keyword = any(kw in col_lower for kw in column_keywords)
+                            print(f"  Checking column '{col}': keyword match = {col_has_keyword}")
+                            if col_has_keyword:
+                                try:
+                                    df[col] = pd.to_numeric(df[col], errors='coerce')
+                                    has_values = df[col].notna().any()
+                                    print(f"  '{col}' is numeric: {has_values}")
+                                    if has_values:
+                                        value_column = col
+                                        print(f"✅ SELECTED value column: '{col}' (matched keywords {column_keywords})")
+                                        break
+                                except Exception as e:
+                                    print(f"  '{col}' conversion error: {e}")
+                                    continue
+                        if value_column:
+                            break
 
             # Если не нашли по запросу - берём первую числовую подходящую
             if not value_column:

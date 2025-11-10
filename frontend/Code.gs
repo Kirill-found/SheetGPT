@@ -271,16 +271,31 @@ function processQuery(query) {
       throw new Error('Запрос пустой. Пожалуйста, введите вопрос.');
     }
 
-    // Проверка: первая строка должна содержать текстовые заголовки
+    // КРИТИЧЕСКОЕ ИСПРАВЛЕНИЕ: Проверяем есть ли заголовки
     const firstCell = sheetData.columnNames[0];
-    if (typeof firstCell === 'number' || firstCell instanceof Date) {
-      throw new Error('ОШИБКА: Первая строка таблицы должна содержать ЗАГОЛОВКИ колонок (текст), а не данные!');
+    const hasHeaders = typeof firstCell === 'string' && firstCell.length > 0 &&
+                       typeof firstCell !== 'number' && !(firstCell instanceof Date);
+
+    let columnNames, dataToSend;
+
+    if (hasHeaders) {
+      // Есть заголовки - используем их и пропускаем первую строку
+      columnNames = sheetData.columnNames;
+      dataToSend = sheetData.data.slice(1, 11);  // Строки 2-11 (пропускаем заголовки)
+    } else {
+      // НЕТ заголовков - генерируем автоматические и отправляем ВСЕ данные включая первую строку
+      const numColumns = sheetData.data.length > 0 ? sheetData.data[0].length : 0;
+      columnNames = [];
+      for (let i = 0; i < numColumns; i++) {
+        columnNames.push(`Колонка ${String.fromCharCode(65 + i)}`);  // A, B, C, D, ...
+      }
+      dataToSend = sheetData.data.slice(0, 10);  // Строки 1-10 (включая первую)
     }
 
     const payload = {
       query: query,
-      column_names: sheetData.columnNames,
-      sheet_data: sheetData.data.slice(1, 11),  // CRITICAL FIX: Skip headers (row 0), send rows 1-10
+      column_names: columnNames,
+      sheet_data: dataToSend,
       history: history  // Добавляем историю в запрос
     };
 
@@ -311,7 +326,11 @@ function processQuery(query) {
         confidence: result.confidence || 0,
         response_type: result.response_type || 'formula',
         insights: result.insights || [],
-        suggested_actions: result.suggested_actions || null
+        suggested_actions: result.suggested_actions || null,
+        // КРИТИЧЕСКИ ВАЖНО: Поля для анализа
+        summary: result.summary || null,
+        methodology: result.methodology || null,
+        key_findings: result.key_findings || []
       };
     } else {
       throw new Error(result.detail || 'Ошибка обработки запроса');
@@ -613,4 +632,21 @@ function executeActions(actions) {
     results: results,
     message: `Выполнено ${results.filter(r => r.success).length}/${results.length} действий`
   };
+}
+
+/**
+ * Wrapper function для вызова из sidebar
+ * Google Apps Script требует чтобы функции вызываемые через google.script.run
+ * были определены на верхнем уровне
+ */
+function setQueryAndProcess(query) {
+  console.log("=== setQueryAndProcess called ===");
+  console.log("Query received:", query);
+  console.log("Query type:", typeof query);
+
+  if (!query) {
+    throw new Error('Запрос пустой. Пожалуйста, введите вопрос.');
+  }
+
+  return processQuery(query);
 }
