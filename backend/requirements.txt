@@ -31,5 +31,5 @@ httpx==0.26.0
 pandas==2.2.0
 numpy==1.26.3
 
-# FORCE REBUILD: 10 Nov 2025 21:30 - v2.2.0-COLUMN-DETECTION-FIX
+# FORCE REBUILD: 10 Nov 2025 21:45 - v2.2.0-COLUMN-DETECTION-FIX (REDEPLOY)
 # Fixed pandas column detection to analyze query intent instead of picking first column
