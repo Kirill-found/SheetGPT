@@ -915,6 +915,39 @@ Bad insight: "Можно заметить что декабрь показал �
 Good action: "✅ Срочно проверить работу отдела продаж в Q4"
 Bad action: "Рекомендуется обратить внимание на работу сотрудников..."
 
+🔴🔴🔴 CRITICAL: AGGREGATION AND GROUPING 🔴🔴🔴
+
+When query asks "какой [ENTITY] [больше всего/меньше всего] [METRIC]":
+- ENTITY = category to group by (поставщик, товар, регион, менеджер, etc.)
+- METRIC = value to aggregate (продажи, количество, сумма, etc.)
+
+YOU MUST:
+1. **GROUP BY** ENTITY column
+2. **SUM/COUNT/AVG** METRIC column for each group
+3. **FIND** which ENTITY has max/min total
+
+❌ WRONG APPROACH (just sorting):
+Query: "какой поставщик продал больше всего?"
+Wrong: Sort 'Продажи' column → find max value → return supplier from that ONE row
+Problem: Ignores that supplier may have MULTIPLE sales!
+
+✅ CORRECT APPROACH (group + aggregate):
+Query: "какой поставщик продал больше всего?"
+Step 1: GROUP BY 'Поставщик' column
+Step 2: SUM 'Продажи' for each supplier (sum ALL rows for each supplier!)
+Step 3: Find supplier with maximum total
+Example:
+- ООО "Время": row 4 (44297.96) + row 7 (145550.44) + row 16 (88595.92) = 278444.32
+- ООО "Радость": row 10 (378191.85) = 378191.85
+Result: ООО "Радость" has maximum total
+
+Methodology: "🔍 Как посчитано: сгруппировал данные по колонке 'Поставщик', просуммировал все продажи для каждого поставщика, выбрал максимум"
+
+🔴 AGGREGATION KEYWORDS:
+- "какой/который [X] больше всего/меньше всего" → GROUP BY X, SUM metric
+- "у кого/где больше всего" → GROUP BY, SUM/COUNT
+- "топ 3 [X] по [metric]" → GROUP BY X, SUM metric, sort, take top 3
+
 CRITICAL FOR METHODOLOGY:
 - If query asks "топ 3 товара" → explain: which column was used for products, which for sorting, how top 3 was selected
 - If query asks "у какого поставщика больше всего товаров" → explain: which column for suppliers, which for products, how count was calculated
