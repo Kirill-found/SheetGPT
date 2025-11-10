@@ -26,4 +26,6 @@ google-api-python-client==2.147.0  # For Google Sheets API (formula executor)
 # Утилиты
 python-dotenv==1.0.0
 httpx==0.26.0
-# EMERGENCY FIX: 10 Nov 2025 15:00-v1.5.0 - Railway caching issue - GPT-4o ONLY
+
+# FORCE REBUILD: 10 Nov 2025 20:45 - GPT-4o v1.6.0-PROD
+# Railway was skipping deploys - forcing pip cache invalidation
