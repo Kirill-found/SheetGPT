@@ -97,6 +97,12 @@ async def generate_formula(request: FormulaRequest):
         response_type = result.get("type", "formula")
 
         if response_type == "analysis" or response_type == "question":
+            # DEBUG: Log result from AI service
+            print(f"📥 formula.py received result keys: {list(result.keys())}")
+            print(f"📥 result has methodology: {('methodology' in result)}")
+            if 'methodology' in result:
+                print(f"📥 methodology value: {result['methodology']}")
+
             # Для анализа возвращаем структурированный ответ
             response_data = FormulaResponse(
                 formula=None,  # Нет формулы
@@ -112,6 +118,10 @@ async def generate_formula(request: FormulaRequest):
             response_dict["summary"] = result.get("summary")
             response_dict["methodology"] = result.get("methodology")  # CRITICAL: Show which data was used
             response_dict["key_findings"] = result.get("key_findings", [])
+
+            print(f"📦 response_dict keys before return: {list(response_dict.keys())}")
+            print(f"📦 response_dict['methodology']: {response_dict.get('methodology')}")
+
             if result.get("conversation_id"):
                 response_dict["conversation_id"] = result["conversation_id"]
             return response_dict

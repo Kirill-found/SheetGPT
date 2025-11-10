@@ -965,16 +965,26 @@ CRITICAL:
             )
 
             result = json.loads(response.choices[0].message.content)
+
+            # DEBUG: Log GPT response
+            print(f"📤 GPT-4o response keys: {list(result.keys())}")
+            print(f"📤 Has methodology: {('methodology' in result)}")
+            if 'methodology' in result:
+                print(f"📤 methodology value: {result['methodology']}")
+
             result["processing_time"] = time.time() - start_time
             result["type"] = "analysis"
 
             # CRITICAL FIX: If GPT-4o didn't return methodology, generate default one
             if not result.get("methodology"):
+                print("⚠️  GPT didn't return methodology, generating fallback...")
                 column_list = ", ".join([f"'{col}'" for col in column_names[:5]])  # First 5 columns
                 if len(column_names) > 5:
                     column_list += f" и ещё {len(column_names) - 5}"
                 result["methodology"] = f"🔍 Как посчитано: проанализированы данные из таблицы (колонки: {column_list})"
+                print(f"✅ Fallback methodology: {result['methodology']}")
 
+            print(f"✅ Final result keys before return: {list(result.keys())}")
             return result
 
         except Exception as e:
