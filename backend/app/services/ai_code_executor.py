@@ -106,6 +106,15 @@ class AICodeExecutor:
             # Format key_findings
             key_findings = [f"{supplier}: {avg_price:,.2f}" for supplier, avg_price in avg_prices.items()]
 
+            # Format structured_data for table creation
+            structured_data = {
+                "headers": ["Поставщик", "Средняя цена (руб.)"],
+                "rows": [[supplier, round(avg_price, 2)] for supplier, avg_price in avg_prices.items()],
+                "has_table": True,
+                "table_title": "Средняя цена товаров по поставщикам",
+                "chart_recommended": "column"  # Рекомендуемый тип графика
+            }
+
             return {
                 "summary": summary,
                 "methodology": f"FAILSAFE: Удалены дубликаты ({df_before}->{df_after} rows), сгруппировано по поставщикам ({supplier_col}), вычислена средняя цена для колонки '{price_col}' (idx={selected_idx}, samples={selected_samples}). Available: {', '.join(numeric_debug)}",
@@ -113,6 +122,7 @@ class AICodeExecutor:
                 "confidence": 0.99,
                 "response_type": "analysis",
                 "data": avg_prices.to_dict(),
+                "structured_data": structured_data,
                 "code_generated": "# FAILSAFE MODE: Direct calculation without AI code generation",
                 "python_executed": True,
                 "execution_output": ""
@@ -357,6 +367,27 @@ Generate CORRECTED code that will work. Return ONLY the Python code."""
         except:
             return None
 
+    def _detect_chart_type(self, query: str) -> str:
+        """
+        Определяет рекомендуемый тип графика на основе запроса
+        """
+        query_lower = query.lower()
+
+        # Гистограмма/столбчатая для сравнения
+        if any(word in query_lower for word in ['топ', 'top', 'сравн', 'compare', 'больше', 'меньше']):
+            return "column"
+
+        # Линейный график для трендов
+        if any(word in query_lower for word in ['тренд', 'trend', 'динамик', 'изменен', 'рост', 'падение']):
+            return "line"
+
+        # Круговая диаграмма для долей
+        if any(word in query_lower for word in ['дол', 'процент', 'share', 'percent', 'распределение']):
+            return "pie"
+
+        # По умолчанию - столбчатая
+        return "column"
+
     def _analyze_dataframe(self, df: pd.DataFrame) -> str:
         """
         Анализирует структуру DataFrame для AI
@@ -409,6 +440,22 @@ Generate CORRECTED code that will work. Return ONLY the Python code."""
             key_findings = [f"{k}: {v:,.2f}" if isinstance(v, (int, float)) else f"{k}: {v}"
                           for k, v in list(result_dict.items())[:5]]
 
+        # Форматируем structured_data для создания таблиц
+        structured_data = None
+        if isinstance(result_dict, dict) and result_dict:
+            # Определяем заголовки и данные
+            headers = ["Название", "Значение"]
+            rows = [[str(k), float(v) if isinstance(v, (int, float)) else str(v)]
+                   for k, v in result_dict.items()]
+
+            structured_data = {
+                "headers": headers,
+                "rows": rows,
+                "has_table": True,
+                "table_title": exec_result.get('summary', 'Результаты анализа').split('\n')[0][:50],
+                "chart_recommended": self._detect_chart_type(query)
+            }
+
         # DEBUG: Print generated code to console for debugging
         print("=" * 80)
         print("🐍 AI GENERATED PYTHON CODE:")
@@ -427,6 +474,7 @@ Generate CORRECTED code that will work. Return ONLY the Python code."""
             "confidence": exec_result.get('confidence', 0.95),
             "response_type": "analysis",
             "data": result_dict,
+            "structured_data": structured_data,
             "code_generated": code,  # FULL CODE for debugging
             "python_executed": True,
             "execution_output": exec_result.get('output', '')
