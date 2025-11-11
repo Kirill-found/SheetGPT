@@ -1,0 +1,1 @@
+{"formula":null,"explanation":"","target_cell":null,"confidence":0.95,"response_type":"analysis","insights":[],"suggested_actions":null,"summary":"Средняя цена:\n\n4,750.00 руб.","methodology":"Удалены дубликаты по товарам (A) и ценам (C), вычислена средняя цена методом .mean()","key_findings":[]}
