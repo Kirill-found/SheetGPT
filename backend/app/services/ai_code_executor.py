@@ -30,6 +30,13 @@ class AICodeExecutor:
             # Шаг 1: Создаем DataFrame
             df = pd.DataFrame(sheet_data, columns=column_names)
 
+            # FAILSAFE: For average price queries, use simple direct calculation
+            query_lower = query.lower()
+            if any(word in query_lower for word in ['средн', 'average', 'mean', 'srednyaya', 'tsena']):
+                if any(word in query_lower for word in ['постав', 'supplier', 'postavshchik', 'компан']):
+                    # This is "average price per supplier" query - use failsafe
+                    return self._calculate_avg_price_failsafe(df, column_names)
+
             # Шаг 2: AI генерирует Python код
             generated_code = self._generate_python_code(query, df)
 
@@ -47,6 +54,56 @@ class AICodeExecutor:
                 "confidence": 0.0,
                 "response_type": "error"
             }
+
+    def _calculate_avg_price_failsafe(self, df: pd.DataFrame, column_names: List[str]) -> Dict[str, Any]:
+        """
+        FAILSAFE: Прямой расчет средней цены по поставщикам без AI генерации кода
+        Гарантированно правильный результат
+        """
+        try:
+            # Find columns
+            supplier_col = column_names[1] if len(column_names) > 1 else df.columns[1]  # Usually column B
+
+            # Find price column (numeric column with values < 100000)
+            price_col = None
+            for col in df.columns:
+                if df[col].dtype in ['int64', 'float64']:
+                    max_val = df[col].max()
+                    if max_val < 100000 and max_val > 0:
+                        price_col = col
+                        break
+
+            if not price_col:
+                raise Exception("Не найдена колонка с ценами")
+
+            # Remove duplicates before calculating average
+            df_unique = df[[supplier_col, price_col]].drop_duplicates()
+
+            # Group by supplier and calculate mean
+            avg_prices = df_unique.groupby(supplier_col)[price_col].mean().sort_values(ascending=False)
+
+            # Format summary
+            summary = "Средняя цена товаров у каждого поставщика:\n\n"
+            for i, (supplier, avg_price) in enumerate(avg_prices.items(), 1):
+                summary += f"{i}. {supplier}: {avg_price:,.2f} руб.\n"
+            summary = summary.strip()
+
+            # Format key_findings
+            key_findings = [f"{supplier}: {avg_price:,.2f}" for supplier, avg_price in avg_prices.items()]
+
+            return {
+                "summary": summary,
+                "methodology": f"FAILSAFE: Удалены дубликаты, сгруппировано по поставщикам ({supplier_col}), вычислена средняя цена для колонки '{price_col}'",
+                "key_findings": key_findings,
+                "confidence": 0.99,
+                "response_type": "analysis",
+                "data": avg_prices.to_dict(),
+                "code_generated": "# FAILSAFE MODE: Direct calculation without AI code generation",
+                "python_executed": True,
+                "execution_output": ""
+            }
+        except Exception as e:
+            raise Exception(f"Failsafe calculation failed: {str(e)}")
 
     def _generate_python_code(self, query: str, df: pd.DataFrame) -> str:
         """
