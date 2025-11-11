@@ -159,12 +159,21 @@ class AIService:
                 df = pd.DataFrame(sheet_data, columns=column_names)
                 supplier_col = column_names[1] if len(column_names) > 1 else df.columns[1]
 
-                # Find price column
+                # Find price column - skip first numeric (usually ID/quantity)
                 price_col = None
-                for col in df.columns:
-                    if df[col].dtype in ['int64', 'float64'] and df[col].max() < 100000:
+                numeric_cols = [col for col in df.columns if df[col].dtype in ['int64', 'float64']]
+                # Try columns from position 2+ first (usually price is not first numeric)
+                for col in numeric_cols:
+                    col_index = list(df.columns).index(col)
+                    if col_index >= 2 and df[col].max() < 100000 and df[col].max() > 100:
                         price_col = col
                         break
+                # Fallback: any numeric < 100000
+                if not price_col:
+                    for col in numeric_cols:
+                        if df[col].max() < 100000 and df[col].max() > 100:
+                            price_col = col
+                            break
 
                 if price_col:
                     df_unique = df[[supplier_col, price_col]].drop_duplicates()
