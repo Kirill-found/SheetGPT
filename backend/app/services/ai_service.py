@@ -162,6 +162,14 @@ class AIService:
                 # Find price column - skip first numeric (usually ID/quantity)
                 price_col = None
                 numeric_cols = [col for col in df.columns if df[col].dtype in ['int64', 'float64']]
+
+                # DEBUG: Log all numeric columns
+                numeric_debug = []
+                for col in numeric_cols:
+                    col_idx = list(df.columns).index(col)
+                    col_max = df[col].max()
+                    numeric_debug.append(f"{col}(idx={col_idx}, max={col_max})")
+
                 # Try columns from position 2+ first (usually price is not first numeric)
                 for col in numeric_cols:
                     col_index = list(df.columns).index(col)
@@ -176,6 +184,10 @@ class AIService:
                             break
 
                 if price_col:
+                    # DEBUG: Get column info
+                    col_index = list(df.columns).index(price_col)
+                    sample_values = df[price_col].dropna().head(3).tolist()
+
                     df_unique = df[[supplier_col, price_col]].drop_duplicates()
                     avg_prices = df_unique.groupby(supplier_col)[price_col].mean().sort_values(ascending=False)
 
@@ -185,7 +197,7 @@ class AIService:
 
                     return {
                         "summary": summary.strip(),
-                        "methodology": f"HARDCODED: Удалены дубликаты, средняя по {supplier_col}, колонка {price_col}",
+                        "methodology": f"HARDCODED: Удалены дубликаты, средняя по {supplier_col}, колонка {price_col} (индекс {col_index}, примеры: {sample_values}). Доступные numeric: {', '.join(numeric_debug)}",
                         "key_findings": [f"{s}: {p:,.2f}" for s, p in avg_prices.items()],
                         "confidence": 0.99,
                         "response_type": "analysis"
