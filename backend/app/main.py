@@ -162,13 +162,11 @@ async def process_formula(request: FormulaRequest):
         # Convert to dict to add debug fields (code_generated, etc.)
         response_dict = response.model_dump()
 
-        # Add debug fields for troubleshooting
-        if result.get("code_generated"):
-            response_dict["code_generated"] = result.get("code_generated")
-        if result.get("python_executed"):
-            response_dict["python_executed"] = result.get("python_executed")
-        if result.get("execution_output"):
-            response_dict["execution_output"] = result.get("execution_output")
+        # Add debug fields ALWAYS (for troubleshooting)
+        response_dict["code_generated"] = result.get("code_generated", "NOT_IN_RESULT")
+        response_dict["python_executed"] = result.get("python_executed", False)
+        response_dict["execution_output"] = result.get("execution_output", "")
+        response_dict["_debug_result_keys"] = list(result.keys())  # DEBUG: show what keys result has
 
         logger.info("[COMPLETE] Response sent successfully")
         logger.info("="*60)
