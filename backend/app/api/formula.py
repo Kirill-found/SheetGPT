@@ -76,14 +76,12 @@ async def generate_formula(request: FormulaRequest):
                 conversation_id=request.conversation_id
             )
         else:
-            # Старый путь без conversation history
-            result = await ai_service.process_query(
+            # v5.1.0: Use AI Code Executor via process_formula_request
+            result = ai_service.process_formula_request(
                 query=request.query,
                 column_names=request.column_names,
-                sample_data=request.sheet_data,
-                history=request.history,
-                selected_range=request.selected_range,
-                active_cell=request.active_cell
+                sheet_data=request.sheet_data,
+                history=request.history or []
             )
 
         # Проверяем confidence
