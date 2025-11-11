@@ -71,17 +71,26 @@ RULES FOR CODE GENERATION:
 1. Use pandas for all data operations
 2. Variable 'df' contains the data
 3. Create a variable 'result' with the final answer
-4. Create a variable 'summary' with human-readable explanation
-5. Create a variable 'methodology' explaining what was calculated
+4. Create a variable 'summary' with human-readable explanation in Russian
+5. Create a variable 'methodology' explaining what was calculated in Russian
 6. Handle duplicates properly (GROUP BY when needed)
 7. For "топ товаров" - group by product column and sum sales
 8. For "топ поставщиков" - group by supplier column and sum sales
 9. Always aggregate duplicate entries
+10. LIMIT TOP LISTS to maximum 5 items for readability
+11. Use DOUBLE line break (\\n\\n) after title for better spacing
 
 REQUIRED OUTPUT VARIABLES:
 - result: the computed answer (number, dataframe, or list)
 - summary: string with the answer in Russian
 - methodology: string explaining the calculation in Russian
+
+FORMATTING RULES FOR SUMMARY:
+- Always use \\n for line breaks
+- Format numbers with thousand separators: {{value:,.2f}}
+- For TOP lists: put each item on NEW LINE
+- Use clear structure: Title, then numbered list
+- Keep it readable and well-spaced
 
 EXAMPLE CODE FOR "топ 3 товара по продажам":
 ```python
@@ -89,13 +98,31 @@ EXAMPLE CODE FOR "топ 3 товара по продажам":
 product_sales = df.groupby('Колонка A')['Колонка E'].sum().sort_values(ascending=False)
 top3 = product_sales.head(3)
 
-# Format result
+# Format result with CLEAR LINE BREAKS
 result = top3.to_dict()
-summary = "Топ 3 товара по продажам:\\n"
+summary = "Топ 3 товара по продажам:\\n\\n"
 for i, (product, sales) in enumerate(top3.items(), 1):
     summary += f"{{i}}. {{product}}: {{sales:,.2f}} руб.\\n"
 summary = summary.strip()
 methodology = f"Сгруппировано по товарам (Колонка A), просуммированы продажи (Колонка E). Всего уникальных товаров: {{len(product_sales)}}"
+```
+
+EXAMPLE CODE FOR "у какого поставщика больше всего продаж":
+```python
+# Group by supplier and sum sales
+supplier_sales = df.groupby('Колонка B')['Колонка E'].sum().sort_values(ascending=False)
+top_supplier = supplier_sales.index[0]
+top_sales = supplier_sales.iloc[0]
+
+# Format with TOP 5 for context
+result = supplier_sales.head(5).to_dict()
+summary = f"Топ поставщик: {{top_supplier}}\\n"
+summary += f"Продажи: {{top_sales:,.2f}} руб.\\n\\n"
+summary += "Топ 5 поставщиков:\\n\\n"
+for i, (supplier, sales) in enumerate(supplier_sales.head(5).items(), 1):
+    summary += f"{{i}}. {{supplier}}: {{sales:,.2f}} руб.\\n"
+summary = summary.strip()
+methodology = f"Сгруппировано по поставщикам (Колонка B), просуммированы продажи (Колонка E)"
 ```
 
 NOW GENERATE CODE FOR THIS QUESTION:
