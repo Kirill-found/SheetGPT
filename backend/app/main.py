@@ -108,6 +108,8 @@ async def process_formula(request: FormulaRequest):
             )
             executor_used = True
             logger.info("[SUCCESS] Code executed successfully")
+            logger.info(f"[DEBUG] Result keys: {list(result.keys())}")
+            logger.info(f"[DEBUG] Has code_generated: {('code_generated' in result)}")
 
         except ImportError:
             logger.warning("[FALLBACK] AI Code Executor not found, using v3 service")
