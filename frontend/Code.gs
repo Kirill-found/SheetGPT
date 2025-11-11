@@ -381,7 +381,9 @@ function processQuery(query) {
         // КРИТИЧЕСКИ ВАЖНО: Поля для анализа
         summary: result.summary || null,
         methodology: result.methodology || null,
-        key_findings: result.key_findings || []
+        key_findings: result.key_findings || [],
+        // НОВОЕ: Структурированные данные для создания таблиц/графиков
+        structured_data: result.structured_data || null
       };
     } else {
       throw new Error(result.detail || 'Ошибка обработки запроса');
@@ -683,6 +685,240 @@ function executeActions(actions) {
     results: results,
     message: `Выполнено ${results.filter(r => r.success).length}/${results.length} действий`
   };
+}
+
+/**
+ * Создает таблицу из structured_data в новом листе
+ * @param {Object} structuredData - Объект с headers, rows, table_title, chart_recommended
+ * @returns {Object} - Результат создания таблицы с информацией о листе и диапазоне
+ */
+function createTableInSheet(structuredData) {
+  try {
+    console.log('=== CREATE TABLE START ===');
+    console.log('Structured data:', JSON.stringify(structuredData, null, 2));
+
+    // Валидация входных данных
+    if (!structuredData || !structuredData.headers || !structuredData.rows) {
+      throw new Error('Некорректные данные: отсутствуют headers или rows');
+    }
+
+    const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+    const tableTitle = structuredData.table_title || 'Анализ данных';
+
+    // Создаем уникальное имя для листа (добавляем timestamp если лист уже существует)
+    let sheetName = tableTitle;
+    let counter = 1;
+    while (spreadsheet.getSheetByName(sheetName)) {
+      sheetName = `${tableTitle} (${counter})`;
+      counter++;
+    }
+
+    // Создаем новый лист
+    const newSheet = spreadsheet.insertSheet(sheetName);
+    console.log('Created sheet:', sheetName);
+
+    // Подготовка данных для вставки (заголовки + строки)
+    const headers = structuredData.headers;
+    const rows = structuredData.rows;
+    const allData = [headers].concat(rows);
+
+    // Вставляем данные начиная с A1
+    const numRows = allData.length;
+    const numCols = headers.length;
+    const dataRange = newSheet.getRange(1, 1, numRows, numCols);
+    dataRange.setValues(allData);
+    console.log(`Inserted data: ${numRows} rows x ${numCols} cols`);
+
+    // Форматирование заголовков
+    const headerRange = newSheet.getRange(1, 1, 1, numCols);
+    headerRange
+      .setFontWeight('bold')
+      .setBackground('#4285F4')
+      .setFontColor('#FFFFFF')
+      .setHorizontalAlignment('center')
+      .setVerticalAlignment('middle');
+
+    // Границы для всей таблицы
+    dataRange.setBorder(
+      true, true, true, true,  // top, left, bottom, right
+      true, true,               // vertical, horizontal
+      '#000000',                // color
+      SpreadsheetApp.BorderStyle.SOLID
+    );
+
+    // Автоподбор ширины колонок
+    for (let col = 1; col <= numCols; col++) {
+      newSheet.autoResizeColumn(col);
+    }
+
+    // Замораживаем первую строку (заголовки)
+    newSheet.setFrozenRows(1);
+
+    // Активируем новый лист
+    newSheet.activate();
+
+    console.log('=== CREATE TABLE SUCCESS ===');
+
+    return {
+      success: true,
+      sheetName: sheetName,
+      dataRange: dataRange.getA1Notation(),
+      rowCount: numRows,
+      message: `Таблица "${sheetName}" создана успешно`,
+      chartRecommended: structuredData.chart_recommended || null
+    };
+
+  } catch (error) {
+    console.error('CREATE TABLE ERROR:', error.toString());
+    return {
+      success: false,
+      error: error.toString(),
+      message: 'Ошибка создания таблицы: ' + error.toString()
+    };
+  }
+}
+
+/**
+ * Создает график на основе данных таблицы
+ * @param {string} sheetName - Имя листа с данными
+ * @param {string} dataRange - Диапазон данных (например "A1:B6")
+ * @param {string} chartType - Тип графика: column, bar, line, pie, area
+ * @param {string} title - Заголовок графика
+ * @returns {Object} - Результат создания графика
+ */
+function createChartFromTable(sheetName, dataRange, chartType, title) {
+  try {
+    console.log('=== CREATE CHART START ===');
+    console.log('Sheet:', sheetName);
+    console.log('Range:', dataRange);
+    console.log('Type:', chartType);
+    console.log('Title:', title);
+
+    const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+    const sheet = spreadsheet.getSheetByName(sheetName);
+
+    if (!sheet) {
+      throw new Error(`Лист "${sheetName}" не найден`);
+    }
+
+    // Получаем диапазон данных
+    const range = sheet.getRange(dataRange);
+
+    // Определяем тип графика
+    let chartTypeEnum;
+    switch (chartType) {
+      case 'column':
+        chartTypeEnum = Charts.ChartType.COLUMN;
+        break;
+      case 'bar':
+        chartTypeEnum = Charts.ChartType.BAR;
+        break;
+      case 'line':
+        chartTypeEnum = Charts.ChartType.LINE;
+        break;
+      case 'pie':
+        chartTypeEnum = Charts.ChartType.PIE;
+        break;
+      case 'area':
+        chartTypeEnum = Charts.ChartType.AREA;
+        break;
+      case 'scatter':
+        chartTypeEnum = Charts.ChartType.SCATTER;
+        break;
+      default:
+        chartTypeEnum = Charts.ChartType.COLUMN;
+    }
+
+    // Создаем график
+    const chartBuilder = sheet.newChart()
+      .setChartType(chartTypeEnum)
+      .addRange(range)
+      .setPosition(2, range.getLastColumn() + 2, 0, 0)  // Размещаем справа от таблицы
+      .setOption('title', title || 'График')
+      .setOption('width', 600)
+      .setOption('height', 400)
+      .setOption('legend', { position: 'bottom' })
+      .setOption('animation', { startup: true, duration: 1000 });
+
+    // Специальные настройки для разных типов графиков
+    if (chartType === 'pie') {
+      chartBuilder
+        .setOption('pieSliceText', 'value')
+        .setOption('is3D', false);
+    } else {
+      chartBuilder
+        .setOption('hAxis', { title: 'Категория' })
+        .setOption('vAxis', { title: 'Значение' });
+    }
+
+    const chart = chartBuilder.build();
+    sheet.insertChart(chart);
+
+    console.log('=== CREATE CHART SUCCESS ===');
+
+    return {
+      success: true,
+      sheetName: sheetName,
+      chartType: chartType,
+      message: `График "${title}" создан успешно`
+    };
+
+  } catch (error) {
+    console.error('CREATE CHART ERROR:', error.toString());
+    return {
+      success: false,
+      error: error.toString(),
+      message: 'Ошибка создания графика: ' + error.toString()
+    };
+  }
+}
+
+/**
+ * Создает таблицу И график одновременно (полный пайплайн)
+ * @param {Object} structuredData - Объект с headers, rows, table_title, chart_recommended
+ * @returns {Object} - Результат создания таблицы и графика
+ */
+function createTableAndChart(structuredData) {
+  try {
+    // Сначала создаем таблицу
+    const tableResult = createTableInSheet(structuredData);
+
+    if (!tableResult.success) {
+      return tableResult;
+    }
+
+    // Если рекомендован график - создаем его
+    if (structuredData.chart_recommended) {
+      const chartResult = createChartFromTable(
+        tableResult.sheetName,
+        tableResult.dataRange,
+        structuredData.chart_recommended,
+        structuredData.table_title || 'График анализа'
+      );
+
+      return {
+        success: true,
+        table: tableResult,
+        chart: chartResult,
+        message: `Таблица и график "${tableResult.sheetName}" созданы успешно`
+      };
+    }
+
+    // Если график не рекомендован - возвращаем только результат таблицы
+    return {
+      success: true,
+      table: tableResult,
+      chart: null,
+      message: tableResult.message
+    };
+
+  } catch (error) {
+    return {
+      success: false,
+      error: error.toString(),
+      message: 'Ошибка создания таблицы и графика: ' + error.toString()
+    };
+  }
 }
 
 /**

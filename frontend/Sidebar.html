@@ -646,6 +646,33 @@
           });
           content.appendChild(actionsList);
         }
+
+        // НОВОЕ: Кнопка создания таблицы если есть structured_data
+        if (result.structured_data && result.structured_data.headers && result.structured_data.rows) {
+          const tableActions = document.createElement('div');
+          tableActions.className = 'action-buttons';
+          tableActions.style.marginTop = '16px';
+          tableActions.style.paddingTop = '12px';
+          tableActions.style.borderTop = '1px solid #eee';
+
+          const createTableBtn = document.createElement('button');
+          createTableBtn.className = 'action-btn primary';
+          createTableBtn.innerHTML = '📊 Создать таблицу';
+          createTableBtn.onclick = () => createTable(result.structured_data);
+          tableActions.appendChild(createTableBtn);
+
+          // Если есть рекомендация графика - показываем это
+          if (result.structured_data.chart_recommended) {
+            const chartInfo = document.createElement('span');
+            chartInfo.style.fontSize = '12px';
+            chartInfo.style.color = '#666';
+            chartInfo.style.marginLeft = '8px';
+            chartInfo.textContent = `+ график (${result.structured_data.chart_recommended})`;
+            tableActions.appendChild(chartInfo);
+          }
+
+          content.appendChild(tableActions);
+        }
       }
 
       bubble.appendChild(content);
@@ -729,6 +756,35 @@
       }).catch(() => {
         alert('❌ Не удалось скопировать');
       });
+    }
+
+    function createTable(structuredData) {
+      // Показываем индикатор загрузки
+      const btn = event.target;
+      btn.disabled = true;
+      btn.textContent = '⏳ Создание...';
+
+      google.script.run
+        .withSuccessHandler((result) => {
+          btn.disabled = false;
+          btn.textContent = '✓ Создано!';
+          if (result.success) {
+            // Показываем успешное сообщение
+            setTimeout(() => {
+              alert(`✓ ${result.message}\n\nЛист: ${result.table.sheetName}\nСтрок: ${result.table.rowCount}`);
+              btn.textContent = '📊 Создать таблицу';
+            }, 500);
+          } else {
+            alert('❌ Ошибка: ' + (result.error || result.message));
+            btn.textContent = '📊 Создать таблицу';
+          }
+        })
+        .withFailureHandler((error) => {
+          btn.disabled = false;
+          btn.textContent = '📊 Создать таблицу';
+          alert('❌ Ошибка создания таблицы: ' + error.message);
+        })
+        .createTableAndChart(structuredData);
     }
 
     function executeActions(actions) {
