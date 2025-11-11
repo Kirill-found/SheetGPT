@@ -22,6 +22,9 @@ RUN echo "Cache bust: $CACHE_BUST"
 # Copy backend - will be forced to re-execute due to ARG change above
 COPY backend backend
 
+# FORCE REBUILD OF COPY LAYER - timestamp to invalidate cache
+RUN echo "REBUILD-2025-11-11-22-42" > /app/backend/.rebuild_marker
+
 # CRITICAL: Clear all Python cache files to force module reload
 RUN find /app/backend -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true
 RUN find /app/backend -type f -name '*.pyc' -delete 2>/dev/null || true
