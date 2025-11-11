@@ -52,7 +52,7 @@ async def root():
     """Health check endpoint"""
     return {
         "name": "SheetGPT API",
-        "version": "5.0.0",
+        "version": "5.0.1",  # CHANGED to verify Railway deployment
         "status": "operational",
         "engine": "AI Code Executor",
         "features": {
@@ -60,7 +60,8 @@ async def root():
             "python_execution": True,
             "accuracy": "99%",
             "methodology": True,
-            "auto_headers": True
+            "auto_headers": True,
+            "structured_data": True  # ADDED - new feature
         },
         "timestamp": datetime.now().isoformat()
     }
