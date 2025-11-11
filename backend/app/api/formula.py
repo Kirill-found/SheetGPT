@@ -1,4 +1,4 @@
-# v5.0.2 - Force Railway rebuild: 2025-11-11T22:30:00
+# v5.0.3 - Railway MUST deploy this: 2025-11-11T19:55:00 - STRUCTURED_DATA FIX
 from fastapi import APIRouter, HTTPException
 from app.schemas.requests import FormulaRequest
 from app.schemas.responses import FormulaResponse, ErrorResponse
