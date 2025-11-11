@@ -32,7 +32,7 @@ class AICodeExecutor:
 
             # FAILSAFE: For average price queries, use simple direct calculation
             query_lower = query.lower()
-            if any(word in query_lower for word in ['средн', 'average', 'mean', 'srednya', 'tsena', 'price']):
+            if any(word in query_lower for word in ['средн', 'average', 'mean', 'sredn', 'tsena', 'price']):
                 if any(word in query_lower for word in ['постав', 'supplier', 'postavsh', 'компан', 'kazhdogo']):
                     # This is "average price per supplier" query - use failsafe
                     return self._calculate_avg_price_failsafe(df, column_names)
