@@ -118,6 +118,10 @@ async def generate_formula(request: FormulaRequest):
             response_dict["summary"] = result.get("summary")
             response_dict["methodology"] = result.get("methodology")  # CRITICAL: Show which data was used
             response_dict["key_findings"] = result.get("key_findings", [])
+            # DEBUG: Add generated Python code for troubleshooting
+            response_dict["code_generated"] = result.get("code_generated")
+            response_dict["python_executed"] = result.get("python_executed", False)
+            response_dict["execution_output"] = result.get("execution_output", "")
 
             print(f"📦 response_dict keys before return: {list(response_dict.keys())}")
             print(f"📦 response_dict['methodology']: {response_dict.get('methodology')}")
