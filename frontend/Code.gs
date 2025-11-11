@@ -329,6 +329,27 @@ function processQuery(query) {
       history: history  // Добавляем историю в запрос
     };
 
+    // КРИТИЧЕСКАЯ ОТЛАДКА - ПОКАЗЫВАЕМ ЧТО ОТПРАВЛЯЕМ!
+    console.log('=== SENDING TO API ===');
+    console.log('Payload:', JSON.stringify(payload, null, 2));
+    console.log('Column names:', columnNames);
+    console.log('Data rows count:', dataToSend.length);
+    console.log('First data row:', dataToSend[0]);
+    console.log('==================');
+
+    // ПОКАЗЫВАЕМ АЛЕРТ С ОТЛАДКОЙ!
+    const debugInfo = `ОТЛАДКА SHEETGPT:
+
+Заголовки: ${columnNames.join(', ')}
+Строк данных: ${dataToSend.length}
+Первая строка: ${dataToSend[0] ? dataToSend[0].join(' | ') : 'НЕТ'}
+
+Если видите "Колонка A, B, C..." - нет заголовков
+Если видите "Товар, Поставщик..." - есть заголовки`;
+
+    // Раскомментируй для отладки:
+    // SpreadsheetApp.getUi().alert('DEBUG', debugInfo, SpreadsheetApp.getUi().ButtonSet.OK);
+
     const options = {
       method: 'post',
       contentType: 'application/json',
@@ -662,6 +683,101 @@ function executeActions(actions) {
     results: results,
     message: `Выполнено ${results.filter(r => r.success).length}/${results.length} действий`
   };
+}
+
+/**
+ * Обрабатывает batch запрос для диапазона ячеек
+ * Применяет один запрос к нескольким строкам
+ */
+function processBatchQuery(query, range) {
+  try {
+    console.log('=== BATCH QUERY START ===');
+    console.log('Query:', query);
+    console.log('Range:', range);
+
+    const sheet = SpreadsheetApp.getActiveSheet();
+    const rangeData = sheet.getRange(range);
+    const values = rangeData.getValues();
+
+    console.log('Rows to process:', values.length);
+
+    // Get context from full sheet
+    const sheetData = getSheetData();
+    const columnNames = sheetData.columnNames;
+
+    const results = [];
+    const totalRows = values.length;
+
+    // Process each row
+    for (let i = 0; i < values.length; i++) {
+      const row = values[i];
+      const rowNumber = rangeData.getRow() + i;
+
+      console.log(`Processing row ${i + 1}/${totalRows}:`, row);
+
+      try {
+        // Create payload with single row context
+        const payload = {
+          query: query,
+          column_names: columnNames,
+          sheet_data: [row],  // Send only this row
+          context_data: sheetData.data.slice(0, 10),  // Full context for reference
+          history: []
+        };
+
+        const options = {
+          method: 'post',
+          contentType: 'application/json',
+          payload: JSON.stringify(payload),
+          muteHttpExceptions: true
+        };
+
+        const response = UrlFetchApp.fetch(API_URL + '/api/v1/formula', options);
+        const result = JSON.parse(response.getContentText());
+
+        if (response.getResponseCode() === 200) {
+          results.push({
+            row: rowNumber,
+            success: true,
+            summary: result.summary || result.explanation || 'OK',
+            data: result
+          });
+        } else {
+          results.push({
+            row: rowNumber,
+            success: false,
+            error: result.detail || 'Unknown error'
+          });
+        }
+
+      } catch (error) {
+        results.push({
+          row: rowNumber,
+          success: false,
+          error: error.toString()
+        });
+      }
+
+      // Progress update (можно добавить callback)
+      console.log(`Progress: ${i + 1}/${totalRows} (${Math.round((i + 1) / totalRows * 100)}%)`);
+    }
+
+    console.log('=== BATCH QUERY COMPLETE ===');
+    console.log('Success:', results.filter(r => r.success).length);
+    console.log('Failed:', results.filter(r => !r.success).length);
+
+    return {
+      success: true,
+      total: totalRows,
+      processed: results.length,
+      succeeded: results.filter(r => r.success).length,
+      failed: results.filter(r => !r.success).length,
+      results: results
+    };
+
+  } catch (error) {
+    throw new Error('Batch processing error: ' + error.toString());
+  }
 }
 
 /**

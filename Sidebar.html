@@ -770,14 +770,134 @@
         return;
       }
 
+      // Add user message
       addMessage(`⚡ Batch: "${query}" к диапазону ${range}`, 'user');
-      addLoadingIndicator('Применяю к диапазону...');
 
-      // TODO: Implement batch processing
-      setTimeout(() => {
-        removeLoadingIndicator();
-        addMessage('Batch режим в разработке. Скоро будет доступен!', 'ai');
-      }, 1500);
+      // Add loading with progress
+      const loadingMsg = `Обрабатываю ${range}...`;
+      addLoadingIndicatorWithProgress(loadingMsg);
+
+      // Call backend batch processor
+      google.script.run
+        .withSuccessHandler(handleBatchResponse)
+        .withFailureHandler(handleBatchError)
+        .processBatchQuery(query, range);
+    }
+
+    // Handle batch response
+    function handleBatchResponse(result) {
+      removeLoadingIndicator();
+
+      if (!result.success) {
+        addMessage('❌ Ошибка batch обработки', 'ai');
+        return;
+      }
+
+      // Create summary message
+      const container = document.getElementById('chatContainer');
+      const messageDiv = document.createElement('div');
+      messageDiv.className = 'message ai';
+
+      const bubble = document.createElement('div');
+      bubble.className = 'message-bubble';
+
+      // Badge
+      const badge = document.createElement('div');
+      badge.className = 'response-type-badge';
+      badge.textContent = '⚡ Batch результат';
+      bubble.appendChild(badge);
+
+      // Summary
+      const summary = document.createElement('div');
+      summary.className = 'result-summary';
+      summary.innerHTML = `
+        <strong>Обработано:</strong> ${result.processed} строк<br>
+        <strong>Успешно:</strong> ${result.succeeded}<br>
+        <strong>Ошибок:</strong> ${result.failed}
+      `;
+      bubble.appendChild(summary);
+
+      // Results table
+      if (result.results && result.results.length > 0) {
+        const resultsDiv = document.createElement('div');
+        resultsDiv.style.marginTop = '10px';
+        resultsDiv.style.fontSize = '11px';
+
+        const table = document.createElement('table');
+        table.style.width = '100%';
+        table.style.borderCollapse = 'collapse';
+
+        // Header
+        const thead = document.createElement('thead');
+        thead.innerHTML = '<tr><th style="padding: 4px; border: 1px solid #e0e0e0;">Строка</th><th style="padding: 4px; border: 1px solid #e0e0e0;">Результат</th></tr>';
+        table.appendChild(thead);
+
+        // Body
+        const tbody = document.createElement('tbody');
+        result.results.slice(0, 10).forEach(r => {
+          const tr = document.createElement('tr');
+          const statusIcon = r.success ? '✅' : '❌';
+          const resultText = r.success ? r.summary : r.error;
+          tr.innerHTML = `
+            <td style="padding: 4px; border: 1px solid #e0e0e0;">${statusIcon} ${r.row}</td>
+            <td style="padding: 4px; border: 1px solid #e0e0e0; font-size: 10px;">${resultText}</td>
+          `;
+          tbody.appendChild(tr);
+        });
+        table.appendChild(tbody);
+
+        if (result.results.length > 10) {
+          const moreDiv = document.createElement('div');
+          moreDiv.style.marginTop = '4px';
+          moreDiv.style.fontSize = '10px';
+          moreDiv.style.color = '#5f6368';
+          moreDiv.textContent = `... и еще ${result.results.length - 10} строк`;
+          resultsDiv.appendChild(table);
+          resultsDiv.appendChild(moreDiv);
+        } else {
+          resultsDiv.appendChild(table);
+        }
+
+        bubble.appendChild(resultsDiv);
+      }
+
+      messageDiv.appendChild(bubble);
+      container.appendChild(messageDiv);
+
+      scrollToBottom();
+    }
+
+    // Handle batch error
+    function handleBatchError(error) {
+      removeLoadingIndicator();
+      addMessage('❌ Ошибка batch обработки: ' + (error.message || error), 'ai');
+    }
+
+    // Add loading indicator with progress support
+    function addLoadingIndicatorWithProgress(message = 'Обрабатываю...') {
+      const container = document.getElementById('chatContainer');
+      const loadingDiv = document.createElement('div');
+      loadingDiv.className = 'message ai';
+      loadingDiv.id = 'loading';
+
+      const bubble = document.createElement('div');
+      bubble.className = 'message-bubble';
+
+      const dots = document.createElement('div');
+      dots.className = 'loading-dots';
+      dots.innerHTML = '<div class="loading-dot"></div><div class="loading-dot"></div><div class="loading-dot"></div>';
+
+      const text = document.createElement('div');
+      text.className = 'loading-text';
+      text.id = 'loading-progress-text';
+      text.textContent = message;
+
+      bubble.appendChild(dots);
+      bubble.appendChild(text);
+      loadingDiv.appendChild(bubble);
+      container.appendChild(loadingDiv);
+
+      scrollToBottom();
     }
 
     // Use quick action
