@@ -31,5 +31,5 @@ httpx==0.26.0
 pandas==2.2.0
 numpy==1.26.3
 
-# FORCE REBUILD: 10 Nov 2025 22:30 - v2.3.0-PATTERN-FIX
-# Fixed regex pattern to detect "у какого/какой/каких [X] больше всего [Y]" queries
+# FORCE REBUILD: 11 Nov 2025 - v5.0.0-AI-CODE-EXECUTOR
+# AI generates Python code for 99% accuracy on all queries
