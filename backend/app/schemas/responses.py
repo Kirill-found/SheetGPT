@@ -15,6 +15,8 @@ class FormulaResponse(BaseModel):
     summary: Optional[str] = Field(None, description="Краткий вывод анализа")
     methodology: Optional[str] = Field(None, description="Объяснение какие данные использовались для расчёта")
     key_findings: Optional[List[str]] = Field(None, description="Ключевые находки с цифрами")
+    # Table/Chart creation field (CRITICAL for actions system)
+    structured_data: Optional[dict] = Field(None, description="Структурированные данные для создания таблиц/графиков")
 
     class Config:
         json_schema_extra = {
