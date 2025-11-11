@@ -76,9 +76,12 @@ RULES FOR CODE GENERATION:
 6. Handle duplicates properly (GROUP BY when needed)
 7. For "топ товаров" - group by product column and sum sales
 8. For "топ поставщиков" - group by supplier column and sum sales
-9. Always aggregate duplicate entries
-10. LIMIT TOP LISTS to maximum 5 items for readability
-11. Use DOUBLE line break (\\n\\n) after title for better spacing
+9. For "средняя цена" - use .mean() on PRICE column (NOT SUM!)
+10. CRITICAL: When asked for AVERAGE/MEAN - use df.groupby()['PriceColumn'].mean()
+11. CRITICAL: NEVER calculate average as sum/count - use .mean() function directly!
+12. Always aggregate duplicate entries
+13. LIMIT TOP LISTS to maximum 5 items for readability
+14. Use DOUBLE line break (\\n\\n) after title for better spacing
 
 REQUIRED OUTPUT VARIABLES:
 - result: the computed answer (number, dataframe, or list)
@@ -91,6 +94,28 @@ FORMATTING RULES FOR SUMMARY:
 - For TOP lists: put each item on NEW LINE
 - Use clear structure: Title, then numbered list
 - Keep it readable and well-spaced
+
+EXAMPLE CODE FOR "средняя цена товаров у каждого поставщика":
+```python
+# IMPORTANT: Use .mean() for averages, NOT sum/count!
+# Find price column (usually has prices in it)
+price_col = None
+for col in df.columns:
+    if df[col].dtype in ['int64', 'float64'] and df[col].max() < 100000:
+        price_col = col
+        break
+
+# Group by supplier and calculate MEAN of prices
+supplier_avg_price = df.groupby('Колонка B')[price_col].mean().sort_values(ascending=False)
+
+# Format result
+result = supplier_avg_price.to_dict()
+summary = "Средняя цена товаров у каждого поставщика:\\n\\n"
+for i, (supplier, avg_price) in enumerate(supplier_avg_price.items(), 1):
+    summary += f"{{i}}. {{supplier}}: {{avg_price:,.2f}} руб.\\n"
+summary = summary.strip()
+methodology = f"Сгруппировано по поставщикам (Колонка B), вычислена средняя цена методом .mean() для колонки '{{price_col}}'"
+```
 
 EXAMPLE CODE FOR "топ 3 товара по продажам":
 ```python
