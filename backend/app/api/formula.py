@@ -1,3 +1,4 @@
+# v5.0.2 - Force Railway rebuild: 2025-11-11T22:30:00
 from fastapi import APIRouter, HTTPException
 from app.schemas.requests import FormulaRequest
 from app.schemas.responses import FormulaResponse, ErrorResponse
