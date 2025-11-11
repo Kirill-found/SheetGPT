@@ -64,6 +64,15 @@ class AICodeExecutor:
             # Find columns
             supplier_col = column_names[1] if len(column_names) > 1 else df.columns[1]  # Usually column B
 
+            # DEBUG: Log all numeric columns
+            numeric_debug = []
+            for col in df.columns:
+                if df[col].dtype in ['int64', 'float64']:
+                    col_idx = list(df.columns).index(col)
+                    col_max = df[col].max()
+                    col_samples = df[col].dropna().head(3).tolist()
+                    numeric_debug.append(f"{col}(idx={col_idx}, max={col_max}, samples={col_samples})")
+
             # Find price column (numeric column with values < 100000)
             price_col = None
             for col in df.columns:
@@ -76,8 +85,14 @@ class AICodeExecutor:
             if not price_col:
                 raise Exception("Не найдена колонка с ценами")
 
+            # DEBUG: Get selected column info
+            selected_idx = list(df.columns).index(price_col)
+            selected_samples = df[price_col].dropna().head(5).tolist()
+
             # Remove duplicates before calculating average
+            df_before = len(df)
             df_unique = df[[supplier_col, price_col]].drop_duplicates()
+            df_after = len(df_unique)
 
             # Group by supplier and calculate mean
             avg_prices = df_unique.groupby(supplier_col)[price_col].mean().sort_values(ascending=False)
@@ -93,7 +108,7 @@ class AICodeExecutor:
 
             return {
                 "summary": summary,
-                "methodology": f"FAILSAFE: Удалены дубликаты, сгруппировано по поставщикам ({supplier_col}), вычислена средняя цена для колонки '{price_col}'",
+                "methodology": f"FAILSAFE: Удалены дубликаты ({df_before}->{df_after} rows), сгруппировано по поставщикам ({supplier_col}), вычислена средняя цена для колонки '{price_col}' (idx={selected_idx}, samples={selected_samples}). Available: {', '.join(numeric_debug)}",
                 "key_findings": key_findings,
                 "confidence": 0.99,
                 "response_type": "analysis",
