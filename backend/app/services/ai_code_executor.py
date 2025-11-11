@@ -329,6 +329,17 @@ Generate CORRECTED code that will work. Return ONLY the Python code."""
             key_findings = [f"{k}: {v:,.2f}" if isinstance(v, (int, float)) else f"{k}: {v}"
                           for k, v in list(result_dict.items())[:5]]
 
+        # DEBUG: Print generated code to console for debugging
+        print("=" * 80)
+        print("🐍 AI GENERATED PYTHON CODE:")
+        print("=" * 80)
+        print(code)
+        print("=" * 80)
+        print("📊 EXECUTION RESULT:")
+        print(f"Summary: {exec_result.get('summary')}")
+        print(f"Methodology: {exec_result.get('methodology')}")
+        print("=" * 80)
+
         return {
             "summary": exec_result.get('summary', 'Результат вычислен'),
             "methodology": exec_result.get('methodology', 'Автоматический анализ с помощью Python'),
@@ -336,7 +347,7 @@ Generate CORRECTED code that will work. Return ONLY the Python code."""
             "confidence": exec_result.get('confidence', 0.95),
             "response_type": "analysis",
             "data": result_dict,
-            "code_generated": code[:500] + "..." if len(code) > 500 else code,
+            "code_generated": code,  # FULL CODE for debugging
             "python_executed": True,
             "execution_output": exec_result.get('output', '')
         }
