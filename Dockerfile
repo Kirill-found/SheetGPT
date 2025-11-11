@@ -16,11 +16,16 @@ COPY backend/requirements.txt backend/requirements.txt
 RUN pip install --no-cache-dir -r backend/requirements.txt
 
 # FORCE INVALIDATE CACHE - Use ARG to force rebuild on every commit
-ARG CACHE_BUST=2025-11-11-20-00-FORCE-REBUILD-STRUCTURED-DATA
+ARG CACHE_BUST=2025-11-11-20-30-CLEAR-PYTHON-CACHE
 RUN echo "Cache bust: $CACHE_BUST"
 
 # Copy backend - will be forced to re-execute due to ARG change above
 COPY backend backend
+
+# CRITICAL: Clear all Python cache files to force module reload
+RUN find /app/backend -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true
+RUN find /app/backend -type f -name '*.pyc' -delete 2>/dev/null || true
+RUN find /app/backend -type f -name '*.pyo' -delete 2>/dev/null || true
 
 # Set working directory to backend
 WORKDIR /app/backend
