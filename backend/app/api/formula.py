@@ -118,8 +118,12 @@ async def generate_formula(request: FormulaRequest):
             response_dict["methodology"] = result.get("methodology")  # CRITICAL: Show which data was used
             response_dict["key_findings"] = result.get("key_findings", [])
             # CRITICAL: Add structured_data for table/chart creation
+            print(f"🔍 DEBUG: 'structured_data' in result: {'structured_data' in result}")
             if "structured_data" in result:
+                print(f"🔍 DEBUG: structured_data value: {result['structured_data']}")
                 response_dict["structured_data"] = result["structured_data"]
+            else:
+                print(f"🔍 DEBUG: result keys: {list(result.keys())}")
             # DEBUG: Add generated Python code for troubleshooting
             response_dict["code_generated"] = result.get("code_generated")
             response_dict["python_executed"] = result.get("python_executed", False)
