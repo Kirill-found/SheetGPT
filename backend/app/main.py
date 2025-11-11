@@ -54,7 +54,7 @@ async def root():
     """Health check endpoint"""
     return {
         "name": "SheetGPT API",
-        "version": "5.0.1",  # CHANGED to verify Railway deployment
+        "version": "5.0.3",  # AI Code Executor + structured_data for tables/charts
         "status": "operational",
         "engine": "AI Code Executor",
         "features": {
@@ -63,7 +63,7 @@ async def root():
             "accuracy": "99%",
             "methodology": True,
             "auto_headers": True,
-            "structured_data": True  # ADDED - new feature
+            "structured_data": True  # Tables and charts support
         },
         "timestamp": datetime.now().isoformat()
     }
@@ -73,7 +73,7 @@ async def health_check():
     """Detailed health check"""
     return {
         "status": "healthy",
-        "version": "3.0.0",
+        "version": "5.0.3",
         "service": "SheetGPT API",
         "timestamp": datetime.now().isoformat(),
         "checks": {
@@ -190,8 +190,8 @@ async def process_formula(request: FormulaRequest):
 async def get_version():
     """Get detailed version information"""
     return {
-        "api_version": "5.0.0",
-        "release": "AI_CODE_EXECUTOR",
+        "api_version": "5.0.3",
+        "release": "AI_CODE_EXECUTOR_WITH_STRUCTURED_DATA",
         "engine": "GPT-4o + Python Code Execution",
         "accuracy": "99%",
         "features": {
