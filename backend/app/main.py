@@ -207,23 +207,36 @@ async def get_version():
 
 @app.get("/test")
 async def test_endpoint():
-    """Test endpoint for debugging"""
-    test_data = [
-        ["Товар 1", "ООО Время", 10730.32, 1010, 107303.2],
-        ["Товар 14", "ООО Время", 6328.28, 1007, 44297.96],
-        ["Товар 14", "ООО Время", 6328.28, 1023, 145550.44],
-        ["Товар 14", "ООО Время", 6328.28, 1023, 145550.44],
-    ]
+    """Test endpoint for debugging AI Code Executor"""
+    try:
+        from app.services.ai_code_executor import get_ai_executor
+        executor = get_ai_executor()
 
-    total_vremya = sum(row[4] for row in test_data)
+        test_data = [
+            ["Tovar 1", "OOO Kosmos", 4500, 1, 4500],
+            ["Tovar 2", "OOO Kosmos", 5000, 2, 10000],
+        ]
 
-    return {
-        "test": "aggregation",
-        "supplier": "ООО Время",
-        "expected_total": 442702.04,
-        "calculated_total": total_vremya,
-        "status": "CORRECT" if abs(total_vremya - 442702.04) < 0.1 else "ERROR"
-    }
+        result = executor.process_with_code(
+            query="srednyaya tsena",
+            column_names=["A", "B", "C", "D", "E"],
+            sheet_data=test_data,
+            history=[]
+        )
+
+        return {
+            "test": "AI Code Executor",
+            "result_keys": list(result.keys()),
+            "has_code_generated": ("code_generated" in result),
+            "code_preview": result.get("code_generated", "NOT FOUND")[:200] if result.get("code_generated") else "NO CODE",
+            "summary": result.get("summary", "NO SUMMARY"),
+            "methodology": result.get("methodology", "NO METHODOLOGY")
+        }
+    except Exception as e:
+        return {
+            "test": "FAILED",
+            "error": str(e)
+        }
 
 if __name__ == "__main__":
     import uvicorn
