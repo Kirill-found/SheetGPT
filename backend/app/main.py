@@ -1,6 +1,7 @@
 """
 SheetGPT API Production v5.0 - AI Code Executor
 Генерирует Python код для точных вычислений
+Supports structured_data for table/chart creation
 """
 
 from fastapi import FastAPI, HTTPException
