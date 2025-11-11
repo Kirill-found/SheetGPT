@@ -1,11 +1,11 @@
 FROM python:3.11.8-slim
 
 # FORCE REBUILD - Break Railway cache
-ARG BUILD_DATE=2025-11-11-22-20-v5.0.2-FORCE-REBUILD
+ARG BUILD_DATE=2025-11-11-19-55-v5.0.3-MANUAL-DEPLOY
 LABEL build_date=$BUILD_DATE
-LABEL version="5.0.2-FORCE-REBUILD"
+LABEL version="5.0.3-MANUAL-DEPLOY-WITH-STRUCTURED-DATA"
 LABEL model="gpt-4o"
-LABEL rebuild="production-2025-11-11-22-20-FORCE-ALL-LAYERS-REBUILD"
+LABEL rebuild="production-2025-11-11-19-55-FORCE-ALL-LAYERS-REBUILD"
 
 WORKDIR /app
 
@@ -16,14 +16,14 @@ COPY backend/requirements.txt backend/requirements.txt
 RUN pip install --no-cache-dir -r backend/requirements.txt
 
 # FORCE INVALIDATE CACHE - Use ARG to force rebuild on every commit
-ARG CACHE_BUST=2025-11-11-22-20-ABSOLUTE-FINAL-FIX
+ARG CACHE_BUST=2025-11-11-19-55-v5.0.3-DEPLOY
 RUN echo "Cache bust: $CACHE_BUST"
 
 # Copy backend - will be forced to re-execute due to ARG change above
 COPY backend backend
 
 # FORCE REBUILD OF COPY LAYER - timestamp to invalidate cache
-RUN echo "REBUILD-2025-11-11-22-42" > /app/backend/.rebuild_marker
+RUN echo "REBUILD-2025-11-11-19-55-v5.0.3" > /app/backend/.rebuild_marker
 
 # CRITICAL: Clear all Python cache files to force module reload
 RUN find /app/backend -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true
