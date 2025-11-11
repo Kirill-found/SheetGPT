@@ -94,6 +94,9 @@ async def generate_formula(request: FormulaRequest):
 
         # Возвращаем ответ в зависимости от типа
         response_type = result.get("response_type", result.get("type", "formula"))
+        print(f"🚨 FORMULA.PY: response_type = '{response_type}'")
+        print(f"🚨 FORMULA.PY: result.get('response_type') = '{result.get('response_type')}'")
+        print(f"🚨 FORMULA.PY: Condition check: response_type == 'analysis' = {response_type == 'analysis'}")
 
         if response_type == "analysis" or response_type == "question":
             # DEBUG: Log result from AI service
