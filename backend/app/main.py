@@ -157,10 +157,21 @@ async def process_formula(request: FormulaRequest):
             key_findings=result.get("key_findings", [])
         )
 
+        # Convert to dict to add debug fields (code_generated, etc.)
+        response_dict = response.model_dump()
+
+        # Add debug fields for troubleshooting
+        if result.get("code_generated"):
+            response_dict["code_generated"] = result.get("code_generated")
+        if result.get("python_executed"):
+            response_dict["python_executed"] = result.get("python_executed")
+        if result.get("execution_output"):
+            response_dict["execution_output"] = result.get("execution_output")
+
         logger.info("[COMPLETE] Response sent successfully")
         logger.info("="*60)
 
-        return response
+        return response_dict
 
     except Exception as e:
         logger.error(f"[ERROR] Processing failed: {str(e)}")
