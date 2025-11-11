@@ -1,4 +1,4 @@
-FROM python:3.11-slim
+FROM python:3.11.8-slim
 
 # FORCE REBUILD - Break Railway cache
 ARG BUILD_DATE=2025-11-11-22-20-v5.0.2-FORCE-REBUILD
