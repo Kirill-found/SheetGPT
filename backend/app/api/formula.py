@@ -93,7 +93,7 @@ async def generate_formula(request: FormulaRequest):
             )
 
         # Возвращаем ответ в зависимости от типа
-        response_type = result.get("type", "formula")
+        response_type = result.get("response_type", result.get("type", "formula"))
 
         if response_type == "analysis" or response_type == "question":
             # DEBUG: Log result from AI service
