@@ -162,6 +162,10 @@ async def process_formula(request: FormulaRequest):
         # Convert to dict to add debug fields (code_generated, etc.)
         response_dict = response.model_dump()
 
+        # Add structured_data for table/chart creation (CRITICAL for actions system)
+        if "structured_data" in result:
+            response_dict["structured_data"] = result["structured_data"]
+
         # Add debug fields ALWAYS (for troubleshooting)
         response_dict["code_generated"] = result.get("code_generated", "NOT_IN_RESULT")
         response_dict["python_executed"] = result.get("python_executed", False)

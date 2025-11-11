@@ -1,0 +1,44 @@
+================================================================================
+TEST: Average price per supplier
+================================================================================
+
+Expected for OOO Kosmos: 4322.50 (25935 / 6)
+Sending request to API...
+
+WARNING: No 'code_generated' field in response!
+Response keys: ['formula', 'explanation', 'target_cell', 'confidence', 'response_type', 'insights', 'suggested_actions', 'summary', 'methodology', 'key_findings']
+================================================================================
+RESULT (summary):
+================================================================================
+—редн€€ цена товаров у каждого поставщика:
+
+1. OOO Vremya: 5,500.00 руб.
+2. OOO Kosmos: 4,155.83 руб.
+3. OOO Radost: 3,750.00 руб.
+
+
+================================================================================
+METHODOLOGY:
+================================================================================
+—группировано по поставщикам (Kolonna B), вычислена средн€€ цена методом .mean() дл€ колонки 'Kolonna C'
+
+
+================================================================================
+FULL API RESPONSE:
+================================================================================
+{
+  "formula": null,
+  "explanation": "",
+  "target_cell": null,
+  "confidence": 0.95,
+  "response_type": "analysis",
+  "insights": [],
+  "suggested_actions": null,
+  "summary": "—редн€€ цена товаров у каждого поставщика:\n\n1. OOO Vremya: 5,500.00 руб.\n2. OOO Kosmos: 4,155.83 руб.\n3. OOO Radost: 3,750.00 руб.",
+  "methodology": "—группировано по поставщикам (Kolonna B), вычислена средн€€ цена методом .mean() дл€ колонки 'Kolonna C'",
+  "key_findings": [
+    "OOO Vremya: 5,500.00",
+    "OOO Kosmos: 4,155.83",
+    "OOO Radost: 3,750.00"
+  ]
+}

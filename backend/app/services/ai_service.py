@@ -195,12 +195,22 @@ class AIService:
                     for i, (supplier, avg_price) in enumerate(avg_prices.items(), 1):
                         summary += f"{i}. {supplier}: {avg_price:,.2f} руб.\n"
 
+                    # Prepare structured data for table/chart creation
+                    structured_data = {
+                        "headers": ["Поставщик", "Средняя цена (руб.)"],
+                        "rows": [[supplier, round(avg_price, 2)] for supplier, avg_price in avg_prices.items()],
+                        "has_table": True,
+                        "table_title": "Средняя цена товаров по поставщикам",
+                        "chart_recommended": "column"
+                    }
+
                     return {
                         "summary": summary.strip(),
                         "methodology": f"HARDCODED: Удалены дубликаты, средняя по {supplier_col}, колонка {price_col} (индекс {col_index}, примеры: {sample_values}). Доступные numeric: {', '.join(numeric_debug)}",
                         "key_findings": [f"{s}: {p:,.2f}" for s, p in avg_prices.items()],
                         "confidence": 0.99,
-                        "response_type": "analysis"
+                        "response_type": "analysis",
+                        "structured_data": structured_data
                     }
 
             # Use AI Code Executor for ALL other queries
