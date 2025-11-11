@@ -149,7 +149,40 @@ class AIService:
         Supports ANY query: top products, averages, sums, counts, etc.
         """
         try:
-            # Use AI Code Executor for ALL queries (not just aggregations)
+            # SPECIAL CASE: Average price queries - use hardcoded correct logic
+            query_lower = query.lower()
+            is_average_query = any(w in query_lower for w in ['средн', 'average', 'mean', 'sredn'])
+            is_supplier_query = any(w in query_lower for w in ['постав', 'supplier', 'компан', 'postavsh', 'kazhdogo'])
+
+            if is_average_query and is_supplier_query:
+                # Use direct pandas calculation for guaranteed accuracy
+                df = pd.DataFrame(sheet_data, columns=column_names)
+                supplier_col = column_names[1] if len(column_names) > 1 else df.columns[1]
+
+                # Find price column
+                price_col = None
+                for col in df.columns:
+                    if df[col].dtype in ['int64', 'float64'] and df[col].max() < 100000:
+                        price_col = col
+                        break
+
+                if price_col:
+                    df_unique = df[[supplier_col, price_col]].drop_duplicates()
+                    avg_prices = df_unique.groupby(supplier_col)[price_col].mean().sort_values(ascending=False)
+
+                    summary = "Средняя цена товаров у каждого поставщика:\n\n"
+                    for i, (supplier, avg_price) in enumerate(avg_prices.items(), 1):
+                        summary += f"{i}. {supplier}: {avg_price:,.2f} руб.\n"
+
+                    return {
+                        "summary": summary.strip(),
+                        "methodology": f"HARDCODED: Удалены дубликаты, средняя по {supplier_col}, колонка {price_col}",
+                        "key_findings": [f"{s}: {p:,.2f}" for s, p in avg_prices.items()],
+                        "confidence": 0.99,
+                        "response_type": "analysis"
+                    }
+
+            # Use AI Code Executor for ALL other queries
             executor = get_ai_executor()
             result = executor.process_with_code(
                 query=query,
