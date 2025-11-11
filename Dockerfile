@@ -38,4 +38,5 @@ EXPOSE 8000
 
 # Start the application (use exec form with sh to support env variables)
 # UPDATED: Use main.py (not main_simple.py) to enable conversation history + all features
-CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}"]
+# CRITICAL: Delete .pyc files BEFORE EVERY START to force Python to use fresh source code
+CMD ["sh", "-c", "find /app/backend -type f -name '*.pyc' -delete && echo 'Deleted .pyc files' && uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}"]
