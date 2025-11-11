@@ -1,7 +1,8 @@
 """
-SheetGPT API Production v5.0 - AI Code Executor
+SheetGPT API Production v5.0.3 - AI Code Executor with structured_data
 Генерирует Python код для точных вычислений
-Supports structured_data for table/chart creation
+Supports structured_data for table/chart creation in Google Sheets
+Railway deployment: 2025-11-11 19:55
 """
 
 from fastapi import FastAPI, HTTPException
@@ -20,10 +21,10 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Create FastAPI app with VERSION 5.0.0 - AI Code Executor
+# Create FastAPI app with VERSION 5.0.3 - AI Code Executor + structured_data
 app = FastAPI(
     title="SheetGPT API",
-    version="5.0.0",  # AI Code Executor версия
+    version="5.0.3",  # AI Code Executor + structured_data for tables/charts
     description="AI-powered spreadsheet assistant with Python code execution for 99% accuracy"
 )
 
@@ -40,10 +41,11 @@ app.add_middleware(
 async def startup_event():
     """Log startup information"""
     logger.info("="*60)
-    logger.info("SheetGPT API v5.0.0 STARTING - AI CODE EXECUTOR")
+    logger.info("SheetGPT API v5.0.3 STARTING - AI CODE EXECUTOR + STRUCTURED_DATA")
     logger.info(f"Started at: {datetime.now()}")
     logger.info("AI Code Generation: ENABLED")
     logger.info("Python Code Execution: ENABLED")
+    logger.info("Structured Data: ENABLED (tables/charts)")
     logger.info("Accuracy target: 99%")
     logger.info("="*60)
 
