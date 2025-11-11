@@ -15,8 +15,11 @@ COPY backend/requirements.txt backend/requirements.txt
 # Install dependencies
 RUN pip install --no-cache-dir -r backend/requirements.txt
 
-# FORCE COPY backend - Break cache to get latest files with structured_data
-# Updated: 2025-11-11-19-50 - structured_data feature
+# FORCE INVALIDATE CACHE - Use ARG to force rebuild on every commit
+ARG CACHE_BUST=2025-11-11-20-00-FORCE-REBUILD-STRUCTURED-DATA
+RUN echo "Cache bust: $CACHE_BUST"
+
+# Copy backend - will be forced to re-execute due to ARG change above
 COPY backend backend
 
 # Set working directory to backend
