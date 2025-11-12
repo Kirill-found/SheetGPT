@@ -113,16 +113,6 @@ class AICodeExecutor:
             # Format key_findings
             key_findings = [f"{product}: {sales:,.2f}" for product, sales in top_items.items()]
 
-            # КРИТИЧЕСКИ ВАЖНО: structured_data для auto-создания графика
-            structured_data = {
-                "headers": ["Название", "Значение"],
-                "rows": [[product, float(sales)] for product, sales in top_items.items()],
-                "has_table": True,
-                "table_title": f"Топ {top_n} товаров по продажам",
-                "chart_recommended": "column",
-                "auto_execute": True  # АВТОМАТИЧЕСКИ создаем таблицу+график!
-            }
-
             return {
                 "summary": summary,
                 "methodology": f"FAILSAFE MODE: Проанализированы РЕАЛЬНЫЕ данные из таблицы. Сгруппировано по '{product_col}', просуммированы '{sales_col}'. Найдено {len(product_sales)} уникальных товаров.",
@@ -130,10 +120,9 @@ class AICodeExecutor:
                 "confidence": 0.99,
                 "response_type": "analysis",
                 "data": top_items.to_dict(),
-                "structured_data": structured_data,
-                "code_generated": "# FAILSAFE MODE: Direct pandas calculation, no AI code generation",
-                "python_executed": True,
-                "execution_output": ""
+                "structured_data": None,  # Упрощено - только расчеты!
+                "code_generated": "# FAILSAFE MODE: Direct pandas calculation",
+                "python_executed": True
             }
         except Exception as e:
             raise Exception(f"Failsafe top items calculation failed: {str(e)}")
@@ -189,26 +178,16 @@ class AICodeExecutor:
             # Format key_findings
             key_findings = [f"{supplier}: {avg_price:,.2f}" for supplier, avg_price in avg_prices.items()]
 
-            # Format structured_data for table creation
-            structured_data = {
-                "headers": ["Поставщик", "Средняя цена (руб.)"],
-                "rows": [[supplier, round(avg_price, 2)] for supplier, avg_price in avg_prices.items()],
-                "has_table": True,
-                "table_title": "Средняя цена товаров по поставщикам",
-                "chart_recommended": "column"  # Рекомендуемый тип графика
-            }
-
             return {
                 "summary": summary,
-                "methodology": f"FAILSAFE: Удалены дубликаты ({df_before}->{df_after} rows), сгруппировано по поставщикам ({supplier_col}), вычислена средняя цена для колонки '{price_col}' (idx={selected_idx}, samples={selected_samples}). Available: {', '.join(numeric_debug)}",
+                "methodology": f"FAILSAFE: Удалены дубликаты ({df_before}->{df_after} rows), сгруппировано по поставщикам ({supplier_col}), вычислена средняя цена для колонки '{price_col}' (idx={selected_idx}, samples={selected_samples}).",
                 "key_findings": key_findings,
                 "confidence": 0.99,
                 "response_type": "analysis",
                 "data": avg_prices.to_dict(),
-                "structured_data": structured_data,
-                "code_generated": "# FAILSAFE MODE: Direct calculation without AI code generation",
-                "python_executed": True,
-                "execution_output": ""
+                "structured_data": None,  # Упрощено - только расчеты!
+                "code_generated": "# FAILSAFE MODE: Direct calculation",
+                "python_executed": True
             }
         except Exception as e:
             raise Exception(f"Failsafe calculation failed: {str(e)}")
@@ -690,7 +669,8 @@ Generate CORRECTED code that will work. Return ONLY the Python code."""
 
     def _format_response(self, exec_result: Dict[str, Any], code: str, query: str) -> Dict[str, Any]:
         """
-        Форматирует финальный ответ
+        Форматирует финальный ответ - УПРОЩЕННАЯ ВЕРСИЯ
+        Фокус на точных расчетах, без создания таблиц/графиков
         """
         result = exec_result.get('result')
 
@@ -702,29 +682,11 @@ Generate CORRECTED code that will work. Return ONLY the Python code."""
         else:
             result_dict = result
 
-        # Форматируем key_findings
+        # Форматируем key_findings для красивого отображения
         key_findings = exec_result.get('key_findings', [])
         if not key_findings and isinstance(result_dict, dict):
             key_findings = [f"{k}: {v:,.2f}" if isinstance(v, (int, float)) else f"{k}: {v}"
-                          for k, v in list(result_dict.items())[:5]]
-
-        # Форматируем structured_data для создания таблиц
-        # ВАЖНО: Создаем таблицу ТОЛЬКО если пользователь явно просит или это логично
-        structured_data = None
-        if isinstance(result_dict, dict) and result_dict and self._should_create_table(query):
-            # Определяем заголовки и данные
-            headers = ["Название", "Значение"]
-            rows = [[str(k), float(v) if isinstance(v, (int, float)) else str(v)]
-                   for k, v in result_dict.items()]
-
-            structured_data = {
-                "headers": headers,
-                "rows": rows,
-                "has_table": True,
-                "table_title": exec_result.get('summary', 'Результаты анализа').split('\n')[0][:50],
-                "chart_recommended": self._detect_chart_type(query),
-                "auto_execute": self._should_auto_execute_table(query)  # НОВОЕ: автовыполнение
-            }
+                          for k, v in list(result_dict.items())[:10]]  # Показываем до 10 элементов
 
         # DEBUG: Print generated code to console for debugging
         print("=" * 80)
@@ -737,16 +699,7 @@ Generate CORRECTED code that will work. Return ONLY the Python code."""
         print(f"Methodology: {exec_result.get('methodology')}")
         print("=" * 80)
 
-        # Определяем action_type и highlight данные
-        highlight_rows = exec_result.get('highlight_rows', None)
-        action_type = None
-        highlight_color = "#FFFF00"  # Желтый цвет по умолчанию
-        highlight_message = None
-
-        if highlight_rows and len(highlight_rows) > 0:
-            action_type = "highlight"
-            highlight_message = f"Выделено {len(highlight_rows)} строк"
-
+        # УПРОЩЕННЫЙ ОТВЕТ - только расчеты!
         response_data = {
             "summary": exec_result.get('summary', 'Результат вычислен'),
             "methodology": exec_result.get('methodology', 'Автоматический анализ с помощью Python'),
@@ -754,18 +707,10 @@ Generate CORRECTED code that will work. Return ONLY the Python code."""
             "confidence": exec_result.get('confidence', 0.95),
             "response_type": "analysis",
             "data": result_dict,
-            "structured_data": structured_data,
-            "code_generated": code,  # FULL CODE for debugging
-            "python_executed": True,
-            "execution_output": exec_result.get('output', '')
+            "structured_data": None,  # Больше не создаем таблицы!
+            "code_generated": code[:500],  # Первые 500 символов кода для отладки
+            "python_executed": True
         }
-
-        # Добавляем highlight данные если есть
-        if action_type:
-            response_data["action_type"] = action_type
-            response_data["highlight_rows"] = highlight_rows
-            response_data["highlight_color"] = highlight_color
-            response_data["highlight_message"] = highlight_message
 
         return response_data
 
