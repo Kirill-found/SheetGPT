@@ -172,7 +172,11 @@ Return ONLY the Python code, no explanations."""
             full_system_prompt = (
                 base_system_prompt +
                 f"\n🎯 YOUR ROLE AND CONTEXT:\n{custom_context}\n\n"
-                "Based on your role, provide professional insights, recommendations, and warnings in your output variables.\n"
+                "⚠️ IMPORTANT: Since you have a professional role, you MUST generate these variables:\n"
+                "- professional_insights: string with your professional analysis\n"
+                "- recommendations: list of actionable recommendations\n"
+                "- warnings: list of risks or issues to watch\n\n"
+                "These fields are REQUIRED when role is specified. Analyze data from that role's perspective.\n"
                 "Generate clean, working code that analyzes REAL data only."
             )
         else:
