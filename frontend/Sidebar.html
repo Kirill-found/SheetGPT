@@ -323,8 +323,15 @@
 <body>
   <!-- Header -->
   <div class="header">
-    <h1>💬 SheetGPT AI</h1>
-    <p>Умный ассистент для таблиц</p>
+    <div style="display: flex; justify-content: space-between; align-items: center;">
+      <div>
+        <h1>💬 SheetGPT AI</h1>
+        <p>Умный ассистент для таблиц</p>
+      </div>
+      <button onclick="openSettings()" style="background: rgba(255,255,255,0.2); border: none; color: white; padding: 8px 12px; border-radius: 6px; cursor: pointer; font-size: 16px;" title="Настройки AI">
+        ⚙️
+      </button>
+    </div>
   </div>
 
   <!-- Chat Container -->
@@ -643,6 +650,66 @@
             content.appendChild(actionsList);
           }
 
+          // v6.2.8: Professional Insights (custom_context feature)
+          if (result.professionalInsights) {
+            const insightsDiv = document.createElement('div');
+            insightsDiv.style.padding = '12px';
+            insightsDiv.style.backgroundColor = '#fff3e0';
+            insightsDiv.style.borderLeft = '4px solid #ff9800';
+            insightsDiv.style.borderRadius = '6px';
+            insightsDiv.style.marginTop = '12px';
+            insightsDiv.innerHTML = `<strong>💡 Professional Insights:</strong><br>${result.professionalInsights}`;
+            content.appendChild(insightsDiv);
+          }
+
+          // v6.2.8: Recommendations
+          if (result.recommendations && result.recommendations.length > 0) {
+            const recsTitle = document.createElement('p');
+            recsTitle.style.marginTop = '12px';
+            recsTitle.style.fontWeight = '600';
+            recsTitle.style.marginBottom = '6px';
+            recsTitle.textContent = '✅ Recommendations:';
+            content.appendChild(recsTitle);
+
+            const recsList = document.createElement('ul');
+            recsList.className = 'insights-list';
+            recsList.style.listStyle = 'none';
+            recsList.style.padding = '8px';
+            recsList.style.backgroundColor = '#e8f5e9';
+            recsList.style.borderRadius = '6px';
+            result.recommendations.forEach(rec => {
+              const li = document.createElement('li');
+              li.style.padding = '4px 0';
+              li.textContent = `• ${rec}`;
+              recsList.appendChild(li);
+            });
+            content.appendChild(recsList);
+          }
+
+          // v6.2.8: Warnings
+          if (result.warnings && result.warnings.length > 0) {
+            const warningsTitle = document.createElement('p');
+            warningsTitle.style.marginTop = '12px';
+            warningsTitle.style.fontWeight = '600';
+            warningsTitle.style.marginBottom = '6px';
+            warningsTitle.textContent = '⚠️ Warnings:';
+            content.appendChild(warningsTitle);
+
+            const warnsList = document.createElement('ul');
+            warnsList.className = 'insights-list';
+            warnsList.style.listStyle = 'none';
+            warnsList.style.padding = '8px';
+            warnsList.style.backgroundColor = '#ffebee';
+            warnsList.style.borderRadius = '6px';
+            result.warnings.forEach(warn => {
+              const li = document.createElement('li');
+              li.style.padding = '4px 0';
+              li.textContent = `⚠ ${warn}`;
+              warnsList.appendChild(li);
+            });
+            content.appendChild(warnsList);
+          }
+
           // Все убрано - только показываем результаты расчетов!
         }
 
@@ -748,6 +815,86 @@
     }
 
     // Функции создания таблиц/графиков удалены - фокус на расчетах!
+
+    // v6.2.8: Settings для custom_context
+    function openSettings() {
+      // Загружаем текущий custom_context
+      google.script.run
+        .withSuccessHandler(function(context) {
+          document.getElementById('customContextInput').value = context || '';
+          document.getElementById('settingsModal').style.display = 'flex';
+        })
+        .getCustomContext();
+    }
+
+    function closeSettings() {
+      document.getElementById('settingsModal').style.display = 'none';
+    }
+
+    function saveSettings() {
+      const context = document.getElementById('customContextInput').value.trim();
+
+      google.script.run
+        .withSuccessHandler(function(result) {
+          if (result.success) {
+            alert('✅ Настройки сохранены!');
+            closeSettings();
+          } else {
+            alert('❌ Ошибка сохранения: ' + result.error);
+          }
+        })
+        .withFailureHandler(function(error) {
+          alert('❌ Ошибка: ' + error.message);
+        })
+        .saveCustomContext(context);
+    }
   </script>
+
+  <!-- v6.2.8: Settings Modal -->
+  <div id="settingsModal" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 1000; justify-content: center; align-items: center;">
+    <div style="background: white; border-radius: 12px; padding: 24px; max-width: 90%; max-height: 80%; overflow-y: auto; box-shadow: 0 8px 32px rgba(0,0,0,0.2);">
+      <h2 style="margin: 0 0 16px 0; color: #0f9d58;">⚙️ Настройки AI</h2>
+
+      <div style="margin-bottom: 16px;">
+        <label style="display: block; font-weight: 600; margin-bottom: 8px; color: #202124;">
+          🎯 Персонализация AI (Custom Context)
+        </label>
+        <p style="font-size: 13px; color: #5f6368; margin-bottom: 12px;">
+          Опишите роль AI для более точных рекомендаций. Например: "Ты финансовый директор с 10-летним опытом. Анализируй данные с точки зрения рентабельности и unit economics."
+        </p>
+        <textarea
+          id="customContextInput"
+          placeholder="Оставьте пустым для стандартного режима..."
+          style="width: 100%; min-height: 120px; padding: 12px; border: 1px solid #dadce0; border-radius: 8px; font-family: inherit; font-size: 14px; resize: vertical;"
+          maxlength="2000"
+        ></textarea>
+        <div style="text-align: right; font-size: 12px; color: #5f6368; margin-top: 4px;">
+          <span id="charCount">0</span> / 2000 символов
+        </div>
+      </div>
+
+      <div style="display: flex; gap: 12px; justify-content: flex-end;">
+        <button onclick="closeSettings()" style="padding: 10px 20px; border: 1px solid #dadce0; background: white; color: #202124; border-radius: 6px; cursor: pointer; font-weight: 500;">
+          Отмена
+        </button>
+        <button onclick="saveSettings()" style="padding: 10px 20px; border: none; background: #0f9d58; color: white; border-radius: 6px; cursor: pointer; font-weight: 500;">
+          💾 Сохранить
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Character counter for custom_context
+    document.addEventListener('DOMContentLoaded', function() {
+      const input = document.getElementById('customContextInput');
+      if (input) {
+        input.addEventListener('input', function() {
+          document.getElementById('charCount').textContent = this.value.length;
+        });
+      }
+    });
+  </script>
+
 </body>
 </html>

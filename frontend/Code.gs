@@ -172,11 +172,13 @@ function columnToLetter(column) {
 function generateFormula(query) {
   try {
     const sheetData = getSheetData();
+    const customContext = getCustomContext(); // v6.2.8: Загружаем роль AI
 
     const payload = {
       query: query,
       column_names: sheetData.columnNames,
-      sheet_data: sheetData.data // Отправляем ВСЕ данные (до 1000 строк)
+      sheet_data: sheetData.data, // Отправляем ВСЕ данные (до 1000 строк)
+      custom_context: customContext || undefined // v6.2.8: Персонализированная роль AI
     };
 
     const options = {
@@ -195,7 +197,14 @@ function generateFormula(query) {
         formula: result.formula,
         explanation: result.explanation,
         confidence: result.confidence,
-        targetCell: result.target_cell
+        targetCell: result.target_cell,
+        // v6.2.8: Professional insights from custom_context
+        summary: result.summary,
+        methodology: result.methodology,
+        keyFindings: result.key_findings,
+        professionalInsights: result.professional_insights,
+        recommendations: result.recommendations,
+        warnings: result.warnings
       };
     } else {
       return {
@@ -238,6 +247,38 @@ function saveConversationHistory(history) {
     userProps.setProperty('sheetgpt_history', JSON.stringify(limitedHistory));
   } catch (error) {
     console.log('Не удалось сохранить историю: ' + error);
+  }
+}
+
+/**
+ * Получает custom_context (роль AI) из настроек
+ */
+function getCustomContext() {
+  try {
+    const userProps = PropertiesService.getUserProperties();
+    return userProps.getProperty('sheetgpt_custom_context') || '';
+  } catch (error) {
+    console.log('Не удалось загрузить custom_context: ' + error);
+    return '';
+  }
+}
+
+/**
+ * Сохраняет custom_context (роль AI) в настройки
+ */
+function saveCustomContext(context) {
+  try {
+    const userProps = PropertiesService.getUserProperties();
+    if (context && context.trim()) {
+      userProps.setProperty('sheetgpt_custom_context', context.trim());
+      return { success: true };
+    } else {
+      userProps.deleteProperty('sheetgpt_custom_context');
+      return { success: true };
+    }
+  } catch (error) {
+    console.log('Не удалось сохранить custom_context: ' + error);
+    return { success: false, error: error.toString() };
   }
 }
 
