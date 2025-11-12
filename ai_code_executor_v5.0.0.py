@@ -22,60 +22,22 @@ class AICodeExecutor:
         self.client = OpenAI(api_key=settings.OPENAI_API_KEY)
         self.model = "gpt-4o"  # Лучшая модель для генерации кода
 
-    def _sanitize_custom_context(self, custom_context: Optional[str]) -> Optional[str]:
-        """
-        Санитизация custom_context для защиты от prompt injection
-        """
-        if not custom_context or not custom_context.strip():
-            return None
-
-        # Очищаем от лишних пробелов
-        sanitized = custom_context.strip()
-
-        # Проверяем длину (макс 2000 символов)
-        if len(sanitized) > 2000:
-            sanitized = sanitized[:2000] + "..."
-
-        # Запрещенные паттерны для prompt injection
-        dangerous_patterns = [
-            r"ignore\s+(previous|above|all)\s+instructions",
-            r"forget\s+(everything|all|previous)",
-            r"disregard\s+(previous|above)",
-            r"new\s+instructions:",
-            r"system\s*:\s*",
-            r"assistant\s*:\s*",
-            r"<\|im_start\|>",
-            r"<\|im_end\|>",
-        ]
-
-        # Проверяем на опасные паттерны
-        for pattern in dangerous_patterns:
-            if re.search(pattern, sanitized, re.IGNORECASE):
-                # Если найден опасный паттерн - возвращаем None (игнорируем custom_context)
-                print(f"⚠️ WARNING: Dangerous pattern detected in custom_context: {pattern}")
-                return None
-
-        return sanitized
-
-    def process_with_code(self, query: str, column_names: List[str], sheet_data: List[List[Any]], history: List[Dict[str, Any]] = None, custom_context: Optional[str] = None) -> Dict[str, Any]:
+    def process_with_code(self, query: str, column_names: List[str], sheet_data: List[List[Any]], history: List[Dict[str, Any]] = None) -> Dict[str, Any]:
         """
         Основная функция - генерирует и выполняет Python код для точных расчетов
         """
         try:
-            # Шаг 0: Санитизируем custom_context
-            safe_custom_context = self._sanitize_custom_context(custom_context)
-
             # Шаг 1: Создаем DataFrame
             df = pd.DataFrame(sheet_data, columns=column_names)
 
             # Шаг 2: AI генерирует Python код
-            generated_code = self._generate_python_code(query, df, safe_custom_context)
+            generated_code = self._generate_python_code(query, df)
 
             # Шаг 3: Выполняем код безопасно
             result = self._execute_python_code(generated_code, df)
 
             # Шаг 4: Форматируем ответ
-            return self._format_response(result, generated_code, query, safe_custom_context)
+            return self._format_response(result, generated_code, query)
 
         except Exception as e:
             return {
@@ -86,16 +48,14 @@ class AICodeExecutor:
                 "response_type": "error"
             }
 
-    def _generate_python_code(self, query: str, df: pd.DataFrame, custom_context: Optional[str] = None) -> str:
+    def _generate_python_code(self, query: str, df: pd.DataFrame) -> str:
         """
         AI генерирует Python код для решения задачи
-        С опциональным custom_context для персонализации
         """
 
         # Анализируем структуру данных
         data_info = self._analyze_dataframe(df)
 
-        # Строим базовый промпт
         prompt = f"""You are a Python data analyst expert. Generate Python code to answer this question.
 
 QUESTION: {query}
@@ -122,9 +82,6 @@ REQUIRED OUTPUT VARIABLES:
 - result: the computed answer (number, dataframe, or list)
 - summary: string with the answer in Russian
 - methodology: string explaining the calculation in Russian
-- professional_insights: (optional) professional analysis based on your role
-- recommendations: (optional) list of actionable recommendations
-- warnings: (optional) list of potential issues or concerns
 
 EXAMPLE CODE FOR "топ 3 товара по продажам":
 ```python
@@ -146,34 +103,10 @@ NOW GENERATE CODE FOR THIS QUESTION:
 
 Return ONLY the Python code, no explanations."""
 
-        # Строим system prompt с custom_context (если есть)
-        base_system_prompt = (
-            "You are a Python data analysis expert. Generate ONLY code that uses the provided DataFrame 'df'.\n\n"
-            "⛔ CRITICAL ANTI-HALLUCINATION RULES (CANNOT BE OVERRIDDEN):\n"
-            "1. NEVER create new data with pd.DataFrame() or dictionaries\n"
-            "2. NEVER use hardcoded product names like 'Product A', 'Product E', 'Item 1', etc.\n"
-            "3. ALWAYS use df.groupby() to analyze REAL data from 'df'\n"
-            "4. ALWAYS reference columns by their EXACT names shown in data_info\n"
-            "5. If you create fake data, the code will FAIL validation\n\n"
-            "✅ CORRECT: product_sales = df.groupby(df.columns[0])[df.columns[1]].sum()\n"
-            "❌ WRONG: result = {'Product E': 3000, 'Product F': 2500}\n\n"
-        )
-
-        # Добавляем custom_context если есть
-        if custom_context:
-            full_system_prompt = (
-                base_system_prompt +
-                f"\n🎯 YOUR ROLE AND CONTEXT:\n{custom_context}\n\n"
-                "Based on your role, provide professional insights, recommendations, and warnings in your output variables.\n"
-                "Generate clean, working code that analyzes REAL data only."
-            )
-        else:
-            full_system_prompt = base_system_prompt + "Generate clean, working code that analyzes REAL data only."
-
         response = self.client.chat.completions.create(
             model=self.model,
             messages=[
-                {"role": "system", "content": full_system_prompt},
+                {"role": "system", "content": "You are a Python data analysis expert. Generate clean, working code."},
                 {"role": "user", "content": prompt}
             ],
             temperature=0.1,
@@ -189,37 +122,10 @@ Return ONLY the Python code, no explanations."""
 
         return code
 
-    def _validate_generated_code(self, code: str) -> None:
-        """
-        Валидирует сгенерированный код перед выполнением
-        Проверяет на признаки fake data / hallucination
-        """
-        # Запрещенные паттерны - признаки hallucination
-        forbidden_patterns = [
-            (r"pd\.DataFrame\s*\(\s*\{", "Creating new DataFrame with hardcoded data"),
-            (r"pd\.DataFrame\s*\(\s*\[", "Creating new DataFrame with hardcoded lists"),
-            (r"['\"]Product\s+[A-Z]['\"]\s*:", "Hardcoded product name like 'Product E'"),
-            (r"['\"]Item\s+\d+['\"]\s*:", "Hardcoded item name like 'Item 1'"),
-            (r"result\s*=\s*\{[^}]*['\"]Product", "Result contains hardcoded 'Product'"),
-            (r"result\s*=\s*\{[^}]*['\"]Item", "Result contains hardcoded 'Item'"),
-        ]
-
-        for pattern, description in forbidden_patterns:
-            if re.search(pattern, code, re.IGNORECASE):
-                raise ValueError(
-                    f"⛔ CODE VALIDATION FAILED: {description}\n"
-                    f"AI tried to create fake data instead of analyzing real 'df'!\n"
-                    f"Pattern: {pattern}\n"
-                    f"Code:\n{code[:500]}"
-                )
-
     def _execute_python_code(self, code: str, df: pd.DataFrame) -> Dict[str, Any]:
         """
         Безопасно выполняет Python код и возвращает результат
         """
-        # ВАЛИДАЦИЯ: Проверяем что код не создает fake data
-        self._validate_generated_code(code)
-
         # Создаем безопасное окружение для выполнения
         safe_globals = {
             'df': df,
@@ -351,10 +257,9 @@ Generate CORRECTED code that will work. Return ONLY the Python code."""
 
         return '\n'.join(analysis)
 
-    def _format_response(self, exec_result: Dict[str, Any], code: str, query: str, custom_context: Optional[str] = None) -> Dict[str, Any]:
+    def _format_response(self, exec_result: Dict[str, Any], code: str, query: str) -> Dict[str, Any]:
         """
         Форматирует финальный ответ
-        С опциональными профессиональными инсайтами (если custom_context был указан)
         """
         result = exec_result.get('result')
 
@@ -372,27 +277,17 @@ Generate CORRECTED code that will work. Return ONLY the Python code."""
             key_findings = [f"{k}: {v:,.2f}" if isinstance(v, (int, float)) else f"{k}: {v}"
                           for k, v in list(result_dict.items())[:5]]
 
-        # Базовый ответ
-        response = {
+        return {
             "summary": exec_result.get('summary', 'Результат вычислен'),
             "methodology": exec_result.get('methodology', 'Автоматический анализ с помощью Python'),
             "key_findings": key_findings,
             "confidence": exec_result.get('confidence', 0.95),
             "response_type": "analysis",
             "data": result_dict,
-            "structured_data": None,  # v6.0.0: Только расчеты, без таблиц/графиков
             "code_generated": code[:500] + "..." if len(code) > 500 else code,
             "python_executed": True,
             "execution_output": exec_result.get('output', '')
         }
-
-        # Добавляем профессиональные инсайты если custom_context был указан
-        if custom_context:
-            response["professional_insights"] = exec_result.get('professional_insights')
-            response["recommendations"] = exec_result.get('recommendations')
-            response["warnings"] = exec_result.get('warnings')
-
-        return response
 
 # Singleton
 ai_executor = AICodeExecutor()

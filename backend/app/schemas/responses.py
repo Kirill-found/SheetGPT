@@ -15,6 +15,10 @@ class FormulaResponse(BaseModel):
     summary: Optional[str] = Field(None, description="Краткий вывод анализа")
     methodology: Optional[str] = Field(None, description="Объяснение какие данные использовались для расчёта")
     key_findings: Optional[List[str]] = Field(None, description="Ключевые находки с цифрами")
+    # Professional insights (new - v6.2.0)
+    professional_insights: Optional[str] = Field(None, description="Профессиональные инсайты от AI с учетом роли")
+    recommendations: Optional[List[str]] = Field(None, description="Рекомендации по улучшению")
+    warnings: Optional[List[str]] = Field(None, description="Предупреждения о потенциальных проблемах")
     # Table/Chart creation field (CRITICAL for actions system)
     structured_data: Optional[dict] = Field(None, description="Структурированные данные для создания таблиц/графиков")
     # Highlight action fields

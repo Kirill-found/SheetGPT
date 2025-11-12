@@ -77,12 +77,13 @@ async def generate_formula(request: FormulaRequest):
                 conversation_id=request.conversation_id
             )
         else:
-            # v5.1.0: Use AI Code Executor via process_formula_request
+            # v6.2.0: Use AI Code Executor with optional custom_context
             result = ai_service.process_formula_request(
                 query=request.query,
                 column_names=request.column_names,
                 sheet_data=request.sheet_data,
-                history=request.history or []
+                history=request.history or [],
+                custom_context=request.custom_context  # v6.2.0: Персонализированная роль AI
             )
 
         # Проверяем confidence

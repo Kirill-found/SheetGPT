@@ -11,6 +11,7 @@ class FormulaRequest(BaseModel):
     selected_range: Optional[str] = Field(None, description="Выделенный диапазон (например 'H5:H17')")
     active_cell: Optional[str] = Field(None, description="Активная ячейка (например 'H5')")
     conversation_id: Optional[str] = Field(None, description="ID разговора для поддержки контекстных запросов")
+    custom_context: Optional[str] = Field(None, max_length=2000, description="Персонализированная роль AI (например, 'Ты финансовый директор...')")
 
     class Config:
         json_schema_extra = {
