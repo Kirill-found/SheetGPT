@@ -50,9 +50,14 @@ class AICodeExecutor:
             return self._format_response(result, generated_code, query)
 
         except Exception as e:
+            # Добавляем сгенерированный код в ошибку для отладки
+            error_summary = f"Ошибка: {str(e)}"
+            if 'generated_code' in locals():
+                error_summary += f"\n\n🔍 DEBUG - Generated code:\n{generated_code[:800]}"
+
             return {
                 "error": str(e),
-                "summary": f"Ошибка: {str(e)}",
+                "summary": error_summary,
                 "methodology": "Ошибка при обработке",
                 "confidence": 0.0,
                 "response_type": "error"
