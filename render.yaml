@@ -1,12 +1,12 @@
 services:
   - type: web
     name: sheetgpt-api
-    env: python
+    runtime: python
     region: frankfurt
     plan: free
     branch: main
-    buildCommand: "pip install -r requirements-minimal.txt"
-    startCommand: "uvicorn app.main_simple:app --host 0.0.0.0 --port $PORT"
+    buildCommand: "cd backend && pip install -r requirements.txt"
+    startCommand: "cd backend && uvicorn app.main:app --host 0.0.0.0 --port $PORT"
     envVars:
       - key: PYTHON_VERSION
         value: 3.11.0
