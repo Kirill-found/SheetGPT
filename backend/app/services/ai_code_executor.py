@@ -166,9 +166,12 @@ RULES FOR CODE GENERATION:
 14. Always aggregate duplicate entries for TOP/SUM queries
 15. LIMIT TOP LISTS to maximum 5 items for readability
 16. Use DOUBLE line break (\\n\\n) after title for better spacing
-17. CRITICAL: ALWAYS USE REAL DATA FROM 'df' - NEVER MAKE UP EXAMPLE DATA LIKE "Product F"!
-18. CRITICAL: Use actual column names from data_info above - check df.columns!
-19. If user asks "создай диаграмму/таблицу" - analyze REAL data from df first, then format
+17. ⛔ CRITICAL: NEVER CREATE NEW DATAFRAMES OR DICTIONARIES WITH FAKE DATA!
+18. ⛔ CRITICAL: ONLY USE EXISTING 'df' VARIABLE - DO NOT WRITE df = pd.DataFrame(...)!
+19. ⛔ CRITICAL: Use df.columns[0], df.columns[1] to get REAL column names from existing df
+20. ⛔ CRITICAL: ALL product names, suppliers, values MUST come from df - NO HARDCODED "Product A/B/C/D/E"!
+21. CRITICAL: For "создай график/таблицу" - analyze df.groupby() FIRST, then format results
+22. CRITICAL: NEVER write example data like {'Product E': 3000, 'Product F': 2500} - use df data!
 
 REQUIRED OUTPUT VARIABLES:
 - result: the computed answer (number, dataframe, or list)
@@ -265,26 +268,39 @@ summary = summary.strip()
 methodology = f"Сгруппировано по поставщикам (Колонка B), просуммированы продажи (Колонка E)"
 ```
 
-EXAMPLE CODE FOR "создай диаграмму по топ 5 товарам":
+EXAMPLE CODE FOR "создай график/диаграмму по топ 5 товарам":
 ```python
-# IMPORTANT: Use REAL data from df, analyze it first!
-# Find actual column with products (usually first column)
-product_col = df.columns[0]  # Get REAL column name from df
-# Find actual column with sales (usually last numeric column)
+# ⛔ IMPORTANT: NEVER create new DataFrame or dict with fake data!
+# ✅ ONLY use existing 'df' variable provided to you!
+
+# Step 1: Get REAL column names from existing df
+product_col = df.columns[0]  # This gets ACTUAL column name like "Товар", NOT "Колонка A"!
 numeric_cols = [col for col in df.columns if df[col].dtype in ['int64', 'float64']]
 sales_col = numeric_cols[-1] if numeric_cols else df.columns[-1]
 
-# Group by product and sum sales using ACTUAL column names
+print(f"DEBUG: Using columns: product={{product_col}}, sales={{sales_col}}")
+print(f"DEBUG: Sample products from df: {{df[product_col].head(3).tolist()}}")  # ← This shows REAL products!
+
+# Step 2: Analyze REAL data from df (DO NOT CREATE NEW DATA!)
 product_sales = df.groupby(product_col)[sales_col].sum().sort_values(ascending=False)
 top5 = product_sales.head(5)
 
-# Format result with REAL product names from df
-result = top5.to_dict()
+print(f"DEBUG: Top 5 from df: {{top5.to_dict()}}")  # ← Must show REAL product names!
+
+# Step 3: Format result - product names come FROM DF, not hardcoded!
+result = top5.to_dict()  # ← This will have REAL names like {{'Товар 4': 3000, 'Товар 5': 2500}}
 summary = "Топ 5 товаров по продажам:\\n\\n"
-for i, (product, sales) in enumerate(top5.items(), 1):
-    summary += f"{{i}}. {{product}}: {{sales:,.2f}} руб.\\n"
+for i, (product, sales) in enumerate(top5.items(), 1):  # ← 'product' comes from df!
+    summary += f"{{i}}. {{product}}: {{sales:,.2f}} руб.\\n"  # ← Shows REAL product name
 summary = summary.strip()
-methodology = f"Проанализированы РЕАЛЬНЫЕ данные из таблицы. Сгруппировано по {{product_col}}, просуммированы {{sales_col}}"
+methodology = f"Проанализированы РЕАЛЬНЫЕ данные из df. Сгруппировано по '{{product_col}}', просуммированы '{{sales_col}}'. Найдено {{len(product_sales)}} уникальных товаров."
+```
+
+⛔ WRONG CODE EXAMPLE (DO NOT DO THIS!):
+```python
+# ❌ NEVER write code like this:
+result = {{'Product E': 3000, 'Product F': 2500}}  # ← WRONG! Fake data!
+summary = "1. Product E: 3,000..."  # ← WRONG! Not from df!
 ```
 
 NOW GENERATE CODE FOR THIS QUESTION:

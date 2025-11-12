@@ -436,313 +436,326 @@
     }
 
     function addAIResponse(result) {
-      const container = document.getElementById('chatContainer');
-      const messageDiv = document.createElement('div');
-      messageDiv.className = 'message ai';
+      try {
+        const container = document.getElementById('chatContainer');
+        const messageDiv = document.createElement('div');
+        messageDiv.className = 'message ai';
 
-      const bubble = document.createElement('div');
-      bubble.className = 'message-bubble';
+        const bubble = document.createElement('div');
+        bubble.className = 'message-bubble';
 
-      // Response type badge
-      const responseType = result.response_type || 'formula';
-      const badge = document.createElement('div');
-      badge.className = `response-type-badge response-type-${responseType}`;
-      if (responseType === 'analysis') {
-        badge.textContent = '📊 Анализ';
-      } else if (responseType === 'action') {
-        badge.textContent = '🎯 Действия';
-        badge.className = 'response-type-badge response-type-formula';  // Используем тот же стиль
-      } else {
-        badge.textContent = '📝 Формула';
-      }
-      bubble.appendChild(badge);
-
-      // Main content
-      const content = document.createElement('div');
-
-      if (responseType === 'formula' && result.formula) {
-        // Formula
-        const formulaDiv = document.createElement('div');
-        formulaDiv.className = 'formula-code';
-        formulaDiv.textContent = result.formula;
-        content.appendChild(formulaDiv);
-
-        // Explanation
-        const explanation = document.createElement('p');
-        explanation.textContent = result.explanation;
-        content.appendChild(explanation);
-
-        // Action buttons
-        const actions = document.createElement('div');
-        actions.className = 'action-buttons';
-
-        const insertBtn = document.createElement('button');
-        insertBtn.className = 'action-btn primary';
-        insertBtn.textContent = '✓ Вставить формулу';
-        insertBtn.onclick = () => insertFormula(result.formula, result.target_cell);
-        actions.appendChild(insertBtn);
-
-        const copyBtn = document.createElement('button');
-        copyBtn.className = 'action-btn';
-        copyBtn.textContent = '📋 Скопировать';
-        copyBtn.onclick = () => copyToClipboard(result.formula);
-        actions.appendChild(copyBtn);
-
-        content.appendChild(actions);
-      } else if (responseType === 'action' && result.insights) {
-        // Action Plan
-        const explanation = document.createElement('p');
-        explanation.textContent = result.explanation;
-        content.appendChild(explanation);
-
-        // Display actions
-        if (result.insights && result.insights.length > 0) {
-          const actionsTitle = document.createElement('p');
-          actionsTitle.style.marginTop = '12px';
-          actionsTitle.style.fontWeight = '500';
-          actionsTitle.textContent = '📋 План действий:';
-          content.appendChild(actionsTitle);
-
-          const actionsList = document.createElement('ul');
-          actionsList.className = 'insights-list';
-          result.insights.forEach(action => {
-            const li = document.createElement('li');
-            // Красивое отображение action
-            if (action.type === 'create_chart') {
-              li.textContent = `📊 Создать график: ${action.config.title || 'График данных'} (диапазон: ${action.config.dataRange})`;
-            } else if (action.type === 'format_cells') {
-              li.textContent = `🎨 Форматировать ячейки: ${action.config.range}`;
-            } else if (action.type === 'insert_formula') {
-              li.textContent = `📝 Вставить формулу: ${action.config.formula}`;
-            } else {
-              li.textContent = `${action.type}: ${JSON.stringify(action.config)}`;
-            }
-            actionsList.appendChild(li);
-          });
-          content.appendChild(actionsList);
+        // Response type badge
+        const responseType = result.response_type || 'formula';
+        const badge = document.createElement('div');
+        badge.className = `response-type-badge response-type-${responseType}`;
+        if (responseType === 'analysis') {
+          badge.textContent = '📊 Анализ';
+        } else if (responseType === 'action') {
+          badge.textContent = '🎯 Действия';
+          badge.className = 'response-type-badge response-type-formula';
+        } else {
+          badge.textContent = '📝 Формула';
         }
+        bubble.appendChild(badge);
 
-        // Execute button
-        const actions = document.createElement('div');
-        actions.className = 'action-buttons';
+        // Main content
+        const content = document.createElement('div');
 
-        const executeBtn = document.createElement('button');
-        executeBtn.className = 'action-btn primary';
-        executeBtn.textContent = '▶ Выполнить действия';
-        executeBtn.onclick = () => executeActions(result.insights);
-        actions.appendChild(executeBtn);
+        if (responseType === 'formula' && result.formula) {
+          // Formula
+          const formulaDiv = document.createElement('div');
+          formulaDiv.className = 'formula-code';
+          formulaDiv.textContent = result.formula;
+          content.appendChild(formulaDiv);
 
-        content.appendChild(actions);
-      } else {
-        // Analysis - structured response
+          // Explanation
+          const explanation = document.createElement('p');
+          explanation.textContent = result.explanation;
+          content.appendChild(explanation);
 
-        // Summary (краткий вывод)
-        if (result.summary) {
-          const summaryDiv = document.createElement('div');
-          summaryDiv.style.padding = '10px';
-          summaryDiv.style.backgroundColor = '#f5f5f5';
-          summaryDiv.style.borderRadius = '6px';
-          summaryDiv.style.marginBottom = '12px';
-          summaryDiv.style.fontWeight = '500';
-          summaryDiv.innerHTML = `<strong>📊 Вывод:</strong><br>${result.summary}`;
-          content.appendChild(summaryDiv);
-        } else if (result.explanation || result.answer) {
-          // Fallback для старого формата
-          const answer = document.createElement('p');
-          answer.textContent = result.explanation || result.answer;
-          content.appendChild(answer);
-        }
+          // Action buttons
+          const actions = document.createElement('div');
+          actions.className = 'action-buttons';
 
-        // Methodology (как посчитано)
-        if (result.methodology) {
-          const methodologyDiv = document.createElement('div');
-          methodologyDiv.style.padding = '10px';
-          methodologyDiv.style.backgroundColor = '#e3f2fd';
-          methodologyDiv.style.borderRadius = '6px';
-          methodologyDiv.style.marginBottom = '12px';
-          methodologyDiv.style.fontSize = '13px';
-          methodologyDiv.innerHTML = `${result.methodology}`;
-          content.appendChild(methodologyDiv);
-        }
+          const insertBtn = document.createElement('button');
+          insertBtn.className = 'action-btn primary';
+          insertBtn.textContent = '✓ Вставить формулу';
+          insertBtn.onclick = () => insertFormula(result.formula, result.target_cell);
+          actions.appendChild(insertBtn);
 
-        // Key findings (ключевые находки)
-        if (result.key_findings && result.key_findings.length > 0) {
-          const findingsTitle = document.createElement('p');
-          findingsTitle.style.marginTop = '12px';
-          findingsTitle.style.fontWeight = '600';
-          findingsTitle.style.marginBottom = '6px';
-          findingsTitle.textContent = '🔍 Ключевые находки:';
-          content.appendChild(findingsTitle);
+          const copyBtn = document.createElement('button');
+          copyBtn.className = 'action-btn';
+          copyBtn.textContent = '📋 Скопировать';
+          copyBtn.onclick = () => copyToClipboard(result.formula);
+          actions.appendChild(copyBtn);
 
-          const findingsList = document.createElement('ul');
-          findingsList.className = 'insights-list';
-          findingsList.style.listStyle = 'none';
-          findingsList.style.padding = '0';
-          result.key_findings.forEach(finding => {
-            const li = document.createElement('li');
-            li.style.padding = '6px 0';
-            li.style.borderBottom = '1px solid #eee';
-            li.textContent = finding;
-            findingsList.appendChild(li);
-          });
-          content.appendChild(findingsList);
-        }
+          content.appendChild(actions);
+        } else if (responseType === 'action' && result.insights) {
+          // Action Plan
+          const explanation = document.createElement('p');
+          explanation.textContent = result.explanation;
+          content.appendChild(explanation);
 
-        // Insights (инсайты)
-        if (result.insights && result.insights.length > 0) {
-          const insightsTitle = document.createElement('p');
-          insightsTitle.style.marginTop = '12px';
-          insightsTitle.style.fontWeight = '600';
-          insightsTitle.style.marginBottom = '6px';
-          insightsTitle.textContent = '💡 Инсайты:';
-          content.appendChild(insightsTitle);
+          // Display actions
+          if (result.insights && result.insights.length > 0) {
+            const actionsTitle = document.createElement('p');
+            actionsTitle.style.marginTop = '12px';
+            actionsTitle.style.fontWeight = '500';
+            actionsTitle.textContent = '📋 План действий:';
+            content.appendChild(actionsTitle);
 
-          const insightsList = document.createElement('ul');
-          insightsList.className = 'insights-list';
-          insightsList.style.listStyle = 'none';
-          insightsList.style.padding = '0';
-          result.insights.forEach(insight => {
-            const li = document.createElement('li');
-            li.style.padding = '6px 0';
-
-            // Проверяем тип insight - строка или объект
-            if (typeof insight === 'object') {
-              // Для action plan объектов (не должно быть в analysis, но на всякий случай)
-              if (insight.type === 'create_chart') {
-                li.textContent = `📊 Создать график: ${insight.config.title || 'График данных'}`;
+            const actionsList = document.createElement('ul');
+            actionsList.className = 'insights-list';
+            result.insights.forEach(action => {
+              const li = document.createElement('li');
+              if (action.type === 'create_chart') {
+                li.textContent = `📊 Создать график: ${action.config.title || 'График данных'} (диапазон: ${action.config.dataRange})`;
+              } else if (action.type === 'format_cells') {
+                li.textContent = `🎨 Форматировать ячейки: ${action.config.range}`;
+              } else if (action.type === 'insert_formula') {
+                li.textContent = `📝 Вставить формулу: ${action.config.formula}`;
               } else {
-                li.textContent = `${insight.type}: ${JSON.stringify(insight.config || insight)}`;
+                li.textContent = `${action.type}: ${JSON.stringify(action.config)}`;
               }
-            } else {
-              // Для обычных текстовых insights
-              li.textContent = insight;
-            }
-            insightsList.appendChild(li);
-          });
-          content.appendChild(insightsList);
-        }
+              actionsList.appendChild(li);
+            });
+            content.appendChild(actionsList);
+          }
 
-        // Suggested actions (рекомендации)
-        if (result.suggested_actions && result.suggested_actions.length > 0) {
-          const actionsTitle = document.createElement('p');
-          actionsTitle.style.marginTop = '12px';
-          actionsTitle.style.fontWeight = '600';
-          actionsTitle.style.marginBottom = '6px';
-          actionsTitle.textContent = '✅ Рекомендации:';
-          content.appendChild(actionsTitle);
+          // Execute button
+          const actions = document.createElement('div');
+          actions.className = 'action-buttons';
 
-          const actionsList = document.createElement('ul');
-          actionsList.className = 'insights-list';
-          actionsList.style.listStyle = 'none';
-          actionsList.style.padding = '0';
-          actionsList.style.backgroundColor = '#e8f5e9';
-          actionsList.style.padding = '8px';
-          actionsList.style.borderRadius = '6px';
-          result.suggested_actions.forEach(action => {
-            const li = document.createElement('li');
-            li.style.padding = '4px 0';
-            li.textContent = action;
-            actionsList.appendChild(li);
-          });
-          content.appendChild(actionsList);
-        }
+          const executeBtn = document.createElement('button');
+          executeBtn.className = 'action-btn primary';
+          executeBtn.textContent = '▶ Выполнить действия';
+          executeBtn.onclick = () => executeActions(result.insights);
+          actions.appendChild(executeBtn);
 
-        // НОВОЕ: Автоматическое создание или показ кнопки для structured_data
-        if (result.structured_data && result.structured_data.headers && result.structured_data.rows) {
-          // Если auto_execute=true - создаем таблицу АВТОМАТИЧЕСКИ
-          if (result.structured_data.auto_execute) {
-            // Показываем сообщение что создается таблица
-            const autoMessage = document.createElement('div');
-            autoMessage.style.marginTop = '12px';
-            autoMessage.style.padding = '8px 12px';
-            autoMessage.style.backgroundColor = '#E8F5E9';
-            autoMessage.style.borderRadius = '4px';
-            autoMessage.style.fontSize = '13px';
-            autoMessage.style.color = '#2E7D32';
-            autoMessage.textContent = '📊 Создание таблицы и графика...';
-            content.appendChild(autoMessage);
+          content.appendChild(actions);
+        } else {
+          // Analysis - structured response
 
-            // Автоматически вызываем создание таблицы
-            setTimeout(() => {
-              google.script.run
-                .withSuccessHandler((tableResult) => {
-                  if (tableResult.success) {
-                    autoMessage.textContent = `✅ Таблица "${tableResult.table.sheetName}" создана`;
-                    autoMessage.style.backgroundColor = '#C8E6C9';
-                  } else {
-                    autoMessage.textContent = `❌ Ошибка: ${tableResult.message}`;
+          // Summary
+          if (result.summary) {
+            const summaryDiv = document.createElement('div');
+            summaryDiv.style.padding = '10px';
+            summaryDiv.style.backgroundColor = '#f5f5f5';
+            summaryDiv.style.borderRadius = '6px';
+            summaryDiv.style.marginBottom = '12px';
+            summaryDiv.style.fontWeight = '500';
+            summaryDiv.innerHTML = `<strong>📊 Вывод:</strong><br>${result.summary}`;
+            content.appendChild(summaryDiv);
+          } else if (result.explanation || result.answer) {
+            const answer = document.createElement('p');
+            answer.textContent = result.explanation || result.answer;
+            content.appendChild(answer);
+          }
+
+          // Methodology
+          if (result.methodology) {
+            const methodologyDiv = document.createElement('div');
+            methodologyDiv.style.padding = '10px';
+            methodologyDiv.style.backgroundColor = '#e3f2fd';
+            methodologyDiv.style.borderRadius = '6px';
+            methodologyDiv.style.marginBottom = '12px';
+            methodologyDiv.style.fontSize = '13px';
+            methodologyDiv.innerHTML = `${result.methodology}`;
+            content.appendChild(methodologyDiv);
+          }
+
+          // Key findings
+          if (result.key_findings && result.key_findings.length > 0) {
+            const findingsTitle = document.createElement('p');
+            findingsTitle.style.marginTop = '12px';
+            findingsTitle.style.fontWeight = '600';
+            findingsTitle.style.marginBottom = '6px';
+            findingsTitle.textContent = '🔍 Ключевые находки:';
+            content.appendChild(findingsTitle);
+
+            const findingsList = document.createElement('ul');
+            findingsList.className = 'insights-list';
+            findingsList.style.listStyle = 'none';
+            findingsList.style.padding = '0';
+            result.key_findings.forEach(finding => {
+              const li = document.createElement('li');
+              li.style.padding = '6px 0';
+              li.style.borderBottom = '1px solid #eee';
+              li.textContent = finding;
+              findingsList.appendChild(li);
+            });
+            content.appendChild(findingsList);
+          }
+
+          // Insights
+          if (result.insights && result.insights.length > 0) {
+            const insightsTitle = document.createElement('p');
+            insightsTitle.style.marginTop = '12px';
+            insightsTitle.style.fontWeight = '600';
+            insightsTitle.style.marginBottom = '6px';
+            insightsTitle.textContent = '💡 Инсайты:';
+            content.appendChild(insightsTitle);
+
+            const insightsList = document.createElement('ul');
+            insightsList.className = 'insights-list';
+            insightsList.style.listStyle = 'none';
+            insightsList.style.padding = '0';
+            result.insights.forEach(insight => {
+              const li = document.createElement('li');
+              li.style.padding = '6px 0';
+
+              if (typeof insight === 'object') {
+                if (insight.type === 'create_chart') {
+                  li.textContent = `📊 Создать график: ${insight.config.title || 'График данных'}`;
+                } else {
+                  li.textContent = `${insight.type}: ${JSON.stringify(insight.config || insight)}`;
+                }
+              } else {
+                li.textContent = insight;
+              }
+              insightsList.appendChild(li);
+            });
+            content.appendChild(insightsList);
+          }
+
+          // Suggested actions
+          if (result.suggested_actions && result.suggested_actions.length > 0) {
+            const actionsTitle = document.createElement('p');
+            actionsTitle.style.marginTop = '12px';
+            actionsTitle.style.fontWeight = '600';
+            actionsTitle.style.marginBottom = '6px';
+            actionsTitle.textContent = '✅ Рекомендации:';
+            content.appendChild(actionsTitle);
+
+            const actionsList = document.createElement('ul');
+            actionsList.className = 'insights-list';
+            actionsList.style.listStyle = 'none';
+            actionsList.style.padding = '0';
+            actionsList.style.backgroundColor = '#e8f5e9';
+            actionsList.style.padding = '8px';
+            actionsList.style.borderRadius = '6px';
+            result.suggested_actions.forEach(action => {
+              const li = document.createElement('li');
+              li.style.padding = '4px 0';
+              li.textContent = action;
+              actionsList.appendChild(li);
+            });
+            content.appendChild(actionsList);
+          }
+
+          // Structured data - table/chart creation
+          if (result.structured_data && result.structured_data.headers && result.structured_data.rows) {
+            // Проверяем auto_execute явно
+            const shouldAutoExecute = result.structured_data.auto_execute === true;
+
+            if (shouldAutoExecute) {
+              // АВТОМАТИЧЕСКОЕ создание таблицы
+              const autoMessage = document.createElement('div');
+              autoMessage.style.marginTop = '12px';
+              autoMessage.style.padding = '8px 12px';
+              autoMessage.style.backgroundColor = '#E8F5E9';
+              autoMessage.style.borderRadius = '4px';
+              autoMessage.style.fontSize = '13px';
+              autoMessage.style.color = '#2E7D32';
+              autoMessage.textContent = '📊 Создание таблицы и графика...';
+              content.appendChild(autoMessage);
+
+              // Автоматически вызываем создание таблицы через небольшую задержку
+              setTimeout(function() {
+                google.script.run
+                  .withSuccessHandler(function(tableResult) {
+                    if (tableResult && tableResult.success) {
+                      autoMessage.textContent = `✅ Таблица "${tableResult.table.sheetName}" создана`;
+                      autoMessage.style.backgroundColor = '#C8E6C9';
+                    } else {
+                      autoMessage.textContent = `❌ Ошибка: ${tableResult.message || 'Неизвестная ошибка'}`;
+                      autoMessage.style.backgroundColor = '#FFCDD2';
+                      autoMessage.style.color = '#C62828';
+                    }
+                  })
+                  .withFailureHandler(function(error) {
+                    autoMessage.textContent = `❌ Ошибка: ${error.message}`;
                     autoMessage.style.backgroundColor = '#FFCDD2';
                     autoMessage.style.color = '#C62828';
-                  }
-                })
-                .withFailureHandler((error) => {
-                  autoMessage.textContent = `❌ Ошибка: ${error.message}`;
-                  autoMessage.style.backgroundColor = '#FFCDD2';
-                  autoMessage.style.color = '#C62828';
-                })
-                .createTableAndChart(result.structured_data);
-            }, 300);
-          } else {
-            // Если auto_execute=false - показываем КНОПКУ (как раньше)
-            const tableActions = document.createElement('div');
-            tableActions.className = 'action-buttons';
-            tableActions.style.marginTop = '16px';
-            tableActions.style.paddingTop = '12px';
-            tableActions.style.borderTop = '1px solid #eee';
+                  })
+                  .createTableAndChart(result.structured_data);
+              }, 300);
+            } else {
+              // Показываем КНОПКУ для создания таблицы
+              const tableActions = document.createElement('div');
+              tableActions.className = 'action-buttons';
+              tableActions.style.marginTop = '16px';
+              tableActions.style.paddingTop = '12px';
+              tableActions.style.borderTop = '1px solid #eee';
 
-            const createTableBtn = document.createElement('button');
-            createTableBtn.className = 'action-btn primary';
-            createTableBtn.innerHTML = '📊 Создать таблицу';
-            createTableBtn.onclick = () => createTable(result.structured_data);
-            tableActions.appendChild(createTableBtn);
+              const createTableBtn = document.createElement('button');
+              createTableBtn.className = 'action-btn primary';
+              createTableBtn.innerHTML = '📊 Создать таблицу';
+              createTableBtn.onclick = function() {
+                createTable(result.structured_data, createTableBtn);
+              };
+              tableActions.appendChild(createTableBtn);
 
-            // Если есть рекомендация графика - показываем это
-            if (result.structured_data.chart_recommended) {
-              const chartInfo = document.createElement('span');
-              chartInfo.style.fontSize = '12px';
-              chartInfo.style.color = '#666';
-              chartInfo.style.marginLeft = '8px';
-              chartInfo.textContent = `+ график (${result.structured_data.chart_recommended})`;
-              tableActions.appendChild(chartInfo);
+              if (result.structured_data.chart_recommended) {
+                const chartInfo = document.createElement('span');
+                chartInfo.style.fontSize = '12px';
+                chartInfo.style.color = '#666';
+                chartInfo.style.marginLeft = '8px';
+                chartInfo.textContent = `+ график (${result.structured_data.chart_recommended})`;
+                tableActions.appendChild(chartInfo);
+              }
+
+              content.appendChild(tableActions);
+            }
+          }
+
+          // Row highlighting
+          if (result.action_type === 'highlight' && result.highlight_rows && result.highlight_rows.length > 0) {
+            const highlightActions = document.createElement('div');
+            highlightActions.className = 'action-buttons';
+            highlightActions.style.marginTop = '16px';
+            highlightActions.style.paddingTop = '12px';
+            highlightActions.style.borderTop = '1px solid #eee';
+
+            const highlightBtn = document.createElement('button');
+            highlightBtn.className = 'action-btn primary';
+            highlightBtn.innerHTML = `🎨 Выделить ${result.highlight_rows.length} строк`;
+            highlightBtn.onclick = function() {
+              highlightSelectedRows(result.highlight_rows, result.highlight_color, highlightBtn);
+            };
+            highlightActions.appendChild(highlightBtn);
+
+            if (result.highlight_message) {
+              const highlightInfo = document.createElement('span');
+              highlightInfo.style.fontSize = '12px';
+              highlightInfo.style.color = '#666';
+              highlightInfo.style.marginLeft = '8px';
+              highlightInfo.textContent = result.highlight_message;
+              highlightActions.appendChild(highlightInfo);
             }
 
-            content.appendChild(tableActions);
+            content.appendChild(highlightActions);
           }
         }
 
-        // НОВОЕ: Кнопка выделения строк если есть highlight_rows
-        if (result.action_type === 'highlight' && result.highlight_rows && result.highlight_rows.length > 0) {
-          const highlightActions = document.createElement('div');
-          highlightActions.className = 'action-buttons';
-          highlightActions.style.marginTop = '16px';
-          highlightActions.style.paddingTop = '12px';
-          highlightActions.style.borderTop = '1px solid #eee';
+        bubble.appendChild(content);
+        messageDiv.appendChild(bubble);
+        container.appendChild(messageDiv);
 
-          const highlightBtn = document.createElement('button');
-          highlightBtn.className = 'action-btn primary';
-          highlightBtn.innerHTML = `🎨 Выделить ${result.highlight_rows.length} строк`;
-          highlightBtn.onclick = () => highlightSelectedRows(result.highlight_rows, result.highlight_color);
-          highlightActions.appendChild(highlightBtn);
-
-          // Показываем сообщение о количестве строк
-          if (result.highlight_message) {
-            const highlightInfo = document.createElement('span');
-            highlightInfo.style.fontSize = '12px';
-            highlightInfo.style.color = '#666';
-            highlightInfo.style.marginLeft = '8px';
-            highlightInfo.textContent = result.highlight_message;
-            highlightActions.appendChild(highlightInfo);
-          }
-
-          content.appendChild(highlightActions);
-        }
+        scrollToBottom();
+      } catch (error) {
+        console.error('Error in addAIResponse:', error);
+        // Показываем ошибку пользователю
+        const container = document.getElementById('chatContainer');
+        const errorDiv = document.createElement('div');
+        errorDiv.className = 'message ai';
+        const bubble = document.createElement('div');
+        bubble.className = 'message-bubble';
+        bubble.style.borderColor = '#f44336';
+        bubble.innerHTML = `<p style="color: #f44336;">❌ Ошибка отображения ответа: ${error.message}</p>`;
+        errorDiv.appendChild(bubble);
+        container.appendChild(errorDiv);
       }
-
-      bubble.appendChild(content);
-      messageDiv.appendChild(bubble);
-      container.appendChild(messageDiv);
-
-      scrollToBottom();
     }
 
     function addLoadingIndicator() {
@@ -772,12 +785,18 @@
 
     function handleResponse(result) {
       removeLoadingIndicator();
-      addAIResponse(result);
       isProcessing = false;
+
+      if (result) {
+        addAIResponse(result);
+      } else {
+        handleError({message: 'Пустой ответ от сервера'});
+      }
     }
 
     function handleError(error) {
       removeLoadingIndicator();
+      isProcessing = false;
 
       const container = document.getElementById('chatContainer');
       const errorDiv = document.createElement('div');
@@ -786,13 +805,12 @@
       const bubble = document.createElement('div');
       bubble.className = 'message-bubble';
       bubble.style.borderColor = '#f44336';
-      bubble.innerHTML = `<p style="color: #f44336;">❌ Ошибка: ${error.message}</p>`;
+      bubble.innerHTML = `<p style="color: #f44336;">❌ Ошибка: ${error.message || 'Неизвестная ошибка'}</p>`;
 
       errorDiv.appendChild(bubble);
       container.appendChild(errorDiv);
 
       scrollToBottom();
-      isProcessing = false;
     }
 
     function scrollToBottom() {
@@ -821,9 +839,8 @@
       });
     }
 
-    function createTable(structuredData) {
+    function createTable(structuredData, btn) {
       // Показываем индикатор загрузки
-      const btn = event.target;
       btn.disabled = true;
       btn.textContent = '⏳ Создание...';
 
@@ -832,7 +849,6 @@
           btn.disabled = false;
           btn.textContent = '✓ Создано!';
           if (result.success) {
-            // Показываем успешное сообщение
             setTimeout(() => {
               alert(`✓ ${result.message}\n\nЛист: ${result.table.sheetName}\nСтрок: ${result.table.rowCount}`);
               btn.textContent = '📊 Создать таблицу';
@@ -850,9 +866,8 @@
         .createTableAndChart(structuredData);
     }
 
-    function highlightSelectedRows(rowNumbers, color) {
+    function highlightSelectedRows(rowNumbers, color, btn) {
       // Показываем индикатор загрузки
-      const btn = event.target;
       const originalText = btn.textContent;
       btn.disabled = true;
       btn.textContent = '⏳ Выделение...';
