@@ -1,7 +1,7 @@
 FROM python:3.11-slim
 
 # CRITICAL: Change this on EVERY deployment to force rebuild
-ARG CACHEBUST=20251112-1255-v628
+ARG CACHEBUST=20251112-1302-FORCE-REBUILD
 RUN echo "CACHE BUST: $CACHEBUST - Building v6.2.8 with custom_context"
 
 LABEL version="6.2.8"

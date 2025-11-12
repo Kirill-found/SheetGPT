@@ -55,7 +55,7 @@ async def root():
     """Health check endpoint"""
     return {
         "name": "SheetGPT API",
-        "version": "5.0.3",  # AI Code Executor + structured_data for tables/charts
+        "version": "6.2.8",  # v6.2.8: custom_context + professional insights
         "status": "operational",
         "engine": "AI Code Executor",
         "features": {
@@ -64,7 +64,8 @@ async def root():
             "accuracy": "99%",
             "methodology": True,
             "auto_headers": True,
-            "structured_data": True  # Tables and charts support
+            "custom_context": True,  # v6.2.8: Personalized AI role
+            "professional_insights": True  # v6.2.8: AI-generated insights/recommendations
         },
         "timestamp": datetime.now().isoformat()
     }
