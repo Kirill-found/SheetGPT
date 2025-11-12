@@ -40,6 +40,9 @@ class AICodeExecutor:
             # Шаг 2: AI генерирует Python код
             generated_code = self._generate_python_code(query, df)
 
+            # DEBUG: Логируем сгенерированный код
+            print(f"\n{'='*60}\nGENERATED CODE:\n{'='*60}\n{generated_code}\n{'='*60}\n")
+
             # Шаг 3: Выполняем код безопасно
             result = self._execute_python_code(generated_code, df)
 
@@ -311,7 +314,18 @@ Return ONLY the Python code, no explanations."""
         response = self.client.chat.completions.create(
             model=self.model,
             messages=[
-                {"role": "system", "content": "You are a Python data analysis expert. Generate clean, working code."},
+                {
+                    "role": "system",
+                    "content": (
+                        "You are a Python data analysis expert. Generate clean, working code.\n"
+                        "⛔ CRITICAL: You MUST use ONLY the 'df' variable provided to you.\n"
+                        "⛔ NEVER create new DataFrames with pd.DataFrame()\n"
+                        "⛔ NEVER create dictionaries with hardcoded data like {'Product E': 3000}\n"
+                        "⛔ ALL data MUST come from analyzing the existing 'df' variable using pandas operations\n"
+                        "✅ CORRECT: df.groupby(df.columns[0])[df.columns[1]].sum()\n"
+                        "❌ WRONG: result = {'Product E': 3000, 'Product F': 2500}"
+                    )
+                },
                 {"role": "user", "content": prompt}
             ],
             temperature=0.1,
@@ -327,10 +341,35 @@ Return ONLY the Python code, no explanations."""
 
         return code
 
+    def _validate_generated_code(self, code: str) -> None:
+        """
+        Валидирует сгенерированный код перед выполнением
+        Выбрасывает исключение если находит запрещенные паттерны
+        """
+        # Запрещенные паттерны - признаки fake data
+        forbidden_patterns = [
+            r"pd\.DataFrame\s*\(",  # Создание нового DataFrame
+            r"['\"]Product\s+[A-Z]['\"]\s*:",  # {'Product E': ..., 'Product F': ...}
+            r"['\"]Item\s+\d+['\"]\s*:",  # {'Item 1': ..., 'Item 2': ...}
+            r"result\s*=\s*\{[^}]*['\"]Product",  # result = {'Product A': 100}
+            r"result\s*=\s*\{[^}]*['\"]Item",  # result = {'Item 1': 100}
+        ]
+
+        for pattern in forbidden_patterns:
+            if re.search(pattern, code):
+                raise ValueError(
+                    f"⛔ CRITICAL ERROR: Generated code contains FAKE DATA pattern: {pattern}\n"
+                    f"AI must use REAL data from 'df' variable, NOT create new dictionaries or DataFrames!\n"
+                    f"Found in code:\n{code[:500]}"
+                )
+
     def _execute_python_code(self, code: str, df: pd.DataFrame) -> Dict[str, Any]:
         """
         Безопасно выполняет Python код и возвращает результат
         """
+        # КРИТИЧЕСКАЯ ВАЛИДАЦИЯ: проверяем что код не создает fake data
+        self._validate_generated_code(code)
+
         # Создаем безопасное окружение для выполнения
         safe_globals = {
             'df': df,
