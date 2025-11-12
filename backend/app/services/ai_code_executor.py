@@ -31,18 +31,22 @@ class AICodeExecutor:
             # Шаг 1: Создаем DataFrame
             df = pd.DataFrame(sheet_data, columns=column_names)
 
-            # FAILSAFE: For average price queries, use simple direct calculation
+            # УНИВЕРСАЛЬНЫЙ FAILSAFE: Если запрос содержит "топ X" - ВСЕГДА используем FAILSAFE!
+            # Это покрывает ВСЕ варианты: "топ 5", "выдели топ", "покажи топ", "создай график по топ", и т.д.
             query_lower = query.lower()
+            if re.search(r'топ\s+\d+', query_lower) or (
+                'топ' in query_lower and any(word in query_lower for word in ['товар', 'продукт', 'прода', 'item', 'product'])
+            ):
+                # Любой запрос с "топ X товаров/продуктов" - FAILSAFE без AI!
+                print(f"⚡ FAILSAFE ACTIVATED for TOP items query: {query}")
+                return self._calculate_top_items_failsafe(df, column_names, query)
+
+            # FAILSAFE 2: For average price queries, use simple direct calculation
             if any(word in query_lower for word in ['средн', 'average', 'mean', 'sredn', 'tsena', 'price']):
                 if any(word in query_lower for word in ['постав', 'supplier', 'postavsh', 'компан', 'kazhdogo']):
                     # This is "average price per supplier" query - use failsafe
+                    print(f"⚡ FAILSAFE ACTIVATED for AVG price query: {query}")
                     return self._calculate_avg_price_failsafe(df, column_names)
-
-            # FAILSAFE 2: For chart/table creation queries, use direct pandas calculation
-            if any(word in query_lower for word in ['создай график', 'построй график', 'сделай график', 'график по', 'диаграмм']):
-                if any(word in query_lower for word in ['топ', 'top']):
-                    # "создай график по топ X товарам" - use failsafe
-                    return self._calculate_top_items_failsafe(df, column_names, query)
 
             # Шаг 2: AI генерирует Python код
             try:
