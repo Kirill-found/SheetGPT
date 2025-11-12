@@ -166,6 +166,9 @@ RULES FOR CODE GENERATION:
 14. Always aggregate duplicate entries for TOP/SUM queries
 15. LIMIT TOP LISTS to maximum 5 items for readability
 16. Use DOUBLE line break (\\n\\n) after title for better spacing
+17. CRITICAL: ALWAYS USE REAL DATA FROM 'df' - NEVER MAKE UP EXAMPLE DATA LIKE "Product F"!
+18. CRITICAL: Use actual column names from data_info above - check df.columns!
+19. If user asks "создай диаграмму/таблицу" - analyze REAL data from df first, then format
 
 REQUIRED OUTPUT VARIABLES:
 - result: the computed answer (number, dataframe, or list)
@@ -260,6 +263,28 @@ for i, (supplier, sales) in enumerate(supplier_sales.head(5).items(), 1):
     summary += f"{{i}}. {{supplier}}: {{sales:,.2f}} руб.\\n"
 summary = summary.strip()
 methodology = f"Сгруппировано по поставщикам (Колонка B), просуммированы продажи (Колонка E)"
+```
+
+EXAMPLE CODE FOR "создай диаграмму по топ 5 товарам":
+```python
+# IMPORTANT: Use REAL data from df, analyze it first!
+# Find actual column with products (usually first column)
+product_col = df.columns[0]  # Get REAL column name from df
+# Find actual column with sales (usually last numeric column)
+numeric_cols = [col for col in df.columns if df[col].dtype in ['int64', 'float64']]
+sales_col = numeric_cols[-1] if numeric_cols else df.columns[-1]
+
+# Group by product and sum sales using ACTUAL column names
+product_sales = df.groupby(product_col)[sales_col].sum().sort_values(ascending=False)
+top5 = product_sales.head(5)
+
+# Format result with REAL product names from df
+result = top5.to_dict()
+summary = "Топ 5 товаров по продажам:\\n\\n"
+for i, (product, sales) in enumerate(top5.items(), 1):
+    summary += f"{{i}}. {{product}}: {{sales:,.2f}} руб.\\n"
+summary = summary.strip()
+methodology = f"Проанализированы РЕАЛЬНЫЕ данные из таблицы. Сгруппировано по {{product_col}}, просуммированы {{sales_col}}"
 ```
 
 NOW GENERATE CODE FOR THIS QUESTION:
