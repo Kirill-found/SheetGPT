@@ -122,9 +122,11 @@ REQUIRED OUTPUT VARIABLES:
 - result: the computed answer (number, dataframe, or list)
 - summary: string with the answer in Russian
 - methodology: string explaining the calculation in Russian
-- professional_insights: (optional) professional analysis based on your role
-- recommendations: (optional) list of actionable recommendations
-- warnings: (optional) list of potential issues or concerns
+
+CONDITIONAL VARIABLES (required if you have a professional role):
+- professional_insights: string - professional analysis based on your role
+- recommendations: list of strings - actionable recommendations
+- warnings: list of strings - potential issues or concerns
 
 EXAMPLE CODE FOR "топ 3 товара по продажам":
 ```python
