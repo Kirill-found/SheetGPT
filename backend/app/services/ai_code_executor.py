@@ -64,6 +64,8 @@ class AICodeExecutor:
         try:
             # Шаг 0: Санитизируем custom_context
             safe_custom_context = self._sanitize_custom_context(custom_context)
+            print(f"\n🔍 DEBUG: custom_context = {custom_context}")
+            print(f"🔍 DEBUG: safe_custom_context = {safe_custom_context}")
 
             # Шаг 1: Создаем DataFrame
             df = pd.DataFrame(sheet_data, columns=column_names)
@@ -75,7 +77,10 @@ class AICodeExecutor:
             result = self._execute_python_code(generated_code, df)
 
             # Шаг 4: Форматируем ответ
-            return self._format_response(result, generated_code, query, safe_custom_context)
+            print(f"🔍 DEBUG: Before _format_response, safe_custom_context = {safe_custom_context}")
+            final_response = self._format_response(result, generated_code, query, safe_custom_context)
+            print(f"🔍 DEBUG: After _format_response, professional_insights = {final_response.get('professional_insights')}")
+            return final_response
 
         except Exception as e:
             return {
