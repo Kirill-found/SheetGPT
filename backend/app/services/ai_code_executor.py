@@ -418,19 +418,53 @@ Generate CORRECTED code that will work. Return ONLY the Python code."""
 
     def _should_highlight_rows(self, query: str) -> bool:
         """
-        Определяет, является ли запрос на выделение строк
+        Определяет, является ли запрос на РЕАЛЬНОЕ выделение строк цветом
+        НЕ путать с "выдели топ 5" (покажи) и "выдели строки где..." (highlight)
         """
         query_lower = query.lower()
 
+        # Если есть запрос на график/таблицу - это НЕ highlight
+        if any(word in query_lower for word in ['график', 'диаграмм', 'таблиц', 'chart']):
+            return False
+
+        # "выдели топ" = покажи топ, НЕ highlight
+        if 'выдели' in query_lower and 'топ' in query_lower:
+            return False
+
+        # Реальный highlight - с указанием условия "где"
         highlight_keywords = [
-            'выдели', 'подсвети', 'покрась', 'highlight', 'mark', 'цвет',
+            'подсвети', 'покрась', 'highlight', 'mark', 'цвет',
             'закрась', 'раскрась', 'отметь'
         ]
+
+        # "выдели" только если есть "где" или "с" (условие)
+        if 'выдели' in query_lower:
+            return 'где' in query_lower or 'с ' in query_lower or 'строк' in query_lower
+
         return any(word in query_lower for word in highlight_keywords)
+
+    def _should_auto_execute_table(self, query: str) -> bool:
+        """
+        Определяет, нужно ли АВТОМАТИЧЕСКИ создать таблицу/график (без кнопки)
+        Возвращает True только если пользователь ЯВНО просит: "построй график", "создай таблицу"
+        """
+        query_lower = query.lower()
+
+        # Явные команды на создание таблицы/графика
+        auto_execute_keywords = [
+            'построй график', 'создай график', 'сделай график', 'нарисуй график',
+            'построй диаграмм', 'создай диаграмм', 'сделай диаграмм',
+            'построй таблиц', 'создай таблиц',
+            'визуализируй', 'визуализ',
+            'покажи в виде', 'отобрази',
+            'build chart', 'create chart', 'make chart'
+        ]
+
+        return any(keyword in query_lower for keyword in auto_execute_keywords)
 
     def _should_create_table(self, query: str) -> bool:
         """
-        Определяет, нужно ли создавать таблицу/график для данного запроса
+        Определяет, нужно ли создавать structured_data для таблицы/графика
         ВАЖНО: Таблицы создаются ТОЛЬКО если:
         1. Пользователь явно просит (построй таблицу, создай график, визуализируй)
         2. ИЛИ запрос подразумевает сравнение/рейтинг (топ-N, сравнение, средние по группам)
@@ -445,12 +479,13 @@ Generate CORRECTED code that will work. Return ONLY the Python code."""
         # Явный запрос на таблицу/график
         explicit_keywords = [
             'таблиц', 'график', 'диаграмм', 'визуализ', 'chart', 'table', 'plot',
-            'построй', 'создай', 'покажи в виде', 'отобрази', 'нарисуй'
+            'построй', 'создай', 'покажи в виде', 'отобрази', 'нарисуй', 'сделай'
         ]
         if any(word in query_lower for word in explicit_keywords):
             return True
 
         # Запросы, которые логично визуализировать (топ-N, сравнение, средние по группам)
+        # НО только предложить (показать кнопку), не автовыполнять
         implicit_keywords = [
             'топ', 'top', 'рейтинг', 'ranking', 'лучш', 'худш',
             'сравн', 'compare', 'comparison',
@@ -552,7 +587,8 @@ Generate CORRECTED code that will work. Return ONLY the Python code."""
                 "rows": rows,
                 "has_table": True,
                 "table_title": exec_result.get('summary', 'Результаты анализа').split('\n')[0][:50],
-                "chart_recommended": self._detect_chart_type(query)
+                "chart_recommended": self._detect_chart_type(query),
+                "auto_execute": self._should_auto_execute_table(query)  # НОВОЕ: автовыполнение
             }
 
         # DEBUG: Print generated code to console for debugging

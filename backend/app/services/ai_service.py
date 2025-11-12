@@ -196,12 +196,20 @@ class AIService:
                         summary += f"{i}. {supplier}: {avg_price:,.2f} руб.\n"
 
                     # Prepare structured data for table/chart creation
+                    # Определяем auto_execute на основе запроса
+                    query_lower = query.lower()
+                    auto_execute = any(keyword in query_lower for keyword in [
+                        'построй график', 'создай график', 'сделай график',
+                        'построй диаграмм', 'создай диаграмм', 'визуализ'
+                    ])
+
                     structured_data = {
                         "headers": ["Поставщик", "Средняя цена (руб.)"],
                         "rows": [[supplier, round(avg_price, 2)] for supplier, avg_price in avg_prices.items()],
                         "has_table": True,
                         "table_title": "Средняя цена товаров по поставщикам",
-                        "chart_recommended": "column"
+                        "chart_recommended": "column",
+                        "auto_execute": auto_execute
                     }
 
                     return {

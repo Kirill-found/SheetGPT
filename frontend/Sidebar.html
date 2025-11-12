@@ -647,31 +647,67 @@
           content.appendChild(actionsList);
         }
 
-        // НОВОЕ: Кнопка создания таблицы если есть structured_data
+        // НОВОЕ: Автоматическое создание или показ кнопки для structured_data
         if (result.structured_data && result.structured_data.headers && result.structured_data.rows) {
-          const tableActions = document.createElement('div');
-          tableActions.className = 'action-buttons';
-          tableActions.style.marginTop = '16px';
-          tableActions.style.paddingTop = '12px';
-          tableActions.style.borderTop = '1px solid #eee';
+          // Если auto_execute=true - создаем таблицу АВТОМАТИЧЕСКИ
+          if (result.structured_data.auto_execute) {
+            // Показываем сообщение что создается таблица
+            const autoMessage = document.createElement('div');
+            autoMessage.style.marginTop = '12px';
+            autoMessage.style.padding = '8px 12px';
+            autoMessage.style.backgroundColor = '#E8F5E9';
+            autoMessage.style.borderRadius = '4px';
+            autoMessage.style.fontSize = '13px';
+            autoMessage.style.color = '#2E7D32';
+            autoMessage.textContent = '📊 Создание таблицы и графика...';
+            content.appendChild(autoMessage);
 
-          const createTableBtn = document.createElement('button');
-          createTableBtn.className = 'action-btn primary';
-          createTableBtn.innerHTML = '📊 Создать таблицу';
-          createTableBtn.onclick = () => createTable(result.structured_data);
-          tableActions.appendChild(createTableBtn);
+            // Автоматически вызываем создание таблицы
+            setTimeout(() => {
+              google.script.run
+                .withSuccessHandler((tableResult) => {
+                  if (tableResult.success) {
+                    autoMessage.textContent = `✅ Таблица "${tableResult.table.sheetName}" создана`;
+                    autoMessage.style.backgroundColor = '#C8E6C9';
+                  } else {
+                    autoMessage.textContent = `❌ Ошибка: ${tableResult.message}`;
+                    autoMessage.style.backgroundColor = '#FFCDD2';
+                    autoMessage.style.color = '#C62828';
+                  }
+                })
+                .withFailureHandler((error) => {
+                  autoMessage.textContent = `❌ Ошибка: ${error.message}`;
+                  autoMessage.style.backgroundColor = '#FFCDD2';
+                  autoMessage.style.color = '#C62828';
+                })
+                .createTableAndChart(result.structured_data);
+            }, 300);
+          } else {
+            // Если auto_execute=false - показываем КНОПКУ (как раньше)
+            const tableActions = document.createElement('div');
+            tableActions.className = 'action-buttons';
+            tableActions.style.marginTop = '16px';
+            tableActions.style.paddingTop = '12px';
+            tableActions.style.borderTop = '1px solid #eee';
 
-          // Если есть рекомендация графика - показываем это
-          if (result.structured_data.chart_recommended) {
-            const chartInfo = document.createElement('span');
-            chartInfo.style.fontSize = '12px';
-            chartInfo.style.color = '#666';
-            chartInfo.style.marginLeft = '8px';
-            chartInfo.textContent = `+ график (${result.structured_data.chart_recommended})`;
-            tableActions.appendChild(chartInfo);
+            const createTableBtn = document.createElement('button');
+            createTableBtn.className = 'action-btn primary';
+            createTableBtn.innerHTML = '📊 Создать таблицу';
+            createTableBtn.onclick = () => createTable(result.structured_data);
+            tableActions.appendChild(createTableBtn);
+
+            // Если есть рекомендация графика - показываем это
+            if (result.structured_data.chart_recommended) {
+              const chartInfo = document.createElement('span');
+              chartInfo.style.fontSize = '12px';
+              chartInfo.style.color = '#666';
+              chartInfo.style.marginLeft = '8px';
+              chartInfo.textContent = `+ график (${result.structured_data.chart_recommended})`;
+              tableActions.appendChild(chartInfo);
+            }
+
+            content.appendChild(tableActions);
           }
-
-          content.appendChild(tableActions);
         }
 
         // НОВОЕ: Кнопка выделения строк если есть highlight_rows
