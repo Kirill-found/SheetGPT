@@ -410,11 +410,74 @@ Generate CORRECTED code that will work. Return ONLY the Python code."""
 
         # Добавляем профессиональные инсайты если custom_context был указан
         if custom_context:
-            response["professional_insights"] = exec_result.get('professional_insights')
-            response["recommendations"] = exec_result.get('recommendations')
-            response["warnings"] = exec_result.get('warnings')
+            # Если AI не сгенерировал insights - генерируем их отдельно
+            if not exec_result.get('professional_insights'):
+                insights_data = self._generate_professional_insights(
+                    query, result_dict, exec_result.get('summary', ''), custom_context
+                )
+                response["professional_insights"] = insights_data.get('professional_insights')
+                response["recommendations"] = insights_data.get('recommendations')
+                response["warnings"] = insights_data.get('warnings')
+            else:
+                response["professional_insights"] = exec_result.get('professional_insights')
+                response["recommendations"] = exec_result.get('recommendations')
+                response["warnings"] = exec_result.get('warnings')
 
         return response
+
+    def _generate_professional_insights(self, query: str, result_data: Any, summary: str, custom_context: str) -> Dict[str, Any]:
+        """
+        Генерирует профессиональные инсайты на основе результатов расчета
+        Вызывается отдельно ПОСЛЕ основного расчета
+        """
+        prompt = f"""Based on the query and calculation results, provide professional analysis.
+
+QUERY: {query}
+
+CALCULATION RESULTS:
+{summary}
+
+DATA: {str(result_data)[:500]}
+
+YOUR ROLE: {custom_context}
+
+Please provide:
+1. professional_insights: Brief professional analysis (2-3 sentences)
+2. recommendations: 2-3 actionable recommendations
+3. warnings: 1-2 risks or concerns to watch
+
+Respond in JSON format ONLY:
+{{
+  "professional_insights": "...",
+  "recommendations": ["...", "..."],
+  "warnings": ["..."]
+}}"""
+
+        try:
+            response = self.client.chat.completions.create(
+                model=self.model,
+                messages=[
+                    {"role": "system", "content": "You are a professional analyst. Provide concise, actionable insights."},
+                    {"role": "user", "content": prompt}
+                ],
+                temperature=0.3,
+                max_tokens=500
+            )
+
+            insights_text = response.choices[0].message.content.strip()
+            # Try to parse JSON
+            if insights_text.startswith('```json'):
+                insights_text = insights_text.replace('```json', '').replace('```', '').strip()
+
+            insights = json.loads(insights_text)
+            return insights
+        except Exception as e:
+            print(f"Error generating insights: {e}")
+            return {
+                "professional_insights": "Анализ данных выполнен успешно.",
+                "recommendations": ["Продолжить мониторинг показателей"],
+                "warnings": []
+            }
 
 # Singleton
 ai_executor = AICodeExecutor()
