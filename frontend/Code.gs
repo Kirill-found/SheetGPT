@@ -829,26 +829,92 @@ function createChartFromTable(sheetName, dataRange, chartType, title) {
         chartTypeEnum = Charts.ChartType.COLUMN;
     }
 
-    // Создаем график
+    // ПРОФЕССИОНАЛЬНЫЙ ГРАФИК с красивым дизайном
     const chartBuilder = sheet.newChart()
       .setChartType(chartTypeEnum)
       .addRange(range)
       .setPosition(2, range.getLastColumn() + 2, 0, 0)  // Размещаем справа от таблицы
       .setOption('title', title || 'График')
-      .setOption('width', 600)
-      .setOption('height', 400)
-      .setOption('legend', { position: 'bottom' })
-      .setOption('animation', { startup: true, duration: 1000 });
+      .setOption('titleTextStyle', {
+        fontSize: 16,
+        bold: true,
+        color: '#202124'
+      })
+      .setOption('width', 700)
+      .setOption('height', 450)
+      .setOption('legend', {
+        position: 'bottom',
+        textStyle: { fontSize: 12 }
+      })
+      .setOption('animation', {
+        startup: true,
+        duration: 1000,
+        easing: 'inAndOut'
+      })
+      .setOption('colors', ['#4285F4', '#EA4335', '#FBBC04', '#34A853', '#FF6D01', '#46BDC6'])
+      .setOption('chartArea', {
+        left: 80,
+        top: 50,
+        width: '75%',
+        height: '65%'
+      })
+      .setOption('backgroundColor', '#FFFFFF')
+      .setOption('lineWidth', 3);
 
     // Специальные настройки для разных типов графиков
     if (chartType === 'pie') {
       chartBuilder
         .setOption('pieSliceText', 'value')
-        .setOption('is3D', false);
-    } else {
+        .setOption('pieSliceTextStyle', { fontSize: 14, color: '#000' })
+        .setOption('is3D', true)  // 3D для круговой диаграммы
+        .setOption('pieHole', 0.4)  // Делаем donut chart
+        .setOption('sliceVisibilityThreshold', 0);
+    } else if (chartType === 'column' || chartType === 'bar') {
       chartBuilder
-        .setOption('hAxis', { title: 'Категория' })
-        .setOption('vAxis', { title: 'Значение' });
+        .setOption('hAxis', {
+          title: 'Категория',
+          titleTextStyle: { fontSize: 13, italic: false, bold: true },
+          textStyle: { fontSize: 11 }
+        })
+        .setOption('vAxis', {
+          title: 'Значение',
+          titleTextStyle: { fontSize: 13, italic: false, bold: true },
+          textStyle: { fontSize: 11 },
+          gridlines: { color: '#E0E0E0', count: 5 },
+          minorGridlines: { color: '#F5F5F5' },
+          format: 'short'
+        })
+        .setOption('bar', { groupWidth: '75%' });
+    } else if (chartType === 'line') {
+      chartBuilder
+        .setOption('hAxis', {
+          title: 'Категория',
+          titleTextStyle: { fontSize: 13, italic: false, bold: true },
+          textStyle: { fontSize: 11 }
+        })
+        .setOption('vAxis', {
+          title: 'Значение',
+          titleTextStyle: { fontSize: 13, italic: false, bold: true },
+          textStyle: { fontSize: 11 },
+          gridlines: { color: '#E0E0E0' },
+          format: 'short'
+        })
+        .setOption('pointSize', 5)
+        .setOption('curveType', 'function');  // Плавные линии
+    } else {
+      // Area chart
+      chartBuilder
+        .setOption('hAxis', {
+          title: 'Категория',
+          titleTextStyle: { fontSize: 13, italic: false, bold: true }
+        })
+        .setOption('vAxis', {
+          title: 'Значение',
+          titleTextStyle: { fontSize: 13, italic: false, bold: true },
+          gridlines: { color: '#E0E0E0' }
+        })
+        .setOption('isStacked', false)
+        .setOption('areaOpacity', 0.3);
     }
 
     const chart = chartBuilder.build();
