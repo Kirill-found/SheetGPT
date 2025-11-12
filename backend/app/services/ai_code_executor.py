@@ -410,18 +410,14 @@ Generate CORRECTED code that will work. Return ONLY the Python code."""
 
         # Добавляем профессиональные инсайты если custom_context был указан
         if custom_context:
-            # Если AI не сгенерировал insights - генерируем их отдельно
-            if not exec_result.get('professional_insights'):
-                insights_data = self._generate_professional_insights(
-                    query, result_dict, exec_result.get('summary', ''), custom_context
-                )
-                response["professional_insights"] = insights_data.get('professional_insights')
-                response["recommendations"] = insights_data.get('recommendations')
-                response["warnings"] = insights_data.get('warnings')
-            else:
-                response["professional_insights"] = exec_result.get('professional_insights')
-                response["recommendations"] = exec_result.get('recommendations')
-                response["warnings"] = exec_result.get('warnings')
+            # ВСЕГДА генерируем insights отдельно (более надежно)
+            print(f"🎯 Generating professional insights for role: {custom_context[:50]}...")
+            insights_data = self._generate_professional_insights(
+                query, result_dict, exec_result.get('summary', ''), custom_context
+            )
+            response["professional_insights"] = insights_data.get('professional_insights')
+            response["recommendations"] = insights_data.get('recommendations')
+            response["warnings"] = insights_data.get('warnings')
 
         return response
 
