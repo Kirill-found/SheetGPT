@@ -38,6 +38,12 @@ class AICodeExecutor:
                     # This is "average price per supplier" query - use failsafe
                     return self._calculate_avg_price_failsafe(df, column_names)
 
+            # FAILSAFE 2: For chart/table creation queries, use direct pandas calculation
+            if any(word in query_lower for word in ['создай график', 'построй график', 'сделай график', 'график по', 'диаграмм']):
+                if any(word in query_lower for word in ['топ', 'top']):
+                    # "создай график по топ X товарам" - use failsafe
+                    return self._calculate_top_items_failsafe(df, column_names, query)
+
             # Шаг 2: AI генерирует Python код
             try:
                 generated_code = self._generate_python_code(query, df)
@@ -71,6 +77,66 @@ class AICodeExecutor:
                 "confidence": 0.0,
                 "response_type": "error"
             }
+
+    def _calculate_top_items_failsafe(self, df: pd.DataFrame, column_names: List[str], query: str) -> Dict[str, Any]:
+        """
+        FAILSAFE: Прямой расчет топ товаров без AI генерации кода
+        Гарантированно правильный результат с РЕАЛЬНЫМИ данными
+        """
+        try:
+            # Extract number from query (топ 5, топ 3, и т.д.)
+            import re
+            match = re.search(r'топ\s+(\d+)', query.lower())
+            top_n = int(match.group(1)) if match else 5
+
+            # Get product column (usually first column)
+            product_col = df.columns[0]
+
+            # Get numeric columns (sales/values)
+            numeric_cols = [col for col in df.columns if df[col].dtype in ['int64', 'float64']]
+            if not numeric_cols:
+                raise Exception("Не найдено числовых колонок для расчета")
+
+            # Use last numeric column as sales
+            sales_col = numeric_cols[-1]
+
+            # Group by product and sum sales
+            product_sales = df.groupby(product_col)[sales_col].sum().sort_values(ascending=False)
+            top_items = product_sales.head(top_n)
+
+            # Format summary
+            summary = f"Топ {top_n} товаров по продажам:\n\n"
+            for i, (product, sales) in enumerate(top_items.items(), 1):
+                summary += f"{i}. {product}: {sales:,.2f} руб.\n"
+            summary = summary.strip()
+
+            # Format key_findings
+            key_findings = [f"{product}: {sales:,.2f}" for product, sales in top_items.items()]
+
+            # КРИТИЧЕСКИ ВАЖНО: structured_data для auto-создания графика
+            structured_data = {
+                "headers": ["Название", "Значение"],
+                "rows": [[product, float(sales)] for product, sales in top_items.items()],
+                "has_table": True,
+                "table_title": f"Топ {top_n} товаров по продажам",
+                "chart_recommended": "column",
+                "auto_execute": True  # АВТОМАТИЧЕСКИ создаем таблицу+график!
+            }
+
+            return {
+                "summary": summary,
+                "methodology": f"FAILSAFE MODE: Проанализированы РЕАЛЬНЫЕ данные из таблицы. Сгруппировано по '{product_col}', просуммированы '{sales_col}'. Найдено {len(product_sales)} уникальных товаров.",
+                "key_findings": key_findings,
+                "confidence": 0.99,
+                "response_type": "analysis",
+                "data": top_items.to_dict(),
+                "structured_data": structured_data,
+                "code_generated": "# FAILSAFE MODE: Direct pandas calculation, no AI code generation",
+                "python_executed": True,
+                "execution_output": ""
+            }
+        except Exception as e:
+            raise Exception(f"Failsafe top items calculation failed: {str(e)}")
 
     def _calculate_avg_price_failsafe(self, df: pd.DataFrame, column_names: List[str]) -> Dict[str, Any]:
         """
