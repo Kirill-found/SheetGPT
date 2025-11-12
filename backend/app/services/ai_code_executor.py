@@ -171,6 +171,28 @@ REQUIRED OUTPUT VARIABLES:
 - result: the computed answer (number, dataframe, or list)
 - summary: string with the answer in Russian
 - methodology: string explaining the calculation in Russian
+- highlight_rows: (ONLY for "выдели" queries) list of row numbers to highlight (1-indexed, starting from 2 for data rows)
+
+SPECIAL: HIGHLIGHT ROW QUERIES ("выдели строки где...")
+If query asks to HIGHLIGHT rows ("выдели", "подсвети", "покрась"), you MUST:
+1. Find matching rows based on condition
+2. Create variable 'highlight_rows' with list of row numbers (1-indexed, data starts at row 2)
+3. Set 'result' to number of matching rows
+4. Set 'summary' to "Найдено X строк для выделения: [description]"
+
+EXAMPLE CODE FOR "выдели строки где товар 2":
+```python
+# Find matching rows
+matching_mask = df['Колонка A'] == 'Товар 2'
+matching_indices = df[matching_mask].index.tolist()
+
+# Convert to 1-indexed row numbers (data starts at row 2 in Google Sheets)
+highlight_rows = [idx + 2 for idx in matching_indices]
+
+result = len(highlight_rows)
+summary = f"Найдено {{len(highlight_rows)}} строк с товаром 'Товар 2'"
+methodology = "Выбраны все строки где колонка A (товар) = 'Товар 2'"
+```
 
 FORMATTING RULES FOR SUMMARY:
 - Always use \\n for line breaks
@@ -312,6 +334,7 @@ Return ONLY the Python code, no explanations."""
             # Дополнительные переменные если есть
             key_findings = safe_locals.get('key_findings', [])
             confidence = safe_locals.get('confidence', 0.95)
+            highlight_rows = safe_locals.get('highlight_rows', None)  # Для выделения строк
 
             return {
                 'result': result,
@@ -319,6 +342,7 @@ Return ONLY the Python code, no explanations."""
                 'methodology': methodology,
                 'key_findings': key_findings,
                 'confidence': confidence,
+                'highlight_rows': highlight_rows,  # Добавлено для выделения строк
                 'code': code,
                 'output': output
             }
@@ -366,6 +390,55 @@ Generate CORRECTED code that will work. Return ONLY the Python code."""
             return fixed_code
         except:
             return None
+
+    def _should_highlight_rows(self, query: str) -> bool:
+        """
+        Определяет, является ли запрос на выделение строк
+        """
+        query_lower = query.lower()
+
+        highlight_keywords = [
+            'выдели', 'подсвети', 'покрась', 'highlight', 'mark', 'цвет',
+            'закрась', 'раскрась', 'отметь'
+        ]
+        return any(word in query_lower for word in highlight_keywords)
+
+    def _should_create_table(self, query: str) -> bool:
+        """
+        Определяет, нужно ли создавать таблицу/график для данного запроса
+        ВАЖНО: Таблицы создаются ТОЛЬКО если:
+        1. Пользователь явно просит (построй таблицу, создай график, визуализируй)
+        2. ИЛИ запрос подразумевает сравнение/рейтинг (топ-N, сравнение, средние по группам)
+        НО НЕ если это запрос на выделение строк!
+        """
+        query_lower = query.lower()
+
+        # Если запрос на выделение - НЕ создаем таблицу
+        if self._should_highlight_rows(query):
+            return False
+
+        # Явный запрос на таблицу/график
+        explicit_keywords = [
+            'таблиц', 'график', 'диаграмм', 'визуализ', 'chart', 'table', 'plot',
+            'построй', 'создай', 'покажи в виде', 'отобрази', 'нарисуй'
+        ]
+        if any(word in query_lower for word in explicit_keywords):
+            return True
+
+        # Запросы, которые логично визуализировать (топ-N, сравнение, средние по группам)
+        implicit_keywords = [
+            'топ', 'top', 'рейтинг', 'ranking', 'лучш', 'худш',
+            'сравн', 'compare', 'comparison',
+            'средн', 'average', 'mean',  # средние по группам
+            'у каждого', 'по каждому', 'для каждого',  # группировка
+            'больше всего', 'меньше всего',
+            'лидер', 'аутсайдер'
+        ]
+        if any(word in query_lower for word in implicit_keywords):
+            return True
+
+        # По умолчанию - НЕ создаем таблицу (просто текстовый ответ)
+        return False
 
     def _detect_chart_type(self, query: str) -> str:
         """
@@ -441,8 +514,9 @@ Generate CORRECTED code that will work. Return ONLY the Python code."""
                           for k, v in list(result_dict.items())[:5]]
 
         # Форматируем structured_data для создания таблиц
+        # ВАЖНО: Создаем таблицу ТОЛЬКО если пользователь явно просит или это логично
         structured_data = None
-        if isinstance(result_dict, dict) and result_dict:
+        if isinstance(result_dict, dict) and result_dict and self._should_create_table(query):
             # Определяем заголовки и данные
             headers = ["Название", "Значение"]
             rows = [[str(k), float(v) if isinstance(v, (int, float)) else str(v)]
@@ -467,7 +541,17 @@ Generate CORRECTED code that will work. Return ONLY the Python code."""
         print(f"Methodology: {exec_result.get('methodology')}")
         print("=" * 80)
 
-        return {
+        # Определяем action_type и highlight данные
+        highlight_rows = exec_result.get('highlight_rows', None)
+        action_type = None
+        highlight_color = "#FFFF00"  # Желтый цвет по умолчанию
+        highlight_message = None
+
+        if highlight_rows and len(highlight_rows) > 0:
+            action_type = "highlight"
+            highlight_message = f"Выделено {len(highlight_rows)} строк"
+
+        response_data = {
             "summary": exec_result.get('summary', 'Результат вычислен'),
             "methodology": exec_result.get('methodology', 'Автоматический анализ с помощью Python'),
             "key_findings": key_findings,
@@ -479,6 +563,15 @@ Generate CORRECTED code that will work. Return ONLY the Python code."""
             "python_executed": True,
             "execution_output": exec_result.get('output', '')
         }
+
+        # Добавляем highlight данные если есть
+        if action_type:
+            response_data["action_type"] = action_type
+            response_data["highlight_rows"] = highlight_rows
+            response_data["highlight_color"] = highlight_color
+            response_data["highlight_message"] = highlight_message
+
+        return response_data
 
 # Singleton
 ai_executor = AICodeExecutor()

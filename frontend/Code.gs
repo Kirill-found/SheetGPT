@@ -383,7 +383,12 @@ function processQuery(query) {
         methodology: result.methodology || null,
         key_findings: result.key_findings || [],
         // НОВОЕ: Структурированные данные для создания таблиц/графиков
-        structured_data: result.structured_data || null
+        structured_data: result.structured_data || null,
+        // НОВОЕ: Поля для выделения строк
+        action_type: result.action_type || null,
+        highlight_rows: result.highlight_rows || null,
+        highlight_color: result.highlight_color || '#FFFF00',
+        highlight_message: result.highlight_message || null
       };
     } else {
       throw new Error(result.detail || 'Ошибка обработки запроса');
@@ -983,6 +988,69 @@ function createTableAndChart(structuredData) {
       success: false,
       error: error.toString(),
       message: 'Ошибка создания таблицы и графика: ' + error.toString()
+    };
+  }
+}
+
+/**
+ * Выделяет строки цветом по списку номеров
+ * @param {Array<number>} rowNumbers - Номера строк для выделения (1-indexed)
+ * @param {string} color - Цвет выделения в формате hex (например, "#FFFF00")
+ * @return {Object} - Результат операции
+ */
+function highlightRows(rowNumbers, color) {
+  try {
+    console.log('=== HIGHLIGHT ROWS START ===');
+    console.log('Row numbers:', rowNumbers);
+    console.log('Color:', color);
+
+    // Валидация
+    if (!rowNumbers || !Array.isArray(rowNumbers) || rowNumbers.length === 0) {
+      throw new Error('Некорректный список номеров строк');
+    }
+
+    const sheet = SpreadsheetApp.getActiveSheet();
+    const lastColumn = sheet.getLastColumn();
+
+    // Счетчик успешно выделенных строк
+    let highlightedCount = 0;
+
+    // Выделяем каждую строку
+    for (let rowNum of rowNumbers) {
+      try {
+        // Проверяем, что номер строки валидный
+        if (rowNum < 1 || rowNum > sheet.getMaxRows()) {
+          console.warn(`Пропускаем некорректный номер строки: ${rowNum}`);
+          continue;
+        }
+
+        // Получаем диапазон всей строки
+        const rowRange = sheet.getRange(rowNum, 1, 1, lastColumn);
+
+        // Устанавливаем цвет фона
+        rowRange.setBackground(color);
+
+        highlightedCount++;
+      } catch (rowError) {
+        console.error(`Ошибка выделения строки ${rowNum}:`, rowError.toString());
+      }
+    }
+
+    console.log(`=== HIGHLIGHT ROWS SUCCESS: ${highlightedCount}/${rowNumbers.length} ===`);
+
+    return {
+      success: true,
+      highlightedCount: highlightedCount,
+      totalRequested: rowNumbers.length,
+      message: `Выделено ${highlightedCount} из ${rowNumbers.length} строк`
+    };
+
+  } catch (error) {
+    console.error('HIGHLIGHT ROWS ERROR:', error.toString());
+    return {
+      success: false,
+      error: error.toString(),
+      message: 'Ошибка выделения строк: ' + error.toString()
     };
   }
 }

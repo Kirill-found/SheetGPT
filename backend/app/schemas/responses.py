@@ -17,6 +17,11 @@ class FormulaResponse(BaseModel):
     key_findings: Optional[List[str]] = Field(None, description="Ключевые находки с цифрами")
     # Table/Chart creation field (CRITICAL for actions system)
     structured_data: Optional[dict] = Field(None, description="Структурированные данные для создания таблиц/графиков")
+    # Highlight action fields
+    action_type: Optional[str] = Field(None, description="Тип действия: highlight | none")
+    highlight_rows: Optional[List[int]] = Field(None, description="Номера строк для выделения (1-indexed)")
+    highlight_color: Optional[str] = Field(None, description="Цвет выделения (hex, например #FFFF00)")
+    highlight_message: Optional[str] = Field(None, description="Сообщение о выделенных строках")
 
     class Config:
         json_schema_extra = {

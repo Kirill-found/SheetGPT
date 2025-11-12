@@ -673,6 +673,33 @@
 
           content.appendChild(tableActions);
         }
+
+        // НОВОЕ: Кнопка выделения строк если есть highlight_rows
+        if (result.action_type === 'highlight' && result.highlight_rows && result.highlight_rows.length > 0) {
+          const highlightActions = document.createElement('div');
+          highlightActions.className = 'action-buttons';
+          highlightActions.style.marginTop = '16px';
+          highlightActions.style.paddingTop = '12px';
+          highlightActions.style.borderTop = '1px solid #eee';
+
+          const highlightBtn = document.createElement('button');
+          highlightBtn.className = 'action-btn primary';
+          highlightBtn.innerHTML = `🎨 Выделить ${result.highlight_rows.length} строк`;
+          highlightBtn.onclick = () => highlightSelectedRows(result.highlight_rows, result.highlight_color);
+          highlightActions.appendChild(highlightBtn);
+
+          // Показываем сообщение о количестве строк
+          if (result.highlight_message) {
+            const highlightInfo = document.createElement('span');
+            highlightInfo.style.fontSize = '12px';
+            highlightInfo.style.color = '#666';
+            highlightInfo.style.marginLeft = '8px';
+            highlightInfo.textContent = result.highlight_message;
+            highlightActions.appendChild(highlightInfo);
+          }
+
+          content.appendChild(highlightActions);
+        }
       }
 
       bubble.appendChild(content);
@@ -785,6 +812,35 @@
           alert('❌ Ошибка создания таблицы: ' + error.message);
         })
         .createTableAndChart(structuredData);
+    }
+
+    function highlightSelectedRows(rowNumbers, color) {
+      // Показываем индикатор загрузки
+      const btn = event.target;
+      const originalText = btn.textContent;
+      btn.disabled = true;
+      btn.textContent = '⏳ Выделение...';
+
+      google.script.run
+        .withSuccessHandler((result) => {
+          btn.disabled = false;
+          if (result.success) {
+            btn.textContent = '✓ Выделено!';
+            setTimeout(() => {
+              alert(`✓ ${result.message}\n\nВыделено строк: ${result.highlightedCount}`);
+              btn.textContent = originalText;
+            }, 500);
+          } else {
+            btn.textContent = originalText;
+            alert('❌ Ошибка: ' + (result.error || result.message));
+          }
+        })
+        .withFailureHandler((error) => {
+          btn.disabled = false;
+          btn.textContent = originalText;
+          alert('❌ Ошибка выделения строк: ' + error.message);
+        })
+        .highlightRows(rowNumbers, color);
     }
 
     function executeActions(actions) {
