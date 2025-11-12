@@ -132,6 +132,10 @@ async def generate_formula(request: FormulaRequest):
             response_dict["code_generated"] = result.get("code_generated")
             response_dict["python_executed"] = result.get("python_executed", False)
             response_dict["execution_output"] = result.get("execution_output", "")
+            # v6.2.8: Add professional insights if present (custom_context feature)
+            response_dict["professional_insights"] = result.get("professional_insights")
+            response_dict["recommendations"] = result.get("recommendations")
+            response_dict["warnings"] = result.get("warnings")
 
             print(f"📦 response_dict keys before return: {list(response_dict.keys())}")
             print(f"📦 response_dict['methodology']: {response_dict.get('methodology')}")
