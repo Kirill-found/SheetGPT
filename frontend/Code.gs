@@ -176,7 +176,7 @@ function generateFormula(query) {
     const payload = {
       query: query,
       column_names: sheetData.columnNames,
-      sheet_data: sheetData.data.slice(0, 100) // Отправляем до 100 строк для правильного суммирования
+      sheet_data: sheetData.data // Отправляем ВСЕ данные (до 1000 строк)
     };
 
     const options = {
@@ -293,7 +293,7 @@ function processQuery(query) {
       for (let i = 0; i < numColumns; i++) {
         columnNames.push(`Колонка ${String.fromCharCode(65 + i)}`);  // A, B, C, D, E
       }
-      dataToSend = sheetData.data.slice(0, 100);  // Берём до 100 строк включая первую
+      dataToSend = sheetData.data;  // Берём ВСЕ строки включая первую
     } else {
       // Возможно есть заголовки
       const firstCell = sheetData.columnNames[0];
@@ -306,7 +306,7 @@ function processQuery(query) {
       if (looksLikeHeaders) {
         console.log('✅ DETECTED: Headers found in first row');
         columnNames = sheetData.columnNames;
-        dataToSend = sheetData.data.slice(1, 101);  // Пропускаем заголовки, берём до 100 строк данных
+        dataToSend = sheetData.data.slice(1);  // Пропускаем заголовки, берём ВСЕ строки данных
       } else {
         console.log('⚠️ DETECTED: No clear headers, using automatic columns');
         const numColumns = firstDataRow.length || 5;
@@ -314,7 +314,7 @@ function processQuery(query) {
         for (let i = 0; i < numColumns; i++) {
           columnNames.push(`Колонка ${String.fromCharCode(65 + i)}`);
         }
-        dataToSend = sheetData.data.slice(0, 100);  // Берём до 100 строк
+        dataToSend = sheetData.data;  // Берём ВСЕ строки
       }
     }
 
