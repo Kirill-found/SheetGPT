@@ -1,7 +1,10 @@
 FROM python:3.11-slim
 
+# v6.2.8 - Force Railway rebuild
+ARG CACHEBUST=2025-11-12-v6.2.8
 LABEL version="6.2.8"
 LABEL description="SheetGPT API with custom_context support"
+LABEL cachebust=$CACHEBUST
 
 WORKDIR /app
 
