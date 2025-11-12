@@ -39,13 +39,21 @@ class AICodeExecutor:
                     return self._calculate_avg_price_failsafe(df, column_names)
 
             # Шаг 2: AI генерирует Python код
-            generated_code = self._generate_python_code(query, df)
-
-            # DEBUG: Логируем сгенерированный код
-            print(f"\n{'='*60}\nGENERATED CODE:\n{'='*60}\n{generated_code}\n{'='*60}\n")
+            try:
+                generated_code = self._generate_python_code(query, df)
+                # DEBUG: Логируем сгенерированный код
+                print(f"\n{'='*60}\nGENERATED CODE:\n{'='*60}\n{generated_code}\n{'='*60}\n")
+            except Exception as gen_error:
+                generated_code = f"ERROR DURING GENERATION: {gen_error}"
+                raise
 
             # Шаг 3: Выполняем код безопасно
-            result = self._execute_python_code(generated_code, df)
+            try:
+                result = self._execute_python_code(generated_code, df)
+            except Exception as exec_error:
+                # Сохраняем код даже если выполнение упало
+                print(f"\n⛔ EXECUTION ERROR with code:\n{generated_code}\n")
+                raise
 
             # Шаг 4: Форматируем ответ
             return self._format_response(result, generated_code, query)
