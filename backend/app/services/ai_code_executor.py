@@ -265,12 +265,20 @@ Return ONLY the Python code, no explanations."""
             key_findings = safe_locals.get('key_findings', [])
             confidence = safe_locals.get('confidence', 0.95)
 
+            # v6.2.0: Профессиональные инсайты (если AI сгенерировал)
+            professional_insights = safe_locals.get('professional_insights', None)
+            recommendations = safe_locals.get('recommendations', None)
+            warnings = safe_locals.get('warnings', None)
+
             return {
                 'result': result,
                 'summary': summary,
                 'methodology': methodology,
                 'key_findings': key_findings,
                 'confidence': confidence,
+                'professional_insights': professional_insights,
+                'recommendations': recommendations,
+                'warnings': warnings,
                 'code': code,
                 'output': output
             }
