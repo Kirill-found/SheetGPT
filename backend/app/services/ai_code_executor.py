@@ -26,6 +26,7 @@ class AICodeExecutor:
         """
         Основная функция - генерирует и выполняет Python код для точных расчетов
         """
+        generated_code = None  # Инициализируем перед try для доступа в except
         try:
             # Шаг 1: Создаем DataFrame
             df = pd.DataFrame(sheet_data, columns=column_names)
@@ -52,7 +53,7 @@ class AICodeExecutor:
         except Exception as e:
             # Добавляем сгенерированный код в ошибку для отладки
             error_summary = f"Ошибка: {str(e)}"
-            if 'generated_code' in locals():
+            if generated_code:
                 error_summary += f"\n\n🔍 DEBUG - Generated code:\n{generated_code[:800]}"
 
             return {
