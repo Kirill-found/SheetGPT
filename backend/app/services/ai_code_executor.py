@@ -139,6 +139,14 @@ for i, (product, sales) in enumerate(top3.items(), 1):
     summary += f"{{i}}. {{product}}: {{sales:,.2f}} руб.\\n"
 summary = summary.strip()
 methodology = f"Сгруппировано по товарам (Колонка A), просуммированы продажи (Колонка E). Всего уникальных товаров: {{len(product_sales)}}"
+
+# If you have a professional role context, add insights/recommendations:
+professional_insights = "Концентрация продаж на топ-3 товарах составляет 75% от общего объема. Высокая зависимость от узкого ассортимента."
+recommendations = [
+    "Диверсифицировать портфель продуктов для снижения рисков",
+    "Проанализировать причины низких продаж остальных товаров"
+]
+warnings = ["Критическая зависимость от ограниченного числа SKU"]
 ```
 
 NOW GENERATE CODE FOR THIS QUESTION:
