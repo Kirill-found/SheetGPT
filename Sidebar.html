@@ -650,6 +650,11 @@
             content.appendChild(actionsList);
           }
 
+          // DEBUG: Log what we received from API
+          console.log("🔍 DEBUG result keys:", Object.keys(result));
+          console.log("🔍 professional_insights:", result.professional_insights);
+          console.log("🔍 recommendations:", result.recommendations);
+          console.log("🔍 warnings:", result.warnings);
           // v6.2.8: Professional Insights (custom_context feature)
           if (result.professional_insights) {
             const insightsDiv = document.createElement('div');
