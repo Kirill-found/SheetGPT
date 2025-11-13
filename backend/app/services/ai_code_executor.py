@@ -399,6 +399,9 @@ Generate CORRECTED code that will work. Return ONLY the Python code."""
             key_findings = [f"{k}: {v:,.2f}" if isinstance(v, (int, float)) else f"{k}: {v}"
                           for k, v in list(result_dict.items())[:5]]
 
+        # Определяем нужна ли таблица/график
+        structured_data = self._generate_structured_data_if_needed(query, result_dict, exec_result.get('summary', ''))
+
         # Базовый ответ
         response = {
             "summary": exec_result.get('summary', 'Результат вычислен'),
@@ -407,7 +410,7 @@ Generate CORRECTED code that will work. Return ONLY the Python code."""
             "confidence": exec_result.get('confidence', 0.95),
             "response_type": "analysis",
             "data": result_dict,
-            "structured_data": None,  # v6.0.0: Только расчеты, без таблиц/графиков
+            "structured_data": structured_data,  # v6.3.2: Генерируем для запросов "создай таблицу/график"
             "code_generated": code[:500] + "..." if len(code) > 500 else code,
             "python_executed": True,
             "execution_output": exec_result.get('output', '')
@@ -430,6 +433,62 @@ Generate CORRECTED code that will work. Return ONLY the Python code."""
             pass
 
         return response
+
+    def _generate_structured_data_if_needed(self, query: str, result_dict: Any, summary: str) -> Optional[Dict[str, Any]]:
+        """
+        Определяет нужна ли таблица/график и генерирует structured_data
+        """
+        # Ключевые слова для определения запроса на таблицу/график
+        table_keywords = ['таблиц', 'создай табл', 'сделай табл', 'table', 'построй табл']
+        chart_keywords = ['график', 'диаграмм', 'chart', 'построй', 'визуализ', 'plot']
+
+        query_lower = query.lower()
+        needs_table = any(kw in query_lower for kw in table_keywords)
+        needs_chart = any(kw in query_lower for kw in chart_keywords)
+
+        # Если не запрашивали таблицу или график - возвращаем None
+        if not (needs_table or needs_chart):
+            return None
+
+        # Если result_dict не подходит для таблицы - возвращаем None
+        if not isinstance(result_dict, dict) or len(result_dict) == 0:
+            return None
+
+        # Конвертируем dict в формат таблицы
+        try:
+            # Определяем заголовки и строки
+            if isinstance(list(result_dict.values())[0], (int, float)):
+                # Простой dict типа {продукт: значение}
+                headers = ["Название", "Значение"]
+                rows = [[str(k), float(v)] for k, v in result_dict.items()]
+            else:
+                # Более сложная структура
+                headers = ["Элемент", "Данные"]
+                rows = [[str(k), str(v)] for k, v in result_dict.items()]
+
+            # Определяем тип графика
+            chart_type = None
+            if needs_chart:
+                # Определяем подходящий тип графика
+                if len(rows) <= 10:
+                    chart_type = "column"  # Столбчатая для небольших данных
+                elif 'доля' in query_lower or 'процент' in query_lower:
+                    chart_type = "pie"
+                elif 'динамик' in query_lower or 'trend' in query_lower:
+                    chart_type = "line"
+                else:
+                    chart_type = "bar"
+
+            return {
+                "headers": headers,
+                "rows": rows[:50],  # Максимум 50 строк
+                "table_title": summary[:100],  # Используем summary как название
+                "chart_recommended": chart_type
+            }
+
+        except Exception as e:
+            print(f"Error generating structured_data: {e}")
+            return None
 
     def _generate_professional_insights(self, query: str, result_data: Any, summary: str, custom_context: str) -> Dict[str, Any]:
         """
