@@ -853,6 +853,9 @@ function createChartFromTable(sheetName, dataRange, chartType, title) {
 
     // Получаем диапазон данных
     const range = sheet.getRange(dataRange);
+    console.log('[CHART] Range object created:', range.getA1Notation());
+    console.log('[CHART] Range dimensions:', range.getNumRows(), 'x', range.getNumColumns());
+    console.log('[CHART] Range values (first 3 rows):', range.getValues().slice(0, 3));
 
     // Определяем тип графика
     let chartTypeEnum;
@@ -878,6 +881,8 @@ function createChartFromTable(sheetName, dataRange, chartType, title) {
       default:
         chartTypeEnum = Charts.ChartType.COLUMN;
     }
+
+    console.log('[CHART] Chart type enum:', chartTypeEnum);
 
     // ПРОФЕССИОНАЛЬНЫЙ ГРАФИК с красивым дизайном
     const chartBuilder = sheet.newChart()
@@ -967,8 +972,17 @@ function createChartFromTable(sheetName, dataRange, chartType, title) {
         .setOption('areaOpacity', 0.3);
     }
 
+    console.log('[CHART] Building chart...');
     const chart = chartBuilder.build();
+    console.log('[CHART] Chart built successfully, chart object:', !!chart);
+
+    console.log('[CHART] Inserting chart into sheet...');
     sheet.insertChart(chart);
+    console.log('[CHART] Chart inserted successfully!');
+
+    // Проверяем что график действительно появился
+    const charts = sheet.getCharts();
+    console.log('[CHART] Total charts on sheet after insert:', charts.length);
 
     console.log('=== CREATE CHART SUCCESS ===');
 
@@ -976,7 +990,8 @@ function createChartFromTable(sheetName, dataRange, chartType, title) {
       success: true,
       sheetName: sheetName,
       chartType: chartType,
-      message: `График "${title}" создан успешно`
+      chartsCount: charts.length,
+      message: `График "${title}" создан успешно (всего графиков на листе: ${charts.length})`
     };
 
   } catch (error) {
@@ -1005,6 +1020,8 @@ function createTableAndChart(structuredData) {
 
     // Если рекомендован график - создаем его
     if (structuredData.chart_recommended) {
+      console.log('[CHART] Creating chart with type:', structuredData.chart_recommended);
+
       const chartResult = createChartFromTable(
         tableResult.sheetName,
         tableResult.dataRange,
@@ -1012,11 +1029,23 @@ function createTableAndChart(structuredData) {
         structuredData.table_title || 'График анализа'
       );
 
+      console.log('[CHART] Chart result:', JSON.stringify(chartResult));
+
+      // ВАЖНО: Проверяем успешность создания графика
+      if (!chartResult.success) {
+        return {
+          success: false,
+          table: tableResult,
+          chart: chartResult,
+          message: `⚠️ Таблица создана, но график не удалось построить: ${chartResult.error || chartResult.message}`
+        };
+      }
+
       return {
         success: true,
         table: tableResult,
         chart: chartResult,
-        message: `Таблица и график "${tableResult.sheetName}" созданы успешно`
+        message: `✅ Таблица и график "${tableResult.sheetName}" созданы успешно`
       };
     }
 
