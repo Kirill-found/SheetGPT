@@ -110,7 +110,8 @@ async def process_formula(request: FormulaRequest):
                 query=request.query,
                 column_names=request.column_names,
                 sheet_data=request.sheet_data,
-                history=request.history
+                history=request.history,
+                custom_context=request.custom_context  # v6.2.10: Pass custom_context to executor
             )
             executor_used = True
             logger.info("[SUCCESS] Code executed successfully")
@@ -177,6 +178,10 @@ async def process_formula(request: FormulaRequest):
         response_dict["python_executed"] = result.get("python_executed", False)
         response_dict["execution_output"] = result.get("execution_output", "")
         response_dict["_debug_result_keys"] = list(result.keys())  # DEBUG: show what keys result has
+        # v6.2.10: Add professional insights from custom_context feature
+        response_dict["professional_insights"] = result.get("professional_insights")
+        response_dict["recommendations"] = result.get("recommendations")
+        response_dict["warnings"] = result.get("warnings")
 
         logger.info("[COMPLETE] Response sent successfully")
         logger.info("="*60)
