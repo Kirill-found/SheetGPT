@@ -87,8 +87,8 @@
 
     /* ===== HEADER ===== */
     .sidebar-header {
-      height: 48px;
-      padding: var(--space-md) var(--space-lg);
+      height: 36px;
+      padding: var(--space-sm) var(--space-md);
       border-bottom: 1px solid var(--border-light);
       display: flex;
       align-items: center;
@@ -98,16 +98,22 @@
     }
 
     .logo-text {
-      font-size: 16px;
+      font-size: 14px;
       font-weight: 600;
       color: var(--text-primary);
       letter-spacing: -0.01em;
     }
 
+    .header-actions {
+      display: flex;
+      gap: var(--space-xs);
+      align-items: center;
+    }
+
     .header-btn {
-      width: 32px;
-      height: 32px;
-      padding: var(--space-sm);
+      width: 28px;
+      height: 28px;
+      padding: 6px;
       background: transparent;
       border: none;
       border-radius: 6px;
@@ -123,24 +129,94 @@
     }
 
     .header-btn svg {
-      width: 20px;
-      height: 20px;
+      width: 16px;
+      height: 16px;
       color: var(--text-secondary);
+    }
+
+    .history-dropdown {
+      position: absolute;
+      top: 40px;
+      right: 12px;
+      width: 280px;
+      max-height: 400px;
+      overflow-y: auto;
+      background: white;
+      border: 1px solid var(--border-light);
+      border-radius: 8px;
+      box-shadow: var(--shadow-lg);
+      display: none;
+      z-index: 100;
+    }
+
+    .history-dropdown.show {
+      display: block;
+    }
+
+    .history-header {
+      padding: var(--space-md);
+      border-bottom: 1px solid var(--border-light);
+      font-weight: 600;
+      font-size: 13px;
+      color: var(--text-primary);
+    }
+
+    .history-list {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+    }
+
+    .history-item {
+      padding: var(--space-md);
+      border-bottom: 1px solid var(--border-light);
+      cursor: pointer;
+      transition: background var(--transition-fast);
+    }
+
+    .history-item:hover {
+      background: var(--bg-secondary);
+    }
+
+    .history-item:last-child {
+      border-bottom: none;
+    }
+
+    .history-item-title {
+      font-size: 13px;
+      color: var(--text-primary);
+      margin-bottom: var(--space-xs);
+      display: -webkit-box;
+      -webkit-line-clamp: 2;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+
+    .history-item-time {
+      font-size: 11px;
+      color: var(--text-tertiary);
+    }
+
+    .history-empty {
+      padding: var(--space-xl);
+      text-align: center;
+      color: var(--text-secondary);
+      font-size: 13px;
     }
 
     /* ===== CONTENT AREA ===== */
     .chat-container {
       flex: 1;
       overflow-y: auto;
-      padding: var(--space-lg);
+      padding: var(--space-md) var(--space-sm);
       display: flex;
       flex-direction: column;
-      gap: var(--space-lg);
+      gap: var(--space-md);
     }
 
     /* ===== EMPTY STATE ===== */
     .empty-state {
-      padding: var(--space-2xl) var(--space-lg);
+      padding: var(--space-xl) var(--space-sm);
       text-align: center;
     }
 
@@ -381,7 +457,7 @@
 
     /* ===== INPUT AREA ===== */
     .input-container {
-      padding: var(--space-lg);
+      padding: var(--space-md) var(--space-sm);
       border-top: 1px solid var(--border-light);
       background: var(--bg-primary);
       flex-shrink: 0;
@@ -589,13 +665,28 @@
 <body>
   <!-- Header -->
   <div class="sidebar-header">
-    <span class="logo-text">SheetGPT AI</span>
-    <button class="header-btn" onclick="openSettings()" aria-label="Настройки">
-      <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
-      </svg>
-    </button>
+    <span class="logo-text">Чат</span>
+    <div class="header-actions">
+      <button class="header-btn" onclick="toggleHistory()" aria-label="История">
+        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+        </svg>
+      </button>
+      <button class="header-btn" onclick="openSettings()" aria-label="Настройки">
+        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+        </svg>
+      </button>
+    </div>
+
+    <!-- History Dropdown -->
+    <div id="historyDropdown" class="history-dropdown">
+      <div class="history-header">История чатов</div>
+      <ul class="history-list" id="historyList">
+        <!-- Will be populated dynamically -->
+      </ul>
+    </div>
   </div>
 
   <!-- Chat Container -->
@@ -1032,6 +1123,117 @@
         })
         .saveCustomContext(context);
     }
+
+    // Chat History Functions
+    let chatHistoryData = [];
+
+    function toggleHistory() {
+      const dropdown = document.getElementById('historyDropdown');
+      const isVisible = dropdown.classList.contains('show');
+
+      if (isVisible) {
+        dropdown.classList.remove('show');
+      } else {
+        loadHistory();
+        dropdown.classList.add('show');
+      }
+    }
+
+    function loadHistory() {
+      const historyList = document.getElementById('historyList');
+
+      // Load from localStorage (temporary - in production use Google Apps Script)
+      const savedHistory = localStorage.getItem('sheetgpt_history');
+      chatHistoryData = savedHistory ? JSON.parse(savedHistory) : [];
+
+      if (chatHistoryData.length === 0) {
+        historyList.innerHTML = '<div class="history-empty">История пуста</div>';
+        return;
+      }
+
+      historyList.innerHTML = '';
+      chatHistoryData.forEach((item, index) => {
+        const li = document.createElement('li');
+        li.className = 'history-item';
+        li.onclick = () => loadChat(index);
+
+        const title = document.createElement('div');
+        title.className = 'history-item-title';
+        title.textContent = item.title || item.firstMessage || 'Новый чат';
+
+        const time = document.createElement('div');
+        time.className = 'history-item-time';
+        time.textContent = formatTime(item.timestamp);
+
+        li.appendChild(title);
+        li.appendChild(time);
+        historyList.appendChild(li);
+      });
+    }
+
+    function saveChatToHistory() {
+      const messages = Array.from(document.getElementById('chatContainer').querySelectorAll('.message'));
+      if (messages.length === 0) return;
+
+      const firstUserMessage = messages.find(m => m.classList.contains('user'));
+      const firstMessage = firstUserMessage ? firstUserMessage.textContent.trim() : 'Новый чат';
+
+      const chatData = {
+        id: Date.now(),
+        title: firstMessage.substring(0, 50) + (firstMessage.length > 50 ? '...' : ''),
+        firstMessage: firstMessage,
+        timestamp: Date.now(),
+        messages: chatHistory
+      };
+
+      chatHistoryData.unshift(chatData);
+      if (chatHistoryData.length > 20) chatHistoryData.pop(); // Keep only last 20
+
+      localStorage.setItem('sheetgpt_history', JSON.stringify(chatHistoryData));
+    }
+
+    function loadChat(index) {
+      const chat = chatHistoryData[index];
+      if (!chat) return;
+
+      // Clear current chat
+      const container = document.getElementById('chatContainer');
+      container.innerHTML = '';
+      document.getElementById('emptyState').style.display = 'none';
+
+      // Restore messages (simplified version)
+      alert('Загрузка истории чата: ' + chat.title);
+      toggleHistory();
+    }
+
+    function formatTime(timestamp) {
+      const date = new Date(timestamp);
+      const now = new Date();
+      const diff = now - date;
+
+      if (diff < 60000) return 'только что';
+      if (diff < 3600000) return Math.floor(diff / 60000) + ' мин назад';
+      if (diff < 86400000) return Math.floor(diff / 3600000) + ' ч назад';
+
+      return date.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' });
+    }
+
+    // Save chat on successful response
+    const originalHandleResponse = handleResponse;
+    handleResponse = function(result) {
+      originalHandleResponse(result);
+      setTimeout(saveChatToHistory, 500); // Save after rendering
+    };
+
+    // Close history dropdown when clicking outside
+    document.addEventListener('click', function(e) {
+      const dropdown = document.getElementById('historyDropdown');
+      const historyBtn = document.querySelector('button[aria-label="История"]');
+
+      if (!dropdown.contains(e.target) && e.target !== historyBtn && !historyBtn.contains(e.target)) {
+        dropdown.classList.remove('show');
+      }
+    });
   </script>
 </body>
 </html>
