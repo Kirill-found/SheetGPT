@@ -413,16 +413,21 @@ Generate CORRECTED code that will work. Return ONLY the Python code."""
             "execution_output": exec_result.get('output', '')
         }
 
-        # Добавляем профессиональные инсайты если custom_context был указан
-        if custom_context:
-            # ВСЕГДА генерируем insights отдельно (более надежно)
-            print(f"🎯 Generating professional insights for role: {custom_context[:50]}...")
+        # Добавляем профессиональные инсайты
+        # ВСЕГДА генерируем insights (с custom_context или без)
+        context_to_use = custom_context or "You are a data analyst. Provide brief, actionable insights."
+        print(f"🎯 Generating professional insights (custom={bool(custom_context)})...")
+        try:
             insights_data = self._generate_professional_insights(
-                query, result_dict, exec_result.get('summary', ''), custom_context
+                query, result_dict, exec_result.get('summary', ''), context_to_use
             )
             response["professional_insights"] = insights_data.get('professional_insights')
             response["recommendations"] = insights_data.get('recommendations')
             response["warnings"] = insights_data.get('warnings')
+        except Exception as e:
+            print(f"⚠️ Failed to generate insights: {e}")
+            # Если не получилось - оставляем null
+            pass
 
         return response
 
