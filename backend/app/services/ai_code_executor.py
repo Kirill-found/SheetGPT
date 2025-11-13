@@ -399,11 +399,29 @@ Generate CORRECTED code that will work. Return ONLY the Python code."""
             key_findings = [f"{k}: {v:,.2f}" if isinstance(v, (int, float)) else f"{k}: {v}"
                           for k, v in list(result_dict.items())[:5]]
 
+        # Извлекаем данные для выделения из key_findings если result_dict пустой
+        if not result_dict and key_findings:
+            # Пытаемся создать данные из key_findings
+            print(f"📊 No result_dict, extracting from key_findings: {key_findings}")
+            result_dict = {}
+            for finding in key_findings:
+                if ':' in finding:
+                    parts = finding.split(':', 1)
+                    key = parts[0].strip()
+                    value_str = parts[1].strip().replace(',', '')
+                    try:
+                        # Пытаемся преобразовать в число
+                        value = float(value_str)
+                        result_dict[key] = value
+                    except ValueError:
+                        result_dict[key] = value_str
+
         # Определяем нужна ли таблица/график
         structured_data = self._generate_structured_data_if_needed(query, result_dict, exec_result.get('summary', ''))
 
         # Определяем нужно ли выделение строк
         print(f"🔍 Checking if highlighting needed for query: {query}")
+        print(f"🔍 Result dict: {result_dict}")
         highlighting_data = self._generate_highlighting_if_needed(query, result_dict)
         if highlighting_data:
             print(f"✅ Highlighting data generated: {highlighting_data}")
