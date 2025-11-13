@@ -1008,21 +1008,30 @@
         // Handle structured data (tables and charts)
         if (result.structured_data) {
           console.log('[UI] Creating table and chart from structured_data');
+          console.log('[UI] Data:', result.structured_data);
+
           google.script.run
             .withSuccessHandler(function(tableResult) {
-              if (tableResult.success) {
-                const successDiv = document.createElement('div');
-                successDiv.className = 'message ai';
-                const successBubble = document.createElement('div');
-                successBubble.className = 'message-bubble';
-                const successBox = document.createElement('div');
-                successBox.className = 'content-box success';
-                successBox.textContent = tableResult.message || 'Таблица создана успешно';
-                successBubble.appendChild(successBox);
-                successDiv.appendChild(successBubble);
-                container.appendChild(successDiv);
-                scrollToBottom();
+              console.log('[UI] Success handler:', tableResult);
+
+              const resultDiv = document.createElement('div');
+              resultDiv.className = 'message ai';
+              const resultBubble = document.createElement('div');
+              resultBubble.className = 'message-bubble';
+              const resultBox = document.createElement('div');
+
+              if (tableResult && tableResult.success) {
+                resultBox.className = 'content-box success';
+                resultBox.textContent = '✅ ' + (tableResult.message || 'Таблица создана успешно');
+              } else {
+                resultBox.className = 'content-box error';
+                resultBox.textContent = '❌ ' + (tableResult ? (tableResult.message || tableResult.error || 'Неизвестная ошибка') : 'Функция не вернула результат');
               }
+
+              resultBubble.appendChild(resultBox);
+              resultDiv.appendChild(resultBubble);
+              container.appendChild(resultDiv);
+              scrollToBottom();
             })
             .withFailureHandler(function(error) {
               console.error('[UI] Table creation failed:', error);
