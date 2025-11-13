@@ -2,7 +2,7 @@
 SheetGPT API Production v6.2.10 - AI Code Executor with custom_context support
 Генерирует Python код для точных вычислений
 Supports professional insights based on user-defined AI role
-Railway deployment: 2025-11-13 12:28 - FORCED
+Railway deployment: 2025-11-13 12:56 - CACHE BUST
 """
 
 from fastapi import FastAPI, HTTPException
