@@ -543,15 +543,26 @@
         } else {
           // Analysis - structured response
 
-          // Summary
+          // Summary - improved formatting
           if (result.summary) {
+            const summaryTitle = document.createElement('div');
+            summaryTitle.style.fontWeight = '700';
+            summaryTitle.style.fontSize = '15px';
+            summaryTitle.style.marginBottom = '8px';
+            summaryTitle.style.color = '#1976d2';
+            summaryTitle.textContent = '📊 Вывод:';
+            content.appendChild(summaryTitle);
+
             const summaryDiv = document.createElement('div');
-            summaryDiv.style.padding = '10px';
+            summaryDiv.style.padding = '12px';
             summaryDiv.style.backgroundColor = '#f5f5f5';
-            summaryDiv.style.borderRadius = '6px';
-            summaryDiv.style.marginBottom = '12px';
-            summaryDiv.style.fontWeight = '500';
-            summaryDiv.innerHTML = `<strong>📊 Вывод:</strong><br>${result.summary}`;
+            summaryDiv.style.borderRadius = '8px';
+            summaryDiv.style.marginBottom = '16px';
+            summaryDiv.style.lineHeight = '1.6';
+            summaryDiv.style.fontSize = '14px';
+            // Split by ". " to create paragraphs for better readability
+            const sentences = result.summary.split('. ');
+            summaryDiv.innerHTML = sentences.map(s => s.trim() ? `<p style="margin: 8px 0;">${s.trim()}${s.endsWith('.') ? '' : '.'}</p>` : '').join('');
             content.appendChild(summaryDiv);
           } else if (result.explanation || result.answer) {
             const answer = document.createElement('p');
@@ -657,34 +668,48 @@
           console.log("🔍 warnings:", result.warnings);
           // v6.2.8: Professional Insights (custom_context feature)
           if (result.professional_insights) {
+            const insightsTitle = document.createElement('div');
+            insightsTitle.style.fontWeight = '700';
+            insightsTitle.style.fontSize = '15px';
+            insightsTitle.style.marginTop = '16px';
+            insightsTitle.style.marginBottom = '8px';
+            insightsTitle.style.color = '#f57c00';
+            insightsTitle.textContent = '💡 Профессиональный анализ:';
+            content.appendChild(insightsTitle);
+
             const insightsDiv = document.createElement('div');
             insightsDiv.style.padding = '12px';
             insightsDiv.style.backgroundColor = '#fff3e0';
             insightsDiv.style.borderLeft = '4px solid #ff9800';
-            insightsDiv.style.borderRadius = '6px';
-            insightsDiv.style.marginTop = '12px';
-            insightsDiv.innerHTML = `<strong>💡 Professional Insights:</strong><br>${result.professional_insights}`;
+            insightsDiv.style.borderRadius = '8px';
+            insightsDiv.style.lineHeight = '1.6';
+            insightsDiv.style.fontSize = '14px';
+            insightsDiv.innerHTML = result.professional_insights;
             content.appendChild(insightsDiv);
           }
 
           // v6.2.8: Recommendations
           if (result.recommendations && result.recommendations.length > 0) {
-            const recsTitle = document.createElement('p');
-            recsTitle.style.marginTop = '12px';
-            recsTitle.style.fontWeight = '600';
-            recsTitle.style.marginBottom = '6px';
-            recsTitle.textContent = '✅ Recommendations:';
+            const recsTitle = document.createElement('div');
+            recsTitle.style.fontWeight = '700';
+            recsTitle.style.fontSize = '15px';
+            recsTitle.style.marginTop = '16px';
+            recsTitle.style.marginBottom = '8px';
+            recsTitle.style.color = '#388e3c';
+            recsTitle.textContent = '✅ Рекомендации:';
             content.appendChild(recsTitle);
 
             const recsList = document.createElement('ul');
             recsList.className = 'insights-list';
             recsList.style.listStyle = 'none';
-            recsList.style.padding = '8px';
+            recsList.style.padding = '12px';
             recsList.style.backgroundColor = '#e8f5e9';
-            recsList.style.borderRadius = '6px';
+            recsList.style.borderRadius = '8px';
+            recsList.style.lineHeight = '1.6';
             result.recommendations.forEach(rec => {
               const li = document.createElement('li');
-              li.style.padding = '4px 0';
+              li.style.padding = '6px 0';
+              li.style.fontSize = '14px';
               li.textContent = `• ${rec}`;
               recsList.appendChild(li);
             });
@@ -693,23 +718,27 @@
 
           // v6.2.8: Warnings
           if (result.warnings && result.warnings.length > 0) {
-            const warningsTitle = document.createElement('p');
-            warningsTitle.style.marginTop = '12px';
-            warningsTitle.style.fontWeight = '600';
-            warningsTitle.style.marginBottom = '6px';
-            warningsTitle.textContent = '⚠️ Warnings:';
+            const warningsTitle = document.createElement('div');
+            warningsTitle.style.fontWeight = '700';
+            warningsTitle.style.fontSize = '15px';
+            warningsTitle.style.marginTop = '16px';
+            warningsTitle.style.marginBottom = '8px';
+            warningsTitle.style.color = '#d32f2f';
+            warningsTitle.textContent = '⚠️ Предупреждения:';
             content.appendChild(warningsTitle);
 
             const warnsList = document.createElement('ul');
             warnsList.className = 'insights-list';
             warnsList.style.listStyle = 'none';
-            warnsList.style.padding = '8px';
+            warnsList.style.padding = '12px';
             warnsList.style.backgroundColor = '#ffebee';
-            warnsList.style.borderRadius = '6px';
+            warnsList.style.borderRadius = '8px';
+            warnsList.style.lineHeight = '1.6';
             result.warnings.forEach(warn => {
               const li = document.createElement('li');
-              li.style.padding = '4px 0';
-              li.textContent = `⚠ ${warn}`;
+              li.style.padding = '6px 0';
+              li.style.fontSize = '14px';
+              li.textContent = `• ${warn}`;
               warnsList.appendChild(li);
             });
             content.appendChild(warnsList);

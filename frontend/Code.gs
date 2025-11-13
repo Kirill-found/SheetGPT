@@ -41,7 +41,7 @@ function onInstall(e) {
 function showSidebar(e) {
   const html = HtmlService.createHtmlOutputFromFile('Sidebar')
     .setTitle('SheetGPT AI')
-    .setWidth(350);
+    .setWidth(480);
 
   // Если вызвано как Add-on (есть параметр e или нет доступа к UI)
   try {
