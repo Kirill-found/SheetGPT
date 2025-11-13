@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>Обновление SheetGPT в Apps Script</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Arial, sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #4F46E5;
+            margin-bottom: 10px;
+        }
+        .version {
+            color: #6B7280;
+            font-size: 14px;
+            margin-bottom: 30px;
+        }
+        .step {
+            background: #EEF2FF;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 8px;
+            border-left: 4px solid #4F46E5;
+        }
+        .step h3 {
+            margin-top: 0;
+            color: #4F46E5;
+        }
+        .button {
+            display: inline-block;
+            padding: 12px 24px;
+            background: #4F46E5;
+            color: white;
+            text-decoration: none;
+            border-radius: 6px;
+            margin: 10px 10px 10px 0;
+            font-weight: 500;
+        }
+        .button:hover {
+            background: #4338CA;
+        }
+        .code-box {
+            background: #1F2937;
+            color: #A5F3FC;
+            padding: 15px;
+            border-radius: 6px;
+            font-family: monospace;
+            font-size: 13px;
+            overflow-x: auto;
+            margin: 10px 0;
+        }
+        .warning {
+            background: #FEF3C7;
+            border-left: 4px solid #F59E0B;
+            padding: 15px;
+            border-radius: 6px;
+            margin: 20px 0;
+        }
+        .success {
+            background: #D1FAE5;
+            border-left: 4px solid #10B981;
+            padding: 15px;
+            border-radius: 6px;
+            margin: 20px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔧 Обновление SheetGPT</h1>
+        <p class="version">Версия v6.3.4 | Backend + Frontend</p>
+
+        <div class="warning">
+            <strong>⚠️ ВАЖНО:</strong> Google Apps Script работает в облаке и не синхронизируется с локальными файлами автоматически. Без ручного обновления диаграммы работать не будут!
+        </div>
+
+        <div class="step">
+            <h3>Шаг 1: Откройте Apps Script редактор</h3>
+            <ol>
+                <li>Откройте ваш Google Sheets с SheetGPT</li>
+                <li>Меню: <strong>Расширения → Apps Script</strong></li>
+            </ol>
+        </div>
+
+        <div class="step">
+            <h3>Шаг 2: Обновите Code.gs</h3>
+            <ol>
+                <li>В левом меню выберите файл <strong>Code.gs</strong></li>
+                <li>Выделите весь текст: <code>Ctrl+A</code></li>
+                <li>Удалите: <code>Delete</code></li>
+                <li>Откройте актуальный код по ссылке ниже</li>
+                <li>Скопируйте всё: <code>Ctrl+A → Ctrl+C</code></li>
+                <li>Вставьте в Apps Script: <code>Ctrl+V</code></li>
+                <li>Сохраните: <code>Ctrl+S</code></li>
+            </ol>
+            <a href="https://raw.githubusercontent.com/Kirill-found/SheetGPT/main/Code.gs" target="_blank" class="button">
+                📄 Открыть Code.gs
+            </a>
+            <a href="https://github.com/Kirill-found/SheetGPT/blob/main/Code.gs" target="_blank" class="button" style="background: #6B7280;">
+                👁️ Просмотр на GitHub
+            </a>
+        </div>
+
+        <div class="step">
+            <h3>Шаг 3: Обновите Sidebar.html</h3>
+            <ol>
+                <li>В левом меню выберите файл <strong>Sidebar.html</strong></li>
+                <li>Выделите весь текст: <code>Ctrl+A</code></li>
+                <li>Удалите: <code>Delete</code></li>
+                <li>Откройте актуальный код по ссылке ниже</li>
+                <li>Скопируйте всё: <code>Ctrl+A → Ctrl+C</code></li>
+                <li>Вставьте в Apps Script: <code>Ctrl+V</code></li>
+                <li>Сохраните: <code>Ctrl+S</code></li>
+            </ol>
+            <a href="https://raw.githubusercontent.com/Kirill-found/SheetGPT/main/Sidebar.html" target="_blank" class="button">
+                📄 Открыть Sidebar.html
+            </a>
+            <a href="https://github.com/Kirill-found/SheetGPT/blob/main/Sidebar.html" target="_blank" class="button" style="background: #6B7280;">
+                👁️ Просмотр на GitHub
+            </a>
+        </div>
+
+        <div class="step">
+            <h3>Шаг 4: Проверьте версию</h3>
+            <p>В Code.gs найдите строку примерно 427:</p>
+            <div class="code-box">
+structured_data: result.structured_data || null,
+            </div>
+            <p>Если эта строка есть — обновление успешно! ✅</p>
+        </div>
+
+        <div class="step">
+            <h3>Шаг 5: Перезагрузите и проверьте</h3>
+            <ol>
+                <li>Вернитесь в Google Sheets</li>
+                <li>Перезагрузите страницу: <code>F5</code> или <code>Ctrl+R</code></li>
+                <li>Откройте SheetGPT сайдбар</li>
+                <li>Попробуйте: <strong>"составь диаграмму по товарам"</strong></li>
+            </ol>
+        </div>
+
+        <div class="success">
+            <strong>✅ После обновления:</strong><br>
+            • Диаграммы будут создаваться автоматически<br>
+            • Таблицы появятся в новых листах<br>
+            • Графики будут рядом с данными<br>
+            • Ошибки исчезнут
+        </div>
+
+        <hr style="margin: 30px 0; border: none; border-top: 1px solid #E5E7EB;">
+
+        <h3>🔍 Что изменилось в v6.3.4:</h3>
+        <ul>
+            <li><strong>Backend v6.3.3:</strong> AI Code Executor генерирует structured_data для запросов с графиками</li>
+            <li><strong>Frontend v6.3.4:</strong> Sidebar.html обрабатывает structured_data и вызывает createTableAndChart()</li>
+            <li><strong>Code.gs:</strong> Добавлены функции createTableAndChart, createTableInSheet, createChartFromTable</li>
+            <li><strong>Типы графиков:</strong> column, bar, pie, line — выбираются автоматически</li>
+        </ul>
+
+        <hr style="margin: 30px 0; border: none; border-top: 1px solid #E5E7EB;">
+
+        <h3>❓ Почему нужно обновлять вручную?</h3>
+        <p>Google Apps Script — это облачная среда, которая:</p>
+        <ul>
+            <li>Не имеет доступа к вашему компьютеру</li>
+            <li>Не синхронизируется с GitHub автоматически</li>
+            <li>Не обновляется из Railway/Docker</li>
+            <li>Требует ручного копирования кода</li>
+        </ul>
+        <p><strong>Backend на Railway</strong> обновляется автоматически через git push, но <strong>Apps Script требует ручного обновления</strong>.</p>
+    </div>
+</body>
+</html>
