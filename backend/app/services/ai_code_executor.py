@@ -601,10 +601,11 @@ Generate CORRECTED code that will work. Return ONLY the Python code."""
                 else:
                     # Если данные прямо в словаре (key: value пары)
                     print(f"⚠️ No standard keys found, trying to extract from dict items")
+                    print(f"⚠️ Dict items: {list(result_data.items())}")
                     items = list(result_data.items())
                     rows_data = [[k, v] for k, v in items if isinstance(v, (int, float))]
                     if rows_data:
-                        print(f"✅ Extracted {len(rows_data)} numeric items from dict")
+                        print(f"✅ Extracted {len(rows_data)} numeric items from dict: {rows_data}")
 
                 # Если есть данные и они являются списком
                 if rows_data and isinstance(rows_data, list) and len(rows_data) > 0:
@@ -629,6 +630,7 @@ Generate CORRECTED code that will work. Return ONLY the Python code."""
                             rows_to_highlight = [row[0] for row in numeric_values[:count]]
                             highlight_color = '#90EE90'  # Зелёный для топ значений
                             highlight_message = f'Выделены топ {count} товаров'
+                            print(f"✅ Generated highlight rows: {rows_to_highlight}")
                         elif 'худш' in query_lower or 'минимальн' in query_lower or 'меньш' in query_lower:
                             # Берём последние N (минимальные)
                             rows_to_highlight = [row[0] for row in numeric_values[-count:]]
