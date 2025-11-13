@@ -429,7 +429,11 @@ function processQuery(query) {
         action_type: result.action_type || null,
         highlight_rows: result.highlight_rows || null,
         highlight_color: result.highlight_color || '#FFFF00',
-        highlight_message: result.highlight_message || null
+        highlight_message: result.highlight_message || null,
+        // v6.2.11: Professional insights from custom_context
+        professional_insights: result.professional_insights || null,
+        recommendations: result.recommendations || null,
+        warnings: result.warnings || null
       };
     } else {
       throw new Error(result.detail || 'Ошибка обработки запроса');

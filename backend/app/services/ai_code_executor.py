@@ -436,23 +436,23 @@ Generate CORRECTED code that will work. Return ONLY the Python code."""
         Генерирует профессиональные инсайты на основе результатов расчета
         Вызывается отдельно ПОСЛЕ основного расчета
         """
-        prompt = f"""Based on the query and calculation results, provide professional analysis.
+        prompt = f"""На основе запроса и результатов расчета предоставь профессиональный анализ.
 
-QUERY: {query}
+ЗАПРОС: {query}
 
-CALCULATION RESULTS:
+РЕЗУЛЬТАТЫ РАСЧЕТА:
 {summary}
 
-DATA: {str(result_data)[:500]}
+ДАННЫЕ: {str(result_data)[:500]}
 
-YOUR ROLE: {custom_context}
+ТВОЯ РОЛЬ: {custom_context}
 
-Please provide:
-1. professional_insights: Brief professional analysis (2-3 sentences)
-2. recommendations: 2-3 actionable recommendations
-3. warnings: 1-2 risks or concerns to watch
+Предоставь на РУССКОМ языке:
+1. professional_insights: Краткий профессиональный анализ (2-3 предложения)
+2. recommendations: 2-3 практические рекомендации
+3. warnings: 1-2 риска или проблемы, на которые стоит обратить внимание
 
-Respond in JSON format ONLY:
+Ответь ТОЛЬКО в JSON формате:
 {{
   "professional_insights": "...",
   "recommendations": ["...", "..."],
@@ -463,7 +463,7 @@ Respond in JSON format ONLY:
             response = self.client.chat.completions.create(
                 model=self.model,
                 messages=[
-                    {"role": "system", "content": "You are a professional analyst. Provide concise, actionable insights."},
+                    {"role": "system", "content": "Ты профессиональный аналитик. Предоставляй краткие, практичные инсайты НА РУССКОМ ЯЗЫКЕ."},
                     {"role": "user", "content": prompt}
                 ],
                 temperature=0.3,
