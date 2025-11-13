@@ -282,6 +282,15 @@ Return ONLY the Python code, no explanations."""
 
             # Дополнительные переменные если есть
             key_findings = safe_locals.get('key_findings', [])
+
+            # v6.5.4: Если result == None, пытаемся найти данные в других переменных
+            if result is None:
+                # Ищем переменные с данными
+                for var_name in ['товары', 'products', 'data', 'top_items', 'топ_товары', 'df_result']:
+                    if var_name in safe_locals:
+                        result = safe_locals[var_name]
+                        print(f"📊 Found result in variable '{var_name}'")
+                        break
             confidence = safe_locals.get('confidence', 0.95)
 
             # v6.2.0: Профессиональные инсайты (если AI сгенерировал)
