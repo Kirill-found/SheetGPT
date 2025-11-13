@@ -1,10 +1,24 @@
-# v5.0.3 - Railway MUST deploy this: 2025-11-11T20:38:00 - STRUCTURED_DATA FIX - CACHE BUST
+# v6.2.8 - Custom Context Debug
 from fastapi import APIRouter, HTTPException
 from app.schemas.requests import FormulaRequest
 from app.schemas.responses import FormulaResponse, ErrorResponse
 from app.services.ai_service import ai_service
+import logging
 
 router = APIRouter(prefix="/api/v1", tags=["formula"])
+logger = logging.getLogger(__name__)
+
+
+@router.post("/debug-request", include_in_schema=False)
+async def debug_request(request: FormulaRequest):
+    """Debug endpoint to see what's being received"""
+    return {
+        "query": request.query,
+        "custom_context": request.custom_context,
+        "custom_context_type": str(type(request.custom_context)),
+        "custom_context_len": len(request.custom_context) if request.custom_context else 0,
+        "has_custom_context": bool(request.custom_context)
+    }
 
 
 @router.post(
