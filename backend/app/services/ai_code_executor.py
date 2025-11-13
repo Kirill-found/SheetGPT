@@ -428,10 +428,52 @@ Generate CORRECTED code that will work. Return ONLY the Python code."""
         # Определяем нужна ли таблица/график
         structured_data = self._generate_structured_data_if_needed(query, result_dict, exec_result.get('summary', ''))
 
-        # Определяем нужно ли выделение строк
-        print(f"🔍 Checking if highlighting needed for query: {query}")
-        print(f"🔍 Result dict: {result_dict}")
-        highlighting_data = self._generate_highlighting_if_needed(query, result_dict)
+        # v6.5.5: ПРОСТОЕ РЕШЕНИЕ для выделения
+        # Если в запросе есть ключевые слова выделения - генерируем данные прямо здесь
+        highlight_keywords = ['выдели', 'подсвет', 'отметь', 'покаж', 'highlight', 'mark', 'топ', 'лучш', 'худш']
+        query_lower = query.lower()
+
+        if any(kw in query_lower for kw in highlight_keywords):
+            print(f"🎯 Highlight keyword found, generating highlight data directly")
+
+            # Извлекаем число из запроса
+            import re
+            numbers = re.findall(r'\d+', query)
+            count = 5  # По умолчанию 5
+            if numbers:
+                count = min(int(numbers[0]), 20)
+
+            # Генерируем строки для выделения на основе key_findings
+            if key_findings and len(key_findings) > 0:
+                # Выделяем топ N строк (начиная со строки 2 в Sheets)
+                rows_to_highlight = list(range(2, min(2 + count, 2 + len(key_findings))))
+
+                if 'топ' in query_lower or 'лучш' in query_lower:
+                    highlight_color = '#90EE90'  # Зелёный для топ
+                    highlight_message = f'Выделены топ {len(rows_to_highlight)} товаров'
+                elif 'худш' in query_lower or 'минимальн' in query_lower:
+                    highlight_color = '#FFB6C1'  # Красный для худших
+                    highlight_message = f'Выделены {len(rows_to_highlight)} минимальных значений'
+                else:
+                    highlight_color = '#FFFF00'  # Жёлтый по умолчанию
+                    highlight_message = f'Выделены {len(rows_to_highlight)} строк'
+
+                highlighting_data = {
+                    "action_type": "highlight_rows",
+                    "highlight_rows": rows_to_highlight,
+                    "highlight_color": highlight_color,
+                    "highlight_message": highlight_message
+                }
+                print(f"✅ Generated highlighting: {highlighting_data}")
+            else:
+                highlighting_data = None
+                print(f"❌ No key_findings to base highlighting on")
+        else:
+            highlighting_data = None
+            print(f"❌ No highlight keywords in query")
+
+        # Старый метод как fallback (закомментирован)
+        # highlighting_data = self._generate_highlighting_if_needed(query, result_dict)
         if highlighting_data:
             print(f"✅ Highlighting data generated: {highlighting_data}")
         else:
