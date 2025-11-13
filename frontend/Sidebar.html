@@ -651,14 +651,14 @@
           }
 
           // v6.2.8: Professional Insights (custom_context feature)
-          if (result.professionalInsights) {
+          if (result.professional_insights) {
             const insightsDiv = document.createElement('div');
             insightsDiv.style.padding = '12px';
             insightsDiv.style.backgroundColor = '#fff3e0';
             insightsDiv.style.borderLeft = '4px solid #ff9800';
             insightsDiv.style.borderRadius = '6px';
             insightsDiv.style.marginTop = '12px';
-            insightsDiv.innerHTML = `<strong>💡 Professional Insights:</strong><br>${result.professionalInsights}`;
+            insightsDiv.innerHTML = `<strong>💡 Professional Insights:</strong><br>${result.professional_insights}`;
             content.appendChild(insightsDiv);
           }
 
