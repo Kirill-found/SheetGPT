@@ -813,6 +813,12 @@
       // Add user message
       addMessage(message, 'user');
 
+      // Save user message to history
+      chatHistory.push({
+        role: 'user',
+        content: message
+      });
+
       // Clear input
       input.value = '';
       input.style.height = 'auto';
@@ -998,6 +1004,67 @@
         bubble.appendChild(content);
         messageDiv.appendChild(bubble);
         container.appendChild(messageDiv);
+
+        // Handle structured data (tables and charts)
+        if (result.structured_data) {
+          console.log('[UI] Creating table and chart from structured_data');
+          google.script.run
+            .withSuccessHandler(function(tableResult) {
+              if (tableResult.success) {
+                const successDiv = document.createElement('div');
+                successDiv.className = 'message ai';
+                const successBubble = document.createElement('div');
+                successBubble.className = 'message-bubble';
+                const successBox = document.createElement('div');
+                successBox.className = 'content-box success';
+                successBox.textContent = tableResult.message || 'Таблица создана успешно';
+                successBubble.appendChild(successBox);
+                successDiv.appendChild(successBubble);
+                container.appendChild(successDiv);
+                scrollToBottom();
+              }
+            })
+            .withFailureHandler(function(error) {
+              console.error('[UI] Table creation failed:', error);
+              const errorDiv = document.createElement('div');
+              errorDiv.className = 'message ai';
+              const errorBubble = document.createElement('div');
+              errorBubble.className = 'message-bubble';
+              const errorBox = document.createElement('div');
+              errorBox.className = 'content-box error';
+              errorBox.textContent = 'Ошибка создания таблицы: ' + error.message;
+              errorBubble.appendChild(errorBox);
+              errorDiv.appendChild(errorBubble);
+              container.appendChild(errorDiv);
+              scrollToBottom();
+            })
+            .createTableAndChart(result.structured_data);
+        }
+
+        // Handle row highlighting
+        if (result.highlight_rows && result.highlight_rows.length > 0) {
+          console.log('[UI] Highlighting rows:', result.highlight_rows);
+          google.script.run
+            .withSuccessHandler(function(highlightResult) {
+              if (highlightResult.success) {
+                const successDiv = document.createElement('div');
+                successDiv.className = 'message ai';
+                const successBubble = document.createElement('div');
+                successBubble.className = 'message-bubble';
+                const successBox = document.createElement('div');
+                successBox.className = 'content-box success';
+                successBox.textContent = result.highlight_message || highlightResult.message;
+                successBubble.appendChild(successBox);
+                successDiv.appendChild(successBubble);
+                container.appendChild(successDiv);
+                scrollToBottom();
+              }
+            })
+            .withFailureHandler(function(error) {
+              console.error('[UI] Row highlighting failed:', error);
+            })
+            .highlightRows(result.highlight_rows, result.highlight_color || '#FFFF00');
+        }
 
         scrollToBottom();
       } catch (error) {
@@ -1199,11 +1266,30 @@
       // Clear current chat
       const container = document.getElementById('chatContainer');
       container.innerHTML = '';
-      document.getElementById('emptyState').style.display = 'none';
+      const emptyState = document.getElementById('emptyState');
+      if (emptyState) {
+        emptyState.style.display = 'none';
+      }
 
-      // Restore messages (simplified version)
-      alert('Загрузка истории чата: ' + chat.title);
+      // Restore chat history array
+      chatHistory = chat.messages || [];
+
+      // Restore messages from saved history
+      if (chat.messages && chat.messages.length > 0) {
+        chat.messages.forEach(msg => {
+          if (msg.role === 'user') {
+            addMessage(msg.content, 'user');
+          } else if (msg.role === 'assistant' && msg.result) {
+            addAIResponse(msg.result);
+          }
+        });
+      } else {
+        // Fallback: just show the title as first message
+        addMessage(chat.firstMessage || chat.title, 'user');
+      }
+
       toggleHistory();
+      scrollToBottom();
     }
 
     function formatTime(timestamp) {
@@ -1221,6 +1307,14 @@
     // Save chat on successful response
     const originalHandleResponse = handleResponse;
     handleResponse = function(result) {
+      // Save AI response to history
+      if (result) {
+        chatHistory.push({
+          role: 'assistant',
+          result: result  // Save full result for later restoration
+        });
+      }
+
       originalHandleResponse(result);
       setTimeout(saveChatToHistory, 500); // Save after rendering
     };
