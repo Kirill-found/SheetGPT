@@ -402,6 +402,9 @@ Generate CORRECTED code that will work. Return ONLY the Python code."""
         # Определяем нужна ли таблица/график
         structured_data = self._generate_structured_data_if_needed(query, result_dict, exec_result.get('summary', ''))
 
+        # Определяем нужно ли выделение строк
+        highlighting_data = self._generate_highlighting_if_needed(query, result_dict)
+
         # Базовый ответ
         response = {
             "summary": exec_result.get('summary', 'Результат вычислен'),
@@ -415,6 +418,10 @@ Generate CORRECTED code that will work. Return ONLY the Python code."""
             "python_executed": True,
             "execution_output": exec_result.get('output', '')
         }
+
+        # Добавляем данные выделения если есть
+        if highlighting_data:
+            response.update(highlighting_data)
 
         # Добавляем профессиональные инсайты
         # ВСЕГДА генерируем insights (с custom_context или без)
@@ -488,6 +495,79 @@ Generate CORRECTED code that will work. Return ONLY the Python code."""
 
         except Exception as e:
             print(f"Error generating structured_data: {e}")
+            return None
+
+    def _generate_highlighting_if_needed(self, query: str, result_data: Any) -> Optional[Dict[str, Any]]:
+        """
+        Определяет нужно ли выделение строк и генерирует данные для него
+        """
+        # Ключевые слова для выделения
+        highlight_keywords = ['выдели', 'подсвет', 'отметь', 'покаж', 'highlight', 'mark', 'топ', 'лучш', 'худш', 'больш', 'меньш', 'максимальн', 'минимальн']
+
+        query_lower = query.lower()
+        needs_highlighting = any(kw in query_lower for kw in highlight_keywords)
+
+        if not needs_highlighting:
+            return None
+
+        try:
+            # Пытаемся определить что выделять
+            rows_to_highlight = []
+            highlight_color = '#FFFF00'  # Жёлтый по умолчанию
+            highlight_message = 'Выделены строки по запросу'
+
+            # Если результат - DataFrame или список с числовыми данными
+            if hasattr(result_data, 'shape'):  # pandas DataFrame
+                # Ищем топ значения
+                if 'топ' in query_lower or 'лучш' in query_lower or 'максимальн' in query_lower:
+                    # Находим колонку с числовыми значениями
+                    numeric_cols = result_data.select_dtypes(include=['number']).columns
+                    if len(numeric_cols) > 0:
+                        col = numeric_cols[0]  # Берём первую числовую колонку
+                        top_n = 5  # По умолчанию топ 5
+                        # Пытаемся извлечь число из запроса
+                        import re
+                        numbers = re.findall(r'\d+', query)
+                        if numbers:
+                            top_n = min(int(numbers[0]), 20)  # Максимум 20
+
+                        # Находим топ строки
+                        top_indices = result_data.nlargest(top_n, col).index.tolist()
+                        rows_to_highlight = [i + 2 for i in top_indices]  # +2 для Google Sheets (заголовок + индекс с 0)
+                        highlight_color = '#90EE90'  # Зелёный для топ значений
+                        highlight_message = f'Выделены топ {top_n} строк'
+
+                elif 'худш' in query_lower or 'минимальн' in query_lower or 'меньш' in query_lower:
+                    # Находим минимальные значения
+                    numeric_cols = result_data.select_dtypes(include=['number']).columns
+                    if len(numeric_cols) > 0:
+                        col = numeric_cols[0]
+                        bottom_n = 5
+                        # Пытаемся извлечь число из запроса
+                        import re
+                        numbers = re.findall(r'\d+', query)
+                        if numbers:
+                            bottom_n = min(int(numbers[0]), 20)
+
+                        # Находим худшие строки
+                        bottom_indices = result_data.nsmallest(bottom_n, col).index.tolist()
+                        rows_to_highlight = [i + 2 for i in bottom_indices]  # +2 для Google Sheets
+                        highlight_color = '#FFB6C1'  # Светло-красный для худших значений
+                        highlight_message = f'Выделены {bottom_n} минимальных значений'
+
+            # Если нашли строки для выделения
+            if rows_to_highlight:
+                return {
+                    "action_type": "highlight_rows",
+                    "highlight_rows": rows_to_highlight,
+                    "highlight_color": highlight_color,
+                    "highlight_message": highlight_message
+                }
+
+            return None
+
+        except Exception as e:
+            print(f"Error generating highlighting data: {e}")
             return None
 
     def _generate_professional_insights(self, query: str, result_data: Any, summary: str, custom_context: str) -> Dict[str, Any]:
