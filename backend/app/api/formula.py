@@ -58,6 +58,10 @@ async def generate_formula(request: FormulaRequest):
                 detail="Необходимо указать названия колонок"
             )
 
+        # DEBUG: Log custom_context
+        print(f"\n🎯 FORMULA.PY: request.custom_context = {request.custom_context}")
+        print(f"🎯 FORMULA.PY: custom_context type = {type(request.custom_context)}")
+
         # Обрабатываем запрос через AI
         # Если есть conversation_id - используем generate_actions (Interactive Builder с историей)
         # Иначе используем старый process_query

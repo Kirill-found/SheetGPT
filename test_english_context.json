@@ -1,0 +1,12 @@
+{
+  "query": "топ 5 товаров по продажам",
+  "column_names": ["Товар", "Продажи"],
+  "sheet_data": [
+    ["Товар 1", 1000],
+    ["Товар 2", 2000],
+    ["Товар 3", 1500],
+    ["Товар 4", 3000],
+    ["Товар 5", 2500]
+  ],
+  "custom_context": "You are a CFO with 10 years of experience. Analyze data from profitability perspective. Give actionable recommendations."
+}
