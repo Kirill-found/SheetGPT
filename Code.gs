@@ -4,8 +4,7 @@
  */
 
 // Backend API URL
-// Updated to new environment with v1.2.0 (methodology + intent fixes)
-const API_URL = 'https://sheetgpt-sheet.up.railway.app';
+const API_URL = 'https://sheetgpt-production.up.railway.app';
 
 /**
  * Запускается при открытии таблицы
@@ -18,8 +17,6 @@ function onOpen(e) {
       SpreadsheetApp.getUi()
         .createMenu('SheetGPT')
         .addItem('Открыть AI помощник', 'showSidebar')
-        .addSeparator()
-        .addItem('Новый разговор', 'startNewConversation')
         .addSeparator()
         .addItem('Справка', 'showHelp')
         .addToUi();
@@ -42,40 +39,19 @@ function onInstall(e) {
  * Для Add-on возвращает HtmlOutput напрямую
  */
 function showSidebar(e) {
+  const html = HtmlService.createHtmlOutputFromFile('Sidebar')
+    .setTitle('SheetGPT AI')
+    .setWidth(800);
+
+  // Если вызвано как Add-on (есть параметр e или нет доступа к UI)
   try {
-    Logger.log('=== showSidebar START ===');
-    Logger.log('Parameter e: ' + e);
-
-    const html = HtmlService.createHtmlOutputFromFile('Sidebar')
-      .setTitle('SheetGPT AI')
-      .setWidth(350);
-
-    Logger.log('HTML created, title: ' + html.getTitle());
-    Logger.log('HTML width: ' + html.getWidth());
-
-    // Если вызвано как Add-on (есть параметр e или нет доступа к UI)
     if (e) {
-      Logger.log('Returning HTML for Add-on context');
       return html;
     }
-
-    Logger.log('Calling showSidebar...');
     SpreadsheetApp.getUi().showSidebar(html);
-    Logger.log('✅ showSidebar completed successfully');
   } catch (error) {
-    Logger.log('❌ ERROR in showSidebar:');
-    Logger.log('Error name: ' + error.name);
-    Logger.log('Error message: ' + error.message);
-    Logger.log('Error stack: ' + error.stack);
-
-    // Показываем ошибку пользователю
-    SpreadsheetApp.getActiveSpreadsheet().toast(
-      'Ошибка при открытии Sidebar: ' + error.message,
-      'Ошибка',
-      5
-    );
-
-    throw error; // Пробрасываем ошибку чтобы увидеть её в UI
+    // Fallback для Add-on контекста
+    return html;
   }
 }
 
@@ -120,115 +96,6 @@ function showHelp() {
 }
 
 /**
- * ДИАГНОСТИКА: Тестирует соединение с API сервером
- * Запустите эту функцию чтобы проверить настройки
- */
-function testAPIConnection() {
-  try {
-    Logger.log('🔍 Тестирование соединения с API...');
-    Logger.log('API URL: ' + API_URL);
-
-    // Проверка 1: Health check
-    const healthUrl = API_URL + '/health';
-    Logger.log('Запрос к: ' + healthUrl);
-
-    const response = UrlFetchApp.fetch(healthUrl, {
-      method: 'get',
-      muteHttpExceptions: true
-    });
-
-    const statusCode = response.getResponseCode();
-    const content = response.getContentText();
-
-    Logger.log('Status: ' + statusCode);
-    Logger.log('Response: ' + content);
-
-    if (statusCode === 200) {
-      const healthData = JSON.parse(content);
-      Logger.log('✅ УСПЕХ! Сервер отвечает');
-      Logger.log('Версия: ' + healthData.version);
-      Logger.log('Статус: ' + healthData.status);
-
-      // Проверка 2: Тест формулы
-      Logger.log('\n🧪 Тестирование API формул...');
-      const testPayload = {
-        query: 'Сумма продаж',
-        column_names: ['Товар', 'Продажи'],
-        sheet_data: [['Товар','Продажи'],['Тест',1000]]
-      };
-
-      const formulaUrl = API_URL + '/api/v1/formula';
-      const formulaResponse = UrlFetchApp.fetch(formulaUrl, {
-        method: 'post',
-        contentType: 'application/json',
-        payload: JSON.stringify(testPayload),
-        muteHttpExceptions: true
-      });
-
-      const formulaStatus = formulaResponse.getResponseCode();
-      const formulaContent = formulaResponse.getContentText();
-
-      Logger.log('Formula API Status: ' + formulaStatus);
-      Logger.log('Formula API Response: ' + formulaContent);
-
-      if (formulaStatus === 200) {
-        Logger.log('✅ API формул работает!');
-        SpreadsheetApp.getActiveSpreadsheet().toast(
-          '✅ Соединение работает!\nВерсия: ' + healthData.version,
-          'Тест API',
-          5
-        );
-        return true;
-      } else {
-        Logger.log('❌ API формул вернул ошибку: ' + formulaStatus);
-        SpreadsheetApp.getActiveSpreadsheet().toast(
-          '⚠️ Health check OK, но API формул не работает\nПроверьте логи (Ctrl+Enter)',
-          'Тест API',
-          5
-        );
-        return false;
-      }
-    } else {
-      Logger.log('❌ Сервер вернул статус: ' + statusCode);
-      SpreadsheetApp.getActiveSpreadsheet().toast(
-        '❌ Сервер вернул ошибку: ' + statusCode,
-        'Тест API',
-        5
-      );
-      return false;
-    }
-  } catch (error) {
-    Logger.log('❌ ОШИБКА: ' + error.toString());
-    Logger.log('Error name: ' + error.name);
-    Logger.log('Error message: ' + error.message);
-
-    if (error.message && error.message.indexOf('белом списке') !== -1) {
-      Logger.log('\n⚠️ URL НЕ В WHITELIST!');
-      Logger.log('Решение:');
-      Logger.log('1. Откройте Project Settings (⚙️ слева)');
-      Logger.log('2. Включите "Show appsscript.json in editor"');
-      Logger.log('3. Обновите appsscript.json с правильным urlFetchWhitelist');
-
-      SpreadsheetApp.getActiveSpreadsheet().toast(
-        '❌ URL не в whitelist!\n' +
-        'Откройте Project Settings → Show appsscript.json\n' +
-        'Проверьте логи для деталей (Ctrl+Enter)',
-        'Ошибка',
-        10
-      );
-    } else {
-      SpreadsheetApp.getActiveSpreadsheet().toast(
-        '❌ Ошибка: ' + error.message + '\nПроверьте логи (Ctrl+Enter)',
-        'Тест API',
-        5
-      );
-    }
-
-    return false;
-  }
-}
-
-/**
  * Читает данные из активного листа
  */
 function getSheetData() {
@@ -238,77 +105,13 @@ function getSheetData() {
 
   // Ограничиваем до 1000 строк для производительности
   const maxRows = 1000;
-  let data = values.slice(0, maxRows);
-
-  // Получаем информацию о выделенном диапазоне
-  const activeRange = sheet.getActiveRange();
-  const activeCell = sheet.getActiveCell();
-
-  let selectedRange = null;
-  let activeCellA1 = null;
-
-  if (activeRange) {
-    selectedRange = activeRange.getA1Notation();
-  }
-
-  if (activeCell) {
-    activeCellA1 = activeCell.getA1Notation();
-  }
-
-  // === УМНОЕ ОПРЕДЕЛЕНИЕ СТРОКИ ЗАГОЛОВКОВ ===
-  let headerRowIndex = 0;
-
-  // Ищем первую строку, где больше 50% ячеек содержат непустой текст
-  for (let i = 0; i < Math.min(5, data.length); i++) {
-    const row = data[i];
-    let nonEmptyCount = 0;
-    let textCount = 0;
-
-    for (let cell of row) {
-      if (cell !== null && cell !== undefined && cell !== '' && cell !== 0) {
-        nonEmptyCount++;
-
-        // Проверяем, что это текст (не число, не дата)
-        if (typeof cell === 'string' && cell.trim() !== '' && isNaN(cell)) {
-          textCount++;
-        }
-      }
-    }
-
-    // Если больше 30% ячеек - непустой текст, и больше 50% заполнено, это заголовки
-    if (textCount >= row.length * 0.3 && nonEmptyCount >= row.length * 0.5) {
-      headerRowIndex = i;
-      Logger.log('✅ Найдена строка заголовков: ' + (i + 1));
-      break;
-    }
-  }
-
-  // Если нашли заголовки не в первой строке, пропускаем мусор сверху
-  if (headerRowIndex > 0) {
-    Logger.log('⚠️ Пропускаем ' + headerRowIndex + ' строк мусора сверху');
-    data = data.slice(headerRowIndex);
-  }
-
-  // Преобразуем все значения в строки для совместимости с Pydantic
-  const stringData = data.map(row => row.map(cell => {
-    if (cell === null || cell === undefined) return '';
-    if (cell instanceof Date) return cell.toISOString();
-    return String(cell);
-  }));
-
-  const columnNames = stringData.length > 0 ? stringData[0] : [];
-
-  Logger.log('📋 Column names: ' + columnNames.slice(0, 5).join(', '));
-  Logger.log('📊 Data rows: ' + stringData.length);
+  const data = values.slice(0, maxRows);
 
   return {
-    data: stringData,
-    columnNames: columnNames,
+    data: data,
+    columnNames: data.length > 0 ? data[0] : [],
     rowCount: values.length,
-    sheetName: sheet.getName(),
-    selectedRange: selectedRange,
-    activeCell: activeCellA1,
-    headerRowIndex: headerRowIndex + 1  // +1 для отображения пользователю (нумерация с 1)
+    sheetName: sheet.getName()
   };
 }
 
@@ -329,10 +132,7 @@ function insertFormula(formula, cell) {
     // Если начинается с "=" - это формула, иначе - текст
     const range = sheet.getRange(cell);
     if (formula && formula.toString().startsWith('=')) {
-      // Конвертируем русские названия функций обратно в английские
-      // Google Sheets API требует английские названия в setFormula()
-      const englishFormula = convertToEnglishFunctions(formula);
-      range.setFormula(englishFormula);
+      range.setFormula(formula);
     } else {
       range.setValue(formula);
     }
@@ -354,74 +154,6 @@ function insertFormula(formula, cell) {
 }
 
 /**
- * Конвертирует русские названия функций в английские для Google Sheets API
- */
-function convertToEnglishFunctions(formula) {
-  // Словарь русских → английских названий функций
-  const functionMap = {
-    'ЕСЛИ': 'IF',
-    'ЕПУСТО': 'ISBLANK',
-    'ЕЧИСЛО': 'ISNUMBER',
-    'ПОИСКПОЗ': 'MATCH',
-    'СЧЁТЕСЛИ': 'COUNTIF',
-    'СУММЕСЛИ': 'SUMIF',
-    'СУММЕСЛИМН': 'SUMIFS',
-    'СЧЁТЕСЛИМН': 'COUNTIFS',
-    'СРЗНАЧЕСЛИ': 'AVERAGEIF',
-    'СРЗНАЧЕСЛИМН': 'AVERAGEIFS',
-    'ВПР': 'VLOOKUP',
-    'ГПР': 'HLOOKUP',
-    'ИНДЕКС': 'INDEX',
-    'СУММ': 'SUM',
-    'СРЗНАЧ': 'AVERAGE',
-    'МАКС': 'MAX',
-    'МИН': 'MIN',
-    'СЧЁТ': 'COUNT',
-    'СЧЁТЗ': 'COUNTA',
-    'И': 'AND',
-    'ИЛИ': 'OR',
-    'НЕ': 'NOT',
-    'ИСТИНА': 'TRUE',
-    'ЛОЖЬ': 'FALSE',
-    'ТЕКСТ': 'TEXT',
-    'ЗНАЧЕН': 'VALUE',
-    'ДЛСТР': 'LEN',
-    'ЛЕВСИМВ': 'LEFT',
-    'ПРАВСИМВ': 'RIGHT',
-    'ПСТР': 'MID',
-    'СЦЕПИТЬ': 'CONCATENATE',
-    'ОБЪЕДИНИТЬ': 'TEXTJOIN',
-    'СЕГОДНЯ': 'TODAY',
-    'ТДАТА': 'NOW',
-    'ГОД': 'YEAR',
-    'МЕСЯЦ': 'MONTH',
-    'ДЕНЬ': 'DAY',
-    'ДАТА': 'DATE',
-    'ЕОШИБКА': 'ISERROR',
-    'ЕСЛИОШИБКА': 'IFERROR',
-    'ОКРУГЛ': 'ROUND',
-    'ОКРУГЛВВЕРХ': 'ROUNDUP',
-    'ОКРУГЛВНИЗ': 'ROUNDDOWN',
-    'ARRAYFORMULA': 'ARRAYFORMULA'
-  };
-
-  let result = formula;
-
-  // Заменяем каждую русскую функцию на английскую
-  // ВАЖНО: \b (word boundary) не работает с кириллицей!
-  // Поэтому заменяем "ФУНКЦИЯ(" на "FUNCTION(" напрямую
-  for (const [rus, eng] of Object.entries(functionMap)) {
-    const pattern = new RegExp(rus + '\\(', 'g');
-    result = result.replace(pattern, eng + '(');
-  }
-
-  // ВАЖНО: Точки с запятой НЕ заменяем!
-  // В русской локализации Google Sheets API также использует точки с запятой
-
-  return result;
-}
-
-/**
  * Конвертирует номер колонки в букву (1 → A, 27 → AA)
  */
 function columnToLetter(column) {
@@ -440,47 +172,39 @@ function columnToLetter(column) {
 function generateFormula(query) {
   try {
     const sheetData = getSheetData();
-
-    // Получаем conversation_id для поддержки контекстных запросов
-    const conversationId = getConversationId();
+    const customContext = getCustomContext(); // v6.2.8: Загружаем роль AI
 
     const payload = {
       query: query,
       column_names: sheetData.columnNames,
-      sheet_data: sheetData.data.slice(0, 10), // Отправляем только первые 10 строк
-      selected_range: sheetData.selectedRange,
-      active_cell: sheetData.activeCell,
-      conversation_id: conversationId  // Отправляем conversation_id если есть
+      sheet_data: sheetData.data, // Отправляем ВСЕ данные (до 1000 строк)
+      custom_context: customContext || undefined // v6.2.8: Персонализированная роль AI
     };
 
     const options = {
       method: 'post',
       contentType: 'application/json',
       payload: JSON.stringify(payload),
-      muteHttpExceptions: true,
-      headers: {
-        'Cache-Control': 'no-cache, no-store, must-revalidate',
-        'Pragma': 'no-cache'
-      }
+      muteHttpExceptions: true
     };
 
-    // Добавляем timestamp к URL для борьбы с кэшированием
-    const url = API_URL + '/api/v1/formula?t=' + new Date().getTime();
-    const response = UrlFetchApp.fetch(url, options);
+    const response = UrlFetchApp.fetch(API_URL + '/api/v1/formula', options);
     const result = JSON.parse(response.getContentText());
 
     if (response.getResponseCode() === 200) {
-      // Сохраняем conversation_id из ответа для следующих запросов
-      if (result.conversation_id) {
-        saveConversationId(result.conversation_id);
-      }
-
       return {
         success: true,
         formula: result.formula,
         explanation: result.explanation,
         confidence: result.confidence,
-        targetCell: result.target_cell
+        targetCell: result.target_cell,
+        // v6.2.8: Professional insights from custom_context
+        summary: result.summary,
+        methodology: result.methodology,
+        keyFindings: result.key_findings,
+        professionalInsights: result.professional_insights,
+        recommendations: result.recommendations,
+        warnings: result.warnings
       };
     } else {
       return {
@@ -527,6 +251,38 @@ function saveConversationHistory(history) {
 }
 
 /**
+ * Получает custom_context (роль AI) из настроек
+ */
+function getCustomContext() {
+  try {
+    const userProps = PropertiesService.getUserProperties();
+    return userProps.getProperty('sheetgpt_custom_context') || '';
+  } catch (error) {
+    console.log('Не удалось загрузить custom_context: ' + error);
+    return '';
+  }
+}
+
+/**
+ * Сохраняет custom_context (роль AI) в настройки
+ */
+function saveCustomContext(context) {
+  try {
+    const userProps = PropertiesService.getUserProperties();
+    if (context && context.trim()) {
+      userProps.setProperty('sheetgpt_custom_context', context.trim());
+      return { success: true };
+    } else {
+      userProps.deleteProperty('sheetgpt_custom_context');
+      return { success: true };
+    }
+  } catch (error) {
+    console.log('Не удалось сохранить custom_context: ' + error);
+    return { success: false, error: error.toString() };
+  }
+}
+
+/**
  * Очищает историю запросов
  */
 function clearConversationHistory() {
@@ -541,265 +297,111 @@ function clearConversationHistory() {
 }
 
 /**
- * Получает conversation_id из UserProperties
- * conversation_id используется для поддержки контекстных запросов ("попробуй еще раз", "измени", etc.)
- */
-function getConversationId() {
-  try {
-    const userProps = PropertiesService.getUserProperties();
-    return userProps.getProperty('sheetgpt_conversation_id');
-  } catch (error) {
-    console.log('Не удалось получить conversation_id: ' + error);
-    return null;
-  }
-}
-
-/**
- * Сохраняет conversation_id в UserProperties
- */
-function saveConversationId(conversationId) {
-  try {
-    if (conversationId) {
-      const userProps = PropertiesService.getUserProperties();
-      userProps.setProperty('sheetgpt_conversation_id', conversationId);
-    }
-  } catch (error) {
-    console.log('Не удалось сохранить conversation_id: ' + error);
-  }
-}
-
-/**
- * Очищает conversation_id (начинает новый разговор)
- */
-function clearConversationId() {
-  try {
-    const userProps = PropertiesService.getUserProperties();
-    userProps.deleteProperty('sheetgpt_conversation_id');
-    return true;
-  } catch (error) {
-    console.log('Не удалось очистить conversation_id: ' + error);
-    return false;
-  }
-}
-
-/**
- * Начинает новый разговор (очищает conversation_id)
- * Вызывается пользователем через меню
- */
-function startNewConversation() {
-  const cleared = clearConversationId();
-  if (cleared) {
-    SpreadsheetApp.getActiveSpreadsheet().toast(
-      'Начат новый разговор. Теперь система не будет помнить предыдущие запросы.',
-      'Новый разговор',
-      5
-    );
-  } else {
-    SpreadsheetApp.getActiveSpreadsheet().toast(
-      'Не удалось начать новый разговор',
-      'Ошибка',
-      3
-    );
-  }
-}
-
-/**
- * ДИАГНОСТИЧЕСКАЯ ФУНКЦИЯ - Простой эхо-тест для проверки передачи параметров
- * Используется для диагностики проблем с google.script.run
- */
-function simpleEcho(text) {
-  Logger.log('=== simpleEcho START ===');
-  Logger.log('Received text: ' + text);
-  Logger.log('Type: ' + typeof text);
-  Logger.log('Is undefined: ' + (text === undefined));
-  Logger.log('Is null: ' + (text === null));
-
-  if (text === undefined) {
-    return {
-      success: false,
-      error: 'ПАРАМЕТР UNDEFINED',
-      message: 'google.script.run НЕ ПЕРЕДАЛ параметр! Это означает проблему с iframe или настройками Apps Script.'
-    };
-  }
-
-  if (text === null) {
-    return {
-      success: false,
-      error: 'ПАРАМЕТР NULL',
-      message: 'Параметр null (не undefined, но пустой)'
-    };
-  }
-
-  if (typeof text !== 'string') {
-    return {
-      success: false,
-      error: 'НЕВЕРНЫЙ ТИП',
-      message: 'Параметр имеет тип: ' + typeof text + ', ожидалась строка'
-    };
-  }
-
-  return {
-    success: true,
-    message: '✅ ПАРАМЕТР ПОЛУЧЕН УСПЕШНО!',
-    received: text,
-    type: typeof text,
-    length: text.length
-  };
-}
-
-/**
- * Обработка запроса (упрощенная версия - без UserProperties)
- * Параметры передаются напрямую
- */
-function setQueryAndProcess(queryText) {
-  try {
-    Logger.log('=== setQueryAndProcess START ===');
-    Logger.log('Received queryText: ' + queryText);
-    Logger.log('Type: ' + typeof queryText);
-    Logger.log('Length: ' + (queryText ? queryText.length : 'N/A'));
-
-    // ВАЖНО: Если queryText undefined, значит google.script.run не передал параметр
-    if (queryText === undefined || queryText === null || queryText === 'undefined') {
-      Logger.log('❌ queryText is undefined/null - параметр НЕ ПЕРЕДАН!');
-      throw new Error('КРИТИЧЕСКАЯ ОШИБКА: Параметр не передан из Sidebar. Проблема с google.script.run в iframe контексте.');
-    }
-
-    // Проверяем что query не пустой
-    const query = String(queryText).trim();
-    if (!query || query === '') {
-      Logger.log('❌ Empty query after trim!');
-      throw new Error('Запрос пустой. Пожалуйста, введите текст запроса.');
-    }
-
-    Logger.log('✅ Query validated, length: ' + query.length);
-
-    // Напрямую вызываем processQueryWithParam без промежуточного хранилища
-    return processQueryWithParam(query);
-  } catch (error) {
-    Logger.log('❌ setQueryAndProcess ERROR: ' + error.message);
-    Logger.log('Error stack: ' + error.stack);
-    throw error;
-  }
-}
-
-/**
  * Обрабатывает запрос пользователя (для чата)
  * Возвращает результат напрямую без вставки формулы
  */
 function processQuery(query) {
-  // Для обратной совместимости
-  if (query && typeof query === 'string' && query.trim() !== '') {
-    return processQueryWithParam(query);
-  }
-  // Если query пустой, пробуем получить из временного хранилища
-  return processQueryInternal();
-}
-
-/**
- * Внутренняя функция обработки запроса
- */
-function processQueryInternal() {
   try {
-    Logger.log('=== processQueryInternal START ===');
-
-    // Получаем query из временного хранилища
-    const userProps = PropertiesService.getUserProperties();
-    const query = userProps.getProperty('temp_query');
-
-    Logger.log('Query from storage: ' + query);
-    Logger.log('Query type: ' + typeof query);
-
-    // Проверяем что query не пустой
-    if (!query || query === 'undefined' || String(query).trim() === '') {
-      Logger.log('❌ Empty query received!');
-      throw new Error('Запрос пустой. Пожалуйста, введите текст запроса.');
-    }
-
-    return processQueryWithParam(query);
-  } catch (error) {
-    Logger.log('❌ processQueryInternal ERROR: ' + error.message);
-    throw error;
-  }
-}
-
-/**
- * Обработка запроса с параметром
- */
-function processQueryWithParam(query) {
-  try {
-    Logger.log('=== processQueryWithParam START ===');
-    Logger.log('Query: ' + query);
-
     const sheetData = getSheetData();
-    Logger.log('Columns: ' + sheetData.columnNames.length);
 
     // Получаем историю предыдущих запросов
     const history = getConversationHistory();
-    Logger.log('History items: ' + history.length);
 
-    // Получаем conversation_id для поддержки контекстных запросов
-    const conversationId = getConversationId();
-    Logger.log('ConvID: ' + conversationId);
+    // КРИТИЧЕСКАЯ ПРОВЕРКА: query не должен быть undefined/null
+    if (!query || query === 'undefined' || typeof query === 'undefined') {
+      throw new Error('Запрос пустой. Пожалуйста, введите вопрос.');
+    }
+
+    // КРИТИЧЕСКОЕ ИСПРАВЛЕНИЕ: НОВАЯ ЛОГИКА ОБРАБОТКИ
+    console.log('=== DATA DETECTION START ===');
+    console.log('First row:', sheetData.columnNames);
+    console.log('Total rows:', sheetData.data.length);
+
+    let columnNames, dataToSend;
+
+    // УНИВЕРСАЛЬНАЯ ПРОВЕРКА: смотрим ПЕРВУЮ СТРОКУ ДАННЫХ
+    // Если она содержит строки вида "ООО", "ИП" - это ДАННЫЕ, НЕ заголовки!
+    const firstDataRow = sheetData.data.length > 0 ? sheetData.data[0] : [];
+    const hasCompanyNames = firstDataRow.some(cell =>
+      typeof cell === 'string' && (cell.includes('ООО') || cell.includes('ИП'))
+    );
+
+    if (hasCompanyNames) {
+      // ПЕРВАЯ СТРОКА - ЭТО ДАННЫЕ! Нет заголовков!
+      console.log('⚠️ DETECTED: First row contains data (companies), NO headers!');
+      const numColumns = firstDataRow.length;
+      columnNames = [];
+      for (let i = 0; i < numColumns; i++) {
+        columnNames.push(`Колонка ${String.fromCharCode(65 + i)}`);  // A, B, C, D, E
+      }
+      dataToSend = sheetData.data;  // Берём ВСЕ строки включая первую
+    } else {
+      // Возможно есть заголовки
+      const firstCell = sheetData.columnNames[0];
+      const looksLikeHeaders = typeof firstCell === 'string' &&
+                                !(/^\d+$/.test(firstCell)) &&  // Не число
+                                firstCell.length > 0 &&
+                                firstCell !== '' &&
+                                !firstCell.includes('Товар ');  // Не "Товар 1", а просто "Товар"
+
+      if (looksLikeHeaders) {
+        console.log('✅ DETECTED: Headers found in first row');
+        columnNames = sheetData.columnNames;
+        dataToSend = sheetData.data.slice(1);  // Пропускаем заголовки, берём ВСЕ строки данных
+      } else {
+        console.log('⚠️ DETECTED: No clear headers, using automatic columns');
+        const numColumns = firstDataRow.length || 5;
+        columnNames = [];
+        for (let i = 0; i < numColumns; i++) {
+          columnNames.push(`Колонка ${String.fromCharCode(65 + i)}`);
+        }
+        dataToSend = sheetData.data;  // Берём ВСЕ строки
+      }
+    }
+
+    console.log('Final columnNames:', columnNames);
+    console.log('Rows to send:', dataToSend.length);
+    console.log('First data row:', dataToSend[0]);
 
     const payload = {
       query: query,
-      column_names: sheetData.columnNames,
-      sheet_data: sheetData.data.slice(0, 10),
-      history: history,  // Добавляем историю в запрос
-      conversation_id: conversationId  // Отправляем conversation_id если есть
+      column_names: columnNames,
+      sheet_data: dataToSend,
+      history: history  // Добавляем историю в запрос
     };
 
-    Logger.log('=== PAYLOAD DEBUG ===');
-    Logger.log('query type: ' + typeof payload.query);
-    Logger.log('query value: ' + payload.query);
-    Logger.log('column_names type: ' + typeof payload.column_names);
-    Logger.log('column_names length: ' + (payload.column_names ? payload.column_names.length : 'null'));
-    Logger.log('column_names[0]: ' + (payload.column_names && payload.column_names.length > 0 ? payload.column_names[0] : 'N/A'));
-    Logger.log('sheet_data type: ' + typeof payload.sheet_data);
-    Logger.log('sheet_data length: ' + (payload.sheet_data ? payload.sheet_data.length : 'null'));
-    Logger.log('history type: ' + typeof payload.history);
-    Logger.log('history length: ' + (payload.history ? payload.history.length : 'null'));
-    Logger.log('conversation_id type: ' + typeof payload.conversation_id);
-    Logger.log('conversation_id value: ' + payload.conversation_id);
+    // КРИТИЧЕСКАЯ ОТЛАДКА - ПОКАЗЫВАЕМ ЧТО ОТПРАВЛЯЕМ!
+    console.log('=== SENDING TO API ===');
+    console.log('Payload:', JSON.stringify(payload, null, 2));
+    console.log('Column names:', columnNames);
+    console.log('Data rows count:', dataToSend.length);
+    console.log('First data row:', dataToSend[0]);
+    console.log('==================');
 
-    Logger.log('Creating JSON...');
-    const payloadStr = JSON.stringify(payload);
-    Logger.log('JSON size: ' + payloadStr.length);
-    Logger.log('JSON first 500 chars: ' + payloadStr.substring(0, 500));
+    // ПОКАЗЫВАЕМ АЛЕРТ С ОТЛАДКОЙ!
+    const debugInfo = `ОТЛАДКА SHEETGPT:
+
+Заголовки: ${columnNames.join(', ')}
+Строк данных: ${dataToSend.length}
+Первая строка: ${dataToSend[0] ? dataToSend[0].join(' | ') : 'НЕТ'}
+
+Если видите "Колонка A, B, C..." - нет заголовков
+Если видите "Товар, Поставщик..." - есть заголовки`;
+
+    // Раскомментируй для отладки:
+    // SpreadsheetApp.getUi().alert('DEBUG', debugInfo, SpreadsheetApp.getUi().ButtonSet.OK);
 
     const options = {
       method: 'post',
       contentType: 'application/json',
-      payload: payloadStr,
-      muteHttpExceptions: true,
-      headers: {
-        'Cache-Control': 'no-cache, no-store, must-revalidate',
-        'Pragma': 'no-cache'
-      }
+      payload: JSON.stringify(payload),
+      muteHttpExceptions: true
     };
 
-    // Добавляем timestamp к URL для борьбы с кэшированием
-    const url = API_URL + '/api/v1/formula?t=' + new Date().getTime();
-    Logger.log('URL: ' + url);
-    Logger.log('Sending request...');
+    const response = UrlFetchApp.fetch(API_URL + '/api/v1/formula', options);
+    const result = JSON.parse(response.getContentText());
 
-    const response = UrlFetchApp.fetch(url, options);
-    const statusCode = response.getResponseCode();
-    Logger.log('Status: ' + statusCode);
-
-    const responseText = response.getContentText();
-    Logger.log('Response size: ' + responseText.length);
-
-    const result = JSON.parse(responseText);
-
-    if (statusCode === 200) {
-      Logger.log('✅ Success!');
-
-      // Сохраняем conversation_id из ответа для следующих запросов
-      if (result.conversation_id) {
-        saveConversationId(result.conversation_id);
-      }
-
+    if (response.getResponseCode() === 200) {
       // Сохраняем это действие в историю
       const historyItem = {
         query: query,
@@ -809,7 +411,7 @@ function processQueryWithParam(query) {
       saveConversationHistory(history);
 
       // ВАЖНО: Явно возвращаем все поля, чтобы Google Apps Script не отфильтровал их
-      const finalResult = {
+      return {
         formula: result.formula || null,
         explanation: result.explanation || '',
         target_cell: result.target_cell || null,
@@ -817,97 +419,27 @@ function processQueryWithParam(query) {
         response_type: result.response_type || 'formula',
         insights: result.insights || [],
         suggested_actions: result.suggested_actions || null,
-        // Analysis fields
+        // КРИТИЧЕСКИ ВАЖНО: Поля для анализа
         summary: result.summary || null,
         methodology: result.methodology || null,
-        key_findings: result.key_findings || []
+        key_findings: result.key_findings || [],
+        // НОВОЕ: Структурированные данные для создания таблиц/графиков
+        structured_data: result.structured_data || null,
+        // НОВОЕ: Поля для выделения строк
+        action_type: result.action_type || null,
+        highlight_rows: result.highlight_rows || null,
+        highlight_color: result.highlight_color || '#FFFF00',
+        highlight_message: result.highlight_message || null,
+        // v6.2.11: Professional insights from custom_context
+        professional_insights: result.professional_insights || null,
+        recommendations: result.recommendations || null,
+        warnings: result.warnings || null
       };
-
-      Logger.log('=== processQuery END (success) ===');
-      return finalResult;
     } else {
-      Logger.log('❌ Non-200 status');
-      Logger.log('Result detail type: ' + typeof result.detail);
-      Logger.log('Result detail: ' + JSON.stringify(result.detail));
-
-      // Правильно обрабатываем ошибку от FastAPI
-      let errorMessage = 'Ошибка обработки запроса';
-      if (result.detail) {
-        if (typeof result.detail === 'string') {
-          errorMessage = result.detail;
-        } else if (Array.isArray(result.detail)) {
-          // FastAPI validation errors возвращают массив
-          errorMessage = result.detail.map(e => e.msg || e.message || JSON.stringify(e)).join('; ');
-        } else if (typeof result.detail === 'object') {
-          errorMessage = JSON.stringify(result.detail);
-        }
-      }
-
-      Logger.log('Error message: ' + errorMessage);
-      throw new Error(errorMessage);
+      throw new Error(result.detail || 'Ошибка обработки запроса');
     }
   } catch (error) {
-    Logger.log('❌ EXCEPTION: ' + error.name);
-    Logger.log('Message: ' + error.message);
-    Logger.log('Stack: ' + error.stack);
-
-    // Если ошибка уже обработана выше, просто пробрасываем её
-    if (error.message && !error.message.includes('UrlFetchApp')) {
-      throw error;
-    }
-
-    // Иначе оборачиваем в понятное сообщение
-    throw new Error('Ошибка связи с сервером: ' + error.message);
-  }
-}
-
-/**
- * ТЕСТ: Проверка processQuery с параметром
- */
-function testProcessQuery() {
-  return processQuery('Сумма продаж');
-}
-
-/**
- * ДИАГНОСТИКА: Проверка загрузки Sidebar
- * Запустите эту функцию чтобы проверить, может ли Apps Script найти файл Sidebar
- */
-function testSidebarLoad() {
-  try {
-    Logger.log('🔍 Проверка загрузки Sidebar...');
-
-    // Попытка загрузить HTML файл
-    const html = HtmlService.createHtmlOutputFromFile('Sidebar');
-
-    Logger.log('✅ Sidebar загружен успешно!');
-    Logger.log('Title: ' + html.getTitle());
-    Logger.log('Width: ' + html.getWidth());
-
-    // Попытка получить содержимое
-    const content = html.getContent();
-    Logger.log('Content length: ' + content.length + ' символов');
-    Logger.log('Первые 100 символов: ' + content.substring(0, 100));
-
-    SpreadsheetApp.getActiveSpreadsheet().toast(
-      '✅ Sidebar файл найден и загружен!',
-      'Тест Sidebar',
-      3
-    );
-
-    return true;
-  } catch (error) {
-    Logger.log('❌ ОШИБКА при загрузке Sidebar:');
-    Logger.log('Error name: ' + error.name);
-    Logger.log('Error message: ' + error.message);
-    Logger.log('Error stack: ' + error.stack);
-
-    SpreadsheetApp.getActiveSpreadsheet().toast(
-      '❌ Не удалось загрузить Sidebar!\nПроверьте логи (Ctrl+Enter)',
-      'Ошибка',
-      5
-    );
-
-    return false;
+    throw new Error('Ошибка связи с сервером: ' + error.toString());
   }
 }
 
@@ -1030,60 +562,6 @@ function formatCells(config) {
     return {
       success: true,
       message: 'Форматирование применено'
-    };
-  } catch (error) {
-    return {
-      success: false,
-      error: error.toString()
-    };
-  }
-}
-
-/**
- * Применяет условное форматирование
- */
-function applyConditionalFormat(config) {
-  try {
-    const sheet = SpreadsheetApp.getActiveSheet();
-    const range = sheet.getRange(config.range);
-
-    // Удаляем существующие правила условного форматирования для этого диапазона
-    const rules = sheet.getConditionalFormatRules();
-    const newRules = rules.filter(rule => {
-      const ruleRange = rule.getRanges()[0];
-      return !ruleRange || ruleRange.getA1Notation() !== config.range;
-    });
-
-    // Создаем новое правило
-    let rule;
-
-    if (config.type === 'date_expired') {
-      // Правило для истекших дат
-      // ВАЖНО: Используем $column для абсолютной ссылки на колонку
-      // Например: =$I2<TODAY() - фиксирует колонку I, но строка меняется
-      const formula = '=$' + config.column + '2<TODAY()';
-      rule = SpreadsheetApp.newConditionalFormatRule()
-        .whenFormulaSatisfied(formula)
-        .setBackground(config.backgroundColor || '#f4cccc')
-        .setRanges([range])
-        .build();
-    } else if (config.type === 'custom_formula') {
-      // Кастомная формула
-      rule = SpreadsheetApp.newConditionalFormatRule()
-        .whenFormulaSatisfied(config.formula)
-        .setBackground(config.backgroundColor || '#fff2cc')
-        .setRanges([range])
-        .build();
-    } else {
-      throw new Error('Неизвестный тип условного форматирования: ' + config.type);
-    }
-
-    newRules.push(rule);
-    sheet.setConditionalFormatRules(newRules);
-
-    return {
-      success: true,
-      message: 'Условное форматирование применено к диапазону ' + config.range
     };
   } catch (error) {
     return {
@@ -1219,10 +697,6 @@ function executeActions(actions) {
         result = formatCells(action.config);
         break;
 
-      case 'apply_conditional_format':
-        result = applyConditionalFormat(action.config);
-        break;
-
       case 'insert_data':
         result = insertData(action.config);
         break;
@@ -1264,70 +738,476 @@ function executeActions(actions) {
 }
 
 /**
- * Отменяет выполненное действие
+ * Создает таблицу из structured_data в новом листе
+ * @param {Object} structuredData - Объект с headers, rows, table_title, chart_recommended
+ * @returns {Object} - Результат создания таблицы с информацией о листе и диапазоне
  */
-function undoAction(action, result) {
+function createTableInSheet(structuredData) {
   try {
-    const sheet = SpreadsheetApp.getActiveSheet();
+    console.log('=== CREATE TABLE START ===');
+    console.log('Structured data:', JSON.stringify(structuredData, null, 2));
 
-    switch (action.type) {
-      case 'create_chart':
-        // Удаляем последний созданный график
-        const charts = sheet.getCharts();
-        if (charts.length > 0) {
-          const lastChart = charts[charts.length - 1];
-          sheet.removeChart(lastChart);
-          return {
-            success: true,
-            message: 'График удален'
-          };
-        } else {
-          return {
-            success: false,
-            error: 'График не найден'
-          };
-        }
-
-      case 'format_cells':
-        // Очищаем форматирование в указанном диапазоне
-        if (action.config && action.config.range) {
-          const range = sheet.getRange(action.config.range);
-
-          // Сбрасываем только визуальное форматирование (не данные)
-          if (action.config.backgroundColor) {
-            range.setBackground(null);
-          }
-          if (action.config.textColor) {
-            range.setFontColor(null);
-          }
-          if (action.config.bold) {
-            range.setFontWeight('normal');
-          }
-          if (action.config.fontSize) {
-            range.setFontSize(10); // Default size
-          }
-
-          return {
-            success: true,
-            message: 'Форматирование очищено'
-          };
-        } else {
-          return {
-            success: false,
-            error: 'Диапазон не указан'
-          };
-        }
-
-      default:
-        return {
-          success: false,
-          error: 'Отмена не поддерживается для действия: ' + action.type
-        };
+    // Валидация входных данных
+    if (!structuredData || !structuredData.headers || !structuredData.rows) {
+      throw new Error('Некорректные данные: отсутствуют headers или rows');
     }
+
+    const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+    const tableTitle = structuredData.table_title || 'Анализ данных';
+
+    // Создаем уникальное имя для листа (добавляем timestamp если лист уже существует)
+    let sheetName = tableTitle;
+    let counter = 1;
+    while (spreadsheet.getSheetByName(sheetName)) {
+      sheetName = `${tableTitle} (${counter})`;
+      counter++;
+    }
+
+    // Создаем новый лист
+    const newSheet = spreadsheet.insertSheet(sheetName);
+    console.log('Created sheet:', sheetName);
+
+    // Подготовка данных для вставки (заголовки + строки)
+    const headers = structuredData.headers;
+    const rows = structuredData.rows;
+    const allData = [headers].concat(rows);
+
+    // Вставляем данные начиная с A1
+    const numRows = allData.length;
+    const numCols = headers.length;
+    const dataRange = newSheet.getRange(1, 1, numRows, numCols);
+    dataRange.setValues(allData);
+    console.log(`Inserted data: ${numRows} rows x ${numCols} cols`);
+
+    // Форматирование заголовков
+    const headerRange = newSheet.getRange(1, 1, 1, numCols);
+    headerRange
+      .setFontWeight('bold')
+      .setBackground('#4285F4')
+      .setFontColor('#FFFFFF')
+      .setHorizontalAlignment('center')
+      .setVerticalAlignment('middle');
+
+    // Границы для всей таблицы
+    dataRange.setBorder(
+      true, true, true, true,  // top, left, bottom, right
+      true, true,               // vertical, horizontal
+      '#000000',                // color
+      SpreadsheetApp.BorderStyle.SOLID
+    );
+
+    // Автоподбор ширины колонок
+    for (let col = 1; col <= numCols; col++) {
+      newSheet.autoResizeColumn(col);
+    }
+
+    // Замораживаем первую строку (заголовки)
+    newSheet.setFrozenRows(1);
+
+    // Активируем новый лист
+    newSheet.activate();
+
+    console.log('=== CREATE TABLE SUCCESS ===');
+
+    return {
+      success: true,
+      sheetName: sheetName,
+      dataRange: dataRange.getA1Notation(),
+      rowCount: numRows,
+      message: `Таблица "${sheetName}" создана успешно`,
+      chartRecommended: structuredData.chart_recommended || null
+    };
+
+  } catch (error) {
+    console.error('CREATE TABLE ERROR:', error.toString());
+    return {
+      success: false,
+      error: error.toString(),
+      message: 'Ошибка создания таблицы: ' + error.toString()
+    };
+  }
+}
+
+/**
+ * Создает график на основе данных таблицы
+ * @param {string} sheetName - Имя листа с данными
+ * @param {string} dataRange - Диапазон данных (например "A1:B6")
+ * @param {string} chartType - Тип графика: column, bar, line, pie, area
+ * @param {string} title - Заголовок графика
+ * @returns {Object} - Результат создания графика
+ */
+function createChartFromTable(sheetName, dataRange, chartType, title) {
+  try {
+    console.log('=== CREATE CHART START ===');
+    console.log('Sheet:', sheetName);
+    console.log('Range:', dataRange);
+    console.log('Type:', chartType);
+    console.log('Title:', title);
+
+    const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
+    const sheet = spreadsheet.getSheetByName(sheetName);
+
+    if (!sheet) {
+      throw new Error(`Лист "${sheetName}" не найден`);
+    }
+
+    // Получаем диапазон данных
+    const range = sheet.getRange(dataRange);
+
+    // Определяем тип графика
+    let chartTypeEnum;
+    switch (chartType) {
+      case 'column':
+        chartTypeEnum = Charts.ChartType.COLUMN;
+        break;
+      case 'bar':
+        chartTypeEnum = Charts.ChartType.BAR;
+        break;
+      case 'line':
+        chartTypeEnum = Charts.ChartType.LINE;
+        break;
+      case 'pie':
+        chartTypeEnum = Charts.ChartType.PIE;
+        break;
+      case 'area':
+        chartTypeEnum = Charts.ChartType.AREA;
+        break;
+      case 'scatter':
+        chartTypeEnum = Charts.ChartType.SCATTER;
+        break;
+      default:
+        chartTypeEnum = Charts.ChartType.COLUMN;
+    }
+
+    // ПРОФЕССИОНАЛЬНЫЙ ГРАФИК с красивым дизайном
+    const chartBuilder = sheet.newChart()
+      .setChartType(chartTypeEnum)
+      .addRange(range)
+      .setPosition(2, range.getLastColumn() + 2, 0, 0)  // Размещаем справа от таблицы
+      .setOption('title', title || 'График')
+      .setOption('titleTextStyle', {
+        fontSize: 16,
+        bold: true,
+        color: '#202124'
+      })
+      .setOption('width', 700)
+      .setOption('height', 450)
+      .setOption('legend', {
+        position: 'bottom',
+        textStyle: { fontSize: 12 }
+      })
+      .setOption('animation', {
+        startup: true,
+        duration: 1000,
+        easing: 'inAndOut'
+      })
+      .setOption('colors', ['#4285F4', '#EA4335', '#FBBC04', '#34A853', '#FF6D01', '#46BDC6'])
+      .setOption('chartArea', {
+        left: 80,
+        top: 50,
+        width: '75%',
+        height: '65%'
+      })
+      .setOption('backgroundColor', '#FFFFFF')
+      .setOption('lineWidth', 3);
+
+    // Специальные настройки для разных типов графиков
+    if (chartType === 'pie') {
+      chartBuilder
+        .setOption('pieSliceText', 'value')
+        .setOption('pieSliceTextStyle', { fontSize: 14, color: '#000' })
+        .setOption('is3D', true)  // 3D для круговой диаграммы
+        .setOption('pieHole', 0.4)  // Делаем donut chart
+        .setOption('sliceVisibilityThreshold', 0);
+    } else if (chartType === 'column' || chartType === 'bar') {
+      chartBuilder
+        .setOption('hAxis', {
+          title: 'Категория',
+          titleTextStyle: { fontSize: 13, italic: false, bold: true },
+          textStyle: { fontSize: 11 }
+        })
+        .setOption('vAxis', {
+          title: 'Значение',
+          titleTextStyle: { fontSize: 13, italic: false, bold: true },
+          textStyle: { fontSize: 11 },
+          gridlines: { color: '#E0E0E0', count: 5 },
+          minorGridlines: { color: '#F5F5F5' },
+          format: 'short'
+        })
+        .setOption('bar', { groupWidth: '75%' });
+    } else if (chartType === 'line') {
+      chartBuilder
+        .setOption('hAxis', {
+          title: 'Категория',
+          titleTextStyle: { fontSize: 13, italic: false, bold: true },
+          textStyle: { fontSize: 11 }
+        })
+        .setOption('vAxis', {
+          title: 'Значение',
+          titleTextStyle: { fontSize: 13, italic: false, bold: true },
+          textStyle: { fontSize: 11 },
+          gridlines: { color: '#E0E0E0' },
+          format: 'short'
+        })
+        .setOption('pointSize', 5)
+        .setOption('curveType', 'function');  // Плавные линии
+    } else {
+      // Area chart
+      chartBuilder
+        .setOption('hAxis', {
+          title: 'Категория',
+          titleTextStyle: { fontSize: 13, italic: false, bold: true }
+        })
+        .setOption('vAxis', {
+          title: 'Значение',
+          titleTextStyle: { fontSize: 13, italic: false, bold: true },
+          gridlines: { color: '#E0E0E0' }
+        })
+        .setOption('isStacked', false)
+        .setOption('areaOpacity', 0.3);
+    }
+
+    const chart = chartBuilder.build();
+    sheet.insertChart(chart);
+
+    console.log('=== CREATE CHART SUCCESS ===');
+
+    return {
+      success: true,
+      sheetName: sheetName,
+      chartType: chartType,
+      message: `График "${title}" создан успешно`
+    };
+
+  } catch (error) {
+    console.error('CREATE CHART ERROR:', error.toString());
+    return {
+      success: false,
+      error: error.toString(),
+      message: 'Ошибка создания графика: ' + error.toString()
+    };
+  }
+}
+
+/**
+ * Создает таблицу И график одновременно (полный пайплайн)
+ * @param {Object} structuredData - Объект с headers, rows, table_title, chart_recommended
+ * @returns {Object} - Результат создания таблицы и графика
+ */
+function createTableAndChart(structuredData) {
+  try {
+    // Сначала создаем таблицу
+    const tableResult = createTableInSheet(structuredData);
+
+    if (!tableResult.success) {
+      return tableResult;
+    }
+
+    // Если рекомендован график - создаем его
+    if (structuredData.chart_recommended) {
+      const chartResult = createChartFromTable(
+        tableResult.sheetName,
+        tableResult.dataRange,
+        structuredData.chart_recommended,
+        structuredData.table_title || 'График анализа'
+      );
+
+      return {
+        success: true,
+        table: tableResult,
+        chart: chartResult,
+        message: `Таблица и график "${tableResult.sheetName}" созданы успешно`
+      };
+    }
+
+    // Если график не рекомендован - возвращаем только результат таблицы
+    return {
+      success: true,
+      table: tableResult,
+      chart: null,
+      message: tableResult.message
+    };
+
   } catch (error) {
     return {
       success: false,
-      error: error.toString()
+      error: error.toString(),
+      message: 'Ошибка создания таблицы и графика: ' + error.toString()
     };
   }
+}
+
+/**
+ * Выделяет строки цветом по списку номеров
+ * @param {Array<number>} rowNumbers - Номера строк для выделения (1-indexed)
+ * @param {string} color - Цвет выделения в формате hex (например, "#FFFF00")
+ * @return {Object} - Результат операции
+ */
+function highlightRows(rowNumbers, color) {
+  try {
+    console.log('=== HIGHLIGHT ROWS START ===');
+    console.log('Row numbers:', rowNumbers);
+    console.log('Color:', color);
+
+    // Валидация
+    if (!rowNumbers || !Array.isArray(rowNumbers) || rowNumbers.length === 0) {
+      throw new Error('Некорректный список номеров строк');
+    }
+
+    const sheet = SpreadsheetApp.getActiveSheet();
+    const lastColumn = sheet.getLastColumn();
+
+    // Счетчик успешно выделенных строк
+    let highlightedCount = 0;
+
+    // Выделяем каждую строку
+    for (let rowNum of rowNumbers) {
+      try {
+        // Проверяем, что номер строки валидный
+        if (rowNum < 1 || rowNum > sheet.getMaxRows()) {
+          console.warn(`Пропускаем некорректный номер строки: ${rowNum}`);
+          continue;
+        }
+
+        // Получаем диапазон всей строки
+        const rowRange = sheet.getRange(rowNum, 1, 1, lastColumn);
+
+        // Устанавливаем цвет фона
+        rowRange.setBackground(color);
+
+        highlightedCount++;
+      } catch (rowError) {
+        console.error(`Ошибка выделения строки ${rowNum}:`, rowError.toString());
+      }
+    }
+
+    console.log(`=== HIGHLIGHT ROWS SUCCESS: ${highlightedCount}/${rowNumbers.length} ===`);
+
+    return {
+      success: true,
+      highlightedCount: highlightedCount,
+      totalRequested: rowNumbers.length,
+      message: `Выделено ${highlightedCount} из ${rowNumbers.length} строк`
+    };
+
+  } catch (error) {
+    console.error('HIGHLIGHT ROWS ERROR:', error.toString());
+    return {
+      success: false,
+      error: error.toString(),
+      message: 'Ошибка выделения строк: ' + error.toString()
+    };
+  }
+}
+
+/**
+ * Обрабатывает batch запрос для диапазона ячеек
+ * Применяет один запрос к нескольким строкам
+ */
+function processBatchQuery(query, range) {
+  try {
+    console.log('=== BATCH QUERY START ===');
+    console.log('Query:', query);
+    console.log('Range:', range);
+
+    const sheet = SpreadsheetApp.getActiveSheet();
+    const rangeData = sheet.getRange(range);
+    const values = rangeData.getValues();
+
+    console.log('Rows to process:', values.length);
+
+    // Get context from full sheet
+    const sheetData = getSheetData();
+    const columnNames = sheetData.columnNames;
+
+    const results = [];
+    const totalRows = values.length;
+
+    // Process each row
+    for (let i = 0; i < values.length; i++) {
+      const row = values[i];
+      const rowNumber = rangeData.getRow() + i;
+
+      console.log(`Processing row ${i + 1}/${totalRows}:`, row);
+
+      try {
+        // Create payload with single row context
+        const payload = {
+          query: query,
+          column_names: columnNames,
+          sheet_data: [row],  // Send only this row
+          context_data: sheetData.data.slice(0, 10),  // Full context for reference
+          history: []
+        };
+
+        const options = {
+          method: 'post',
+          contentType: 'application/json',
+          payload: JSON.stringify(payload),
+          muteHttpExceptions: true
+        };
+
+        const response = UrlFetchApp.fetch(API_URL + '/api/v1/formula', options);
+        const result = JSON.parse(response.getContentText());
+
+        if (response.getResponseCode() === 200) {
+          results.push({
+            row: rowNumber,
+            success: true,
+            summary: result.summary || result.explanation || 'OK',
+            data: result
+          });
+        } else {
+          results.push({
+            row: rowNumber,
+            success: false,
+            error: result.detail || 'Unknown error'
+          });
+        }
+
+      } catch (error) {
+        results.push({
+          row: rowNumber,
+          success: false,
+          error: error.toString()
+        });
+      }
+
+      // Progress update (можно добавить callback)
+      console.log(`Progress: ${i + 1}/${totalRows} (${Math.round((i + 1) / totalRows * 100)}%)`);
+    }
+
+    console.log('=== BATCH QUERY COMPLETE ===');
+    console.log('Success:', results.filter(r => r.success).length);
+    console.log('Failed:', results.filter(r => !r.success).length);
+
+    return {
+      success: true,
+      total: totalRows,
+      processed: results.length,
+      succeeded: results.filter(r => r.success).length,
+      failed: results.filter(r => !r.success).length,
+      results: results
+    };
+
+  } catch (error) {
+    throw new Error('Batch processing error: ' + error.toString());
+  }
+}
+
+/**
+ * Wrapper function для вызова из sidebar
+ * Google Apps Script требует чтобы функции вызываемые через google.script.run
+ * были определены на верхнем уровне
+ */
+function setQueryAndProcess(query) {
+  console.log("=== setQueryAndProcess called ===");
+  console.log("Query received:", query);
+  console.log("Query type:", typeof query);
+
+  if (!query) {
+    throw new Error('Запрос пустой. Пожалуйста, введите вопрос.');
+  }
+
+  return processQuery(query);
 }
