@@ -1,8 +1,8 @@
 """
-SheetGPT API Production v6.2.8 - AI Code Executor with custom_context support
+SheetGPT API Production v6.2.10 - AI Code Executor with custom_context support
 Генерирует Python код для точных вычислений
 Supports professional insights based on user-defined AI role
-Railway deployment: 2025-11-12 11:45
+Railway deployment: 2025-11-13 12:28 - FORCED
 """
 
 from fastapi import FastAPI, HTTPException
@@ -24,7 +24,7 @@ logger = logging.getLogger(__name__)
 # Create FastAPI app with VERSION 6.2.8 - AI Code Executor + custom_context
 app = FastAPI(
     title="SheetGPT API",
-    version="6.2.8",  # AI Code Executor + custom_context for personalized insights
+    version="6.2.10",  # AI Code Executor + custom_context for personalized insights
     description="AI-powered spreadsheet assistant with Python code execution for 99% accuracy and personalized professional insights"
 )
 
@@ -41,7 +41,7 @@ app.add_middleware(
 async def startup_event():
     """Log startup information"""
     logger.info("="*60)
-    logger.info("SheetGPT API v6.2.8 STARTING - AI CODE EXECUTOR + CUSTOM_CONTEXT")
+    logger.info("SheetGPT API v6.2.10 STARTING - AI CODE EXECUTOR + CUSTOM_CONTEXT")
     logger.info(f"Started at: {datetime.now()}")
     logger.info("AI Code Generation: ENABLED")
     logger.info("Python Code Execution: ENABLED")
@@ -55,7 +55,7 @@ async def root():
     """Health check endpoint"""
     return {
         "name": "SheetGPT API",
-        "version": "6.2.8",  # v6.2.8: custom_context + professional insights
+        "version": "6.2.8",  # v6.2.10: custom_context + professional insights
         "status": "operational",
         "engine": "AI Code Executor",
         "features": {
@@ -64,8 +64,8 @@ async def root():
             "accuracy": "99%",
             "methodology": True,
             "auto_headers": True,
-            "custom_context": True,  # v6.2.8: Personalized AI role
-            "professional_insights": True  # v6.2.8: AI-generated insights/recommendations
+            "custom_context": True,  # v6.2.10: Personalized AI role
+            "professional_insights": True  # v6.2.10: AI-generated insights/recommendations
         },
         "timestamp": datetime.now().isoformat()
     }
