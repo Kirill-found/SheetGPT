@@ -41,7 +41,7 @@ function onInstall(e) {
 function showSidebar(e) {
   const html = HtmlService.createHtmlOutputFromFile('Sidebar')
     .setTitle('SheetGPT AI')
-    .setWidth(800);
+    .setWidth(600); // Google Sheets maximum sidebar width
 
   // Если вызвано как Add-on (есть параметр e или нет доступа к UI)
   try {
