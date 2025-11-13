@@ -1,0 +1,934 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Google Sans', 'Roboto', Arial, sans-serif;
+      background: #f8f9fa;
+      color: #202124;
+      font-size: 14px;
+      line-height: 1.5;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    /* === Header === */
+    .header {
+      background: linear-gradient(135deg, #0f9d58 0%, #0b8043 100%);
+      color: white;
+      padding: 16px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+      flex-shrink: 0;
+    }
+
+    .header h1 {
+      font-size: 20px;
+      font-weight: 500;
+      margin-bottom: 4px;
+    }
+
+    .header p {
+      font-size: 12px;
+      opacity: 0.9;
+    }
+
+    /* === Chat Container === */
+    .chat-container {
+      flex: 1;
+      overflow-y: auto;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    /* === Messages === */
+    .message {
+      display: flex;
+      gap: 8px;
+      animation: fadeIn 0.3s ease-in;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .message.user {
+      justify-content: flex-end;
+    }
+
+    .message.ai {
+      justify-content: flex-start;
+    }
+
+    .message-bubble {
+      max-width: 85%;
+      padding: 12px 16px;
+      border-radius: 18px;
+      word-wrap: break-word;
+    }
+
+    .message.user .message-bubble {
+      background: #0f9d58;
+      color: white;
+      border-bottom-right-radius: 4px;
+    }
+
+    .message.ai .message-bubble {
+      background: white;
+      color: #202124;
+      border: 1px solid #e0e0e0;
+      border-bottom-left-radius: 4px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    }
+
+    /* === AI Response Types === */
+    .response-type-badge {
+      display: inline-block;
+      font-size: 11px;
+      padding: 2px 8px;
+      border-radius: 8px;
+      margin-bottom: 8px;
+      font-weight: 500;
+    }
+
+    .response-type-formula {
+      background: #e8f5e9;
+      color: #2e7d32;
+    }
+
+    .response-type-analysis {
+      background: #e3f2fd;
+      color: #1565c0;
+    }
+
+    .formula-code {
+      background: #f5f5f5;
+      padding: 8px 12px;
+      border-radius: 8px;
+      font-family: 'Courier New', monospace;
+      font-size: 13px;
+      margin: 8px 0;
+      border-left: 3px solid #0f9d58;
+      word-break: break-all;
+    }
+
+    .insights-list {
+      margin: 8px 0;
+      padding-left: 20px;
+    }
+
+    .insights-list li {
+      margin: 4px 0;
+      color: #555;
+    }
+
+    .action-buttons {
+      display: flex;
+      gap: 8px;
+      margin-top: 8px;
+      flex-wrap: wrap;
+    }
+
+    .action-btn {
+      background: #f1f3f4;
+      border: none;
+      padding: 6px 12px;
+      border-radius: 12px;
+      font-size: 12px;
+      cursor: pointer;
+      transition: all 0.2s;
+      color: #5f6368;
+      font-weight: 500;
+    }
+
+    .action-btn:hover {
+      background: #e8eaed;
+    }
+
+    .action-btn.primary {
+      background: #0f9d58;
+      color: white;
+    }
+
+    .action-btn.primary:hover {
+      background: #0b8043;
+    }
+
+    /* === Input Area === */
+    .input-container {
+      flex-shrink: 0;
+      padding: 12px 16px;
+      background: white;
+      border-top: 1px solid #e0e0e0;
+      box-shadow: 0 -2px 8px rgba(0,0,0,0.05);
+    }
+
+    .input-wrapper {
+      display: flex;
+      gap: 8px;
+      align-items: flex-end;
+    }
+
+    #messageInput {
+      flex: 1;
+      border: 1px solid #dadce0;
+      border-radius: 24px;
+      padding: 10px 16px;
+      font-size: 14px;
+      font-family: inherit;
+      resize: none;
+      max-height: 120px;
+      overflow-y: auto;
+      transition: all 0.2s;
+    }
+
+    #messageInput:focus {
+      outline: none;
+      border-color: #0f9d58;
+      box-shadow: 0 0 0 2px rgba(15, 157, 88, 0.1);
+    }
+
+    #sendBtn {
+      background: #0f9d58;
+      color: white;
+      border: none;
+      border-radius: 50%;
+      width: 40px;
+      height: 40px;
+      cursor: pointer;
+      transition: all 0.2s;
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+    }
+
+    #sendBtn:hover {
+      background: #0b8043;
+      transform: scale(1.05);
+    }
+
+    #sendBtn:disabled {
+      background: #dadce0;
+      cursor: not-allowed;
+      transform: scale(1);
+    }
+
+    /* === Loading === */
+    .loading-indicator {
+      display: flex;
+      gap: 4px;
+      padding: 12px;
+    }
+
+    .loading-dot {
+      width: 8px;
+      height: 8px;
+      background: #0f9d58;
+      border-radius: 50%;
+      animation: bounce 1.4s infinite ease-in-out both;
+    }
+
+    .loading-dot:nth-child(1) { animation-delay: -0.32s; }
+    .loading-dot:nth-child(2) { animation-delay: -0.16s; }
+
+    @keyframes bounce {
+      0%, 80%, 100% { transform: scale(0); }
+      40% { transform: scale(1); }
+    }
+
+    /* === Empty State === */
+    .empty-state {
+      text-align: center;
+      padding: 40px 20px;
+      color: #5f6368;
+    }
+
+    .empty-state-icon {
+      font-size: 48px;
+      margin-bottom: 16px;
+    }
+
+    .empty-state h2 {
+      font-size: 18px;
+      font-weight: 500;
+      margin-bottom: 8px;
+      color: #202124;
+    }
+
+    .empty-state p {
+      font-size: 14px;
+      margin-bottom: 20px;
+    }
+
+    .example-queries {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      max-width: 280px;
+      margin: 0 auto;
+    }
+
+    .example-query {
+      background: white;
+      border: 1px solid #e0e0e0;
+      padding: 10px 14px;
+      border-radius: 12px;
+      font-size: 13px;
+      cursor: pointer;
+      transition: all 0.2s;
+      text-align: left;
+    }
+
+    .example-query:hover {
+      background: #f8f9fa;
+      border-color: #0f9d58;
+      transform: translateX(4px);
+    }
+
+    /* === Scrollbar === */
+    .chat-container::-webkit-scrollbar {
+      width: 6px;
+    }
+
+    .chat-container::-webkit-scrollbar-track {
+      background: transparent;
+    }
+
+    .chat-container::-webkit-scrollbar-thumb {
+      background: #dadce0;
+      border-radius: 3px;
+    }
+
+    .chat-container::-webkit-scrollbar-thumb:hover {
+      background: #bdc1c6;
+    }
+  </style>
+</head>
+<body>
+  <!-- Header -->
+  <div class="header">
+    <div style="display: flex; justify-content: space-between; align-items: center;">
+      <div>
+        <h1>💬 SheetGPT AI</h1>
+        <p>Умный ассистент для таблиц</p>
+      </div>
+      <button onclick="openSettings()" style="background: rgba(255,255,255,0.2); border: none; color: white; padding: 8px 12px; border-radius: 6px; cursor: pointer; font-size: 16px;" title="Настройки AI">
+        ⚙️
+      </button>
+    </div>
+  </div>
+
+  <!-- Chat Container -->
+  <div class="chat-container" id="chatContainer">
+    <!-- Empty State -->
+    <div class="empty-state" id="emptyState">
+      <div class="empty-state-icon">🤖</div>
+      <h2>Начните диалог</h2>
+      <p>Задайте вопрос о данных или попросите создать формулу</p>
+
+      <div class="example-queries">
+        <div class="example-query" onclick="useExample('Топ 3 товара по продажам')">
+          📊 Топ 3 товара по продажам
+        </div>
+        <div class="example-query" onclick="useExample('Сумма где значение больше 500000')">
+          ➕ Сумма где значение больше 500000
+        </div>
+        <div class="example-query" onclick="useExample('Средняя цена по категориям')">
+          📈 Средняя цена по категориям
+        </div>
+      </div>
+    </div>
+
+    <!-- Messages will be added here dynamically -->
+  </div>
+
+  <!-- Input Area -->
+  <div class="input-container">
+    <div class="input-wrapper">
+      <textarea
+        id="messageInput"
+        placeholder="Спросите что-то о данных..."
+        rows="1"
+        onkeydown="handleKeyPress(event)"
+      ></textarea>
+      <button id="sendBtn" onclick="sendMessage()" disabled>
+        ➤
+      </button>
+    </div>
+  </div>
+
+  <script>
+    let chatHistory = [];
+    let isProcessing = false;
+
+    // Initialize
+    document.getElementById('messageInput').addEventListener('input', function() {
+      this.style.height = 'auto';
+      this.style.height = (this.scrollHeight) + 'px';
+
+      const sendBtn = document.getElementById('sendBtn');
+      sendBtn.disabled = !this.value.trim() || isProcessing;
+    });
+
+    function handleKeyPress(event) {
+      if (event.key === 'Enter' && !event.shiftKey) {
+        event.preventDefault();
+        sendMessage();
+      }
+    }
+
+    function useExample(query) {
+      document.getElementById('messageInput').value = query;
+      document.getElementById('sendBtn').disabled = false;
+      sendMessage();
+    }
+
+    function sendMessage() {
+      const input = document.getElementById('messageInput');
+      const message = input.value.trim();
+
+      if (!message || isProcessing) return;
+
+      // Hide empty state
+      document.getElementById('emptyState').style.display = 'none';
+
+      // Add user message
+      addMessage(message, 'user');
+
+      // Clear input
+      input.value = '';
+      input.style.height = 'auto';
+      document.getElementById('sendBtn').disabled = true;
+
+      // Show loading
+      isProcessing = true;
+      addLoadingIndicator();
+
+      // Call backend
+      google.script.run
+        .withSuccessHandler(handleResponse)
+        .withFailureHandler(handleError)
+        .processQuery(message);
+    }
+
+    function addMessage(content, type) {
+      const container = document.getElementById('chatContainer');
+      const messageDiv = document.createElement('div');
+      messageDiv.className = `message ${type}`;
+
+      const bubble = document.createElement('div');
+      bubble.className = 'message-bubble';
+      bubble.textContent = content;
+
+      messageDiv.appendChild(bubble);
+      container.appendChild(messageDiv);
+
+      scrollToBottom();
+    }
+
+    function addAIResponse(result) {
+      try {
+        const container = document.getElementById('chatContainer');
+        const messageDiv = document.createElement('div');
+        messageDiv.className = 'message ai';
+
+        const bubble = document.createElement('div');
+        bubble.className = 'message-bubble';
+
+        // Response type badge
+        const responseType = result.response_type || 'formula';
+        const badge = document.createElement('div');
+        badge.className = `response-type-badge response-type-${responseType}`;
+        if (responseType === 'analysis') {
+          badge.textContent = '📊 Анализ';
+        } else if (responseType === 'action') {
+          badge.textContent = '🎯 Действия';
+          badge.className = 'response-type-badge response-type-formula';
+        } else {
+          badge.textContent = '📝 Формула';
+        }
+        bubble.appendChild(badge);
+
+        // Main content
+        const content = document.createElement('div');
+
+        if (responseType === 'formula' && result.formula) {
+          // Formula
+          const formulaDiv = document.createElement('div');
+          formulaDiv.className = 'formula-code';
+          formulaDiv.textContent = result.formula;
+          content.appendChild(formulaDiv);
+
+          // Explanation
+          const explanation = document.createElement('p');
+          explanation.textContent = result.explanation;
+          content.appendChild(explanation);
+
+          // Action buttons
+          const actions = document.createElement('div');
+          actions.className = 'action-buttons';
+
+          const insertBtn = document.createElement('button');
+          insertBtn.className = 'action-btn primary';
+          insertBtn.textContent = '✓ Вставить формулу';
+          insertBtn.onclick = () => insertFormula(result.formula, result.target_cell);
+          actions.appendChild(insertBtn);
+
+          const copyBtn = document.createElement('button');
+          copyBtn.className = 'action-btn';
+          copyBtn.textContent = '📋 Скопировать';
+          copyBtn.onclick = () => copyToClipboard(result.formula);
+          actions.appendChild(copyBtn);
+
+          content.appendChild(actions);
+        } else if (responseType === 'action' && result.insights) {
+          // Action Plan
+          const explanation = document.createElement('p');
+          explanation.textContent = result.explanation;
+          content.appendChild(explanation);
+
+          // Display actions
+          if (result.insights && result.insights.length > 0) {
+            const actionsTitle = document.createElement('p');
+            actionsTitle.style.marginTop = '12px';
+            actionsTitle.style.fontWeight = '500';
+            actionsTitle.textContent = '📋 План действий:';
+            content.appendChild(actionsTitle);
+
+            const actionsList = document.createElement('ul');
+            actionsList.className = 'insights-list';
+            result.insights.forEach(action => {
+              const li = document.createElement('li');
+              if (action.type === 'create_chart') {
+                li.textContent = `📊 Создать график: ${action.config.title || 'График данных'} (диапазон: ${action.config.dataRange})`;
+              } else if (action.type === 'format_cells') {
+                li.textContent = `🎨 Форматировать ячейки: ${action.config.range}`;
+              } else if (action.type === 'insert_formula') {
+                li.textContent = `📝 Вставить формулу: ${action.config.formula}`;
+              } else {
+                li.textContent = `${action.type}: ${JSON.stringify(action.config)}`;
+              }
+              actionsList.appendChild(li);
+            });
+            content.appendChild(actionsList);
+          }
+
+          // Execute button
+          const actions = document.createElement('div');
+          actions.className = 'action-buttons';
+
+          const executeBtn = document.createElement('button');
+          executeBtn.className = 'action-btn primary';
+          executeBtn.textContent = '▶ Выполнить действия';
+          executeBtn.onclick = () => executeActions(result.insights);
+          actions.appendChild(executeBtn);
+
+          content.appendChild(actions);
+        } else {
+          // Analysis - structured response
+
+          // Summary - improved formatting
+          if (result.summary) {
+            const summaryTitle = document.createElement('div');
+            summaryTitle.style.fontWeight = '700';
+            summaryTitle.style.fontSize = '15px';
+            summaryTitle.style.marginBottom = '8px';
+            summaryTitle.style.color = '#1976d2';
+            summaryTitle.textContent = '📊 Вывод:';
+            content.appendChild(summaryTitle);
+
+            const summaryDiv = document.createElement('div');
+            summaryDiv.style.padding = '12px';
+            summaryDiv.style.backgroundColor = '#f5f5f5';
+            summaryDiv.style.borderRadius = '8px';
+            summaryDiv.style.marginBottom = '16px';
+            summaryDiv.style.lineHeight = '1.6';
+            summaryDiv.style.fontSize = '14px';
+            // Split by ". " to create paragraphs for better readability
+            const sentences = result.summary.split('. ');
+            summaryDiv.innerHTML = sentences.map(s => s.trim() ? `<p style="margin: 8px 0;">${s.trim()}${s.endsWith('.') ? '' : '.'}</p>` : '').join('');
+            content.appendChild(summaryDiv);
+          } else if (result.explanation || result.answer) {
+            const answer = document.createElement('p');
+            answer.textContent = result.explanation || result.answer;
+            content.appendChild(answer);
+          }
+
+          // Methodology
+          if (result.methodology) {
+            const methodologyDiv = document.createElement('div');
+            methodologyDiv.style.padding = '10px';
+            methodologyDiv.style.backgroundColor = '#e3f2fd';
+            methodologyDiv.style.borderRadius = '6px';
+            methodologyDiv.style.marginBottom = '12px';
+            methodologyDiv.style.fontSize = '13px';
+            methodologyDiv.innerHTML = `${result.methodology}`;
+            content.appendChild(methodologyDiv);
+          }
+
+          // Key findings
+          if (result.key_findings && result.key_findings.length > 0) {
+            const findingsTitle = document.createElement('p');
+            findingsTitle.style.marginTop = '12px';
+            findingsTitle.style.fontWeight = '600';
+            findingsTitle.style.marginBottom = '6px';
+            findingsTitle.textContent = '🔍 Ключевые находки:';
+            content.appendChild(findingsTitle);
+
+            const findingsList = document.createElement('ul');
+            findingsList.className = 'insights-list';
+            findingsList.style.listStyle = 'none';
+            findingsList.style.padding = '0';
+            result.key_findings.forEach(finding => {
+              const li = document.createElement('li');
+              li.style.padding = '6px 0';
+              li.style.borderBottom = '1px solid #eee';
+              li.textContent = finding;
+              findingsList.appendChild(li);
+            });
+            content.appendChild(findingsList);
+          }
+
+          // Insights
+          if (result.insights && result.insights.length > 0) {
+            const insightsTitle = document.createElement('p');
+            insightsTitle.style.marginTop = '12px';
+            insightsTitle.style.fontWeight = '600';
+            insightsTitle.style.marginBottom = '6px';
+            insightsTitle.textContent = '💡 Инсайты:';
+            content.appendChild(insightsTitle);
+
+            const insightsList = document.createElement('ul');
+            insightsList.className = 'insights-list';
+            insightsList.style.listStyle = 'none';
+            insightsList.style.padding = '0';
+            result.insights.forEach(insight => {
+              const li = document.createElement('li');
+              li.style.padding = '6px 0';
+
+              if (typeof insight === 'object') {
+                if (insight.type === 'create_chart') {
+                  li.textContent = `📊 Создать график: ${insight.config.title || 'График данных'}`;
+                } else {
+                  li.textContent = `${insight.type}: ${JSON.stringify(insight.config || insight)}`;
+                }
+              } else {
+                li.textContent = insight;
+              }
+              insightsList.appendChild(li);
+            });
+            content.appendChild(insightsList);
+          }
+
+          // Suggested actions
+          if (result.suggested_actions && result.suggested_actions.length > 0) {
+            const actionsTitle = document.createElement('p');
+            actionsTitle.style.marginTop = '12px';
+            actionsTitle.style.fontWeight = '600';
+            actionsTitle.style.marginBottom = '6px';
+            actionsTitle.textContent = '✅ Рекомендации:';
+            content.appendChild(actionsTitle);
+
+            const actionsList = document.createElement('ul');
+            actionsList.className = 'insights-list';
+            actionsList.style.listStyle = 'none';
+            actionsList.style.padding = '0';
+            actionsList.style.backgroundColor = '#e8f5e9';
+            actionsList.style.padding = '8px';
+            actionsList.style.borderRadius = '6px';
+            result.suggested_actions.forEach(action => {
+              const li = document.createElement('li');
+              li.style.padding = '4px 0';
+              li.textContent = action;
+              actionsList.appendChild(li);
+            });
+            content.appendChild(actionsList);
+          }
+
+          // DEBUG: Log what we received from API
+          console.log("🔍 DEBUG result keys:", Object.keys(result));
+          console.log("🔍 professional_insights:", result.professional_insights);
+          console.log("🔍 recommendations:", result.recommendations);
+          console.log("🔍 warnings:", result.warnings);
+          // v6.2.8: Professional Insights (custom_context feature)
+          if (result.professional_insights) {
+            const insightsTitle = document.createElement('div');
+            insightsTitle.style.fontWeight = '700';
+            insightsTitle.style.fontSize = '15px';
+            insightsTitle.style.marginTop = '16px';
+            insightsTitle.style.marginBottom = '8px';
+            insightsTitle.style.color = '#f57c00';
+            insightsTitle.textContent = '💡 Профессиональный анализ:';
+            content.appendChild(insightsTitle);
+
+            const insightsDiv = document.createElement('div');
+            insightsDiv.style.padding = '12px';
+            insightsDiv.style.backgroundColor = '#fff3e0';
+            insightsDiv.style.borderLeft = '4px solid #ff9800';
+            insightsDiv.style.borderRadius = '8px';
+            insightsDiv.style.lineHeight = '1.6';
+            insightsDiv.style.fontSize = '14px';
+            insightsDiv.innerHTML = result.professional_insights;
+            content.appendChild(insightsDiv);
+          }
+
+          // v6.2.8: Recommendations
+          if (result.recommendations && result.recommendations.length > 0) {
+            const recsTitle = document.createElement('div');
+            recsTitle.style.fontWeight = '700';
+            recsTitle.style.fontSize = '15px';
+            recsTitle.style.marginTop = '16px';
+            recsTitle.style.marginBottom = '8px';
+            recsTitle.style.color = '#388e3c';
+            recsTitle.textContent = '✅ Рекомендации:';
+            content.appendChild(recsTitle);
+
+            const recsList = document.createElement('ul');
+            recsList.className = 'insights-list';
+            recsList.style.listStyle = 'none';
+            recsList.style.padding = '12px';
+            recsList.style.backgroundColor = '#e8f5e9';
+            recsList.style.borderRadius = '8px';
+            recsList.style.lineHeight = '1.6';
+            result.recommendations.forEach(rec => {
+              const li = document.createElement('li');
+              li.style.padding = '6px 0';
+              li.style.fontSize = '14px';
+              li.textContent = `• ${rec}`;
+              recsList.appendChild(li);
+            });
+            content.appendChild(recsList);
+          }
+
+          // v6.2.8: Warnings
+          if (result.warnings && result.warnings.length > 0) {
+            const warningsTitle = document.createElement('div');
+            warningsTitle.style.fontWeight = '700';
+            warningsTitle.style.fontSize = '15px';
+            warningsTitle.style.marginTop = '16px';
+            warningsTitle.style.marginBottom = '8px';
+            warningsTitle.style.color = '#d32f2f';
+            warningsTitle.textContent = '⚠️ Предупреждения:';
+            content.appendChild(warningsTitle);
+
+            const warnsList = document.createElement('ul');
+            warnsList.className = 'insights-list';
+            warnsList.style.listStyle = 'none';
+            warnsList.style.padding = '12px';
+            warnsList.style.backgroundColor = '#ffebee';
+            warnsList.style.borderRadius = '8px';
+            warnsList.style.lineHeight = '1.6';
+            result.warnings.forEach(warn => {
+              const li = document.createElement('li');
+              li.style.padding = '6px 0';
+              li.style.fontSize = '14px';
+              li.textContent = `• ${warn}`;
+              warnsList.appendChild(li);
+            });
+            content.appendChild(warnsList);
+          }
+
+          // Все убрано - только показываем результаты расчетов!
+        }
+
+        bubble.appendChild(content);
+        messageDiv.appendChild(bubble);
+        container.appendChild(messageDiv);
+
+        scrollToBottom();
+      } catch (error) {
+        console.error('Error in addAIResponse:', error);
+        // Показываем ошибку пользователю
+        const container = document.getElementById('chatContainer');
+        const errorDiv = document.createElement('div');
+        errorDiv.className = 'message ai';
+        const bubble = document.createElement('div');
+        bubble.className = 'message-bubble';
+        bubble.style.borderColor = '#f44336';
+        bubble.innerHTML = `<p style="color: #f44336;">❌ Ошибка отображения ответа: ${error.message}</p>`;
+        errorDiv.appendChild(bubble);
+        container.appendChild(errorDiv);
+      }
+    }
+
+    function addLoadingIndicator() {
+      const container = document.getElementById('chatContainer');
+      const loadingDiv = document.createElement('div');
+      loadingDiv.className = 'message ai';
+      loadingDiv.id = 'loading';
+
+      const bubble = document.createElement('div');
+      bubble.className = 'message-bubble';
+
+      const loading = document.createElement('div');
+      loading.className = 'loading-indicator';
+      loading.innerHTML = '<div class="loading-dot"></div><div class="loading-dot"></div><div class="loading-dot"></div>';
+
+      bubble.appendChild(loading);
+      loadingDiv.appendChild(bubble);
+      container.appendChild(loadingDiv);
+
+      scrollToBottom();
+    }
+
+    function removeLoadingIndicator() {
+      const loading = document.getElementById('loading');
+      if (loading) loading.remove();
+    }
+
+    function handleResponse(result) {
+      removeLoadingIndicator();
+      isProcessing = false;
+
+      if (result) {
+        addAIResponse(result);
+      } else {
+        handleError({message: 'Пустой ответ от сервера'});
+      }
+    }
+
+    function handleError(error) {
+      removeLoadingIndicator();
+      isProcessing = false;
+
+      const container = document.getElementById('chatContainer');
+      const errorDiv = document.createElement('div');
+      errorDiv.className = 'message ai';
+
+      const bubble = document.createElement('div');
+      bubble.className = 'message-bubble';
+      bubble.style.borderColor = '#f44336';
+      bubble.innerHTML = `<p style="color: #f44336;">❌ Ошибка: ${error.message || 'Неизвестная ошибка'}</p>`;
+
+      errorDiv.appendChild(bubble);
+      container.appendChild(errorDiv);
+
+      scrollToBottom();
+    }
+
+    function scrollToBottom() {
+      const container = document.getElementById('chatContainer');
+      setTimeout(() => {
+        container.scrollTop = container.scrollHeight;
+      }, 100);
+    }
+
+    function insertFormula(formula, targetCell) {
+      google.script.run
+        .withSuccessHandler(() => {
+          alert('✓ Формула вставлена!');
+        })
+        .withFailureHandler((error) => {
+          alert('❌ Ошибка: ' + error.message);
+        })
+        .insertFormula(formula, targetCell);
+    }
+
+    function copyToClipboard(text) {
+      navigator.clipboard.writeText(text).then(() => {
+        alert('✓ Скопировано!');
+      }).catch(() => {
+        alert('❌ Не удалось скопировать');
+      });
+    }
+
+    // Функции создания таблиц/графиков удалены - фокус на расчетах!
+
+    // v6.2.8: Settings для custom_context
+    function openSettings() {
+      // Загружаем текущий custom_context
+      google.script.run
+        .withSuccessHandler(function(context) {
+          document.getElementById('customContextInput').value = context || '';
+          document.getElementById('settingsModal').style.display = 'flex';
+        })
+        .getCustomContext();
+    }
+
+    function closeSettings() {
+      document.getElementById('settingsModal').style.display = 'none';
+    }
+
+    function saveSettings() {
+      const context = document.getElementById('customContextInput').value.trim();
+
+      google.script.run
+        .withSuccessHandler(function(result) {
+          if (result.success) {
+            alert('✅ Настройки сохранены!');
+            closeSettings();
+          } else {
+            alert('❌ Ошибка сохранения: ' + result.error);
+          }
+        })
+        .withFailureHandler(function(error) {
+          alert('❌ Ошибка: ' + error.message);
+        })
+        .saveCustomContext(context);
+    }
+  </script>
+
+  <!-- v6.2.8: Settings Modal -->
+  <div id="settingsModal" style="display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 1000; justify-content: center; align-items: center;">
+    <div style="background: white; border-radius: 12px; padding: 24px; max-width: 90%; max-height: 80%; overflow-y: auto; box-shadow: 0 8px 32px rgba(0,0,0,0.2);">
+      <h2 style="margin: 0 0 16px 0; color: #0f9d58;">⚙️ Настройки AI</h2>
+
+      <div style="margin-bottom: 16px;">
+        <label style="display: block; font-weight: 600; margin-bottom: 8px; color: #202124;">
+          🎯 Персонализация AI (Custom Context)
+        </label>
+        <p style="font-size: 13px; color: #5f6368; margin-bottom: 12px;">
+          Опишите роль AI для более точных рекомендаций. Например: "Ты финансовый директор с 10-летним опытом. Анализируй данные с точки зрения рентабельности и unit economics."
+        </p>
+        <textarea
+          id="customContextInput"
+          placeholder="Оставьте пустым для стандартного режима..."
+          style="width: 100%; min-height: 120px; padding: 12px; border: 1px solid #dadce0; border-radius: 8px; font-family: inherit; font-size: 14px; resize: vertical;"
+          maxlength="2000"
+        ></textarea>
+        <div style="text-align: right; font-size: 12px; color: #5f6368; margin-top: 4px;">
+          <span id="charCount">0</span> / 2000 символов
+        </div>
+      </div>
+
+      <div style="display: flex; gap: 12px; justify-content: flex-end;">
+        <button onclick="closeSettings()" style="padding: 10px 20px; border: 1px solid #dadce0; background: white; color: #202124; border-radius: 6px; cursor: pointer; font-weight: 500;">
+          Отмена
+        </button>
+        <button onclick="saveSettings()" style="padding: 10px 20px; border: none; background: #0f9d58; color: white; border-radius: 6px; cursor: pointer; font-weight: 500;">
+          💾 Сохранить
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Character counter for custom_context
+    document.addEventListener('DOMContentLoaded', function() {
+      const input = document.getElementById('customContextInput');
+      if (input) {
+        input.addEventListener('input', function() {
+          document.getElementById('charCount').textContent = this.value.length;
+        });
+      }
+    });
+  </script>
+
+</body>
+</html>
