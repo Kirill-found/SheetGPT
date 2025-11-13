@@ -440,7 +440,7 @@ Generate CORRECTED code that will work. Return ONLY the Python code."""
         """
         # Ключевые слова для определения запроса на таблицу/график
         table_keywords = ['таблиц', 'создай табл', 'сделай табл', 'table', 'построй табл']
-        chart_keywords = ['график', 'диаграмм', 'chart', 'построй', 'визуализ', 'plot']
+        chart_keywords = ['график', 'диаграмм', 'chart', 'построй', 'визуализ', 'plot', 'сделай']
 
         query_lower = query.lower()
         needs_table = any(kw in query_lower for kw in table_keywords)
@@ -470,14 +470,14 @@ Generate CORRECTED code that will work. Return ONLY the Python code."""
             chart_type = None
             if needs_chart:
                 # Определяем подходящий тип графика
-                if len(rows) <= 10:
-                    chart_type = "column"  # Столбчатая для небольших данных
-                elif 'доля' in query_lower or 'процент' in query_lower:
-                    chart_type = "pie"
-                elif 'динамик' in query_lower or 'trend' in query_lower:
-                    chart_type = "line"
+                if 'круг' in query_lower or 'pie' in query_lower or 'доля' in query_lower or 'процент' in query_lower:
+                    chart_type = "pie"  # Круговая
+                elif 'динамик' in query_lower or 'trend' in query_lower or 'линейн' in query_lower:
+                    chart_type = "line"  # Линейная
+                elif 'столб' in query_lower or 'column' in query_lower or len(rows) <= 10:
+                    chart_type = "column"  # Столбчатая
                 else:
-                    chart_type = "bar"
+                    chart_type = "bar"  # Горизонтальная (по умолчанию для больших данных)
 
             return {
                 "headers": headers,
