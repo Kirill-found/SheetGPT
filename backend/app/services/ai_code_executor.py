@@ -403,7 +403,12 @@ Generate CORRECTED code that will work. Return ONLY the Python code."""
         structured_data = self._generate_structured_data_if_needed(query, result_dict, exec_result.get('summary', ''))
 
         # Определяем нужно ли выделение строк
+        print(f"🔍 Checking if highlighting needed for query: {query}")
         highlighting_data = self._generate_highlighting_if_needed(query, result_dict)
+        if highlighting_data:
+            print(f"✅ Highlighting data generated: {highlighting_data}")
+        else:
+            print(f"❌ No highlighting data generated")
 
         # Базовый ответ
         response = {
@@ -508,15 +513,31 @@ Generate CORRECTED code that will work. Return ONLY the Python code."""
         needs_highlighting = any(kw in query_lower for kw in highlight_keywords)
 
         if not needs_highlighting:
+            print(f"❌ No highlight keywords found in: {query}")
             return None
 
+        print(f"✅ Highlight keywords detected in query: {query}")
+
         try:
+            import re
+
             # Пытаемся определить что выделять
             rows_to_highlight = []
             highlight_color = '#FFFF00'  # Жёлтый по умолчанию
             highlight_message = 'Выделены строки по запросу'
 
-            # Если результат - DataFrame или список с числовыми данными
+            print(f"📊 Result data type: {type(result_data)}")
+            if isinstance(result_data, dict):
+                print(f"📊 Dict keys: {list(result_data.keys())[:5]}")
+
+            # Извлекаем число из запроса
+            numbers = re.findall(r'\d+', query)
+            count = 5  # По умолчанию 5
+            if numbers:
+                count = min(int(numbers[0]), 20)  # Максимум 20
+
+            # Обрабатываем разные типы данных
+            # 1. Если результат - DataFrame
             if hasattr(result_data, 'shape'):  # pandas DataFrame
                 # Ищем топ значения
                 if 'топ' in query_lower or 'лучш' in query_lower or 'максимальн' in query_lower:
@@ -524,50 +545,126 @@ Generate CORRECTED code that will work. Return ONLY the Python code."""
                     numeric_cols = result_data.select_dtypes(include=['number']).columns
                     if len(numeric_cols) > 0:
                         col = numeric_cols[0]  # Берём первую числовую колонку
-                        top_n = 5  # По умолчанию топ 5
-                        # Пытаемся извлечь число из запроса
-                        import re
-                        numbers = re.findall(r'\d+', query)
-                        if numbers:
-                            top_n = min(int(numbers[0]), 20)  # Максимум 20
-
                         # Находим топ строки
-                        top_indices = result_data.nlargest(top_n, col).index.tolist()
-                        rows_to_highlight = [i + 2 for i in top_indices]  # +2 для Google Sheets (заголовок + индекс с 0)
+                        top_indices = result_data.nlargest(count, col).index.tolist()
+                        rows_to_highlight = [i + 2 for i in top_indices]  # +2 для Google Sheets
                         highlight_color = '#90EE90'  # Зелёный для топ значений
-                        highlight_message = f'Выделены топ {top_n} строк'
+                        highlight_message = f'Выделены топ {count} строк'
 
                 elif 'худш' in query_lower or 'минимальн' in query_lower or 'меньш' in query_lower:
                     # Находим минимальные значения
                     numeric_cols = result_data.select_dtypes(include=['number']).columns
                     if len(numeric_cols) > 0:
                         col = numeric_cols[0]
-                        bottom_n = 5
-                        # Пытаемся извлечь число из запроса
-                        import re
-                        numbers = re.findall(r'\d+', query)
-                        if numbers:
-                            bottom_n = min(int(numbers[0]), 20)
-
                         # Находим худшие строки
-                        bottom_indices = result_data.nsmallest(bottom_n, col).index.tolist()
+                        bottom_indices = result_data.nsmallest(count, col).index.tolist()
                         rows_to_highlight = [i + 2 for i in bottom_indices]  # +2 для Google Sheets
                         highlight_color = '#FFB6C1'  # Светло-красный для худших значений
-                        highlight_message = f'Выделены {bottom_n} минимальных значений'
+                        highlight_message = f'Выделены {count} минимальных значений'
+
+            # 2. Если результат - словарь с данными таблицы
+            elif isinstance(result_data, dict):
+                # Ищем данные таблицы в словаре
+                rows_data = None
+
+                # Проверяем разные варианты ключей
+                if 'rows' in result_data:
+                    rows_data = result_data['rows']
+                    print(f"✅ Found 'rows' key with {len(rows_data)} items")
+                elif 'data' in result_data:
+                    rows_data = result_data['data']
+                    print(f"✅ Found 'data' key")
+                elif 'результат' in result_data:
+                    rows_data = result_data['результат']
+                    print(f"✅ Found 'результат' key")
+                elif 'товары' in result_data:
+                    rows_data = result_data['товары']
+                    print(f"✅ Found 'товары' key")
+                else:
+                    # Если данные прямо в словаре (key: value пары)
+                    print(f"⚠️ No standard keys found, trying to extract from dict items")
+                    items = list(result_data.items())
+                    rows_data = [[k, v] for k, v in items if isinstance(v, (int, float))]
+                    if rows_data:
+                        print(f"✅ Extracted {len(rows_data)} numeric items from dict")
+
+                # Если есть данные и они являются списком
+                if rows_data and isinstance(rows_data, list) and len(rows_data) > 0:
+                    print(f"📊 Processing {len(rows_data)} rows of data")
+                    # Пытаемся найти числовую колонку (индекс 1 обычно содержит числа для продаж)
+                    numeric_values = []
+                    for i, row in enumerate(rows_data):
+                        if isinstance(row, (list, tuple)) and len(row) > 1:
+                            try:
+                                # Пытаемся взять второй элемент как число
+                                val = float(row[1]) if len(row) > 1 else 0
+                                numeric_values.append((i + 2, val))  # +2 для строки в Sheets
+                            except (ValueError, TypeError):
+                                pass
+
+                    if numeric_values:
+                        # Сортируем по значению
+                        numeric_values.sort(key=lambda x: x[1], reverse=True)
+
+                        if 'топ' in query_lower or 'лучш' in query_lower or 'максимальн' in query_lower:
+                            # Берём топ N
+                            rows_to_highlight = [row[0] for row in numeric_values[:count]]
+                            highlight_color = '#90EE90'  # Зелёный для топ значений
+                            highlight_message = f'Выделены топ {count} товаров'
+                        elif 'худш' in query_lower or 'минимальн' in query_lower or 'меньш' in query_lower:
+                            # Берём последние N (минимальные)
+                            rows_to_highlight = [row[0] for row in numeric_values[-count:]]
+                            highlight_color = '#FFB6C1'  # Светло-красный для худших значений
+                            highlight_message = f'Выделены {count} товаров с минимальными продажами'
+                        else:
+                            # По умолчанию выделяем топ
+                            rows_to_highlight = [row[0] for row in numeric_values[:count]]
+                            highlight_color = '#FFFF00'  # Жёлтый для обычного выделения
+                            highlight_message = f'Выделены {count} строк'
+
+            # 3. Если результат - список списков (таблица)
+            elif isinstance(result_data, list) and len(result_data) > 0:
+                if all(isinstance(row, (list, tuple)) for row in result_data):
+                    # Это таблица
+                    numeric_values = []
+                    for i, row in enumerate(result_data):
+                        if len(row) > 1:
+                            try:
+                                val = float(row[1])
+                                numeric_values.append((i + 2, val))  # +2 для Sheets
+                            except (ValueError, TypeError):
+                                pass
+
+                    if numeric_values:
+                        numeric_values.sort(key=lambda x: x[1], reverse=True)
+
+                        if 'топ' in query_lower or 'лучш' in query_lower:
+                            rows_to_highlight = [row[0] for row in numeric_values[:count]]
+                            highlight_color = '#90EE90'
+                            highlight_message = f'Выделены топ {count} строк'
+                        elif 'худш' in query_lower or 'минимальн' in query_lower:
+                            rows_to_highlight = [row[0] for row in numeric_values[-count:]]
+                            highlight_color = '#FFB6C1'
+                            highlight_message = f'Выделены {count} минимальных значений'
 
             # Если нашли строки для выделения
             if rows_to_highlight:
-                return {
+                result = {
                     "action_type": "highlight_rows",
                     "highlight_rows": rows_to_highlight,
                     "highlight_color": highlight_color,
                     "highlight_message": highlight_message
                 }
+                print(f"✅ Returning highlighting data: {result}")
+                return result
 
+            print(f"❌ No rows to highlight found")
             return None
 
         except Exception as e:
-            print(f"Error generating highlighting data: {e}")
+            print(f"❌ Error generating highlighting data: {e}")
+            import traceback
+            traceback.print_exc()
             return None
 
     def _generate_professional_insights(self, query: str, result_data: Any, summary: str, custom_context: str) -> Dict[str, Any]:
