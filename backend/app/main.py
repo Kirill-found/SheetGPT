@@ -41,7 +41,7 @@ app.add_middleware(
 async def startup_event():
     """Log startup information"""
     logger.info("="*60)
-    logger.info("SheetGPT API v6.6.4 STARTING - AI CODE EXECUTOR + CUSTOM_CONTEXT")
+    logger.info("SheetGPT API v6.6.8 STARTING - WRAPPER FIX: AI code wrapped in initializer")
     logger.info(f"Started at: {datetime.now()}")
     logger.info("AI Code Generation: ENABLED")
     logger.info("Python Code Execution: ENABLED")
@@ -55,7 +55,7 @@ async def root():
     """Health check endpoint"""
     return {
         "name": "SheetGPT API",
-        "version": "6.6.4",  # v6.6.4: custom_context + professional insights
+        "version": "6.6.8",  # v6.6.8: WRAPPER FIX - AI code wrapped in initializer
         "status": "operational",
         "engine": "AI Code Executor",
         "features": {
