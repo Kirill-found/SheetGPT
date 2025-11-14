@@ -1,4 +1,4 @@
-FORCE REDEPLOY TRIGGER
-Timestamp: $(date)
-Commit: 55c70a7
-Purpose: Deploy custom_context debug endpoint
+FORCE REDEPLOY v6.6.7
+Timestamp: 14 ноя 2025 г. 16:51:20
+Commit: cbcbe75
+Purpose: Deploy v6.6.7 radical fix - pre-initialize variables before exec()
