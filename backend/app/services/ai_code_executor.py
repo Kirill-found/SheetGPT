@@ -456,7 +456,7 @@ Generate CORRECTED code that will work. Return ONLY the Python code."""
                 names_pattern = r'\b[А-ЯA-Z][а-яa-z]+\b'
                 names_found = re.findall(names_pattern, query)
 
-                if names_found and exec_result.get("result"):
+                if names_found:
                     for name in names_found:
                         print(f"[SEARCH] Looking for: {name}")
                         # Используем key_findings для определения позиций
