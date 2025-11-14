@@ -127,6 +127,9 @@ RULES FOR CODE GENERATION:
 8. For "топ поставщиков" - group by supplier column and sum sales
 9. Always aggregate duplicate entries
 
+CRITICAL: For search/highlight queries, you MUST create a 'result' variable containing the filtered DataFrame!
+Example: result = df[df['column'].str.contains("search_term", case=False)]
+
 REQUIRED OUTPUT VARIABLES:
 - result: the computed answer (number, dataframe, or list)
 - summary: string with the answer in Russian
