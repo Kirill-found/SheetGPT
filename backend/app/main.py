@@ -207,7 +207,7 @@ async def process_formula(request: FormulaRequest):
 async def get_version():
     """Get detailed version information"""
     return {
-        "api_version": "6.6.4",
+        "api_version": "6.6.8",
         "release": "AI_CODE_EXECUTOR_WITH_STRUCTURED_DATA",
         "engine": "GPT-4o + Python Code Execution",
         "accuracy": "99%",

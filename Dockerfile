@@ -1,7 +1,7 @@
 FROM python:3.11-slim
 
 # CRITICAL: Change this on EVERY deployment to force rebuild
-ARG CACHEBUST=20251114-2030-v6.6.8-COMPLETE
+ARG CACHEBUST=20251114-2035-v6.6.8-ALL-VERSIONS-FIXED
 RUN echo "CACHE BUST: $CACHEBUST - Building v6.6.8 with WRAPPER for guaranteed variable initialization"
 
 LABEL version="6.6.8"
@@ -15,7 +15,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 # CACHE BUST: Force copy layer to rebuild
 # CRITICAL: This RUN must be AFTER requirements but BEFORE COPY to break Docker cache
-RUN echo "CACHEBUST: 20251114-2030-v6.6.8-COMPLETE - $(date)"
+RUN echo "CACHEBUST: 20251114-2035-v6.6.8-ALL-VERSIONS-FIXED - $(date)"
 
 # Copy application
 COPY backend/ .
