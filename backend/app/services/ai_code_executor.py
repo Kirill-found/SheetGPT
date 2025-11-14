@@ -442,6 +442,28 @@ Generate CORRECTED code that will work. Return ONLY the Python code."""
         if any(kw in query_lower for kw in highlight_keywords):
             print(f"[HIGHLIGHT] Keyword found, generating highlight data")
 
+            # ОПРЕДЕЛЕНИЕ ЦВЕТА ИЗ ЗАПРОСА (v6.5.9)
+            color_map = {
+                'красн': '#FF6B6B',   # Красный
+                'зелен': '#51CF66',   # Зеленый
+                'зелён': '#51CF66',   # Зеленый (альт)
+                'син': '#339AF0',     # Синий
+                'желт': '#FFD43B',    # Желтый
+                'жёлт': '#FFD43B',    # Желтый (альт)
+                'оранж': '#FF922B',   # Оранжевый
+                'фиолет': '#9775FA',  # Фиолетовый
+                'роз': '#F06595',     # Розовый
+                'сер': '#ADB5BD',     # Серый
+                'голуб': '#74C0FC',   # Голубой
+            }
+
+            requested_color = None
+            for color_key, color_value in color_map.items():
+                if color_key in query_lower:
+                    requested_color = color_value
+                    print(f"[COLOR] Detected: {color_key} -> {color_value}")
+                    break
+
             # Проверяем тип запроса
             is_search_query = any(word in query_lower for word in ['фамили', 'имен', 'строк', 'найди', 'где'])
 
@@ -470,7 +492,7 @@ Generate CORRECTED code that will work. Return ONLY the Python code."""
                             print(f"[FOUND] {name} at row 2")
 
                 if rows_to_highlight:
-                    highlight_color = '#ADD8E6'  # Голубой для поиска
+                    highlight_color = requested_color or '#ADD8E6'  # Используем запрошенный цвет
                     found_items = ", ".join(names_found) if names_found else "запрошенные данные"
                     highlight_message = f'Найдена строка: {found_items}'
                     highlighting_data = {
@@ -493,16 +515,16 @@ Generate CORRECTED code that will work. Return ONLY the Python code."""
                 if 'топ' in query_lower or 'лучш' in query_lower:
                     # Для топа используем отсортированные данные
                     rows_to_highlight = [8, 5, 3, 10, 11][:count]  # Топ товаров по продажам
-                    highlight_color = '#90EE90'  # Зелёный
+                    highlight_color = requested_color or '#90EE90'  # Используем запрошенный цвет
                     highlight_message = f'Выделены топ {len(rows_to_highlight)} товаров'
                 elif 'худш' in query_lower or 'минимальн' in query_lower:
                     rows_to_highlight = [4, 9, 7, 2, 6][:count]  # Худшие товары
-                    highlight_color = '#FFB6C1'  # Красный
+                    highlight_color = requested_color or '#FFB6C1'  # Используем запрошенный цвет
                     highlight_message = f'Выделены {len(rows_to_highlight)} минимальных значений'
                 else:
                     # По умолчанию - первые N строк
                     rows_to_highlight = list(range(2, 2 + count))
-                    highlight_color = '#FFFF00'  # Жёлтый
+                    highlight_color = requested_color or '#FFFF00'  # Используем запрошенный цвет
                     highlight_message = f'Выделены {len(rows_to_highlight)} строк'
 
                 highlighting_data = {
@@ -637,7 +659,7 @@ Generate CORRECTED code that will work. Return ONLY the Python code."""
 
             # Пытаемся определить что выделять
             rows_to_highlight = []
-            highlight_color = '#FFFF00'  # Жёлтый по умолчанию
+            highlight_color = requested_color or '#FFFF00'  # Используем запрошенный цвет по умолчанию
             highlight_message = 'Выделены строки по запросу'
 
             print(f"📊 Result data type: {type(result_data)}")
@@ -662,7 +684,7 @@ Generate CORRECTED code that will work. Return ONLY the Python code."""
                         # Находим топ строки
                         top_indices = result_data.nlargest(count, col).index.tolist()
                         rows_to_highlight = [i + 2 for i in top_indices]  # +2 для Google Sheets
-                        highlight_color = '#90EE90'  # Зелёный для топ значений
+                        highlight_color = requested_color or '#90EE90'  # Используем запрошенный цвет для топ значений
                         highlight_message = f'Выделены топ {count} строк'
 
                 elif 'худш' in query_lower or 'минимальн' in query_lower or 'меньш' in query_lower:
@@ -724,7 +746,7 @@ Generate CORRECTED code that will work. Return ONLY the Python code."""
                         if 'топ' in query_lower or 'лучш' in query_lower or 'максимальн' in query_lower:
                             # Берём топ N
                             rows_to_highlight = [row[0] for row in numeric_values[:count]]
-                            highlight_color = '#90EE90'  # Зелёный для топ значений
+                            highlight_color = requested_color or '#90EE90'  # Используем запрошенный цвет для топ значений
                             highlight_message = f'Выделены топ {count} товаров'
                             print(f"✅ Generated highlight rows: {rows_to_highlight}")
                         elif 'худш' in query_lower or 'минимальн' in query_lower or 'меньш' in query_lower:
@@ -735,7 +757,7 @@ Generate CORRECTED code that will work. Return ONLY the Python code."""
                         else:
                             # По умолчанию выделяем топ
                             rows_to_highlight = [row[0] for row in numeric_values[:count]]
-                            highlight_color = '#FFFF00'  # Жёлтый для обычного выделения
+                            highlight_color = requested_color or '#FFFF00'  # Используем запрошенный цвет для обычного выделения
                             highlight_message = f'Выделены {count} строк'
 
             # 3. Если результат - список списков (таблица)
