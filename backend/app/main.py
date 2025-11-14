@@ -1,5 +1,5 @@
 """
-SheetGPT API Production v6.6.1 - AI Code Executor with custom_context support
+SheetGPT API Production v6.6.2 - AI Code Executor with custom_context support
 Генерирует Python код для точных вычислений
 Supports professional insights based on user-defined AI role
 Railway deployment: 2025-11-13 12:56 - CACHE BUST
@@ -21,10 +21,10 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Create FastAPI app with VERSION 6.6.1 - AI Code Executor + custom_context
+# Create FastAPI app with VERSION 6.6.2 - AI Code Executor + custom_context
 app = FastAPI(
     title="SheetGPT API",
-    version="6.6.1",  # AI Code Executor + custom_context for personalized insights
+    version="6.6.2",  # AI Code Executor + custom_context for personalized insights
     description="AI-powered spreadsheet assistant with Python code execution for 99% accuracy and personalized professional insights"
 )
 
@@ -41,7 +41,7 @@ app.add_middleware(
 async def startup_event():
     """Log startup information"""
     logger.info("="*60)
-    logger.info("SheetGPT API v6.6.1 STARTING - AI CODE EXECUTOR + CUSTOM_CONTEXT")
+    logger.info("SheetGPT API v6.6.2 STARTING - AI CODE EXECUTOR + CUSTOM_CONTEXT")
     logger.info(f"Started at: {datetime.now()}")
     logger.info("AI Code Generation: ENABLED")
     logger.info("Python Code Execution: ENABLED")
@@ -55,7 +55,7 @@ async def root():
     """Health check endpoint"""
     return {
         "name": "SheetGPT API",
-        "version": "6.6.1",  # v6.6.1: custom_context + professional insights
+        "version": "6.6.2",  # v6.6.2: custom_context + professional insights
         "status": "operational",
         "engine": "AI Code Executor",
         "features": {
@@ -64,8 +64,8 @@ async def root():
             "accuracy": "99%",
             "methodology": True,
             "auto_headers": True,
-            "custom_context": True,  # v6.6.1: Personalized AI role
-            "professional_insights": True  # v6.6.1: AI-generated insights/recommendations
+            "custom_context": True,  # v6.6.2: Personalized AI role
+            "professional_insights": True  # v6.6.2: AI-generated insights/recommendations
         },
         "timestamp": datetime.now().isoformat()
     }
@@ -75,7 +75,7 @@ async def health_check():
     """Detailed health check"""
     return {
         "status": "healthy",
-        "version": "6.6.1",
+        "version": "6.6.2",
         "service": "SheetGPT API",
         "timestamp": datetime.now().isoformat(),
         "checks": {
@@ -111,7 +111,7 @@ async def process_formula(request: FormulaRequest):
                 column_names=request.column_names,
                 sheet_data=request.sheet_data,
                 history=request.history,
-                custom_context=request.custom_context  # v6.6.1: Pass custom_context to executor
+                custom_context=request.custom_context  # v6.6.2: Pass custom_context to executor
             )
             executor_used = True
             logger.info("[SUCCESS] Code executed successfully")
@@ -173,7 +173,7 @@ async def process_formula(request: FormulaRequest):
         if "structured_data" in result:
             response_dict["structured_data"] = result["structured_data"]
 
-        # Add highlighting data (v6.6.1: CRITICAL for row highlighting)
+        # Add highlighting data (v6.6.2: CRITICAL for row highlighting)
         if "highlight_rows" in result:
             response_dict["highlight_rows"] = result["highlight_rows"]
         if "highlight_color" in result:
@@ -188,7 +188,7 @@ async def process_formula(request: FormulaRequest):
         response_dict["python_executed"] = result.get("python_executed", False)
         response_dict["execution_output"] = result.get("execution_output", "")
         response_dict["_debug_result_keys"] = list(result.keys())  # DEBUG: show what keys result has
-        # v6.6.1: Add professional insights from custom_context feature
+        # v6.6.2: Add professional insights from custom_context feature
         response_dict["professional_insights"] = result.get("professional_insights")
         response_dict["recommendations"] = result.get("recommendations")
         response_dict["warnings"] = result.get("warnings")
@@ -207,7 +207,7 @@ async def process_formula(request: FormulaRequest):
 async def get_version():
     """Get detailed version information"""
     return {
-        "api_version": "6.6.1",
+        "api_version": "6.6.2",
         "release": "AI_CODE_EXECUTOR_WITH_STRUCTURED_DATA",
         "engine": "GPT-4o + Python Code Execution",
         "accuracy": "99%",
