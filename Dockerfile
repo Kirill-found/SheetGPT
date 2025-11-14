@@ -1,11 +1,11 @@
 FROM python:3.11-slim
 
 # CRITICAL: Change this on EVERY deployment to force rebuild
-ARG CACHEBUST=20251112-1302-FORCE-REBUILD
-RUN echo "CACHE BUST: $CACHEBUST - Building v6.2.8 with custom_context"
+ARG CACHEBUST=20251114-1658-v6.6.7-RADICAL-FIX
+RUN echo "CACHE BUST: $CACHEBUST - Building v6.6.7 with result pre-initialization"
 
-LABEL version="6.2.8"
-LABEL description="SheetGPT API with custom_context support"
+LABEL version="6.6.7"
+LABEL description="SheetGPT API v6.6.7 - RADICAL FIX: Pre-initialize variables before exec()"
 
 WORKDIR /app
 
@@ -14,7 +14,7 @@ COPY backend/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # CACHE BUST: Force copy layer to rebuild
-RUN echo "Installing v6.2.8 - $(date)"
+RUN echo "Installing v6.6.7 - $(date)"
 
 # Copy application
 COPY backend/ .
