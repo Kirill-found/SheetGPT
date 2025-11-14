@@ -210,6 +210,34 @@ summary = f"Найдено записей: {{len(result)}}"
 methodology = f"Поиск по частичному совпадению в первой колонке (используется начало имени/фамилии)"
 ```
 
+EXAMPLE CODE FOR "разбей данные по ячейкам" or "split data to columns":
+```python
+# Split comma-separated data in first column into separate columns
+# Detect delimiter automatically (comma, semicolon, tab, pipe)
+first_col_sample = df.iloc[0, 0]
+delimiter = ','  # default
+if ';' in str(first_col_sample):
+    delimiter = ';'
+elif '\\t' in str(first_col_sample):
+    delimiter = '\\t'
+elif '|' in str(first_col_sample):
+    delimiter = '|'
+
+# Split the data
+split_df = df.iloc[:, 0].str.split(delimiter, expand=True)
+
+# If first row looks like headers (contains letters), use it as column names
+if split_df.iloc[0].astype(str).str.match('[а-яА-Яa-zA-Z]').any():
+    split_df.columns = split_df.iloc[0]
+    split_df = split_df.drop(0).reset_index(drop=True)
+else:
+    split_df.columns = [f'Колонка {{i+1}}' for i in range(len(split_df.columns))]
+
+result = split_df
+summary = f"Данные успешно разбиты на {{len(split_df.columns)}} столбцов: {{', '.join(split_df.columns)}}"
+methodology = f"Разделение данных по разделителю ('{{delimiter}}') из первой колонки. Обнаружено {{len(result)}} строк"
+```
+
 NOW GENERATE CODE FOR THIS QUESTION:
 {query}
 

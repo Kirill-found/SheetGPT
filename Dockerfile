@@ -1,12 +1,12 @@
 FROM python:3.11-slim
 
 # CRITICAL: Change this on EVERY deployment to force rebuild
-ARG CACHEBUST=20251114-2200-F-STRING-FIX-v6.6.10
-RUN echo "CACHE BUST: $CACHEBUST - Building v6.6.9 with DETAILED LOGGING to diagnose error"
-# v6.6.9: DEBUG LOGGING - Added trace points to find where exception occurs
+ARG CACHEBUST=20251115-0000-SPLIT-DATA-v6.6.11
+RUN echo "CACHE BUST: $CACHEBUST - Building v6.6.11 with SPLIT DATA support"
+# v6.6.11: SPLIT DATA - Added text-to-columns example in prompt for splitting comma-separated data
 
-LABEL version="6.6.10"
-LABEL description="SheetGPT API v6.6.10 - FIXED: F-string escaping in prompt template"
+LABEL version="6.6.11"
+LABEL description="SheetGPT API v6.6.11 - ADDED: Text-to-columns split data support"
 
 WORKDIR /app
 

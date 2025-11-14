@@ -24,7 +24,7 @@ logger = logging.getLogger(__name__)
 # Create FastAPI app with VERSION 6.6.4 - AI Code Executor + custom_context
 app = FastAPI(
     title="SheetGPT API",
-    version="6.6.10",  # v6.6.10: DEBUG LOGGING - Detailed execution trace
+    version="6.6.11",  # v6.6.11: SPLIT DATA - Added text-to-columns example in prompt
     description="AI-powered spreadsheet assistant with Python code execution for 99% accuracy and personalized professional insights"
 )
 
@@ -41,7 +41,7 @@ app.add_middleware(
 async def startup_event():
     """Log startup information"""
     logger.info("="*60)
-    logger.info("SheetGPT API v6.6.10 STARTING - DEBUG LOGGING: Detailed execution trace")
+    logger.info("SheetGPT API v6.6.11 STARTING - SPLIT DATA: Added text-to-columns support")
     logger.info(f"Started at: {datetime.now()}")
     logger.info("AI Code Generation: ENABLED")
     logger.info("Python Code Execution: ENABLED")
@@ -55,7 +55,7 @@ async def root():
     """Health check endpoint"""
     return {
         "name": "SheetGPT API",
-        "version": "6.6.10",  # v6.6.10: DEBUG LOGGING - Detailed execution trace
+        "version": "6.6.11",  # v6.6.11: SPLIT DATA - Added text-to-columns support
         "status": "operational",
         "engine": "AI Code Executor",
         "features": {
@@ -75,7 +75,7 @@ async def health_check():
     """Detailed health check"""
     return {
         "status": "healthy",
-        "version": "6.6.10",
+        "version": "6.6.11",
         "service": "SheetGPT API",
         "timestamp": datetime.now().isoformat(),
         "checks": {
