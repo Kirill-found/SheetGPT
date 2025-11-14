@@ -446,7 +446,7 @@ Generate CORRECTED code that will work. Return ONLY the Python code."""
             # Генерируем строки для выделения на основе key_findings
             if key_findings and len(key_findings) > 0:
                 # Выделяем топ N строк (начиная со строки 2 в Sheets)
-                rows_to_highlight = [8, 5, 3, 10, 11][:count] # Hardcoded: G=8, D=5, B=3, I=10, J=11
+                rows_to_highlight = list(range(2, min(2 + count, 2 + len(key_findings))))
 
                 if 'топ' in query_lower or 'лучш' in query_lower:
                     highlight_color = '#90EE90'  # Зелёный для топ
@@ -473,7 +473,7 @@ Generate CORRECTED code that will work. Return ONLY the Python code."""
             print(f"❌ No highlight keywords in query")
 
         # Старый метод как fallback (закомментирован)
-        highlighting_data = self._generate_highlighting_if_needed(query, result_dict) if not highlighting_data else highlighting_data
+        # highlighting_data = self._generate_highlighting_if_needed(query, result_dict)
         if highlighting_data:
             print(f"✅ Highlighting data generated: {highlighting_data}")
         else:

@@ -21,7 +21,7 @@ def _generate_highlighting_if_needed(query: str, result_data: Any) -> Optional[D
         print(f"[X] No highlight keywords found in: {query}")
         return None
 
-    print(f"✅ Highlight keywords detected in query: {query}")
+    print(f"[OK] Highlight keywords detected in query: {query}")
 
     try:
         # Пытаемся определить что выделять
