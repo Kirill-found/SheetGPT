@@ -186,14 +186,14 @@ CRITICAL VARIABLE ORDER - ALWAYS FOLLOW THIS SEQUENCE:
 
 WRONG ORDER (causes NameError):
 ```python
-summary = f"Found: {len(result)}"  # ERROR! 'result' not defined yet
+summary = f"Found: {{len(result)}}"  # ERROR! 'result' not defined yet
 result = df[mask]
 ```
 
 CORRECT ORDER:
 ```python
 result = df[mask]  # Create result FIRST
-summary = f"Found: {len(result)}"  # Now can use result safely
+summary = f"Found: {{len(result)}}"  # Now can use result safely
 ```
 
 EXAMPLE CODE FOR "выдели Капустина" or "highlight Shilov":
@@ -206,7 +206,7 @@ EXAMPLE CODE FOR "выдели Капустина" or "highlight Shilov":
 mask = df.iloc[:, 0].astype(str).str.contains("Капуст", case=False, na=False)
 result = df[mask]
 
-summary = f"Найдено записей: {len(result)}"
+summary = f"Найдено записей: {{len(result)}}"
 methodology = f"Поиск по частичному совпадению в первой колонке (используется начало имени/фамилии)"
 ```
 

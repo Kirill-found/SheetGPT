@@ -1,12 +1,12 @@
 FROM python:3.11-slim
 
 # CRITICAL: Change this on EVERY deployment to force rebuild
-ARG CACHEBUST=20251114-2130-DEBUG-LOGGING-v6.6.9
+ARG CACHEBUST=20251114-2200-F-STRING-FIX-v6.6.10
 RUN echo "CACHE BUST: $CACHEBUST - Building v6.6.9 with DETAILED LOGGING to diagnose error"
 # v6.6.9: DEBUG LOGGING - Added trace points to find where exception occurs
 
-LABEL version="6.6.9"
-LABEL description="SheetGPT API v6.6.9 - DEBUG: Detailed logging to trace execution flow"
+LABEL version="6.6.10"
+LABEL description="SheetGPT API v6.6.10 - FIXED: F-string escaping in prompt template"
 
 WORKDIR /app
 
