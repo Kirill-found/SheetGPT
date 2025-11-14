@@ -1,12 +1,12 @@
 FROM python:3.11-slim
 
 # CRITICAL: Change this on EVERY deployment to force rebuild
-ARG CACHEBUST=20251115-0000-SPLIT-DATA-v6.6.11
-RUN echo "CACHE BUST: $CACHEBUST - Building v6.6.11 with SPLIT DATA support"
-# v6.6.11: SPLIT DATA - Added text-to-columns example in prompt for splitting comma-separated data
+ARG CACHEBUST=20251115-0130-SPLIT-DATA-FIX-v6.6.12
+RUN echo "CACHE BUST: $CACHEBUST - Building v6.6.12 with SPLIT DATA FIX"
+# v6.6.12: SPLIT DATA FIX - Returns DataFrame as structured_data for Google Sheets
 
-LABEL version="6.6.11"
-LABEL description="SheetGPT API v6.6.11 - ADDED: Text-to-columns split data support"
+LABEL version="6.6.12"
+LABEL description="SheetGPT API v6.6.12 - FIX: Split data now returned as structured_data"
 
 WORKDIR /app
 

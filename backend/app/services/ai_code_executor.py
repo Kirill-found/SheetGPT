@@ -767,10 +767,36 @@ Generate CORRECTED code that will work. Return ONLY the Python code."""
         # Ключевые слова для определения запроса на таблицу/график
         table_keywords = ['таблиц', 'создай табл', 'сделай табл', 'table', 'построй табл']
         chart_keywords = ['график', 'диаграмм', 'chart', 'построй', 'визуализ', 'plot', 'сделай']
+        split_keywords = ['разбей', 'split', 'разделить', 'text-to-columns', 'по ячейкам', 'раздели', 'text to columns']
 
         query_lower = query.lower()
         needs_table = any(kw in query_lower for kw in table_keywords)
         needs_chart = any(kw in query_lower for kw in chart_keywords)
+        needs_split = any(kw in query_lower for kw in split_keywords)
+
+        # CRITICAL: Для split операций result_dict - это DataFrame, НЕ dict!
+        # Проверяем, является ли result_dict DataFrame (pandas)
+        is_dataframe = hasattr(result_dict, 'shape') and hasattr(result_dict, 'columns')
+
+        # Если это split операция с DataFrame - конвертируем в structured_data
+        if needs_split and is_dataframe:
+            try:
+                import pandas as pd
+                df = result_dict
+
+                # Конвертируем DataFrame в формат structured_data
+                headers = df.columns.tolist()
+                rows = df.values.tolist()
+
+                return {
+                    "headers": headers,
+                    "rows": rows[:100],  # Максимум 100 строк для split операций
+                    "table_title": summary[:100],
+                    "chart_recommended": None  # Для split графики не нужны
+                }
+            except Exception as e:
+                print(f"Error converting split DataFrame to structured_data: {e}")
+                return None
 
         # Если не запрашивали таблицу или график - возвращаем None
         if not (needs_table or needs_chart):
