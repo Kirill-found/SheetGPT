@@ -75,7 +75,7 @@ async def health_check():
     """Detailed health check"""
     return {
         "status": "healthy",
-        "version": "5.0.3",
+        "version": "6.5.6",
         "service": "SheetGPT API",
         "timestamp": datetime.now().isoformat(),
         "checks": {
@@ -173,6 +173,16 @@ async def process_formula(request: FormulaRequest):
         if "structured_data" in result:
             response_dict["structured_data"] = result["structured_data"]
 
+        # Add highlighting data (v6.5.6: CRITICAL for row highlighting)
+        if "highlight_rows" in result:
+            response_dict["highlight_rows"] = result["highlight_rows"]
+        if "highlight_color" in result:
+            response_dict["highlight_color"] = result["highlight_color"]
+        if "highlight_message" in result:
+            response_dict["highlight_message"] = result["highlight_message"]
+        if "action_type" in result:
+            response_dict["action_type"] = result["action_type"]
+
         # Add debug fields ALWAYS (for troubleshooting)
         response_dict["code_generated"] = result.get("code_generated", "NOT_IN_RESULT")
         response_dict["python_executed"] = result.get("python_executed", False)
@@ -197,7 +207,7 @@ async def process_formula(request: FormulaRequest):
 async def get_version():
     """Get detailed version information"""
     return {
-        "api_version": "5.0.3",
+        "api_version": "6.5.6",
         "release": "AI_CODE_EXECUTOR_WITH_STRUCTURED_DATA",
         "engine": "GPT-4o + Python Code Execution",
         "accuracy": "99%",
