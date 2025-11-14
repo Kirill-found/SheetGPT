@@ -14,7 +14,8 @@ COPY backend/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # CACHE BUST: Force copy layer to rebuild
-RUN echo "Installing v6.6.7 - $(date)"
+# CRITICAL: This RUN must be AFTER requirements but BEFORE COPY to break Docker cache
+RUN echo "CACHEBUST: 20251114-172002-v6.6.7-FINAL-FIX - $(date)"
 
 # Copy application
 COPY backend/ .
