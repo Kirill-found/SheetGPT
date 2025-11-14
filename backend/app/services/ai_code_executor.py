@@ -298,6 +298,19 @@ Return ONLY the Python code, no explanations."""
 
             # Извлекаем результаты
             result = safe_locals.get('result', None)
+
+            # v6.6.4: FALLBACK если AI не создал result (что происходит постоянно)
+            if result is None:
+                # Проверяем есть ли другие DataFrame в locals
+                for var_name, var_value in safe_locals.items():
+                    if hasattr(var_value, 'index') and hasattr(var_value, 'columns'):
+                        result = var_value
+                        print(f"[FALLBACK] Using '{var_name}' as result (AI forgot to create 'result')")
+                        break
+                # Если ничего не нашли, используем весь df
+                if result is None and 'df' in safe_globals:
+                    result = safe_globals['df']
+                    print(f"[FALLBACK] Using entire 'df' as result (AI didn't filter anything)")
             summary = safe_locals.get('summary', 'Результат вычислен')
             methodology = safe_locals.get('methodology', 'Python анализ данных')
 
