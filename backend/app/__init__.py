@@ -1,7 +1,7 @@
 """
-SheetGPT Backend Application v6.5.6
+SheetGPT Backend Application v6.5.7
 Railway deployment: 2025-11-11 20:12
 Structured data support for table/chart creation
 """
 
-__version__ = "6.5.6"
+__version__ = "6.5.7"
