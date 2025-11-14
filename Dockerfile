@@ -1,7 +1,7 @@
 FROM python:3.11-slim
 
 # CRITICAL: Change this on EVERY deployment to force rebuild
-ARG CACHEBUST=20251114-1730-v6.6.8-WRAPPER-FIX
+ARG CACHEBUST=20251114-1816-v6.6.8-WRAPPER-FIX-FORCE-DEPLOY
 RUN echo "CACHE BUST: $CACHEBUST - Building v6.6.8 with WRAPPER for guaranteed variable initialization"
 
 LABEL version="6.6.8"
