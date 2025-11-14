@@ -75,7 +75,7 @@ async def health_check():
     """Detailed health check"""
     return {
         "status": "healthy",
-        "version": "6.6.4",
+        "version": "6.6.8",
         "service": "SheetGPT API",
         "timestamp": datetime.now().isoformat(),
         "checks": {
