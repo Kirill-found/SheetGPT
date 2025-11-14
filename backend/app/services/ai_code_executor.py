@@ -113,6 +113,10 @@ SAMPLE DATA (first 5 rows):
 {df.head().to_string()}
 
 RULES FOR CODE GENERATION:
+10. For Russian names/surnames: use partial matching with .str.contains() to handle different word forms
+11. Example: "Капустина" should match "Капустин", "Шилова" matches "Шилов"
+
+
 1. Use pandas for all data operations
 2. Variable 'df' contains the data
 3. Create a variable 'result' with the final answer
@@ -154,6 +158,18 @@ recommendations = [
     "Проанализировать причины низких продаж остальных товаров"
 ]
 warnings = ["Критическая зависимость от ограниченного числа SKU"]
+```
+
+EXAMPLE CODE FOR "выдели Капустина" or "highlight Shilov":
+```python
+# For Russian names: use partial matching to handle word forms (Капустин/Капустина/Капустину)
+search_name = "Капустин"  # Extract base form (remove common endings like -а, -у, -ой)
+
+# Find rows containing the name (partial match)
+result = df[df.iloc[:, 0].astype(str).str.contains(search_name[:6], case=False, na=False)]
+
+summary = f"Найдено записей с '{search_name}': {len(result)}"
+methodology = f"Поиск по частичному совпадению имени/фамилии в первой колонке"
 ```
 
 NOW GENERATE CODE FOR THIS QUESTION:
@@ -465,7 +481,24 @@ Generate CORRECTED code that will work. Return ONLY the Python code."""
                     break
 
             # Проверяем тип запроса
-            is_search_query = any(word in query_lower for word in ['фамили', 'имен', 'строк', 'найди', 'где'])
+            # УЛУЧШЕННАЯ ЛОГИКА: поиск = ключевое слово + имя/фамилия
+            is_search_query = False
+            search_keywords = ['фамили', 'имен', 'строк', 'найди', 'где']
+
+            # Случай 1: явные поисковые ключевые слова
+            if any(word in query_lower for word in search_keywords):
+                is_search_query = True
+
+            # Случай 2: "выдели" + слово с заглавной буквы (вероятно имя/фамилия)
+            elif 'выдели' in query_lower:
+                # Ищем слова с заглавной буквы (кроме первого слова в запросе)
+                words = query.split()
+                for word in words[1:]:  # Пропускаем первое слово
+                    # Если слово начинается с заглавной и не является служебным
+                    if word[0].isupper() and word.lower() not in ['оранжевым', 'красным', 'зелёным', 'синим', 'жёлтым', 'цветом', 'строк']:
+                        is_search_query = True
+                        print(f"[SEARCH_DETECT] Found name/surname: {word}")
+                        break
 
             if is_search_query:
                 # AI УЖЕ ВЫПОЛНИЛ ПОИСК - используем результаты!
@@ -508,7 +541,6 @@ Generate CORRECTED code that will work. Return ONLY the Python code."""
                 else:
                     highlighting_data = None
                     print(f"[WARNING] Could not extract rows from AI results")
-            else:
             else:
                 # ВЫДЕЛЕНИЕ ТОПА/ХУДШИХ
                 import re
