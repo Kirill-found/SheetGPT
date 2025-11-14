@@ -347,14 +347,24 @@ Return ONLY the Python code, no explanations."""
 
         except Exception as e:
             sys.stdout = old_stdout
-            error_msg = f"Ошибка выполнения кода: {str(e)}\n{traceback.format_exc()}"
+            error_msg = f"Ошибка: {str(e)}"
 
-            # Пытаемся выполнить fallback код
-            fallback_code = self._generate_fallback_code(df, code, error_msg)
-            if fallback_code:
-                return self._execute_python_code(fallback_code, df)
+            # v6.6.5: RETURN вместо RAISE! Возвращаем словарь с ошибкой
+            # Это позволит API вернуть ошибку в summary и продолжить работу
+            print(f"[ERROR] Code execution failed: {error_msg}")
 
-            raise Exception(error_msg)
+            return {
+                'result': None,
+                'summary': error_msg,
+                'methodology': 'Выполнение кода не удалось',
+                'key_findings': [],
+                'confidence': 0.0,
+                'professional_insights': None,
+                'recommendations': None,
+                'warnings': None,
+                'code': code,
+                'output': ''
+            }
 
     def _generate_fallback_code(self, df: pd.DataFrame, failed_code: str, error: str) -> Optional[str]:
         """
