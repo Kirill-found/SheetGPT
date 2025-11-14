@@ -1,8 +1,9 @@
 FROM python:3.11-slim
 
 # CRITICAL: Change this on EVERY deployment to force rebuild
-ARG CACHEBUST=20251114-2035-v6.6.8-ALL-VERSIONS-FIXED
+ARG CACHEBUST=20251114-2100-CRITICAL-FORCE-REBUILD-v6.6.8
 RUN echo "CACHE BUST: $CACHEBUST - Building v6.6.8 with WRAPPER for guaranteed variable initialization"
+# CRITICAL FORCE REBUILD 2100 - Railway must deploy this version NOW
 
 LABEL version="6.6.8"
 LABEL description="SheetGPT API v6.6.8 - WRAPPER FIX: AI code wrapped in safe initializer"
