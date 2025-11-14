@@ -163,6 +163,24 @@ recommendations = [
 warnings = ["Критическая зависимость от ограниченного числа SKU"]
 ```
 
+CRITICAL VARIABLE ORDER - ALWAYS FOLLOW THIS SEQUENCE:
+========================================================
+1. FIRST: Create 'result' variable (DO NOT use it before creating!)
+2. SECOND: Create 'summary' variable (now you can safely use 'result')
+3. THIRD: Create 'methodology' variable
+
+WRONG ORDER (causes NameError):
+```python
+summary = f"Found: {len(result)}"  # ERROR! 'result' not defined yet
+result = df[mask]
+```
+
+CORRECT ORDER:
+```python
+result = df[mask]  # Create result FIRST
+summary = f"Found: {len(result)}"  # Now can use result safely
+```
+
 EXAMPLE CODE FOR "выдели Капустина" or "highlight Shilov":
 ```python
 # For Russian names: use .str.contains() with partial match to handle word forms
