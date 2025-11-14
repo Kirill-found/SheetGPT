@@ -307,6 +307,12 @@ Return ONLY the Python code, no explanations."""
         sys.stdout = mystdout = StringIO()
 
         try:
+            # v6.6.7: РАДИКАЛЬНЫЙ FIX - инициализируем result ДО exec()
+            # Это ГАРАНТИРУЕТ что переменная существует, даже если AI использует её раньше
+            safe_locals['result'] = None
+            safe_locals['summary'] = ''
+            safe_locals['methodology'] = ''
+
             # Выполняем код
             exec(code, safe_globals, safe_locals)
 
