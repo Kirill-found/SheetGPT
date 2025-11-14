@@ -24,7 +24,7 @@ logger = logging.getLogger(__name__)
 # Create FastAPI app with VERSION 6.6.4 - AI Code Executor + custom_context
 app = FastAPI(
     title="SheetGPT API",
-    version="6.6.8",  # v6.6.8: WRAPPER FIX - AI code wrapped in initializer
+    version="6.6.9",  # v6.6.9: DEBUG LOGGING - Detailed execution trace
     description="AI-powered spreadsheet assistant with Python code execution for 99% accuracy and personalized professional insights"
 )
 
@@ -41,7 +41,7 @@ app.add_middleware(
 async def startup_event():
     """Log startup information"""
     logger.info("="*60)
-    logger.info("SheetGPT API v6.6.8 STARTING - WRAPPER FIX: AI code wrapped in initializer")
+    logger.info("SheetGPT API v6.6.9 STARTING - DEBUG LOGGING: Detailed execution trace")
     logger.info(f"Started at: {datetime.now()}")
     logger.info("AI Code Generation: ENABLED")
     logger.info("Python Code Execution: ENABLED")
@@ -55,7 +55,7 @@ async def root():
     """Health check endpoint"""
     return {
         "name": "SheetGPT API",
-        "version": "6.6.8",  # v6.6.8: WRAPPER FIX - AI code wrapped in initializer
+        "version": "6.6.9",  # v6.6.9: DEBUG LOGGING - Detailed execution trace
         "status": "operational",
         "engine": "AI Code Executor",
         "features": {
@@ -75,7 +75,7 @@ async def health_check():
     """Detailed health check"""
     return {
         "status": "healthy",
-        "version": "6.6.8",
+        "version": "6.6.9",
         "service": "SheetGPT API",
         "timestamp": datetime.now().isoformat(),
         "checks": {
@@ -207,7 +207,7 @@ async def process_formula(request: FormulaRequest):
 async def get_version():
     """Get detailed version information"""
     return {
-        "api_version": "6.6.8",
+        "api_version": "6.6.9",
         "release": "AI_CODE_EXECUTOR_WITH_STRUCTURED_DATA",
         "engine": "GPT-4o + Python Code Execution",
         "accuracy": "99%",

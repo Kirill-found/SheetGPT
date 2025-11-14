@@ -1,12 +1,12 @@
 FROM python:3.11-slim
 
 # CRITICAL: Change this on EVERY deployment to force rebuild
-ARG CACHEBUST=20251114-2100-CRITICAL-FORCE-REBUILD-v6.6.8
-RUN echo "CACHE BUST: $CACHEBUST - Building v6.6.8 with WRAPPER for guaranteed variable initialization"
-# CRITICAL FORCE REBUILD 2100 - Railway must deploy this version NOW
+ARG CACHEBUST=20251114-2130-DEBUG-LOGGING-v6.6.9
+RUN echo "CACHE BUST: $CACHEBUST - Building v6.6.9 with DETAILED LOGGING to diagnose error"
+# v6.6.9: DEBUG LOGGING - Added trace points to find where exception occurs
 
-LABEL version="6.6.8"
-LABEL description="SheetGPT API v6.6.8 - WRAPPER FIX: AI code wrapped in safe initializer"
+LABEL version="6.6.9"
+LABEL description="SheetGPT API v6.6.9 - DEBUG: Detailed logging to trace execution flow"
 
 WORKDIR /app
 
@@ -16,7 +16,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 # CACHE BUST: Force copy layer to rebuild
 # CRITICAL: This RUN must be AFTER requirements but BEFORE COPY to break Docker cache
-RUN echo "CACHEBUST: 20251114-2035-v6.6.8-ALL-VERSIONS-FIXED - $(date)"
+RUN echo "CACHEBUST: 20251114-2130-v6.6.9-DEBUG-LOGGING - $(date)"
 
 # Copy application
 COPY backend/ .

@@ -83,6 +83,15 @@ class AICodeExecutor:
             return final_response
 
         except Exception as e:
+            print("\n" + "="*80)
+            print("[TRACE 9] ✗✗✗ EXCEPTION IN process_with_code (TOP LEVEL) ✗✗✗")
+            print(f"[TRACE 9] Exception type: {type(e).__name__}")
+            print(f"[TRACE 9] Exception message: {str(e)}")
+            print(f"[TRACE 9] This means exception occurred BEFORE wrapper could apply!")
+            import traceback
+            traceback.print_exc()
+            print("="*80 + "\n")
+
             return {
                 "error": str(e),
                 "summary": f"Ошибка: {str(e)}",
@@ -96,6 +105,12 @@ class AICodeExecutor:
         AI генерирует Python код для решения задачи
         С опциональным custom_context для персонализации
         """
+        print("\n" + "="*80)
+        print("[TRACE 1] _generate_python_code() CALLED")
+        print(f"[TRACE 1] query: {query}")
+        print(f"[TRACE 1] df.shape: {df.shape}")
+        print(f"[TRACE 1] custom_context: {custom_context is not None}")
+        print("="*80 + "\n")
 
         # Анализируем структуру данных
         data_info = self._analyze_dataframe(df)
@@ -245,6 +260,12 @@ Return ONLY the Python code, no explanations."""
         code = re.sub(r'\n```$', '', code)
         code = re.sub(r'^```\n', '', code)
 
+        print("\n" + "="*80)
+        print("[TRACE 2] GPT-4o GENERATED CODE:")
+        print(f"[TRACE 2] Code length: {len(code)} chars")
+        print(f"[TRACE 2] Code preview:\n{code[:500]}")
+        print("="*80 + "\n")
+
         return code
 
     def _validate_generated_code(self, code: str) -> None:
@@ -275,8 +296,19 @@ Return ONLY the Python code, no explanations."""
         """
         Безопасно выполняет Python код и возвращает результат
         """
+        print("\n" + "="*80)
+        print("[TRACE 3] _execute_python_code() CALLED")
+        print(f"[TRACE 3] Code to execute (first 300 chars):\n{code[:300]}")
+        print("="*80 + "\n")
+
         # ВАЛИДАЦИЯ: Проверяем что код не создает fake data
-        self._validate_generated_code(code)
+        print("[TRACE 4] Starting validation...")
+        try:
+            self._validate_generated_code(code)
+            print("[TRACE 4] ✓ Validation PASSED")
+        except Exception as validation_error:
+            print(f"[TRACE 4] ✗ Validation FAILED: {validation_error}")
+            raise  # Re-raise to maintain original behavior
 
         # Создаем безопасное окружение для выполнения
         safe_globals = {
@@ -320,8 +352,15 @@ confidence = 0.95
 {code}
 # === END AI CODE ===
 """
+            print("\n" + "="*80)
+            print("[TRACE 5] APPLYING WRAPPER")
+            print(f"[TRACE 5] Wrapper code (first 400 chars):\n{wrapper_code[:400]}")
+            print("="*80 + "\n")
+
             # Выполняем обёрнутый код
+            print("[TRACE 6] Executing wrapper code with exec()...")
             exec(wrapper_code, safe_globals, safe_locals)
+            print("[TRACE 6] ✓ exec() COMPLETED successfully")
 
             # Восстанавливаем stdout
             sys.stdout = old_stdout
@@ -329,6 +368,13 @@ confidence = 0.95
 
             # Извлекаем результаты
             result = safe_locals.get('result', None)
+
+            print("\n" + "="*80)
+            print("[TRACE 7] EXTRACTING RESULTS")
+            print(f"[TRACE 7] result type: {type(result)}")
+            print(f"[TRACE 7] result value: {str(result)[:200] if result is not None else 'None'}")
+            print(f"[TRACE 7] summary: {safe_locals.get('summary', 'NOT SET')[:100]}")
+            print("="*80 + "\n")
 
             # v6.6.4: FALLBACK если AI не создал result (что происходит постоянно)
             if result is None:
@@ -382,6 +428,14 @@ confidence = 0.95
 
             # v6.6.5: RETURN вместо RAISE! Возвращаем словарь с ошибкой
             # Это позволит API вернуть ошибку в summary и продолжить работу
+            print("\n" + "="*80)
+            print("[TRACE 8] ✗✗✗ EXCEPTION IN _execute_python_code ✗✗✗")
+            print(f"[TRACE 8] Exception type: {type(e).__name__}")
+            print(f"[TRACE 8] Exception message: {error_msg}")
+            print(f"[TRACE 8] Traceback:")
+            import traceback
+            traceback.print_exc()
+            print("="*80 + "\n")
             print(f"[ERROR] Code execution failed: {error_msg}")
 
             return {
