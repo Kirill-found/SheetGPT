@@ -307,14 +307,21 @@ Return ONLY the Python code, no explanations."""
         sys.stdout = mystdout = StringIO()
 
         try:
-            # v6.6.7: РАДИКАЛЬНЫЙ FIX - инициализируем result ДО exec()
-            # Это ГАРАНТИРУЕТ что переменная существует, даже если AI использует её раньше
-            safe_locals['result'] = None
-            safe_locals['summary'] = ''
-            safe_locals['methodology'] = ''
+            # v6.6.8: WRAPPER FIX - оборачиваем AI код в безопасный wrapper
+            # Инициализируем переменные ВНУТРИ выполняемого кода!
+            wrapper_code = f"""# v6.6.8: AUTO-WRAPPER для гарантированной инициализации
+result = None
+summary = ''
+methodology = ''
+key_findings = []
+confidence = 0.95
 
-            # Выполняем код
-            exec(code, safe_globals, safe_locals)
+# === AI GENERATED CODE ===
+{code}
+# === END AI CODE ===
+"""
+            # Выполняем обёрнутый код
+            exec(wrapper_code, safe_globals, safe_locals)
 
             # Восстанавливаем stdout
             sys.stdout = old_stdout

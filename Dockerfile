@@ -1,11 +1,11 @@
 FROM python:3.11-slim
 
 # CRITICAL: Change this on EVERY deployment to force rebuild
-ARG CACHEBUST=20251114-1658-v6.6.7-RADICAL-FIX
-RUN echo "CACHE BUST: $CACHEBUST - Building v6.6.7 with result pre-initialization"
+ARG CACHEBUST=20251114-1730-v6.6.8-WRAPPER-FIX
+RUN echo "CACHE BUST: $CACHEBUST - Building v6.6.8 with WRAPPER for guaranteed variable initialization"
 
-LABEL version="6.6.7"
-LABEL description="SheetGPT API v6.6.7 - RADICAL FIX: Pre-initialize variables before exec()"
+LABEL version="6.6.8"
+LABEL description="SheetGPT API v6.6.8 - WRAPPER FIX: AI code wrapped in safe initializer"
 
 WORKDIR /app
 
@@ -15,7 +15,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 # CACHE BUST: Force copy layer to rebuild
 # CRITICAL: This RUN must be AFTER requirements but BEFORE COPY to break Docker cache
-RUN echo "CACHEBUST: 20251114-172002-v6.6.7-FINAL-FIX - $(date)"
+RUN echo "CACHEBUST: 20251114-1730-v6.6.8-WRAPPER-FIX - $(date)"
 
 # Copy application
 COPY backend/ .

@@ -24,7 +24,7 @@ logger = logging.getLogger(__name__)
 # Create FastAPI app with VERSION 6.6.4 - AI Code Executor + custom_context
 app = FastAPI(
     title="SheetGPT API",
-    version="6.6.7",  # AI Code Executor + custom_context for personalized insights
+    version="6.6.8",  # v6.6.8: WRAPPER FIX - AI code wrapped in initializer
     description="AI-powered spreadsheet assistant with Python code execution for 99% accuracy and personalized professional insights"
 )
 
