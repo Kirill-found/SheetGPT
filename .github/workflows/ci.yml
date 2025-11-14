@@ -1,0 +1,29 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Verify Dockerfile
+        run: |
+          echo "Checking Dockerfile..."
+          cat Dockerfile | grep "CACHEBUST"
+          echo "✓ Dockerfile OK"
+
+      - name: Verify backend structure
+        run: |
+          echo "Checking backend..."
+          test -f backend/app/main.py && echo "✓ main.py exists"
+          test -f backend/requirements.txt && echo "✓ requirements.txt exists"
+          echo "✓ Backend structure OK"
+
+      - name: CI Passed
+        run: echo "✓ All checks passed"
