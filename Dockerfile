@@ -16,7 +16,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 # CACHE BUST: Force copy layer to rebuild
 # CRITICAL: This RUN must be AFTER requirements but BEFORE COPY to break Docker cache
-RUN echo "CACHEBUST: 20251114-2130-v6.6.9-DEBUG-LOGGING - $(date)"
+RUN echo "CACHEBUST: 20251115-0155-v6.6.12-SPLIT-DATA-FIX - $(date)"
 
 # Copy application
 COPY backend/ .
