@@ -1005,49 +1005,100 @@
         messageDiv.appendChild(bubble);
         container.appendChild(messageDiv);
 
-        // Handle structured data (tables and charts)
+        // Handle structured data (tables, charts, and split operations)
         if (result.structured_data) {
-          console.log('[UI] Creating table and chart from structured_data');
+          console.log('[UI] Processing structured_data');
+          console.log('[UI] operation_type:', result.structured_data.operation_type);
           console.log('[UI] Data:', result.structured_data);
 
-          google.script.run
-            .withSuccessHandler(function(tableResult) {
-              console.log('[UI] Success handler:', tableResult);
+          // КРИТИЧНО: Проверяем operation_type чтобы определить куда отправлять данные
+          const isSplitOperation = result.structured_data.operation_type === 'split';
 
-              const resultDiv = document.createElement('div');
-              resultDiv.className = 'message ai';
-              const resultBubble = document.createElement('div');
-              resultBubble.className = 'message-bubble';
-              const resultBox = document.createElement('div');
+          if (isSplitOperation) {
+            // SPLIT OPERATION: заменяем данные в ТЕКУЩЕМ листе
+            console.log('[UI] SPLIT OPERATION: Replacing data in current sheet');
 
-              if (tableResult && tableResult.success) {
-                resultBox.className = 'content-box success';
-                resultBox.textContent = '✅ ' + (tableResult.message || 'Таблица создана успешно');
-              } else {
-                resultBox.className = 'content-box error';
-                resultBox.textContent = '❌ ' + (tableResult ? (tableResult.message || tableResult.error || 'Неизвестная ошибка') : 'Функция не вернула результат');
-              }
+            google.script.run
+              .withSuccessHandler(function(splitResult) {
+                console.log('[UI] Split success handler:', splitResult);
 
-              resultBubble.appendChild(resultBox);
-              resultDiv.appendChild(resultBubble);
-              container.appendChild(resultDiv);
-              scrollToBottom();
-            })
-            .withFailureHandler(function(error) {
-              console.error('[UI] Table creation failed:', error);
-              const errorDiv = document.createElement('div');
-              errorDiv.className = 'message ai';
-              const errorBubble = document.createElement('div');
-              errorBubble.className = 'message-bubble';
-              const errorBox = document.createElement('div');
-              errorBox.className = 'content-box error';
-              errorBox.textContent = 'Ошибка создания таблицы: ' + error.message;
-              errorBubble.appendChild(errorBox);
-              errorDiv.appendChild(errorBubble);
-              container.appendChild(errorDiv);
-              scrollToBottom();
-            })
-            .createTableAndChart(result.structured_data);
+                const resultDiv = document.createElement('div');
+                resultDiv.className = 'message ai';
+                const resultBubble = document.createElement('div');
+                resultBubble.className = 'message-bubble';
+                const resultBox = document.createElement('div');
+
+                if (splitResult && splitResult.success) {
+                  resultBox.className = 'content-box success';
+                  resultBox.textContent = '✅ ' + (splitResult.message || 'Данные успешно разбиты');
+                } else {
+                  resultBox.className = 'content-box error';
+                  resultBox.textContent = '❌ ' + (splitResult ? (splitResult.message || splitResult.error || 'Неизвестная ошибка') : 'Функция не вернула результат');
+                }
+
+                resultBubble.appendChild(resultBox);
+                resultDiv.appendChild(resultBubble);
+                container.appendChild(resultDiv);
+                scrollToBottom();
+              })
+              .withFailureHandler(function(error) {
+                console.error('[UI] Split operation failed:', error);
+                const errorDiv = document.createElement('div');
+                errorDiv.className = 'message ai';
+                const errorBubble = document.createElement('div');
+                errorBubble.className = 'message-bubble';
+                const errorBox = document.createElement('div');
+                errorBox.className = 'content-box error';
+                errorBox.textContent = 'Ошибка разбиения данных: ' + error.message;
+                errorBubble.appendChild(errorBox);
+                errorDiv.appendChild(errorBubble);
+                container.appendChild(errorDiv);
+                scrollToBottom();
+              })
+              .replaceDataInCurrentSheet(result.structured_data);
+          } else {
+            // TABLE/CHART OPERATION: создаём НОВЫЙ лист
+            console.log('[UI] TABLE/CHART OPERATION: Creating new sheet');
+
+            google.script.run
+              .withSuccessHandler(function(tableResult) {
+                console.log('[UI] Table success handler:', tableResult);
+
+                const resultDiv = document.createElement('div');
+                resultDiv.className = 'message ai';
+                const resultBubble = document.createElement('div');
+                resultBubble.className = 'message-bubble';
+                const resultBox = document.createElement('div');
+
+                if (tableResult && tableResult.success) {
+                  resultBox.className = 'content-box success';
+                  resultBox.textContent = '✅ ' + (tableResult.message || 'Таблица создана успешно');
+                } else {
+                  resultBox.className = 'content-box error';
+                  resultBox.textContent = '❌ ' + (tableResult ? (tableResult.message || tableResult.error || 'Неизвестная ошибка') : 'Функция не вернула результат');
+                }
+
+                resultBubble.appendChild(resultBox);
+                resultDiv.appendChild(resultBubble);
+                container.appendChild(resultDiv);
+                scrollToBottom();
+              })
+              .withFailureHandler(function(error) {
+                console.error('[UI] Table creation failed:', error);
+                const errorDiv = document.createElement('div');
+                errorDiv.className = 'message ai';
+                const errorBubble = document.createElement('div');
+                errorBubble.className = 'message-bubble';
+                const errorBox = document.createElement('div');
+                errorBox.className = 'content-box error';
+                errorBox.textContent = 'Ошибка создания таблицы: ' + error.message;
+                errorBubble.appendChild(errorBox);
+                errorDiv.appendChild(errorBubble);
+                container.appendChild(errorDiv);
+                scrollToBottom();
+              })
+              .createTableAndChart(result.structured_data);
+          }
         }
 
         // Handle row highlighting

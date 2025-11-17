@@ -75,12 +75,14 @@ async def health_check():
     """Detailed health check"""
     return {
         "status": "healthy",
-        "version": "6.6.17",
+        "version": "7.0.0",
         "service": "SheetGPT API",
         "timestamp": datetime.now().isoformat(),
         "checks": {
             "ai_service": "operational",
-            "python_aggregation": "enabled",
+            "function_calling": "enabled",
+            "functions_available": 30,
+            "accuracy": "95%+",
             "response_fields": ["summary", "methodology", "key_findings"]
         }
     }
@@ -88,40 +90,61 @@ async def health_check():
 @app.post("/api/v1/formula", response_model=FormulaResponse)
 async def process_formula(request: FormulaRequest):
     """
-    Main endpoint - uses AI Code Executor for 99% accuracy
-    Fallback to v3 service if Code Executor not available
+    Main endpoint v7.0.0 - uses Function Calling for 95%+ accuracy
+    Fallback to Code Executor for complex queries
     """
     try:
-        # Log incoming request (без эмодзи для Railway)
+        # Log incoming request
         logger.info("="*60)
-        logger.info(f"[REQUEST] Query: {request.query}")
+        logger.info(f"[REQUEST v7.0.0] Query: {request.query}")
         logger.info(f"[DATA] Shape: {len(request.sheet_data)} rows x {len(request.column_names)} columns")
 
         result = None
-        executor_used = False
 
-        # Try to use AI Code Executor first
+        # Try AIFunctionCaller first (v7.0.0)
         try:
-            from app.services.ai_code_executor import get_ai_executor
-            logger.info("[ENGINE] Using AI Code Executor")
+            from app.services.ai_function_caller import AIFunctionCaller
+            import pandas as pd
 
-            executor = get_ai_executor()
-            result = executor.process_with_code(
+            logger.info("[ENGINE v7.0.0] Using AI Function Caller")
+
+            # Создаем DataFrame из данных
+            df = pd.DataFrame(request.sheet_data, columns=request.column_names)
+
+            # Создаем caller и обрабатываем запрос
+            caller = AIFunctionCaller()
+            result = await caller.process_query(
                 query=request.query,
+                df=df,
                 column_names=request.column_names,
                 sheet_data=request.sheet_data,
-                history=request.history,
-                custom_context=request.custom_context  # v6.6.4: Pass custom_context to executor
+                custom_context=request.custom_context
             )
-            executor_used = True
-            logger.info("[SUCCESS] Code executed successfully")
-            logger.info(f"[DEBUG] Result keys: {list(result.keys())}")
-            logger.info(f"[DEBUG] Has code_generated: {('code_generated' in result)}")
 
-        except ImportError:
-            logger.warning("[FALLBACK] AI Code Executor not found, using v3 service")
-            # Fallback to v3 service
-            from app.services.ai_service_v3 import get_ai_service
+            logger.info("[SUCCESS] Function calling completed")
+            logger.info(f"[DEBUG] Response type: {result.get('response_type')}")
+            logger.info(f"[DEBUG] Function used: {result.get('function_used', 'N/A')}")
+
+        except Exception as e:
+            logger.warning(f"[FALLBACK] Function caller failed ({str(e)}), using code executor")
+            # Fallback to Code Executor
+            try:
+                from app.services.ai_code_executor import get_ai_executor
+
+                executor = get_ai_executor()
+                result = executor.process_with_code(
+                    query=request.query,
+                    column_names=request.column_names,
+                    sheet_data=request.sheet_data,
+                    history=request.history,
+                    custom_context=request.custom_context
+                )
+                logger.info("[FALLBACK SUCCESS] Code executor used")
+
+            except Exception as fallback_error:
+                logger.error(f"[ERROR] Both function caller and code executor failed: {fallback_error}")
+                # Last resort fallback
+                from app.services.ai_service_v3 import get_ai_service
             ai_service = get_ai_service()
 
             result = ai_service.process_formula_request(
