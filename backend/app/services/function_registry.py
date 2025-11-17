@@ -136,13 +136,16 @@ class FunctionRegistry:
 
             {
                 "name": "highlight_rows",
-                "description": "Выделение строк цветом по условию. Используй для 'выдели', 'подсвети', 'отметь цветом'",
+                "description": """Выделение строк цветом по условию. Используй для 'выдели', 'подсвети', 'отметь цветом'.
+                ВАЖНО: Поддерживает приблизительные названия колонок (например 'Сумма' найдет 'Заказали на сумму' или 'Сумма продаж').
+                Автоматически преобразует строковые числа (например 'р.857 765' -> 857765) для числовых сравнений.
+                Примеры: 'выдели где продажи > 100000', 'подсвети строки где сумма меньше 50000'""",
                 "parameters": {
                     "type": "object",
                     "properties": {
                         "column": {
                             "type": "string",
-                            "description": "Колонка для проверки условия"
+                            "description": "Колонка для проверки (можно неточное название, система найдет похожую)"
                         },
                         "operator": {
                             "type": "string",
@@ -151,7 +154,7 @@ class FunctionRegistry:
                         },
                         "value": {
                             "type": ["string", "number"],
-                            "description": "Значение для сравнения"
+                            "description": "Значение для сравнения (можно число или строку)"
                         },
                         "color": {
                             "type": "string",
@@ -493,17 +496,85 @@ class FunctionRegistry:
                 "parameters": params
             }
 
+    # ========== ВСПОМОГАТЕЛЬНЫЕ ФУНКЦИИ ==========
+
+    def _find_column(self, df: pd.DataFrame, column_name: str) -> str:
+        """
+        Умный поиск колонки: если точное совпадение не найдено, ищет похожую
+        Например: "Сумма" найдет "Заказали на сумму" или "Сумма продаж"
+        """
+        # Точное совпадение
+        if column_name in df.columns:
+            return column_name
+
+        # Case-insensitive поиск
+        for col in df.columns:
+            if col.lower() == column_name.lower():
+                return col
+
+        # Частичное совпадение (колонка содержит искомое слово)
+        column_lower = column_name.lower()
+        matches = [col for col in df.columns if column_lower in col.lower()]
+        if len(matches) == 1:
+            return matches[0]
+        elif len(matches) > 1:
+            # Если несколько совпадений, выбираем самое короткое (наиболее точное)
+            return min(matches, key=len)
+
+        # Обратное совпадение (искомое слово содержит название колонки)
+        reverse_matches = [col for col in df.columns if col.lower() in column_lower]
+        if reverse_matches:
+            return max(reverse_matches, key=len)
+
+        # Не найдено - возвращаем исходное название для ошибки
+        raise ValueError(f"Колонка '{column_name}' не найдена. Доступные: {', '.join(df.columns)}")
+
+    def _parse_numeric_column(self, series: pd.Series) -> pd.Series:
+        """
+        Преобразует строковые числа в numeric
+        Примеры: "р.857 765" -> 857765, "100 000" -> 100000, "$1,234.56" -> 1234.56
+        """
+        def parse_value(val):
+            if pd.isna(val):
+                return val
+            if isinstance(val, (int, float)):
+                return val
+
+            # Преобразуем в строку
+            val_str = str(val)
+
+            # Убираем все кроме цифр, точки и минуса
+            cleaned = re.sub(r'[^\d.-]', '', val_str)
+
+            try:
+                # Пытаемся преобразовать в float
+                return float(cleaned) if cleaned else 0
+            except:
+                # Если не получилось, возвращаем исходное значение
+                return val
+
+        return series.apply(parse_value)
+
     # ========== РЕАЛИЗАЦИЯ ФУНКЦИЙ ==========
 
     # Базовые операции
     def filter_rows(self, df: pd.DataFrame, column: str, operator: str, value: Union[str, int, float]) -> pd.DataFrame:
-        """Фильтрация строк"""
-        if column not in df.columns:
-            raise ValueError(f"Колонка '{column}' не найдена")
+        """Фильтрация строк с умным поиском колонок и преобразованием строковых чисел"""
+        # Умный поиск колонки
+        column = self._find_column(df, column)
 
         if operator == "contains":
             mask = df[column].astype(str).str.contains(str(value), case=False, na=False)
         else:
+            # Для числовых операторов пытаемся преобразовать колонку в числа
+            if operator in ['<', '>', '<=', '>=']:
+                column_data = self._parse_numeric_column(df[column])
+                # Преобразуем value тоже, если это строка
+                if isinstance(value, str):
+                    value = float(re.sub(r'[^\d.-]', '', value)) if value else 0
+            else:
+                column_data = df[column]
+
             ops = {
                 '<': lambda x, y: x < y,
                 '>': lambda x, y: x > y,
@@ -512,7 +583,7 @@ class FunctionRegistry:
                 '<=': lambda x, y: x <= y,
                 '>=': lambda x, y: x >= y,
             }
-            mask = ops[operator](df[column], value)
+            mask = ops[operator](column_data, value)
 
         return df[mask]
 
@@ -533,9 +604,18 @@ class FunctionRegistry:
         return df[mask]
 
     def highlight_rows(self, df: pd.DataFrame, column: str, operator: str, value: Union[str, int, float], color: str = "yellow") -> Dict[str, Any]:
-        """Выделение строк (возвращает индексы)"""
-        if column not in df.columns:
-            raise ValueError(f"Колонка '{column}' не найдена")
+        """Выделение строк с умным поиском колонок и преобразованием строковых чисел"""
+        # Умный поиск колонки
+        column = self._find_column(df, column)
+
+        # Для числовых операторов пытаемся преобразовать колонку в числа
+        if operator in ['<', '>', '<=', '>=']:
+            column_data = self._parse_numeric_column(df[column])
+            # Преобразуем value тоже, если это строка
+            if isinstance(value, str):
+                value = float(re.sub(r'[^\d.-]', '', value)) if value else 0
+        else:
+            column_data = df[column]
 
         ops = {
             '<': lambda x, y: x < y,
@@ -546,7 +626,7 @@ class FunctionRegistry:
             '>=': lambda x, y: x >= y,
         }
 
-        mask = ops[operator](df[column], value)
+        mask = ops[operator](column_data, value)
         rows = df[mask].index.tolist()
 
         # Преобразуем в 1-based index для Google Sheets (строка 1 = заголовки, данные с 2)
@@ -555,7 +635,7 @@ class FunctionRegistry:
         return {
             "highlight_rows": rows_1based,
             "highlight_color": color,
-            "message": f"Выделено {len(rows)} строк цветом {color}"
+            "message": f"Выделено {len(rows)} строк где {column} {operator} {value}, цвет: {color}"
         }
 
     def split_data(self, df: pd.DataFrame, column: str, delimiter: str = ",") -> pd.DataFrame:
