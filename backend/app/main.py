@@ -172,7 +172,9 @@ async def process_formula(request: FormulaRequest):
             logger.info(f"[RESULT] {result['summary'][:100]}...")
         if result.get("methodology"):
             logger.info("[METHODOLOGY] Provided: YES")
-        if executor_used and result.get("python_executed"):
+        if result.get("function_used"):
+            logger.info(f"[FUNCTION] Used: {result['function_used']}")
+        if result.get("python_executed"):
             logger.info("[EXECUTION] Python code executed")
 
         # Ensure all required fields are present
