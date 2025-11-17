@@ -250,9 +250,13 @@ Return ONLY the Python code, no explanations."""
             "2. NEVER use hardcoded product names like 'Product A', 'Product E', 'Item 1', etc.\n"
             "3. ALWAYS use df.groupby() to analyze REAL data from 'df'\n"
             "4. ALWAYS reference columns by their EXACT names shown in data_info\n"
-            "5. If you create fake data, the code will FAIL validation\n\n"
+            "5. If you create fake data, the code will FAIL validation\n"
+            "6. NEVER use .dtype in comparisons - compare column VALUES, not types\n"
+            "7. NEVER write df['column'].dtype < value - write df['column'] < value\n\n"
             "✅ CORRECT: product_sales = df.groupby(df.columns[0])[df.columns[1]].sum()\n"
-            "❌ WRONG: result = {'Product E': 3000, 'Product F': 2500}\n\n"
+            "✅ CORRECT: mask = df['Выручка'] < 100000  # Compare VALUES\n"
+            "❌ WRONG: result = {'Product E': 3000, 'Product F': 2500}\n"
+            "❌ WRONG: mask = df['Выручка'].dtype < 100000  # NEVER compare .dtype!\n\n"
         )
 
         # Добавляем custom_context если есть
@@ -295,12 +299,42 @@ Return ONLY the Python code, no explanations."""
 
         return code
 
+    def _fix_common_code_errors(self, code: str) -> str:
+        """
+        Автоматически исправляет частые ошибки в сгенерированном коде
+        """
+        original_code = code
+
+        # Исправление 1: df['column'].dtype < value → df['column'] < value
+        # Паттерн: находим df[...].dtype и убираем .dtype
+        code = re.sub(
+            r"(df\[[^\]]+\])\.dtype(\s*[<>=!]+)",
+            r"\1\2",
+            code
+        )
+
+        # Исправление 2: df.column.dtype < value → df.column < value
+        code = re.sub(
+            r"(df\.\w+)\.dtype(\s*[<>=!]+)",
+            r"\1\2",
+            code
+        )
+
+        if code != original_code:
+            print(f"[CODE_FIX] Auto-fixed .dtype errors in generated code")
+            print(f"[CODE_FIX] Changed lines:")
+            for i, (old, new) in enumerate(zip(original_code.split('\n'), code.split('\n'))):
+                if old != new:
+                    print(f"  {i+1}: {old.strip()} → {new.strip()}")
+
+        return code
+
     def _validate_generated_code(self, code: str) -> None:
         """
         Валидирует сгенерированный код перед выполнением
-        Проверяет на признаки fake data / hallucination
+        Проверяет на признаки fake data / hallucination (но НЕ на .dtype - это исправляется автоматически)
         """
-        # Запрещенные паттерны - признаки hallucination
+        # Запрещенные паттерны - признаки hallucination (БЕЗ .dtype - это исправляется)
         forbidden_patterns = [
             (r"pd\.DataFrame\s*\(\s*\{", "Creating new DataFrame with hardcoded data"),
             (r"pd\.DataFrame\s*\(\s*\[", "Creating new DataFrame with hardcoded lists"),
@@ -327,6 +361,11 @@ Return ONLY the Python code, no explanations."""
         print("[TRACE 3] _execute_python_code() CALLED")
         print(f"[TRACE 3] Code to execute (first 300 chars):\n{code[:300]}")
         print("="*80 + "\n")
+
+        # ИСПРАВЛЕНИЕ: Автоматически исправляем частые ошибки
+        print("[TRACE 3.5] Auto-fixing common code errors...")
+        code = self._fix_common_code_errors(code)
+        print("[TRACE 3.5] ✓ Code fixed (if needed)")
 
         # ВАЛИДАЦИЯ: Проверяем что код не создает fake data
         print("[TRACE 4] Starting validation...")
