@@ -721,26 +721,49 @@ Generate CORRECTED code that will work. Return ONLY the Python code."""
                     highlighting_data = None
                     print(f"[WARNING] Could not extract rows from AI results")
             else:
-                # ВЫДЕЛЕНИЕ ТОПА/ХУДШИХ
+                # ВЫДЕЛЕНИЕ ТОПА/ХУДШИХ - ДИНАМИЧЕСКИ из результата AI
                 import re
                 numbers = re.findall(r'\d+', query)
                 count = 5  # По умолчанию 5
                 if numbers:
                     count = min(int(numbers[0]), 20)
 
+                # Получаем результат от AI
+                result = exec_result.get('result')
+                rows_to_highlight = []
+
+                if result is not None:
+                    # Если result - DataFrame, берём его индексы
+                    if hasattr(result, 'index'):
+                        original_indices = result.index.tolist()[:count]
+                        rows_to_highlight = [idx + 2 for idx in original_indices]
+                        print(f"[TOP_HIGHLIGHT] Using DataFrame indices: {original_indices} -> {rows_to_highlight}")
+
+                    # Если result - list of dicts, ищем в оригинальном df
+                    elif isinstance(result, list) and len(result) > 0 and df is not None:
+                        first_col = df.columns[0]
+                        for i, row_data in enumerate(result[:count]):
+                            if first_col in row_data:
+                                search_value = row_data[first_col]
+                                matches = df[df[first_col] == search_value]
+                                if not matches.empty:
+                                    idx = matches.index[0]
+                                    rows_to_highlight.append(idx + 2)
+                        print(f"[TOP_HIGHLIGHT] Extracted from list: {rows_to_highlight}")
+
+                # Fallback если не удалось извлечь из результата
+                if not rows_to_highlight:
+                    print(f"[TOP_HIGHLIGHT] WARNING: Could not extract indices from result, using first N rows")
+                    rows_to_highlight = list(range(2, 2 + count))
+
                 if 'топ' in query_lower or 'лучш' in query_lower:
-                    # Для топа используем отсортированные данные
-                    rows_to_highlight = [8, 5, 3, 10, 11][:count]  # Топ товаров по продажам
-                    highlight_color = requested_color or '#90EE90'  # Используем запрошенный цвет
+                    highlight_color = requested_color or '#90EE90'
                     highlight_message = f'Выделены топ {len(rows_to_highlight)} товаров'
                 elif 'худш' in query_lower or 'минимальн' in query_lower:
-                    rows_to_highlight = [4, 9, 7, 2, 6][:count]  # Худшие товары
-                    highlight_color = requested_color or '#FFB6C1'  # Используем запрошенный цвет
+                    highlight_color = requested_color or '#FFB6C1'
                     highlight_message = f'Выделены {len(rows_to_highlight)} минимальных значений'
                 else:
-                    # По умолчанию - первые N строк
-                    rows_to_highlight = list(range(2, 2 + count))
-                    highlight_color = requested_color or '#FFFF00'  # Используем запрошенный цвет
+                    highlight_color = requested_color or '#FFFF00'
                     highlight_message = f'Выделены {len(rows_to_highlight)} строк'
 
                 highlighting_data = {
