@@ -792,7 +792,8 @@ Generate CORRECTED code that will work. Return ONLY the Python code."""
                     "headers": headers,
                     "rows": rows[:100],  # Максимум 100 строк для split операций
                     "table_title": summary[:100],
-                    "chart_recommended": None  # Для split графики не нужны
+                    "chart_recommended": None,  # Для split графики не нужны
+                    "operation_type": "split"  # Указываем, что это split операция для frontend
                 }
             except Exception as e:
                 print(f"Error converting split DataFrame to structured_data: {e}")

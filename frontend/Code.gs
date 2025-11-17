@@ -1013,6 +1013,68 @@ function createTableAndChart(structuredData) {
 }
 
 /**
+ * Заменяет данные в текущем активном листе (для split операций)
+ * @param {Object} structuredData - Объект с headers, rows, table_title
+ * @returns {Object} - Результат замены данных
+ */
+function replaceDataInCurrentSheet(structuredData) {
+  try {
+    console.log('[SPLIT] replaceDataInCurrentSheet called');
+    console.log('[SPLIT] headers:', structuredData.headers);
+    console.log('[SPLIT] rows count:', structuredData.rows ? structuredData.rows.length : 0);
+
+    // Валидация входных данных
+    if (!structuredData || !structuredData.headers || !structuredData.rows) {
+      throw new Error('Некорректные данные: отсутствуют headers или rows');
+    }
+
+    const sheet = SpreadsheetApp.getActiveSheet();
+    const headers = structuredData.headers;
+    const rows = structuredData.rows;
+
+    // Подготовка данных для вставки (заголовки + строки)
+    const allData = [headers].concat(rows);
+    const numRows = allData.length;
+    const numCols = headers.length;
+
+    // КРИТИЧНО: Очищаем текущий sheet перед вставкой новых данных
+    sheet.clear();
+
+    // Вставляем данные начиная с A1
+    const dataRange = sheet.getRange(1, 1, numRows, numCols);
+    dataRange.setValues(allData);
+    console.log(`[SPLIT] Inserted data: ${numRows} rows x ${numCols} cols`);
+
+    // Форматируем заголовки
+    const headerRange = sheet.getRange(1, 1, 1, numCols);
+    headerRange.setFontWeight('bold');
+    headerRange.setBackground('#f0f0f0');
+    headerRange.setHorizontalAlignment('center');
+
+    // Автоматически подбираем ширину колонок
+    for (let i = 1; i <= numCols; i++) {
+      sheet.autoResizeColumn(i);
+    }
+
+    console.log('[SPLIT] Data replaced successfully');
+    return {
+      success: true,
+      sheetName: sheet.getName(),
+      dataRange: `A1:${String.fromCharCode(64 + numCols)}${numRows}`,
+      message: `✅ Данные успешно разбиты на ${numCols} столбцов в текущем листе "${sheet.getName()}"`
+    };
+
+  } catch (error) {
+    console.error('[SPLIT] Error:', error);
+    return {
+      success: false,
+      error: error.toString(),
+      message: 'Ошибка замены данных: ' + error.toString()
+    };
+  }
+}
+
+/**
  * Выделяет строки цветом по списку номеров
  * @param {Array<number>} rowNumbers - Номера строк для выделения (1-indexed)
  * @param {string} color - Цвет выделения в формате hex (например, "#FFFF00")
