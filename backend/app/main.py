@@ -21,10 +21,10 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Create FastAPI app with VERSION 6.6.16 - Backend fix for split operations
+# Create FastAPI app with VERSION 6.6.17 - Backend fix for split operations
 app = FastAPI(
     title="SheetGPT API",
-    version="6.6.16",  # v6.6.16: BACKEND FIX - Split operations now correctly generate structured_data
+    version="6.6.17",  # v6.6.17: BACKEND FIX - Split operations now correctly generate structured_data
     description="AI-powered spreadsheet assistant with Python code execution for 99% accuracy and personalized professional insights"
 )
 
@@ -41,7 +41,7 @@ app.add_middleware(
 async def startup_event():
     """Log startup information"""
     logger.info("="*60)
-    logger.info("SheetGPT API v6.6.16 STARTING - BACKEND FIX: Split operations now correctly generate structured_data")
+    logger.info("SheetGPT API v6.6.17 STARTING - BACKEND FIX: Split operations now correctly generate structured_data")
     logger.info(f"Started at: {datetime.now()}")
     logger.info("AI Code Generation: ENABLED")
     logger.info("Python Code Execution: ENABLED")
@@ -55,7 +55,7 @@ async def root():
     """Health check endpoint"""
     return {
         "name": "SheetGPT API",
-        "version": "6.6.16",  # v6.6.16: BACKEND FIX - Split operations now correctly generate structured_data
+        "version": "6.6.17",  # v6.6.17: BACKEND FIX - Split operations now correctly generate structured_data
         "status": "operational",
         "engine": "AI Code Executor",
         "features": {
@@ -75,7 +75,7 @@ async def health_check():
     """Detailed health check"""
     return {
         "status": "healthy",
-        "version": "6.6.16",
+        "version": "6.6.17",
         "service": "SheetGPT API",
         "timestamp": datetime.now().isoformat(),
         "checks": {

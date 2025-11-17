@@ -228,7 +228,7 @@ split_df = df.iloc[:, 0].str.split(delimiter, expand=True)
 
 # ALWAYS use first row as column names (headers) and remove it from data
 # The first row typically contains column names like "Канал,Показы,Клики,CTR,..."
-headers = split_df.iloc[0].tolist()
+headers = split_df.iloc[0].values.tolist()
 split_df.columns = headers
 split_df = split_df.drop(0).reset_index(drop=True)
 
