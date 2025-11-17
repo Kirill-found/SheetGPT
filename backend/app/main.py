@@ -143,29 +143,16 @@ async def process_formula(request: FormulaRequest):
 
             except Exception as fallback_error:
                 logger.error(f"[ERROR] Both function caller and code executor failed: {fallback_error}")
-                # Last resort fallback
+                # Last resort: v3 service
                 from app.services.ai_service_v3 import get_ai_service
-            ai_service = get_ai_service()
+                ai_service = get_ai_service()
 
-            result = ai_service.process_formula_request(
-                query=request.query,
-                column_names=request.column_names,
-                sheet_data=request.sheet_data,
-                history=request.history
-            )
-
-        except Exception as e:
-            logger.error(f"[ERROR] Code Executor failed: {str(e)}")
-            # Fallback to v3 service on any error
-            from app.services.ai_service_v3 import get_ai_service
-            ai_service = get_ai_service()
-
-            result = ai_service.process_formula_request(
-                query=request.query,
-                column_names=request.column_names,
-                sheet_data=request.sheet_data,
-                history=request.history
-            )
+                result = ai_service.process_formula_request(
+                    query=request.query,
+                    column_names=request.column_names,
+                    sheet_data=request.sheet_data,
+                    history=request.history
+                )
 
         # Log result summary
         if result.get("summary"):
