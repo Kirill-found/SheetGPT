@@ -182,7 +182,7 @@ async def process_formula(request: FormulaRequest):
             formula=result.get("formula"),
             explanation=result.get("explanation", ""),
             target_cell=result.get("target_cell"),
-            confidence=result.get("confidence", 0.95 if executor_used else 0.8),
+            confidence=result.get("confidence", 0.95),  # Function calls set 0.98, code executor 0.95
             response_type=result.get("response_type", "analysis"),
             insights=result.get("insights", []),
             suggested_actions=result.get("suggested_actions"),
