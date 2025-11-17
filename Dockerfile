@@ -1,12 +1,12 @@
 FROM python:3.11-slim
 
 # CRITICAL: Change this on EVERY deployment to force rebuild
-ARG CACHEBUST=20251117-1900-FUNCTION-CALLING-v7.0.0
-RUN echo "CACHE BUST: $CACHEBUST - Building v7.0.0 with FUNCTION CALLING"
-# v7.0.0: MAJOR UPDATE - Function Calling with 30+ verified functions for 95%+ accuracy
+ARG CACHEBUST=20251117-2000-SMART-MATCHING-v7.1.0
+RUN echo "CACHE BUST: $CACHEBUST - Building v7.1.0 with SMART COLUMN MATCHING"
+# v7.1.0: Smart column matching + auto string number parsing (e.g. "р.857 765" -> 857765)
 
-LABEL version="7.0.0"
-LABEL description="SheetGPT API v7.0.0 - Function Calling: 30+ verified functions, 95%+ accuracy, fallback to code executor"
+LABEL version="7.1.0"
+LABEL description="SheetGPT API v7.1.0 - Function Calling with smart column matching, auto string number parsing, 95%+ accuracy"
 
 WORKDIR /app
 
@@ -16,7 +16,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 # CACHE BUST: Force copy layer to rebuild
 # CRITICAL: This RUN must be AFTER requirements but BEFORE COPY to break Docker cache
-RUN echo "CACHEBUST: 20251117-1900-v7.0.0-FUNCTION-CALLING - $(date)"
+RUN echo "CACHEBUST: 20251117-2000-v7.1.0-SMART-MATCHING - $(date)"
 
 # Copy application
 COPY backend/ .
