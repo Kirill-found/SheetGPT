@@ -223,24 +223,18 @@ elif '\\t' in str(first_col_sample):
 elif '|' in str(first_col_sample):
     delimiter = '|'
 
-# Split the data
+# Split ALL rows including the first one
 split_df = df.iloc[:, 0].str.split(delimiter, expand=True)
 
-# Check if first row contains headers (most cells contain letters, not just numbers)
-first_row_text_count = split_df.iloc[0].astype(str).str.contains('[а-яА-Яa-zA-Z]', regex=True, na=False).sum()
-is_header_row = first_row_text_count > len(split_df.columns) / 2
-
-if is_header_row:
-    # Use first row as column names
-    split_df.columns = split_df.iloc[0].values
-    split_df = split_df.drop(0).reset_index(drop=True)
-else:
-    # Generate column names
-    split_df.columns = [f'Колонка {{i+1}}' for i in range(len(split_df.columns))]
+# ALWAYS use first row as column names (headers) and remove it from data
+# The first row typically contains column names like "Канал,Показы,Клики,CTR,..."
+headers = split_df.iloc[0].tolist()
+split_df.columns = headers
+split_df = split_df.drop(0).reset_index(drop=True)
 
 result = split_df
 summary = f"Данные успешно разбиты на {{len(split_df.columns)}} столбцов: {{', '.join(map(str, split_df.columns))}}"
-methodology = f"Разделение данных по разделителю ('{{delimiter}}') из первой колонки. Обнаружено {{len(result)}} строк данных"
+methodology = f"Разделение данных по разделителю ('{{delimiter}}'). Первая строка использована как заголовки столбцов. Обнаружено {{len(result)}} строк данных"
 ```
 
 NOW GENERATE CODE FOR THIS QUESTION:
