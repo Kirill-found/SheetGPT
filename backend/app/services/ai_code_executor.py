@@ -590,7 +590,8 @@ Generate CORRECTED code that will work. Return ONLY the Python code."""
                         result_dict[key] = value_str
 
         # Определяем нужна ли таблица/график
-        structured_data = self._generate_structured_data_if_needed(query, result_dict, exec_result.get('summary', ''))
+        # CRITICAL: Передаём ОРИГИНАЛЬНЫЙ result (может быть DataFrame), а не result_dict!
+        structured_data = self._generate_structured_data_if_needed(query, result, exec_result.get('summary', ''))
 
         # v6.5.6: УЛУЧШЕННАЯ логика для выделения строк с поиском
         highlight_keywords = ['выдели', 'подсвет', 'отметь', 'покаж', 'highlight', 'mark', 'топ', 'лучш', 'худш', 'строк', 'фамили']

@@ -1,12 +1,12 @@
 FROM python:3.11-slim
 
 # CRITICAL: Change this on EVERY deployment to force rebuild
-ARG CACHEBUST=20251117-0000-FRONTEND-FIX-v6.6.13
-RUN echo "CACHE BUST: $CACHEBUST - Building v6.6.13 with FRONTEND FIX"
-# v6.6.13: FRONTEND FIX - Split operations now replace data in current sheet instead of creating new sheet
+ARG CACHEBUST=20251117-1600-BACKEND-FIX-v6.6.14
+RUN echo "CACHE BUST: $CACHEBUST - Building v6.6.14 with BACKEND FIX"
+# v6.6.14: BACKEND FIX - Pass original DataFrame to _generate_structured_data_if_needed() instead of converted list
 
-LABEL version="6.6.13"
-LABEL description="SheetGPT API v6.6.13 - FIX: Split operations replace data in current sheet"
+LABEL version="6.6.14"
+LABEL description="SheetGPT API v6.6.14 - FIX: Split operations now correctly generate structured_data with operation_type"
 
 WORKDIR /app
 
@@ -16,7 +16,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 # CACHE BUST: Force copy layer to rebuild
 # CRITICAL: This RUN must be AFTER requirements but BEFORE COPY to break Docker cache
-RUN echo "CACHEBUST: 20251117-0000-v6.6.13-FRONTEND-FIX - $(date)"
+RUN echo "CACHEBUST: 20251117-1600-v6.6.14-BACKEND-FIX - $(date)"
 
 # Copy application
 COPY backend/ .
