@@ -1,8 +1,8 @@
 """
-SheetGPT API Production v7.2.2 - Function Calling with Smart Matching
+SheetGPT API Production v7.2.3 - Function Calling with Smart Matching
 95%+ accuracy через проверенные функции + умный поиск колонок
 Автоматическое преобразование строковых чисел
-Railway deployment: 2025-11-17 - FUNCTION CALLING v7.2.2
+Railway deployment: 2025-11-17 - FUNCTION CALLING v7.2.3
 """
 
 from fastapi import FastAPI, HTTPException
@@ -21,10 +21,10 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Create FastAPI app with VERSION 7.2.2 - Smart column matching + string number parsing
+# Create FastAPI app with VERSION 7.2.3 - Smart column matching + string number parsing
 app = FastAPI(
     title="SheetGPT API",
-    version="7.2.2",  # v7.2.2: Smart column matching + auto string number parsing
+    version="7.2.3",  # v7.2.3: Smart column matching + auto string number parsing
     description="AI-powered spreadsheet assistant with Function Calling (95%+ accuracy), smart column matching, and automatic string number parsing"
 )
 
@@ -41,7 +41,7 @@ app.add_middleware(
 async def startup_event():
     """Log startup information"""
     logger.info("="*60)
-    logger.info("SheetGPT API v7.2.2 STARTING - Function Calling with Smart Column Matching")
+    logger.info("SheetGPT API v7.2.3 STARTING - Function Calling with Smart Column Matching")
     logger.info(f"Started at: {datetime.now()}")
     logger.info("Function Calling: ENABLED (30+ functions)")
     logger.info("Smart Column Matching: ENABLED (fuzzy matching)")
@@ -75,7 +75,7 @@ async def health_check():
     """Detailed health check"""
     return {
         "status": "healthy",
-        "version": "7.2.2",
+        "version": "7.2.3",
         "service": "SheetGPT API",
         "timestamp": datetime.now().isoformat(),
         "checks": {
@@ -92,7 +92,7 @@ async def health_check():
 @app.post("/api/v1/formula", response_model=FormulaResponse)
 async def process_formula(request: FormulaRequest):
     """
-    Main endpoint v7.2.2 - Function Calling with Smart Column Matching
+    Main endpoint v7.2.3 - Function Calling with Smart Column Matching
     - Fuzzy column name matching (e.g. "Сумма" finds "Заказали на сумму")
     - Auto string number parsing (e.g. "р.857 765" -> 857765)
     - Fallback to Code Executor for complex queries
@@ -100,17 +100,17 @@ async def process_formula(request: FormulaRequest):
     try:
         # Log incoming request
         logger.info("="*60)
-        logger.info(f"[REQUEST v7.2.2] Query: {request.query}")
+        logger.info(f"[REQUEST v7.2.3] Query: {request.query}")
         logger.info(f"[DATA] Shape: {len(request.sheet_data)} rows x {len(request.column_names)} columns")
 
         result = None
 
-        # Try AIFunctionCaller first (v7.2.2 with smart matching)
+        # Try AIFunctionCaller first (v7.2.3 with smart matching)
         try:
             from app.services.ai_function_caller import AIFunctionCaller
             import pandas as pd
 
-            logger.info("[ENGINE v7.2.2] Using AI Function Caller with Smart Column Matching")
+            logger.info("[ENGINE v7.2.3] Using AI Function Caller with Smart Column Matching")
 
             # Создаем DataFrame из данных
             df = pd.DataFrame(request.sheet_data, columns=request.column_names)

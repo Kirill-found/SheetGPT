@@ -829,15 +829,41 @@ Generate CORRECTED code that will work. Return ONLY the Python code."""
         table_keywords = ['таблиц', 'создай табл', 'сделай табл', 'table', 'построй табл']
         chart_keywords = ['график', 'диаграмм', 'chart', 'построй', 'визуализ', 'plot', 'сделай']
         split_keywords = ['разбей', 'split', 'разделить', 'text-to-columns', 'по ячейкам', 'раздели', 'text to columns']
+        merge_keywords = ['объедин', 'соедин', 'concat', 'merge', 'создай колонку', 'добавь колонку', 'новая колонка', 'фио']
 
         query_lower = query.lower()
         needs_table = any(kw in query_lower for kw in table_keywords)
         needs_chart = any(kw in query_lower for kw in chart_keywords)
         needs_split = any(kw in query_lower for kw in split_keywords)
+        needs_merge = any(kw in query_lower for kw in merge_keywords)
 
-        # CRITICAL: Для split операций result_dict - это DataFrame, НЕ dict!
+        # CRITICAL: Для split/merge операций result_dict - это DataFrame, НЕ dict!
         # Проверяем, является ли result_dict DataFrame (pandas)
         is_dataframe = hasattr(result_dict, 'shape') and hasattr(result_dict, 'columns')
+
+        # Если это merge/concat операция с DataFrame - конвертируем в structured_data
+        if needs_merge and is_dataframe:
+            try:
+                import pandas as pd
+                df = result_dict
+
+                # Конвертируем DataFrame в формат structured_data
+                headers = df.columns.tolist()
+                rows = df.values.tolist()
+
+                print(f"[MERGE_DATA] Converting merged DataFrame to structured_data: {len(rows)} rows, {len(headers)} columns")
+                print(f"[MERGE_DATA] Headers: {headers}")
+
+                return {
+                    "headers": headers,
+                    "rows": rows[:100],  # Максимум 100 строк
+                    "table_title": summary[:100] if summary else "Объединенные данные",
+                    "chart_recommended": None,  # Для merge графики не нужны
+                    "operation_type": "merge"  # Указываем, что это merge операция для frontend
+                }
+            except Exception as e:
+                print(f"[ERROR] Converting merge DataFrame to structured_data: {e}")
+                return None
 
         # Если это split операция с DataFrame - конвертируем в structured_data
         if needs_split and is_dataframe:
