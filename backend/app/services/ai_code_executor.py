@@ -302,30 +302,29 @@ Return ONLY the Python code, no explanations."""
     def _fix_common_code_errors(self, code: str) -> str:
         """
         Автоматически исправляет частые ошибки в сгенерированном коде
+        v7.2.1: АГРЕССИВНЫЙ FIX - удаляет ВСЕ .dtype из кода
         """
         original_code = code
 
-        # Исправление 1: df['column'].dtype < value → df['column'] < value
-        # Паттерн: находим df[...].dtype и убираем .dtype
-        code = re.sub(
-            r"(df\[[^\]]+\])\.dtype(\s*[<>=!]+)",
-            r"\1\2",
-            code
-        )
+        # АГРЕССИВНОЕ ИСПРАВЛЕНИЕ: удаляем ВСЕ вхождения .dtype
+        # .dtype НИКОГДА не нужен для сравнения значений
+        # Примеры что будет исправлено:
+        #   df['column'].dtype < 100000 → df['column'] < 100000
+        #   df.column.dtype > value → df.column > value
+        #   df[df.columns[0]].dtype == x → df[df.columns[0]] == x
+        #   mask.dtype != y → mask != y
+        # И любые другие варианты!
 
-        # Исправление 2: df.column.dtype < value → df.column < value
-        code = re.sub(
-            r"(df\.\w+)\.dtype(\s*[<>=!]+)",
-            r"\1\2",
-            code
-        )
+        code = re.sub(r'\.dtype\b', '', code)
 
         if code != original_code:
-            print(f"[CODE_FIX] Auto-fixed .dtype errors in generated code")
+            print(f"[CODE_FIX] ✓ Auto-fixed .dtype errors in generated code")
             print(f"[CODE_FIX] Changed lines:")
             for i, (old, new) in enumerate(zip(original_code.split('\n'), code.split('\n'))):
                 if old != new:
-                    print(f"  {i+1}: {old.strip()} → {new.strip()}")
+                    print(f"  Line {i+1}:")
+                    print(f"    BEFORE: {old.strip()}")
+                    print(f"    AFTER:  {new.strip()}")
 
         return code
 
