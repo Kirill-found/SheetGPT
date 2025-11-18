@@ -378,6 +378,8 @@ function tryExtractFromContainer(container) {
       const text = div.textContent?.trim();
 
       // Более мягкие критерии фильтрации
+      const nestedDivs = div.querySelectorAll('div').length;
+
       return text &&
              text.length > 0 &&
              text.length < 300 &&  // Увеличено с 200 до 300
@@ -387,7 +389,8 @@ function tryExtractFromContainer(container) {
              div.offsetWidth < 800 &&   // Увеличено с 500 до 800
              div.offsetParent !== null &&
              // Исключаем большие контейнеры (много вложенных divs)
-             div.querySelectorAll('div').length < 10;  // Changed from === 0 to < 10
+             // Allow up to 50 nested divs (Google Sheets cells are complex)
+             nestedDivs < 50;  // Changed from < 10 to < 50
     });
 
     console.log(`[SheetGPT] Filtered to ${cellCandidates.length} cell candidates`);
