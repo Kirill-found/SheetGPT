@@ -279,7 +279,8 @@ function readSheetDataFromDOM() {
       const foundRows = document.querySelectorAll(strategy.rows);
       console.log(`[SheetGPT] Trying global selector "${strategy.rows}" → found ${foundRows.length} rows`);
 
-      if (foundRows.length > 10) { // Need at least 10 rows to be sure it's the data grid
+      // ИСПРАВЛЕНИЕ: Минимум 2 строки (заголовок + данные), не 10!
+      if (foundRows.length >= 2) {
         rows = Array.from(foundRows);
         cellSelector = strategy.cells;
         console.log(`[SheetGPT] ✅ Using strategy: rows="${strategy.rows}", cells="${strategy.cells}"`);
