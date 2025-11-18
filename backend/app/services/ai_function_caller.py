@@ -185,13 +185,21 @@ class AIFunctionCaller:
                 response["summary"] = f"Выполнена операция: {func_name}. Получено {len(func_result)} строк"
                 response["methodology"] = f"Использована встроенная функция {func_name} с параметрами: {params}"
 
-        elif func_name in ["calculate_sum", "calculate_average", "calculate_median", "calculate_percentile"]:
-            # Результат - одно число
-            response["summary"] = f"Результат: {func_result:,.2f}"
-            response["key_findings"] = [f"{func_name}: {func_result:,.2f}"]
-            response["methodology"] = f"Вычисление {func_name} для колонки {params.get('column')}"
+        elif func_name in ["calculate_sum", "calculate_average", "calculate_median", "calculate_percentile",
+                           "calculate_max", "calculate_min", "calculate_count", "calculate_count_all",
+                           "calculate_mode", "calculate_std", "calculate_product"]:
+            # Результат - одно число/значение
+            if isinstance(func_result, (int, float)):
+                response["summary"] = f"Результат: {func_result:,.2f}"
+                response["key_findings"] = [f"{func_name}: {func_result:,.2f}"]
+            else:
+                response["summary"] = f"Результат: {func_result}"
+                response["key_findings"] = [f"{func_name}: {func_result}"]
+            response["methodology"] = f"Вычисление {func_name} для колонки {params.get('column', 'N/A')}"
 
-        elif func_name in ["calculate_percentage", "calculate_rank", "calculate_running_total"]:
+        elif func_name in ["calculate_percentage", "calculate_rank", "calculate_running_total",
+                           "calculate_abs", "calculate_round", "calculate_ceiling", "calculate_floor",
+                           "calculate_log", "calculate_power", "calculate_sqrt", "calculate_ratio"]:
             # Результат - Series (новая колонка)
             if isinstance(func_result, pd.Series):
                 # Добавляем новую колонку к DataFrame

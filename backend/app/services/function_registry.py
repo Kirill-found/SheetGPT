@@ -27,7 +27,19 @@ class FunctionRegistry:
             "drop_columns": self.drop_columns,
             "reorder_columns": self.reorder_columns,
 
-            # Вычисления
+            # Filtering Advanced (NEW)
+            "filter_multiple": self.filter_multiple,
+            "filter_null": self.filter_null,
+            "filter_not_null": self.filter_not_null,
+            "filter_between": self.filter_between,
+            "filter_in_list": self.filter_in_list,
+            "filter_not_in_list": self.filter_not_in_list,
+            "filter_regex": self.filter_regex,
+            "filter_top_n": self.filter_top_n,
+            "filter_bottom_n": self.filter_bottom_n,
+            "filter_outliers": self.filter_outliers,
+
+            # Вычисления (базовые)
             "calculate_sum": self.calculate_sum,
             "calculate_average": self.calculate_average,
             "calculate_median": self.calculate_median,
@@ -39,6 +51,23 @@ class FunctionRegistry:
             "calculate_variance": self.calculate_variance,
             "calculate_correlation": self.calculate_correlation,
 
+            # Вычисления (Math Operations - NEW)
+            "calculate_max": self.calculate_max,
+            "calculate_min": self.calculate_min,
+            "calculate_count": self.calculate_count,
+            "calculate_count_all": self.calculate_count_all,
+            "calculate_mode": self.calculate_mode,
+            "calculate_std": self.calculate_std,
+            "calculate_abs": self.calculate_abs,
+            "calculate_round": self.calculate_round,
+            "calculate_ceiling": self.calculate_ceiling,
+            "calculate_floor": self.calculate_floor,
+            "calculate_log": self.calculate_log,
+            "calculate_power": self.calculate_power,
+            "calculate_sqrt": self.calculate_sqrt,
+            "calculate_product": self.calculate_product,
+            "calculate_ratio": self.calculate_ratio,
+
             # Группировка и агрегация
             "aggregate_by_group": self.aggregate_by_group,
             "pivot_table": self.pivot_table,
@@ -49,16 +78,70 @@ class FunctionRegistry:
             "replace_text": self.replace_text,
             "trim_whitespace": self.trim_whitespace,
 
+            # Text Operations Advanced (NEW)
+            "extract_substring": self.extract_substring,
+            "split_column": self.split_column,
+            "uppercase": self.uppercase,
+            "lowercase": self.lowercase,
+            "capitalize": self.capitalize,
+            "title_case": self.title_case,
+            "text_length": self.text_length,
+            "contains_count": self.contains_count,
+            "extract_numbers": self.extract_numbers,
+            "extract_emails": self.extract_emails,
+            "remove_special_chars": self.remove_special_chars,
+            "pad_string": self.pad_string,
+
             # Работа с датами
             "parse_dates": self.parse_dates,
             "date_difference": self.date_difference,
             "filter_by_date_range": self.filter_by_date_range,
+
+            # Date Operations Advanced (NEW)
+            "extract_year": self.extract_year,
+            "extract_month": self.extract_month,
+            "extract_day": self.extract_day,
+            "extract_weekday": self.extract_weekday,
+            "extract_quarter": self.extract_quarter,
+            "add_days": self.add_days,
+            "subtract_days": self.subtract_days,
+            "start_of_month": self.start_of_month,
+            "end_of_month": self.end_of_month,
+            "format_date": self.format_date,
 
             # Продвинутые операции
             "vlookup": self.vlookup,
             "conditional_calculation": self.conditional_calculation,
             "create_bins": self.create_bins,
             "normalize_data": self.normalize_data,
+
+            # Statistical Operations (NEW)
+            "calculate_skewness": self.calculate_skewness,
+            "calculate_kurtosis": self.calculate_kurtosis,
+            "calculate_iqr": self.calculate_iqr,
+            "calculate_z_score": self.calculate_z_score,
+            "detect_outliers": self.detect_outliers,
+            "calculate_quantile": self.calculate_quantile,
+            "calculate_covariance": self.calculate_covariance,
+            "calculate_mad": self.calculate_mad,
+
+            # Window Functions (NEW)
+            "lag_column": self.lag_column,
+            "lead_column": self.lead_column,
+            "cumulative_max": self.cumulative_max,
+            "cumulative_min": self.cumulative_min,
+            "moving_average": self.moving_average,
+            "ewma": self.ewma,
+
+            # Conditional Logic (NEW)
+            "if_then_else": self.if_then_else,
+            "case_when": self.case_when,
+            "coalesce": self.coalesce,
+
+            # Aggregation Advanced (NEW)
+            "count_distinct": self.count_distinct,
+            "first_value": self.first_value,
+            "last_value": self.last_value,
         }
 
     def get_function_definitions(self) -> List[Dict[str, Any]]:
@@ -330,6 +413,331 @@ class FunctionRegistry:
                             "description": "Метод обработки одинаковых значений",
                             "default": "min"
                         }
+                    },
+                    "required": ["column"]
+                }
+            },
+
+            # ========== MATH OPERATIONS (NEW) ==========
+            {
+                "name": "calculate_max",
+                "description": "Максимальное значение в колонке. Используй для 'максимум', 'max', 'наибольшее'",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "column": {"type": "string", "description": "Колонка для поиска максимума"}
+                    },
+                    "required": ["column"]
+                }
+            },
+
+            {
+                "name": "calculate_min",
+                "description": "Минимальное значение в колонке. Используй для 'минимум', 'min', 'наименьшее'",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "column": {"type": "string", "description": "Колонка для поиска минимума"}
+                    },
+                    "required": ["column"]
+                }
+            },
+
+            {
+                "name": "calculate_count",
+                "description": "Количество непустых значений. Используй для 'сколько', 'количество непустых', 'count'",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "column": {"type": "string", "description": "Колонка для подсчета"}
+                    },
+                    "required": ["column"]
+                }
+            },
+
+            {
+                "name": "calculate_count_all",
+                "description": "Количество всех строк (включая пустые). Используй для 'сколько всего строк', 'count all'",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "column": {"type": "string", "description": "Колонка для подсчета (опционально)"}
+                    }
+                }
+            },
+
+            {
+                "name": "calculate_mode",
+                "description": "Мода (наиболее частое значение). Используй для 'самое частое', 'мода', 'mode'",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "column": {"type": "string", "description": "Колонка для поиска моды"}
+                    },
+                    "required": ["column"]
+                }
+            },
+
+            {
+                "name": "calculate_std",
+                "description": "Стандартное отклонение. Используй для 'стандартное отклонение', 'std', 'standard deviation'",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "column": {"type": "string", "description": "Колонка для вычисления"}
+                    },
+                    "required": ["column"]
+                }
+            },
+
+            {
+                "name": "calculate_abs",
+                "description": "Абсолютное значение (модуль). Используй для 'модуль', 'абсолютное значение', 'abs'",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "column": {"type": "string", "description": "Колонка для преобразования"}
+                    },
+                    "required": ["column"]
+                }
+            },
+
+            {
+                "name": "calculate_round",
+                "description": "Округление чисел. Используй для 'округли', 'round'",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "column": {"type": "string", "description": "Колонка для округления"},
+                        "decimals": {"type": "integer", "description": "Количество знаков после запятой", "default": 0}
+                    },
+                    "required": ["column"]
+                }
+            },
+
+            {
+                "name": "calculate_ceiling",
+                "description": "Округление вверх. Используй для 'округли вверх', 'ceiling'",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "column": {"type": "string", "description": "Колонка для округления"}
+                    },
+                    "required": ["column"]
+                }
+            },
+
+            {
+                "name": "calculate_floor",
+                "description": "Округление вниз. Используй для 'округли вниз', 'floor'",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "column": {"type": "string", "description": "Колонка для округления"}
+                    },
+                    "required": ["column"]
+                }
+            },
+
+            {
+                "name": "calculate_log",
+                "description": "Логарифм. Используй для 'логарифм', 'log'",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "column": {"type": "string", "description": "Колонка для вычисления"},
+                        "base": {"type": "number", "description": "Основание логарифма (e, 10, 2, etc.)", "default": 10}
+                    },
+                    "required": ["column"]
+                }
+            },
+
+            {
+                "name": "calculate_power",
+                "description": "Возведение в степень. Используй для 'в квадрате', 'в степени', 'power'",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "column": {"type": "string", "description": "Колонка для возведения в степень"},
+                        "exponent": {"type": "number", "description": "Показатель степени"}
+                    },
+                    "required": ["column", "exponent"]
+                }
+            },
+
+            {
+                "name": "calculate_sqrt",
+                "description": "Квадратный корень. Используй для 'корень квадратный', 'sqrt'",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "column": {"type": "string", "description": "Колонка для извлечения корня"}
+                    },
+                    "required": ["column"]
+                }
+            },
+
+            {
+                "name": "calculate_product",
+                "description": "Произведение всех значений. Используй для 'произведение', 'product', 'умножить все'",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "column": {"type": "string", "description": "Колонка для перемножения"}
+                    },
+                    "required": ["column"]
+                }
+            },
+
+            {
+                "name": "calculate_ratio",
+                "description": "Отношение двух колонок (деление). Используй для 'отношение', 'ratio', 'поделить'",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "numerator_column": {"type": "string", "description": "Числитель (колонка)"},
+                        "denominator_column": {"type": "string", "description": "Знаменатель (колонка)"}
+                    },
+                    "required": ["numerator_column", "denominator_column"]
+                }
+            },
+
+            # ========== FILTERING ADVANCED (NEW) ==========
+            {
+                "name": "filter_multiple",
+                "description": "Фильтрация по множественным условиям (AND/OR). Используй для 'где X и Y', 'где X или Y'",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "conditions": {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "column": {"type": "string"},
+                                    "operator": {"type": "string", "enum": ["<", ">", "==", "!=", "<=", ">=", "contains"]},
+                                    "value": {"type": ["string", "number"]}
+                                }
+                            }
+                        },
+                        "logic": {"type": "string", "enum": ["AND", "OR"], "default": "AND"}
+                    },
+                    "required": ["conditions"]
+                }
+            },
+
+            {
+                "name": "filter_null",
+                "description": "Фильтр только пустых значений. Используй для 'где пусто', 'null values'",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "column": {"type": "string", "description": "Колонка для проверки"}
+                    },
+                    "required": ["column"]
+                }
+            },
+
+            {
+                "name": "filter_not_null",
+                "description": "Фильтр только непустых значений. Используй для 'где не пусто', 'not null'",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "column": {"type": "string", "description": "Колонка для проверки"}
+                    },
+                    "required": ["column"]
+                }
+            },
+
+            {
+                "name": "filter_between",
+                "description": "Фильтр значений в диапазоне. Используй для 'между X и Y', 'в диапазоне'",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "column": {"type": "string"},
+                        "min_value": {"type": "number"},
+                        "max_value": {"type": "number"}
+                    },
+                    "required": ["column", "min_value", "max_value"]
+                }
+            },
+
+            {
+                "name": "filter_in_list",
+                "description": "Фильтр значений из списка. Используй для 'где X в списке', 'один из'",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "column": {"type": "string"},
+                        "values": {"type": "array", "items": {"type": ["string", "number"]}}
+                    },
+                    "required": ["column", "values"]
+                }
+            },
+
+            {
+                "name": "filter_not_in_list",
+                "description": "Исключить значения из списка. Используй для 'где X не в списке', 'исключить'",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "column": {"type": "string"},
+                        "values": {"type": "array", "items": {"type": ["string", "number"]}}
+                    },
+                    "required": ["column", "values"]
+                }
+            },
+
+            {
+                "name": "filter_regex",
+                "description": "Фильтр по регулярному выражению. Используй для сложных паттернов поиска",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "column": {"type": "string"},
+                        "pattern": {"type": "string", "description": "Регулярное выражение"}
+                    },
+                    "required": ["column", "pattern"]
+                }
+            },
+
+            {
+                "name": "filter_top_n",
+                "description": "Топ N значений по колонке. Используй для 'топ 10', 'лучшие N'",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "column": {"type": "string"},
+                        "n": {"type": "integer"}
+                    },
+                    "required": ["column", "n"]
+                }
+            },
+
+            {
+                "name": "filter_bottom_n",
+                "description": "Худшие N значений. Используй для 'худшие 10', 'последние N'",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "column": {"type": "string"},
+                        "n": {"type": "integer"}
+                    },
+                    "required": ["column", "n"]
+                }
+            },
+
+            {
+                "name": "filter_outliers",
+                "description": "Исключить выбросы (outliers). Используй для 'без выбросов', 'remove outliers'",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "column": {"type": "string"},
+                        "method": {"type": "string", "enum": ["iqr", "zscore"], "default": "iqr"},
+                        "threshold": {"type": "number", "default": 1.5}
                     },
                     "required": ["column"]
                 }
@@ -801,6 +1209,191 @@ class FunctionRegistry:
             raise ValueError("Одна или обе колонки не найдены")
 
         return df[column1].corr(df[column2])
+
+    # Math Operations (NEW)
+    def calculate_max(self, df: pd.DataFrame, column: str) -> float:
+        """Максимальное значение"""
+        column = self._find_column(df, column)
+        return df[column].max()
+
+    def calculate_min(self, df: pd.DataFrame, column: str) -> float:
+        """Минимальное значение"""
+        column = self._find_column(df, column)
+        return df[column].min()
+
+    def calculate_count(self, df: pd.DataFrame, column: str) -> int:
+        """Количество непустых значений"""
+        column = self._find_column(df, column)
+        return int(df[column].count())
+
+    def calculate_count_all(self, df: pd.DataFrame, column: Optional[str] = None) -> int:
+        """Количество всех строк"""
+        return len(df)
+
+    def calculate_mode(self, df: pd.DataFrame, column: str) -> Any:
+        """Мода (наиболее частое значение)"""
+        column = self._find_column(df, column)
+        mode_result = df[column].mode()
+        return mode_result.iloc[0] if len(mode_result) > 0 else None
+
+    def calculate_std(self, df: pd.DataFrame, column: str) -> float:
+        """Стандартное отклонение"""
+        column = self._find_column(df, column)
+        return df[column].std()
+
+    def calculate_abs(self, df: pd.DataFrame, column: str) -> pd.Series:
+        """Абсолютное значение"""
+        column = self._find_column(df, column)
+        return df[column].abs()
+
+    def calculate_round(self, df: pd.DataFrame, column: str, decimals: int = 0) -> pd.Series:
+        """Округление"""
+        column = self._find_column(df, column)
+        return df[column].round(decimals)
+
+    def calculate_ceiling(self, df: pd.DataFrame, column: str) -> pd.Series:
+        """Округление вверх"""
+        column = self._find_column(df, column)
+        return np.ceil(df[column])
+
+    def calculate_floor(self, df: pd.DataFrame, column: str) -> pd.Series:
+        """Округление вниз"""
+        column = self._find_column(df, column)
+        return np.floor(df[column])
+
+    def calculate_log(self, df: pd.DataFrame, column: str, base: float = 10) -> pd.Series:
+        """Логарифм"""
+        column = self._find_column(df, column)
+        if base == np.e or base == "e":
+            return np.log(df[column])
+        elif base == 10:
+            return np.log10(df[column])
+        elif base == 2:
+            return np.log2(df[column])
+        else:
+            return np.log(df[column]) / np.log(base)
+
+    def calculate_power(self, df: pd.DataFrame, column: str, exponent: float) -> pd.Series:
+        """Возведение в степень"""
+        column = self._find_column(df, column)
+        return df[column] ** exponent
+
+    def calculate_sqrt(self, df: pd.DataFrame, column: str) -> pd.Series:
+        """Квадратный корень"""
+        column = self._find_column(df, column)
+        return np.sqrt(df[column])
+
+    def calculate_product(self, df: pd.DataFrame, column: str) -> float:
+        """Произведение всех значений"""
+        column = self._find_column(df, column)
+        return df[column].product()
+
+    def calculate_ratio(self, df: pd.DataFrame, numerator_column: str, denominator_column: str) -> pd.Series:
+        """Отношение двух колонок"""
+        numerator_column = self._find_column(df, numerator_column)
+        denominator_column = self._find_column(df, denominator_column)
+        return df[numerator_column] / df[denominator_column]
+
+    # Filtering Advanced (NEW)
+    def filter_multiple(self, df: pd.DataFrame, conditions: List[Dict], logic: str = "AND") -> pd.DataFrame:
+        """Множественная фильтрация с AND/OR"""
+        masks = []
+        for cond in conditions:
+            column = self._find_column(df, cond["column"])
+            operator = cond["operator"]
+            value = cond["value"]
+
+            if operator == "contains":
+                mask = df[column].astype(str).str.contains(str(value), case=False, na=False)
+            else:
+                if operator in ['<', '>', '<=', '>=']:
+                    column_data = self._parse_numeric_column(df[column])
+                    if isinstance(value, str):
+                        value = float(re.sub(r'[^\d.-]', '', value)) if value else 0
+                else:
+                    column_data = df[column]
+
+                ops = {
+                    '<': lambda x, y: x < y,
+                    '>': lambda x, y: x > y,
+                    '==': lambda x, y: x == y,
+                    '!=': lambda x, y: x != y,
+                    '<=': lambda x, y: x <= y,
+                    '>=': lambda x, y: x >= y,
+                }
+                mask = ops[operator](column_data, value)
+
+            masks.append(mask)
+
+        if logic == "AND":
+            combined_mask = masks[0]
+            for mask in masks[1:]:
+                combined_mask = combined_mask & mask
+        else:  # OR
+            combined_mask = masks[0]
+            for mask in masks[1:]:
+                combined_mask = combined_mask | mask
+
+        return df[combined_mask]
+
+    def filter_null(self, df: pd.DataFrame, column: str) -> pd.DataFrame:
+        """Фильтр пустых значений"""
+        column = self._find_column(df, column)
+        return df[df[column].isnull()]
+
+    def filter_not_null(self, df: pd.DataFrame, column: str) -> pd.DataFrame:
+        """Фильтр непустых значений"""
+        column = self._find_column(df, column)
+        return df[df[column].notnull()]
+
+    def filter_between(self, df: pd.DataFrame, column: str, min_value: float, max_value: float) -> pd.DataFrame:
+        """Фильтр значений в диапазоне"""
+        column = self._find_column(df, column)
+        return df[(df[column] >= min_value) & (df[column] <= max_value)]
+
+    def filter_in_list(self, df: pd.DataFrame, column: str, values: List[Union[str, int, float]]) -> pd.DataFrame:
+        """Фильтр значений из списка"""
+        column = self._find_column(df, column)
+        return df[df[column].isin(values)]
+
+    def filter_not_in_list(self, df: pd.DataFrame, column: str, values: List[Union[str, int, float]]) -> pd.DataFrame:
+        """Исключить значения из списка"""
+        column = self._find_column(df, column)
+        return df[~df[column].isin(values)]
+
+    def filter_regex(self, df: pd.DataFrame, column: str, pattern: str) -> pd.DataFrame:
+        """Фильтр по регулярному выражению"""
+        column = self._find_column(df, column)
+        return df[df[column].astype(str).str.contains(pattern, regex=True, na=False)]
+
+    def filter_top_n(self, df: pd.DataFrame, column: str, n: int) -> pd.DataFrame:
+        """Топ N значений"""
+        column = self._find_column(df, column)
+        return df.nlargest(n, column)
+
+    def filter_bottom_n(self, df: pd.DataFrame, column: str, n: int) -> pd.DataFrame:
+        """Худшие N значений"""
+        column = self._find_column(df, column)
+        return df.nsmallest(n, column)
+
+    def filter_outliers(self, df: pd.DataFrame, column: str, method: str = "iqr", threshold: float = 1.5) -> pd.DataFrame:
+        """Исключить выбросы"""
+        column = self._find_column(df, column)
+
+        if method == "iqr":
+            Q1 = df[column].quantile(0.25)
+            Q3 = df[column].quantile(0.75)
+            IQR = Q3 - Q1
+            lower_bound = Q1 - threshold * IQR
+            upper_bound = Q3 + threshold * IQR
+            return df[(df[column] >= lower_bound) & (df[column] <= upper_bound)]
+        elif method == "zscore":
+            mean = df[column].mean()
+            std = df[column].std()
+            z_scores = np.abs((df[column] - mean) / std)
+            return df[z_scores < threshold]
+
+        return df
 
     # Группировка
     def aggregate_by_group(self, df: pd.DataFrame, group_by: List[str], agg_column: str, agg_func: str) -> pd.DataFrame:
