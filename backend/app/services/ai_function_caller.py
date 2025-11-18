@@ -10,7 +10,6 @@ from typing import Any, Dict, List, Optional
 from openai import AsyncOpenAI
 
 from .function_registry import FunctionRegistry
-from .ai_code_executor import AICodeExecutor
 
 
 class AIFunctionCaller:
@@ -18,13 +17,12 @@ class AIFunctionCaller:
     Интеграция с GPT-4o для function calling
     1. GPT-4o определяет функцию и параметры
     2. Выполняем проверенную функцию из registry
-    3. Если функция не найдена - fallback на code generation
+    3. NO FALLBACK - 100 functions должны покрывать все запросы
     """
 
     def __init__(self):
         self.client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
         self.registry = FunctionRegistry()
-        self.code_executor = AICodeExecutor()  # Fallback для сложных запросов
         self.model = "gpt-4o"
 
     async def process_query(
@@ -36,7 +34,7 @@ class AIFunctionCaller:
         custom_context: Optional[str] = None
     ) -> Dict[str, Any]:
         """
-        Обработка запроса с function calling
+        Обработка запроса с function calling (NO FALLBACK - 100 functions only)
         """
 
         # Шаг 1: Анализ DataFrame для контекста
@@ -46,49 +44,53 @@ class AIFunctionCaller:
         system_prompt = self._build_system_prompt(df_info, custom_context)
 
         # Шаг 3: Вызываем GPT-4o с function calling
-        try:
-            response = await self.client.chat.completions.create(
-                model=self.model,
-                messages=[
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": query}
-                ],
-                functions=self.registry.get_function_definitions(),
-                function_call="auto",  # AI решает вызывать ли функцию
-                temperature=0.1
+        response = await self.client.chat.completions.create(
+            model=self.model,
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": query}
+            ],
+            functions=self.registry.get_function_definitions(),
+            function_call="auto",  # AI решает вызывать ли функцию
+            temperature=0.1
+        )
+
+        message = response.choices[0].message
+
+        # Шаг 4: Если AI выбрал функцию - выполняем
+        if message.function_call:
+            return await self._execute_function_call(
+                message.function_call,
+                df,
+                query,
+                sheet_data,
+                column_names
             )
 
-            message = response.choices[0].message
-
-            # Шаг 4: Если AI выбрал функцию - выполняем
-            if message.function_call:
-                return await self._execute_function_call(
-                    message.function_call,
-                    df,
-                    query,
-                    sheet_data,
-                    column_names
-                )
-
-            # Шаг 5: Если функция не выбрана - fallback на code generation
-            else:
-                print(f"[FUNCTION_CALLER] No function matched, falling back to code executor")
-                return await self.code_executor.process_query(
-                    query=query,
-                    column_names=column_names,
-                    sheet_data=sheet_data,
-                    custom_context=custom_context
-                )
-
-        except Exception as e:
-            print(f"[FUNCTION_CALLER] Error: {e}")
-            # Fallback на code executor при ошибке
-            return await self.code_executor.process_query(
-                query=query,
-                column_names=column_names,
-                sheet_data=sheet_data,
-                custom_context=custom_context
-            )
+        # Шаг 5: Если функция не выбрана - возвращаем текстовый ответ
+        else:
+            print(f"[FUNCTION_CALLER] No function matched for query: {query}")
+            return {
+                "formula": None,
+                "explanation": "",
+                "target_cell": None,
+                "confidence": 0.50,
+                "response_type": "text_only",
+                "function_used": None,
+                "parameters": None,
+                "insights": [],
+                "suggested_actions": None,
+                "summary": message.content or "Не удалось найти подходящую функцию для этого запроса.",
+                "methodology": "GPT-4o text response (no function match)",
+                "key_findings": [],
+                "professional_insights": "",
+                "recommendations": ["Попробуйте переформулировать запрос более конкретно"],
+                "warnings": ["Не найдена подходящая функция из 100 доступных"],
+                "structured_data": None,
+                "highlight_rows": None,
+                "highlight_color": None,
+                "highlight_message": None,
+            }
 
     async def _execute_function_call(
         self,
@@ -99,7 +101,7 @@ class AIFunctionCaller:
         column_names: List[str]
     ) -> Dict[str, Any]:
         """
-        Выполнение function call
+        Выполнение function call (NO FALLBACK)
         """
         func_name = function_call.name
         params = json.loads(function_call.arguments)
@@ -112,12 +114,28 @@ class AIFunctionCaller:
 
         if not result["success"]:
             print(f"[FUNCTION_CALLER] Function failed: {result['error']}")
-            # Fallback на code executor
-            return await self.code_executor.process_query(
-                query=query,
-                column_names=column_names,
-                sheet_data=sheet_data
-            )
+            # NO FALLBACK - возвращаем ошибку
+            return {
+                "formula": None,
+                "explanation": "",
+                "target_cell": None,
+                "confidence": 0.30,
+                "response_type": "error",
+                "function_used": func_name,
+                "parameters": params,
+                "insights": [],
+                "suggested_actions": None,
+                "summary": f"Ошибка выполнения функции {func_name}",
+                "methodology": f"Попытка вызова {func_name} с параметрами {params}",
+                "key_findings": [],
+                "professional_insights": "",
+                "recommendations": ["Проверьте правильность названий колонок и параметров"],
+                "warnings": [f"Ошибка: {result['error']}"],
+                "structured_data": None,
+                "highlight_rows": None,
+                "highlight_color": None,
+                "highlight_message": None,
+            }
 
         # Форматируем ответ
         return self._format_response(result, func_name, params, query, df)

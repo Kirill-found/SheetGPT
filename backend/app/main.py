@@ -1,8 +1,8 @@
 """
-SheetGPT API Production v7.3.1 - Function Calling with Smart Matching
-95%+ accuracy через проверенные функции + умный поиск колонок
+SheetGPT API Production v7.4.0 - 100 Functions System (NO FALLBACK)
+95%+ accuracy через 100 проверенных функций + умный поиск колонок
 Автоматическое преобразование строковых чисел
-Railway deployment: 2025-11-17 - FUNCTION CALLING v7.3.1
+Railway deployment: 2025-11-18 - 100 FUNCTIONS, NO TIER 2/3 FALLBACK
 """
 
 from fastapi import FastAPI, HTTPException
@@ -21,11 +21,11 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Create FastAPI app with VERSION 7.3.1 - Smart column matching + string number parsing
+# Create FastAPI app with VERSION 7.4.0 - 100 Functions, NO FALLBACK
 app = FastAPI(
     title="SheetGPT API",
-    version="7.3.1",  # v7.3.1: Improved empty data detection for AI table generation
-    description="AI-powered spreadsheet assistant with Function Calling (95%+ accuracy), smart column matching, and automatic string number parsing"
+    version="7.4.0",  # v7.4.0: 100 functions system, removed Tier 2 (Code Executor) and Tier 3 fallbacks
+    description="AI-powered spreadsheet assistant with 100 Functions (95%+ accuracy target), smart column matching, and automatic string number parsing. NO FALLBACK to code execution."
 )
 
 # Configure CORS
@@ -41,13 +41,15 @@ app.add_middleware(
 async def startup_event():
     """Log startup information"""
     logger.info("="*60)
-    logger.info("SheetGPT API v7.3.1 STARTING - Function Calling with Smart Column Matching")
+    logger.info("SheetGPT API v7.4.0 STARTING - 100 Functions System (NO FALLBACK)")
     logger.info(f"Started at: {datetime.now()}")
-    logger.info("Function Calling: ENABLED (30+ functions)")
+    logger.info("Function Calling: ENABLED (100 functions)")
     logger.info("Smart Column Matching: ENABLED (fuzzy matching)")
     logger.info("String Number Parsing: ENABLED (e.g. 'р.857 765' -> 857765)")
-    logger.info("Python Code Execution: FALLBACK (for complex queries)")
-    logger.info("Accuracy target: 95%+")
+    logger.info("Tier 2 (Code Executor): REMOVED")
+    logger.info("Tier 3 (v3 Service): REMOVED")
+    logger.info("Fallback: DISABLED")
+    logger.info("Accuracy target: 95%+ (function calling only)")
     logger.info("="*60)
 
 @app.get("/")
@@ -92,71 +94,39 @@ async def health_check():
 @app.post("/api/v1/formula", response_model=FormulaResponse)
 async def process_formula(request: FormulaRequest):
     """
-    Main endpoint v7.3.1 - Function Calling with Smart Column Matching
+    Main endpoint v7.4.0 - Function Calling ONLY (NO FALLBACK)
+    - 100 проверенных функций
     - Fuzzy column name matching (e.g. "Сумма" finds "Заказали на сумму")
     - Auto string number parsing (e.g. "р.857 765" -> 857765)
-    - Fallback to Code Executor for complex queries
+    - 95%+ accuracy target
     """
     try:
         # Log incoming request
         logger.info("="*60)
-        logger.info(f"[REQUEST v7.3.1] Query: {request.query}")
+        logger.info(f"[REQUEST v7.4.0] Query: {request.query}")
         logger.info(f"[DATA] Shape: {len(request.sheet_data)} rows x {len(request.column_names)} columns")
 
-        result = None
+        from app.services.ai_function_caller import AIFunctionCaller
+        import pandas as pd
 
-        # Try AIFunctionCaller first (v7.3.1 with smart matching)
-        try:
-            from app.services.ai_function_caller import AIFunctionCaller
-            import pandas as pd
+        logger.info("[ENGINE v7.4.0] Using AI Function Caller (100 functions, NO FALLBACK)")
 
-            logger.info("[ENGINE v7.3.1] Using AI Function Caller with Smart Column Matching")
+        # Создаем DataFrame из данных
+        df = pd.DataFrame(request.sheet_data, columns=request.column_names)
 
-            # Создаем DataFrame из данных
-            df = pd.DataFrame(request.sheet_data, columns=request.column_names)
+        # Создаем caller и обрабатываем запрос
+        caller = AIFunctionCaller()
+        result = await caller.process_query(
+            query=request.query,
+            df=df,
+            column_names=request.column_names,
+            sheet_data=request.sheet_data,
+            custom_context=request.custom_context
+        )
 
-            # Создаем caller и обрабатываем запрос
-            caller = AIFunctionCaller()
-            result = await caller.process_query(
-                query=request.query,
-                df=df,
-                column_names=request.column_names,
-                sheet_data=request.sheet_data,
-                custom_context=request.custom_context
-            )
-
-            logger.info("[SUCCESS] Function calling completed")
-            logger.info(f"[DEBUG] Response type: {result.get('response_type')}")
-            logger.info(f"[DEBUG] Function used: {result.get('function_used', 'N/A')}")
-
-        except Exception as e:
-            logger.warning(f"[FALLBACK] Function caller failed ({str(e)}), using code executor")
-            # Fallback to Code Executor
-            try:
-                from app.services.ai_code_executor import get_ai_executor
-
-                executor = get_ai_executor()
-                result = executor.process_with_code(
-                    query=request.query,
-                    column_names=request.column_names,
-                    sheet_data=request.sheet_data,
-                    history=request.history,
-                    custom_context=request.custom_context
-                )
-                logger.info("[FALLBACK SUCCESS] Code executor used")
-
-            except Exception as fallback_error:
-                logger.error(f"[ERROR] Both function caller and code executor failed: {fallback_error}")
-                # Last resort: v3 service
-                from app.services.ai_service_v3 import get_ai_service
-                ai_service = get_ai_service()
-
-                result = ai_service.process_formula_request(
-                    query=request.query,
-                    column_names=request.column_names,
-                    sheet_data=request.sheet_data,
-                    history=request.history
-                )
+        logger.info("[SUCCESS] Function calling completed")
+        logger.info(f"[DEBUG] Response type: {result.get('response_type')}")
+        logger.info(f"[DEBUG] Function used: {result.get('function_used', 'N/A')}")
 
         # Log result summary
         if result.get("summary"):
