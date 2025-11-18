@@ -271,60 +271,68 @@ function readSheetDataFromDOM() {
       { rows: 'div[role="row"]', cells: 'div[role="gridcell"], div[role="columnheader"]' }
     ];
 
-    let rows = [];
-    let cellSelector = null;
-
-    // Try each strategy GLOBALLY (not limited to container)
+    // ИСПРАВЛЕНИЕ: Пробуем каждую стратегию и валидируем данные
     for (const strategy of selectorStrategies) {
       const foundRows = document.querySelectorAll(strategy.rows);
       console.log(`[SheetGPT] Trying global selector "${strategy.rows}" → found ${foundRows.length} rows`);
 
-      // ИСПРАВЛЕНИЕ: Минимум 2 строки (заголовок + данные), не 10!
-      if (foundRows.length >= 2) {
-        rows = Array.from(foundRows);
-        cellSelector = strategy.cells;
-        console.log(`[SheetGPT] ✅ Using strategy: rows="${strategy.rows}", cells="${strategy.cells}"`);
-        break;
+      if (foundRows.length < 2) {
+        continue; // Need at least 2 rows (header + data)
       }
-    }
 
-    if (rows.length === 0) {
-      console.warn('[SheetGPT] No rows found with any selector strategy');
-      return null;
-    }
+      const rows = Array.from(foundRows);
+      const cellSelector = strategy.cells;
 
-    const data = [];
-    for (const row of rows.slice(0, 1000)) { // Limit to 1000 rows
-      const cells = Array.from(row.querySelectorAll(cellSelector));
-      if (cells.length > 0) {
-        const rowData = cells.map(cell => cell.textContent.trim());
-        if (rowData.some(val => val)) { // Skip empty rows
-          data.push(rowData);
+      // Extract data
+      const data = [];
+      for (const row of rows.slice(0, 1000)) {
+        const cells = Array.from(row.querySelectorAll(cellSelector));
+        if (cells.length > 0) {
+          const rowData = cells.map(cell => cell.textContent.trim());
+          if (rowData.some(val => val)) {
+            data.push(rowData);
+          }
         }
       }
+
+      if (data.length < 1) {
+        console.warn(`[SheetGPT] No data found with strategy "${strategy.rows}"`);
+        continue;
+      }
+
+      const headers = data[0];
+
+      // ВАЛИДАЦИЯ: Пропускаем таблицы с подозрительными заголовками
+      const hasInvalidHeaders = headers.some(h => h && h.length > 100);
+      if (hasInvalidHeaders) {
+        console.warn(`[SheetGPT] ⚠️ Headers too long (> 100 chars) for strategy "${strategy.rows}", trying next...`);
+        console.warn('[SheetGPT] Suspicious headers:', headers);
+        continue; // Try next strategy
+      }
+
+      // ВАЛИДАЦИЯ: Проверяем что все строки имеют похожее число колонок
+      const rows_data = data.slice(1);
+      const avgColumns = data.reduce((sum, row) => sum + row.length, 0) / data.length;
+      const hasConsistentColumns = data.every(row => Math.abs(row.length - avgColumns) <= 2);
+
+      if (!hasConsistentColumns) {
+        console.warn(`[SheetGPT] ⚠️ Inconsistent column counts for strategy "${strategy.rows}", trying next...`);
+        continue;
+      }
+
+      // SUCCESS! Found valid data
+      console.log(`[SheetGPT] ✅ Using strategy: rows="${strategy.rows}", cells="${strategy.cells}"`);
+      console.log(`[SheetGPT] ✅ Read from DOM: ${rows_data.length} rows, ${headers.length} columns`);
+      console.log(`[SheetGPT] Headers:`, headers);
+      console.log(`[SheetGPT] First row:`, rows_data[0]);
+      console.log(`[SheetGPT] Second row:`, rows_data[1]);
+
+      return { headers, data: rows_data };
     }
 
-    if (data.length < 1) {
-      console.warn('[SheetGPT] No data found in DOM');
-      return null;
-    }
-
-    const headers = data[0];
-    const rows_data = data.slice(1);
-
-    console.log(`[SheetGPT] ✅ Read from DOM: ${rows_data.length} rows, ${headers.length} columns`);
-    console.log(`[SheetGPT] Headers:`, headers);
-    console.log(`[SheetGPT] First row:`, rows_data[0]);
-    console.log(`[SheetGPT] Second row:`, rows_data[1]);
-
-    // Validate: all rows should have same number of columns as headers
-    const invalidRows = rows_data.filter(row => row.length !== headers.length);
-    if (invalidRows.length > 0) {
-      console.warn(`[SheetGPT] ⚠️ Found ${invalidRows.length} rows with mismatched column count!`);
-      console.warn(`[SheetGPT] Expected ${headers.length} columns, but found:`, invalidRows.map(r => r.length));
-    }
-
-    return { headers, data: rows_data };
+    // If we got here, no strategy worked
+    console.warn('[SheetGPT] No valid data found with any selector strategy');
+    return null;
   } catch (error) {
     console.error('[SheetGPT] Error reading from DOM:', error);
     return null;
