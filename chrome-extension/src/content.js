@@ -257,50 +257,29 @@ function readSheetDataFromDOM() {
   console.log('[SheetGPT] Reading data from DOM...');
 
   try {
-    // First, find the main grid container to avoid reading UI elements
-    const gridContainers = [
-      '[role="grid"]',           // ARIA grid
-      'table.waffle',            // Classic view
-      '.grid-container',         // New view
-      'table'                    // Fallback
-    ];
-
-    let gridContainer = null;
-    for (const selector of gridContainers) {
-      const container = document.querySelector(selector);
-      if (container) {
-        gridContainer = container;
-        console.log(`[SheetGPT] ✅ Found grid container: "${selector}"`);
-        break;
-      }
-    }
-
-    if (!gridContainer) {
-      console.warn('[SheetGPT] No grid container found');
-      return null;
-    }
-
-    // Try multiple selector strategies for different Google Sheets versions
+    // ИСПРАВЛЕНИЕ: Сначала пробуем найти строки глобально, потом фильтруем по контейнеру
     const selectorStrategies = [
       // Strategy 1: ARIA roles (most reliable)
-      { rows: '[role="row"]', cells: '[role="gridcell"]' },
+      { rows: '[role="row"]', cells: '[role="gridcell"], [role="columnheader"]' },
       // Strategy 2: Table structure
-      { rows: 'tbody tr, tr', cells: 'td' },
+      { rows: 'table.waffle tbody tr', cells: 'td' },
       // Strategy 3: Grid classes
       { rows: '.grid-row, .ritz .grid-row', cells: '.cell, [role="gridcell"]' },
-      // Strategy 4: Generic rows
-      { rows: 'tr', cells: 'td, [role="gridcell"]' }
+      // Strategy 4: Any table rows
+      { rows: 'table tr', cells: 'td, th' },
+      // Strategy 5: Fallback to any grid-like structure
+      { rows: 'div[role="row"]', cells: 'div[role="gridcell"], div[role="columnheader"]' }
     ];
 
     let rows = [];
     let cellSelector = null;
 
-    // Try each strategy until we find rows WITHIN the grid container
+    // Try each strategy GLOBALLY (not limited to container)
     for (const strategy of selectorStrategies) {
-      const foundRows = gridContainer.querySelectorAll(strategy.rows);
-      console.log(`[SheetGPT] Trying selector "${strategy.rows}" in grid → found ${foundRows.length} rows`);
+      const foundRows = document.querySelectorAll(strategy.rows);
+      console.log(`[SheetGPT] Trying global selector "${strategy.rows}" → found ${foundRows.length} rows`);
 
-      if (foundRows.length > 0) {
+      if (foundRows.length > 10) { // Need at least 10 rows to be sure it's the data grid
         rows = Array.from(foundRows);
         cellSelector = strategy.cells;
         console.log(`[SheetGPT] ✅ Using strategy: rows="${strategy.rows}", cells="${strategy.cells}"`);
