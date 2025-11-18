@@ -156,6 +156,19 @@ DataFrame 'df' with {len(df)} rows and columns:
 SAMPLE DATA (first 5 rows):
 {df.head().to_string()}
 
+UNDERSTANDING CONVERSATIONAL REQUESTS:
+========================================
+Users may ask questions in casual, conversational language. You MUST understand the intent:
+
+EXAMPLES OF CONVERSATIONAL REQUESTS:
+- "более обширный анализ нужен" → Perform detailed analysis of existing data
+- "можно поподробнее?" → Provide more detailed analysis
+- "расскажи про это" → Analyze and explain the data
+- "что тут интересного?" → Find insights in the data
+- "сделай выводы" → Draw conclusions from the data
+
+KEY RULE: If df has data (len(df) > 0), the user wants to ANALYZE EXISTING DATA, not create a new table!
+
 RULES FOR CODE GENERATION:
 10. For Russian names/surnames: use partial matching with .str.contains() to handle different word forms
 11. Example: "Капустина" should match "Капустин", "Шилова" matches "Шилов"
