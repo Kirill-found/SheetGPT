@@ -876,6 +876,552 @@ class FunctionRegistry:
                     "required": ["column", "bins"]
                 }
             },
+
+            # ========== TEXT OPERATIONS ADVANCED (NEW) ==========
+            {
+                "name": "extract_substring",
+                "description": "Извлечь подстроку. Используй для 'возьми первые N символов', 'извлечь часть строки'",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "column": {"type": "string"},
+                        "start": {"type": "integer", "description": "Начальная позиция (0-indexed)"},
+                        "length": {"type": "integer", "description": "Длина подстроки (опционально)"}
+                    },
+                    "required": ["column", "start"]
+                }
+            },
+
+            {
+                "name": "split_column",
+                "description": "Разбить колонку на несколько по разделителю. Используй для 'раздели на части', 'split by'",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "column": {"type": "string"},
+                        "delimiter": {"type": "string", "default": " "},
+                        "max_split": {"type": "integer", "default": -1, "description": "Максимум частей (-1 = все)"}
+                    },
+                    "required": ["column"]
+                }
+            },
+
+            {
+                "name": "uppercase",
+                "description": "Верхний регистр. Используй для 'в верхнем регистре', 'заглавными буквами', 'CAPS'",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "column": {"type": "string"}
+                    },
+                    "required": ["column"]
+                }
+            },
+
+            {
+                "name": "lowercase",
+                "description": "Нижний регистр. Используй для 'в нижнем регистре', 'маленькими буквами'",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "column": {"type": "string"}
+                    },
+                    "required": ["column"]
+                }
+            },
+
+            {
+                "name": "capitalize",
+                "description": "Первая буква заглавная, остальные строчные. Используй для 'с заглавной буквы'",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "column": {"type": "string"}
+                    },
+                    "required": ["column"]
+                }
+            },
+
+            {
+                "name": "title_case",
+                "description": "Title Case - каждое слово с заглавной буквы. Используй для 'Title Case', 'каждое слово заглавное'",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "column": {"type": "string"}
+                    },
+                    "required": ["column"]
+                }
+            },
+
+            {
+                "name": "text_length",
+                "description": "Длина строки в символах. Используй для 'сколько символов', 'длина текста'",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "column": {"type": "string"}
+                    },
+                    "required": ["column"]
+                }
+            },
+
+            {
+                "name": "contains_count",
+                "description": "Сколько раз подстрока встречается. Используй для 'сколько раз встречается', 'количество вхождений'",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "column": {"type": "string"},
+                        "substring": {"type": "string"}
+                    },
+                    "required": ["column", "substring"]
+                }
+            },
+
+            {
+                "name": "extract_numbers",
+                "description": "Извлечь числа из текста. Используй для 'достань число', 'вытащи цифры'",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "column": {"type": "string"}
+                    },
+                    "required": ["column"]
+                }
+            },
+
+            {
+                "name": "extract_emails",
+                "description": "Извлечь email адреса. Используй для 'найди email', 'вытащи почту'",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "column": {"type": "string"}
+                    },
+                    "required": ["column"]
+                }
+            },
+
+            {
+                "name": "remove_special_chars",
+                "description": "Удалить спецсимволы (оставить только буквы, цифры, пробелы). Используй для 'убери спецсимволы', 'только буквы и цифры'",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "column": {"type": "string"}
+                    },
+                    "required": ["column"]
+                }
+            },
+
+            {
+                "name": "pad_string",
+                "description": "Дополнить строку до указанной длины. Используй для 'дополни до N символов', 'выровняй по длине'",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "column": {"type": "string"},
+                        "width": {"type": "integer"},
+                        "fillchar": {"type": "string", "default": " "},
+                        "side": {"type": "string", "enum": ["left", "right", "center"], "default": "left"}
+                    },
+                    "required": ["column", "width"]
+                }
+            },
+
+            # ========== DATE OPERATIONS ADVANCED (NEW) ==========
+            {
+                "name": "extract_year",
+                "description": "Извлечь год из даты. Используй для 'год', 'какой год', 'year'",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "column": {"type": "string"}
+                    },
+                    "required": ["column"]
+                }
+            },
+
+            {
+                "name": "extract_month",
+                "description": "Извлечь месяц из даты. Используй для 'месяц', 'какой месяц', 'month'",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "column": {"type": "string"}
+                    },
+                    "required": ["column"]
+                }
+            },
+
+            {
+                "name": "extract_day",
+                "description": "Извлечь день из даты. Используй для 'день', 'какой день', 'day'",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "column": {"type": "string"}
+                    },
+                    "required": ["column"]
+                }
+            },
+
+            {
+                "name": "extract_weekday",
+                "description": "День недели (Monday, Tuesday, etc.). Используй для 'день недели', 'weekday'",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "column": {"type": "string"}
+                    },
+                    "required": ["column"]
+                }
+            },
+
+            {
+                "name": "extract_quarter",
+                "description": "Квартал (1-4). Используй для 'квартал', 'Q1/Q2/Q3/Q4', 'quarter'",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "column": {"type": "string"}
+                    },
+                    "required": ["column"]
+                }
+            },
+
+            {
+                "name": "add_days",
+                "description": "Добавить дни к дате. Используй для 'добавь 30 дней', 'через N дней'",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "column": {"type": "string"},
+                        "days": {"type": "integer"}
+                    },
+                    "required": ["column", "days"]
+                }
+            },
+
+            {
+                "name": "subtract_days",
+                "description": "Вычесть дни из даты. Используй для 'вычти 7 дней', 'N дней назад'",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "column": {"type": "string"},
+                        "days": {"type": "integer"}
+                    },
+                    "required": ["column", "days"]
+                }
+            },
+
+            {
+                "name": "start_of_month",
+                "description": "Первый день месяца. Используй для 'начало месяца', 'первый день месяца'",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "column": {"type": "string"}
+                    },
+                    "required": ["column"]
+                }
+            },
+
+            {
+                "name": "end_of_month",
+                "description": "Последний день месяца. Используй для 'конец месяца', 'последний день месяца'",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "column": {"type": "string"}
+                    },
+                    "required": ["column"]
+                }
+            },
+
+            {
+                "name": "format_date",
+                "description": "Форматировать дату в строку. Используй для 'формат даты', 'преобразуй в формат'",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "column": {"type": "string"},
+                        "format_string": {"type": "string", "default": "%Y-%m-%d", "description": "Формат: %Y=год, %m=месяц, %d=день"}
+                    },
+                    "required": ["column"]
+                }
+            },
+
+            # ========== STATISTICAL OPERATIONS (NEW) ==========
+            {
+                "name": "calculate_skewness",
+                "description": "Асимметрия распределения (skewness). Используй для 'асимметрия', 'skewness'",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "column": {"type": "string"}
+                    },
+                    "required": ["column"]
+                }
+            },
+
+            {
+                "name": "calculate_kurtosis",
+                "description": "Эксцесс распределения (kurtosis). Используй для 'эксцесс', 'kurtosis'",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "column": {"type": "string"}
+                    },
+                    "required": ["column"]
+                }
+            },
+
+            {
+                "name": "calculate_iqr",
+                "description": "Межквартильный размах (IQR). Используй для 'межквартильный размах', 'IQR'",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "column": {"type": "string"}
+                    },
+                    "required": ["column"]
+                }
+            },
+
+            {
+                "name": "calculate_z_score",
+                "description": "Z-score (стандартизация). Используй для 'z-score', 'стандартизация', 'сколько стандартных отклонений'",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "column": {"type": "string"}
+                    },
+                    "required": ["column"]
+                }
+            },
+
+            {
+                "name": "detect_outliers",
+                "description": "Обнаружить выбросы (возвращает True/False). Используй для 'найди выбросы', 'какие значения аномальные'",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "column": {"type": "string"},
+                        "method": {"type": "string", "enum": ["iqr", "zscore"], "default": "iqr"},
+                        "threshold": {"type": "number", "default": 1.5}
+                    },
+                    "required": ["column"]
+                }
+            },
+
+            {
+                "name": "calculate_quantile",
+                "description": "Квантиль (любой процентиль). Используй для 'квантиль 0.75', 'перцентиль', 'quantile'",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "column": {"type": "string"},
+                        "q": {"type": "number", "description": "Квантиль от 0 до 1 (например 0.5 = медиана)"}
+                    },
+                    "required": ["column", "q"]
+                }
+            },
+
+            {
+                "name": "calculate_covariance",
+                "description": "Ковариация между двумя колонками. Используй для 'ковариация', 'covariance'",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "column1": {"type": "string"},
+                        "column2": {"type": "string"}
+                    },
+                    "required": ["column1", "column2"]
+                }
+            },
+
+            {
+                "name": "calculate_mad",
+                "description": "Среднее абсолютное отклонение (MAD). Используй для 'среднее абсолютное отклонение', 'MAD'",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "column": {"type": "string"}
+                    },
+                    "required": ["column"]
+                }
+            },
+
+            # ========== WINDOW FUNCTIONS (NEW) ==========
+            {
+                "name": "lag_column",
+                "description": "Предыдущее значение (сдвиг вниз). Используй для 'предыдущее значение', 'значение из прошлой строки', 'lag'",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "column": {"type": "string"},
+                        "periods": {"type": "integer", "default": 1, "description": "На сколько строк сдвинуть"}
+                    },
+                    "required": ["column"]
+                }
+            },
+
+            {
+                "name": "lead_column",
+                "description": "Следующее значение (сдвиг вверх). Используй для 'следующее значение', 'значение из следующей строки', 'lead'",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "column": {"type": "string"},
+                        "periods": {"type": "integer", "default": 1}
+                    },
+                    "required": ["column"]
+                }
+            },
+
+            {
+                "name": "cumulative_max",
+                "description": "Накопительный максимум. Используй для 'максимум до этой строки', 'cumulative max'",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "column": {"type": "string"}
+                    },
+                    "required": ["column"]
+                }
+            },
+
+            {
+                "name": "cumulative_min",
+                "description": "Накопительный минимум. Используй для 'минимум до этой строки', 'cumulative min'",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "column": {"type": "string"}
+                    },
+                    "required": ["column"]
+                }
+            },
+
+            {
+                "name": "moving_average",
+                "description": "Скользящее среднее (moving average). Используй для 'скользящее среднее за N дней', 'moving average'",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "column": {"type": "string"},
+                        "window": {"type": "integer", "description": "Размер окна (например, 7 для недели)"}
+                    },
+                    "required": ["column", "window"]
+                }
+            },
+
+            {
+                "name": "ewma",
+                "description": "Экспоненциальное скользящее среднее (EWMA). Используй для 'экспоненциальное среднее', 'EWMA'",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "column": {"type": "string"},
+                        "span": {"type": "integer", "default": 10}
+                    },
+                    "required": ["column"]
+                }
+            },
+
+            # ========== CONDITIONAL LOGIC (NEW) ==========
+            {
+                "name": "if_then_else",
+                "description": "IF-THEN-ELSE логика. Используй для 'если условие то X иначе Y', 'IF-THEN-ELSE'",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "condition_column": {"type": "string"},
+                        "operator": {"type": "string", "enum": ["<", ">", "==", "!=", "<=", ">="]},
+                        "threshold": {"type": ["string", "number"]},
+                        "true_value": {"type": ["string", "number"]},
+                        "false_value": {"type": ["string", "number"]}
+                    },
+                    "required": ["condition_column", "operator", "threshold", "true_value", "false_value"]
+                }
+            },
+
+            {
+                "name": "case_when",
+                "description": "CASE WHEN (множественные условия). Используй для 'когда X то Y, когда Z то W', 'CASE WHEN'",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "conditions": {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "column": {"type": "string"},
+                                    "operator": {"type": "string"},
+                                    "value": {"type": ["string", "number"]},
+                                    "then": {"type": ["string", "number"]}
+                                }
+                            }
+                        }
+                    },
+                    "required": ["conditions"]
+                }
+            },
+
+            {
+                "name": "coalesce",
+                "description": "Первое непустое значение из нескольких колонок. Используй для 'первое непустое', 'COALESCE'",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "columns": {"type": "array", "items": {"type": "string"}}
+                    },
+                    "required": ["columns"]
+                }
+            },
+
+            # ========== AGGREGATION ADVANCED (NEW) ==========
+            {
+                "name": "count_distinct",
+                "description": "Количество уникальных значений. Используй для 'сколько уникальных', 'COUNT DISTINCT'",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "column": {"type": "string"}
+                    },
+                    "required": ["column"]
+                }
+            },
+
+            {
+                "name": "first_value",
+                "description": "Первое значение (глобально или по группам). Используй для 'первое значение', 'FIRST_VALUE'",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "column": {"type": "string"},
+                        "group_by": {"type": "string", "description": "Группировать по колонке (опционально)"}
+                    },
+                    "required": ["column"]
+                }
+            },
+
+            {
+                "name": "last_value",
+                "description": "Последнее значение (глобально или по группам). Используй для 'последнее значение', 'LAST_VALUE'",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "column": {"type": "string"},
+                        "group_by": {"type": "string", "description": "Группировать по колонке (опционально)"}
+                    },
+                    "required": ["column"]
+                }
+            },
         ]
 
     def execute(self, func_name: str, df: pd.DataFrame, **params) -> Dict[str, Any]:
