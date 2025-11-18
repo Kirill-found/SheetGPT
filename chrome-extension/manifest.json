@@ -1,0 +1,54 @@
+{
+  "manifest_version": 3,
+  "name": "SheetGPT AI Assistant",
+  "version": "1.0.0",
+  "description": "AI-powered assistant for Google Sheets - analyze data, create tables, generate insights",
+  "permissions": [
+    "activeTab",
+    "storage",
+    "scripting",
+    "identity"
+  ],
+  "host_permissions": [
+    "https://docs.google.com/spreadsheets/*",
+    "https://sheetgpt-production.up.railway.app/*",
+    "https://sheets.googleapis.com/*"
+  ],
+  "oauth2": {
+    "client_id": "25268218961-ti227f8o4ch5damku3cn0543c8jogh3o.apps.googleusercontent.com",
+    "scopes": [
+      "https://www.googleapis.com/auth/spreadsheets"
+    ]
+  },
+  "background": {
+    "service_worker": "src/background.js"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://docs.google.com/spreadsheets/*"],
+      "js": ["src/content.js"],
+      "css": ["styles/sidebar.css"],
+      "run_at": "document_idle"
+    }
+  ],
+  "action": {
+    "default_popup": "src/popup.html",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "options_page": "test_oauth.html",
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "web_accessible_resources": [
+    {
+      "resources": ["src/sidebar.html", "src/sidebar.js"],
+      "matches": ["https://docs.google.com/*"]
+    }
+  ]
+}

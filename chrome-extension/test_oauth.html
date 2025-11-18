@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test OAuth</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        button {
+            padding: 10px 20px;
+            font-size: 16px;
+            cursor: pointer;
+            margin: 10px 0;
+        }
+        .success { color: green; }
+        .error { color: red; }
+        pre {
+            background: #f5f5f5;
+            padding: 10px;
+            border-radius: 5px;
+            overflow-x: auto;
+        }
+    </style>
+</head>
+<body>
+    <h1>SheetGPT OAuth Test</h1>
+
+    <h2>Test 1: Get Auth Token</h2>
+    <button onclick="testGetToken()">Test OAuth Token</button>
+    <div id="token-result"></div>
+
+    <h2>Test 2: Check Manifest</h2>
+    <button onclick="checkManifest()">Check manifest.json</button>
+    <div id="manifest-result"></div>
+
+    <h2>Instructions</h2>
+    <ol>
+        <li>Click "Test OAuth Token"</li>
+        <li>If you see OAuth popup → approve it</li>
+        <li>If you see "Token OK" → OAuth works!</li>
+        <li>If you see error → OAuth needs configuration</li>
+    </ol>
+
+    <h3>If OAuth doesn't work:</h3>
+    <ol>
+        <li>Open <a href="https://console.cloud.google.com/apis/credentials" target="_blank">Google Cloud Console</a></li>
+        <li>Find OAuth Client ID: <code>25268218961-ti227f8o4ch5damku3cn0543c8jogh3o</code></li>
+        <li>Add Authorized JavaScript origins: <code>chrome-extension://[YOUR_EXTENSION_ID]</code></li>
+        <li>Publish OAuth consent screen</li>
+    </ol>
+
+    <script>
+        async function testGetToken() {
+            const result = document.getElementById('token-result');
+            result.innerHTML = '⏳ Testing...';
+
+            try {
+                const token = await new Promise((resolve, reject) => {
+                    chrome.identity.getAuthToken({ interactive: true }, (token) => {
+                        if (chrome.runtime.lastError) {
+                            reject(chrome.runtime.lastError);
+                        } else {
+                            resolve(token);
+                        }
+                    });
+                });
+
+                result.innerHTML = `
+                    <p class="success">✅ Token OK!</p>
+                    <p>Token (first 20 chars): <code>${token.substring(0, 20)}...</code></p>
+                    <p><strong>OAuth works! The problem is elsewhere.</strong></p>
+                `;
+            } catch (error) {
+                result.innerHTML = `
+                    <p class="error">❌ OAuth Error:</p>
+                    <pre>${error.message}</pre>
+                    <p><strong>OAuth needs configuration in Google Cloud Console</strong></p>
+                `;
+            }
+        }
+
+        function checkManifest() {
+            const result = document.getElementById('manifest-result');
+            const manifest = chrome.runtime.getManifest();
+
+            result.innerHTML = `
+                <h3>OAuth Configuration:</h3>
+                <pre>${JSON.stringify(manifest.oauth2, null, 2)}</pre>
+
+                <h3>Permissions:</h3>
+                <pre>${JSON.stringify(manifest.permissions, null, 2)}</pre>
+
+                <h3>Extension ID:</h3>
+                <p><code>${chrome.runtime.id}</code></p>
+                <p>Add this to Google Cloud Console Authorized origins:</p>
+                <p><code>chrome-extension://${chrome.runtime.id}</code></p>
+            `;
+        }
+    </script>
+</body>
+</html>
