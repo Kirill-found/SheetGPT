@@ -257,23 +257,44 @@ function readSheetDataFromDOM() {
   console.log('[SheetGPT] Reading data from DOM...');
 
   try {
-    // Find the grid container
-    const grid = document.querySelector('.grid-container, .waffle');
-    if (!grid) {
-      console.warn('[SheetGPT] Grid container not found');
-      return null;
+    // Try multiple selector strategies for different Google Sheets versions
+    const selectorStrategies = [
+      // Strategy 1: ARIA roles (most reliable)
+      { rows: '[role="grid"] [role="row"]', cells: '[role="gridcell"]' },
+      // Strategy 2: Table structure
+      { rows: '.waffle tbody tr, table.waffle tr', cells: 'td' },
+      // Strategy 3: Grid classes
+      { rows: '.grid-row, .ritz .grid-row', cells: '.cell, [role="gridcell"]' },
+      // Strategy 4: Generic rows in any table
+      { rows: 'tbody tr, table tr', cells: 'td, [role="gridcell"]' },
+      // Strategy 5: Role-based only
+      { rows: '[role="row"]', cells: '[role="gridcell"]' }
+    ];
+
+    let rows = [];
+    let cellSelector = null;
+
+    // Try each strategy until we find rows
+    for (const strategy of selectorStrategies) {
+      const foundRows = document.querySelectorAll(strategy.rows);
+      console.log(`[SheetGPT] Trying selector "${strategy.rows}" → found ${foundRows.length} rows`);
+
+      if (foundRows.length > 0) {
+        rows = Array.from(foundRows);
+        cellSelector = strategy.cells;
+        console.log(`[SheetGPT] ✅ Using strategy: rows="${strategy.rows}", cells="${strategy.cells}"`);
+        break;
+      }
     }
 
-    // Read all visible rows
-    const rows = Array.from(document.querySelectorAll('.grid-row, tr.row'));
     if (rows.length === 0) {
-      console.warn('[SheetGPT] No rows found');
+      console.warn('[SheetGPT] No rows found with any selector strategy');
       return null;
     }
 
     const data = [];
     for (const row of rows.slice(0, 1000)) { // Limit to 1000 rows
-      const cells = Array.from(row.querySelectorAll('.cell, td'));
+      const cells = Array.from(row.querySelectorAll(cellSelector));
       if (cells.length > 0) {
         const rowData = cells.map(cell => cell.textContent.trim());
         if (rowData.some(val => val)) { // Skip empty rows
@@ -626,44 +647,52 @@ function highlightRowsInDOM(rowIndices, colorName) {
 
     let highlightedCount = 0;
 
-    // Find all rows in the sheet
-    // Google Sheets uses different selectors depending on the view
-    const rowSelectors = [
-      '.grid-row',           // Standard view
-      'tr.row',              // Alternative view
-      '[role="row"]'         // Accessibility role
+    // Try multiple selector strategies (same as readSheetDataFromDOM)
+    const selectorStrategies = [
+      { rows: '[role="grid"] [role="row"]', cells: '[role="gridcell"]' },
+      { rows: '.waffle tbody tr, table.waffle tr', cells: 'td' },
+      { rows: '.grid-row, .ritz .grid-row', cells: '.cell, [role="gridcell"]' },
+      { rows: 'tbody tr, table tr', cells: 'td, [role="gridcell"]' },
+      { rows: '[role="row"]', cells: '[role="gridcell"]' }
     ];
 
-    for (const selector of rowSelectors) {
-      const allRows = document.querySelectorAll(selector);
+    let allRows = [];
+    let cellSelector = null;
 
-      if (allRows.length > 0) {
-        console.log(`[SheetGPT] Found ${allRows.length} rows using selector: ${selector}`);
+    // Find rows using any working strategy
+    for (const strategy of selectorStrategies) {
+      const foundRows = document.querySelectorAll(strategy.rows);
+      console.log(`[SheetGPT] Highlight: trying "${strategy.rows}" → ${foundRows.length} rows`);
 
-        // Highlight specified rows (rowIndices are 1-based, where 1=headers, 2=first data row)
-        rowIndices.forEach(rowIndex => {
-          // Convert to 0-based index for DOM
-          const domIndex = rowIndex - 1;
-
-          if (domIndex >= 0 && domIndex < allRows.length) {
-            const row = allRows[domIndex];
-
-            // Apply background color to all cells in the row
-            const cells = row.querySelectorAll('[role="gridcell"], .cell, td');
-            cells.forEach(cell => {
-              cell.style.backgroundColor = bgColor;
-            });
-
-            highlightedCount++;
-            console.log(`[SheetGPT] ✅ Highlighted row ${rowIndex} (DOM index ${domIndex})`);
-          }
-        });
-
-        // If we successfully highlighted rows, break the loop
-        if (highlightedCount > 0) {
-          break;
-        }
+      if (foundRows.length > 0) {
+        allRows = Array.from(foundRows);
+        cellSelector = strategy.cells;
+        console.log(`[SheetGPT] ✅ Highlight using: rows="${strategy.rows}", cells="${strategy.cells}"`);
+        break;
       }
+    }
+
+    if (allRows.length > 0) {
+      // Highlight specified rows (rowIndices are 1-based, where 1=headers, 2=first data row)
+      rowIndices.forEach(rowIndex => {
+        // Convert to 0-based index for DOM
+        const domIndex = rowIndex - 1;
+
+        if (domIndex >= 0 && domIndex < allRows.length) {
+          const row = allRows[domIndex];
+
+          // Apply background color to all cells in the row
+          const cells = row.querySelectorAll(cellSelector);
+          console.log(`[SheetGPT] Row ${rowIndex}: found ${cells.length} cells`);
+
+          cells.forEach(cell => {
+            cell.style.backgroundColor = bgColor;
+          });
+
+          highlightedCount++;
+          console.log(`[SheetGPT] ✅ Highlighted row ${rowIndex} (DOM index ${domIndex})`);
+        }
+      });
     }
 
     if (highlightedCount === 0) {
