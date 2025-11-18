@@ -10,7 +10,7 @@ asyncpg==0.29.0
 alembic==1.13.1
 
 # AI модели
-openai==1.10.0              # GPT-4o for production
+openai==1.109.1             # GPT-4o for production (compatible with httpx>=0.28.1)
 
 # Аутентификация
 python-jose[cryptography]==3.3.0
