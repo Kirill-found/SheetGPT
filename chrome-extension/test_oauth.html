@@ -29,11 +29,11 @@
     <h1>SheetGPT OAuth Test</h1>
 
     <h2>Test 1: Get Auth Token</h2>
-    <button onclick="testGetToken()">Test OAuth Token</button>
+    <button id="test-token-btn">Test OAuth Token</button>
     <div id="token-result"></div>
 
     <h2>Test 2: Check Manifest</h2>
-    <button onclick="checkManifest()">Check manifest.json</button>
+    <button id="check-manifest-btn">Check manifest.json</button>
     <div id="manifest-result"></div>
 
     <h2>Instructions</h2>
@@ -99,6 +99,12 @@
                 <p><code>chrome-extension://${chrome.runtime.id}</code></p>
             `;
         }
+
+        // Add event listeners when DOM is loaded
+        document.addEventListener('DOMContentLoaded', () => {
+            document.getElementById('test-token-btn').addEventListener('click', testGetToken);
+            document.getElementById('check-manifest-btn').addEventListener('click', checkManifest);
+        });
     </script>
 </body>
 </html>
