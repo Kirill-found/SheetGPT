@@ -820,7 +820,83 @@ Generate CORRECTED code that will work. Return ONLY the Python code."""
             # Если не получилось - оставляем null
             pass
 
+        # v7.2.5: Добавляем формулу для merge операций
+        formula = self._generate_formula_for_merge(query, original_df, structured_data)
+        if formula:
+            response["formula"] = formula
+            print(f"[FORMULA] Generated Google Sheets formula: {formula}")
+
         return response
+
+    def _generate_formula_for_merge(self, query: str, original_df: Optional[pd.DataFrame], structured_data: Optional[Dict]) -> Optional[str]:
+        """
+        Генерирует Google Sheets формулу для merge операций (v7.2.5)
+        Например: для "объедини ФИО" вернёт "=A2&\" \"&B2&\" \"&C2"
+        """
+        if not structured_data or original_df is None:
+            return None
+
+        # Проверяем что это merge операция
+        if structured_data.get("operation_type") != "merge":
+            return None
+
+        merge_keywords = ['объедин', 'соедин', 'concat', 'merge', 'фио']
+        query_lower = query.lower()
+        if not any(kw in query_lower for kw in merge_keywords):
+            return None
+
+        try:
+            # Получаем колонки из structured_data
+            headers = structured_data.get("headers", [])
+            if not headers or len(headers) <= 1:
+                return None
+
+            # Если оригинальный df существует, то новая колонка - это последняя
+            # Остальные - исходные колонки для объединения
+            num_original_cols = len(original_df.columns) if original_df is not None else 0
+
+            # Определяем какие колонки нужно объединить
+            # Для "объедини ФИО": колонки Фамилия, Имя, Отчество (первые 3)
+            # Формула должна быть =A2&" "&B2&" "&C2
+
+            if num_original_cols > 0 and num_original_cols < len(headers):
+                # Новая колонка добавлена в конец, используем первые num_original_cols колонок
+                cols_to_merge = list(range(num_original_cols))
+            else:
+                # Fallback: используем все колонки кроме последней
+                cols_to_merge = list(range(len(headers) - 1))
+
+            if not cols_to_merge:
+                return None
+
+            # Генерируем формулу типа =A2&" "&B2&" "&C2
+            # A=0, B=1, C=2, ...
+            def col_to_letter(col_idx):
+                """Конвертирует индекс колонки (0-based) в букву (A, B, C, ...)"""
+                result = ""
+                col_idx += 1  # Convert to 1-based
+                while col_idx > 0:
+                    col_idx -= 1
+                    result = chr(col_idx % 26 + ord('A')) + result
+                    col_idx //= 26
+                return result
+
+            # Создаём части формулы
+            formula_parts = []
+            for col_idx in cols_to_merge:
+                col_letter = col_to_letter(col_idx)
+                formula_parts.append(f"{col_letter}2")
+
+            # Объединяем через &" "&
+            formula = "=" + "&\" \"&".join(formula_parts)
+
+            return formula
+
+        except Exception as e:
+            print(f"[ERROR] Failed to generate formula: {e}")
+            import traceback
+            traceback.print_exc()
+            return None
 
     def _generate_structured_data_if_needed(self, query: str, result_dict: Any, summary: str, original_df: Optional[pd.DataFrame] = None) -> Optional[Dict[str, Any]]:
         """

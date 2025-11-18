@@ -1,12 +1,12 @@
 FROM python:3.11-slim
 
 # CRITICAL: Change this on EVERY deployment to force rebuild
-ARG CACHEBUST=20251117-2325-MERGE-WITH-ORIGINAL-v7.2.4
-RUN echo "CACHE BUST: $CACHEBUST - Building v7.2.4 - merge returns original+new columns"
-# v7.2.4: Fix merge to return ALL columns (original + new), not just new column
+ARG CACHEBUST=20251118-0102-FORMULA-GENERATION-v7.2.5
+RUN echo "CACHE BUST: $CACHEBUST - Building v7.2.5 - Add Google Sheets formula for merge operations"
+# v7.2.5: Add formula field to response for merge operations (e.g., =A2&" "&B2&" "&C2)
 
-LABEL version="7.2.4"
-LABEL description="SheetGPT API v7.2.4 - Merge returns original columns + new column in same table"
+LABEL version="7.2.5"
+LABEL description="SheetGPT API v7.2.5 - Returns Google Sheets formula for merge operations"
 
 WORKDIR /app
 
@@ -16,7 +16,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 # CACHE BUST: Force copy layer to rebuild
 # CRITICAL: This RUN must be AFTER requirements but BEFORE COPY to break Docker cache
-RUN echo "CACHEBUST: 20251117-2325-v7.2.4-MERGE-WITH-ORIGINAL - $(date)"
+RUN echo "CACHEBUST: 20251118-0102-v7.2.5-FORMULA-GENERATION - $(date)"
 
 # Copy application
 COPY backend/ .
