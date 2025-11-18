@@ -1443,6 +1443,78 @@ class FunctionRegistry:
                 result_df[col] = result_df[col].str.strip()
         return result_df
 
+    # Text Operations Advanced (NEW)
+    def extract_substring(self, df: pd.DataFrame, column: str, start: int, length: Optional[int] = None) -> pd.Series:
+        """Извлечь подстроку"""
+        column = self._find_column(df, column)
+        if length:
+            return df[column].astype(str).str[start:start+length]
+        return df[column].astype(str).str[start:]
+
+    def split_column(self, df: pd.DataFrame, column: str, delimiter: str = " ", max_split: int = -1) -> pd.DataFrame:
+        """Разбить колонку на несколько"""
+        column = self._find_column(df, column)
+        result_df = df.copy()
+        split_df = result_df[column].astype(str).str.split(delimiter, n=max_split, expand=True)
+        for i, col in enumerate(split_df.columns):
+            result_df[f"{column}_part_{i+1}"] = split_df[col]
+        return result_df
+
+    def uppercase(self, df: pd.DataFrame, column: str) -> pd.Series:
+        """Верхний регистр"""
+        column = self._find_column(df, column)
+        return df[column].astype(str).str.upper()
+
+    def lowercase(self, df: pd.DataFrame, column: str) -> pd.Series:
+        """Нижний регистр"""
+        column = self._find_column(df, column)
+        return df[column].astype(str).str.lower()
+
+    def capitalize(self, df: pd.DataFrame, column: str) -> pd.Series:
+        """Первая буква заглавная"""
+        column = self._find_column(df, column)
+        return df[column].astype(str).str.capitalize()
+
+    def title_case(self, df: pd.DataFrame, column: str) -> pd.Series:
+        """Title Case"""
+        column = self._find_column(df, column)
+        return df[column].astype(str).str.title()
+
+    def text_length(self, df: pd.DataFrame, column: str) -> pd.Series:
+        """Длина строки"""
+        column = self._find_column(df, column)
+        return df[column].astype(str).str.len()
+
+    def contains_count(self, df: pd.DataFrame, column: str, substring: str) -> pd.Series:
+        """Сколько раз содержится подстрока"""
+        column = self._find_column(df, column)
+        return df[column].astype(str).str.count(substring)
+
+    def extract_numbers(self, df: pd.DataFrame, column: str) -> pd.Series:
+        """Извлечь числа из текста"""
+        column = self._find_column(df, column)
+        return df[column].astype(str).str.extract(r'(\d+)', expand=False)
+
+    def extract_emails(self, df: pd.DataFrame, column: str) -> pd.Series:
+        """Извлечь email"""
+        column = self._find_column(df, column)
+        email_pattern = r'[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}'
+        return df[column].astype(str).str.extract(f'({email_pattern})', expand=False)
+
+    def remove_special_chars(self, df: pd.DataFrame, column: str) -> pd.Series:
+        """Удалить спецсимволы"""
+        column = self._find_column(df, column)
+        return df[column].astype(str).str.replace(r'[^a-zA-Z0-9\s]', '', regex=True)
+
+    def pad_string(self, df: pd.DataFrame, column: str, width: int, fillchar: str = " ", side: str = "left") -> pd.Series:
+        """Дополнить строку до длины"""
+        column = self._find_column(df, column)
+        if side == "left":
+            return df[column].astype(str).str.pad(width, side='left', fillchar=fillchar)
+        elif side == "right":
+            return df[column].astype(str).str.pad(width, side='right', fillchar=fillchar)
+        return df[column].astype(str).str.center(width, fillchar=fillchar)
+
     # Работа с датами
     def parse_dates(self, df: pd.DataFrame, column: str, format: Optional[str] = None) -> pd.DataFrame:
         """Парсинг дат"""
@@ -1467,6 +1539,213 @@ class FunctionRegistry:
         """Фильтрация по диапазону дат"""
         mask = (df[date_column] >= start_date) & (df[date_column] <= end_date)
         return df[mask]
+
+    # Date Operations Advanced (NEW)
+    def extract_year(self, df: pd.DataFrame, column: str) -> pd.Series:
+        """Извлечь год"""
+        column = self._find_column(df, column)
+        return pd.to_datetime(df[column]).dt.year
+
+    def extract_month(self, df: pd.DataFrame, column: str) -> pd.Series:
+        """Извлечь месяц"""
+        column = self._find_column(df, column)
+        return pd.to_datetime(df[column]).dt.month
+
+    def extract_day(self, df: pd.DataFrame, column: str) -> pd.Series:
+        """Извлечь день"""
+        column = self._find_column(df, column)
+        return pd.to_datetime(df[column]).dt.day
+
+    def extract_weekday(self, df: pd.DataFrame, column: str) -> pd.Series:
+        """День недели"""
+        column = self._find_column(df, column)
+        return pd.to_datetime(df[column]).dt.day_name()
+
+    def extract_quarter(self, df: pd.DataFrame, column: str) -> pd.Series:
+        """Квартал"""
+        column = self._find_column(df, column)
+        return pd.to_datetime(df[column]).dt.quarter
+
+    def add_days(self, df: pd.DataFrame, column: str, days: int) -> pd.Series:
+        """Добавить дни"""
+        column = self._find_column(df, column)
+        return pd.to_datetime(df[column]) + pd.Timedelta(days=days)
+
+    def subtract_days(self, df: pd.DataFrame, column: str, days: int) -> pd.Series:
+        """Вычесть дни"""
+        column = self._find_column(df, column)
+        return pd.to_datetime(df[column]) - pd.Timedelta(days=days)
+
+    def start_of_month(self, df: pd.DataFrame, column: str) -> pd.Series:
+        """Начало месяца"""
+        column = self._find_column(df, column)
+        dates = pd.to_datetime(df[column])
+        return dates - pd.to_timedelta(dates.dt.day - 1, unit='D')
+
+    def end_of_month(self, df: pd.DataFrame, column: str) -> pd.Series:
+        """Конец месяца"""
+        column = self._find_column(df, column)
+        dates = pd.to_datetime(df[column])
+        return dates + pd.offsets.MonthEnd(0)
+
+    def format_date(self, df: pd.DataFrame, column: str, format_string: str = "%Y-%m-%d") -> pd.Series:
+        """Форматировать дату"""
+        column = self._find_column(df, column)
+        return pd.to_datetime(df[column]).dt.strftime(format_string)
+
+    # Statistical Operations (NEW)
+    def calculate_skewness(self, df: pd.DataFrame, column: str) -> float:
+        """Асимметрия"""
+        column = self._find_column(df, column)
+        return df[column].skew()
+
+    def calculate_kurtosis(self, df: pd.DataFrame, column: str) -> float:
+        """Эксцесс"""
+        column = self._find_column(df, column)
+        return df[column].kurt()
+
+    def calculate_iqr(self, df: pd.DataFrame, column: str) -> float:
+        """Межквартильный размах"""
+        column = self._find_column(df, column)
+        Q1 = df[column].quantile(0.25)
+        Q3 = df[column].quantile(0.75)
+        return Q3 - Q1
+
+    def calculate_z_score(self, df: pd.DataFrame, column: str) -> pd.Series:
+        """Z-score"""
+        column = self._find_column(df, column)
+        mean = df[column].mean()
+        std = df[column].std()
+        return (df[column] - mean) / std
+
+    def detect_outliers(self, df: pd.DataFrame, column: str, method: str = "iqr", threshold: float = 1.5) -> pd.Series:
+        """Обнаружение выбросов (возвращает boolean Series)"""
+        column = self._find_column(df, column)
+        if method == "iqr":
+            Q1 = df[column].quantile(0.25)
+            Q3 = df[column].quantile(0.75)
+            IQR = Q3 - Q1
+            lower_bound = Q1 - threshold * IQR
+            upper_bound = Q3 + threshold * IQR
+            return (df[column] < lower_bound) | (df[column] > upper_bound)
+        elif method == "zscore":
+            z_scores = np.abs((df[column] - df[column].mean()) / df[column].std())
+            return z_scores > threshold
+        return pd.Series([False] * len(df))
+
+    def calculate_quantile(self, df: pd.DataFrame, column: str, q: float) -> float:
+        """Квантиль"""
+        column = self._find_column(df, column)
+        return df[column].quantile(q)
+
+    def calculate_covariance(self, df: pd.DataFrame, column1: str, column2: str) -> float:
+        """Ковариация"""
+        column1 = self._find_column(df, column1)
+        column2 = self._find_column(df, column2)
+        return df[column1].cov(df[column2])
+
+    def calculate_mad(self, df: pd.DataFrame, column: str) -> float:
+        """Среднее абсолютное отклонение"""
+        column = self._find_column(df, column)
+        return df[column].mad()
+
+    # Window Functions (NEW)
+    def lag_column(self, df: pd.DataFrame, column: str, periods: int = 1) -> pd.Series:
+        """Предыдущее значение (сдвиг вниз)"""
+        column = self._find_column(df, column)
+        return df[column].shift(periods)
+
+    def lead_column(self, df: pd.DataFrame, column: str, periods: int = 1) -> pd.Series:
+        """Следующее значение (сдвиг вверх)"""
+        column = self._find_column(df, column)
+        return df[column].shift(-periods)
+
+    def cumulative_max(self, df: pd.DataFrame, column: str) -> pd.Series:
+        """Накопительный максимум"""
+        column = self._find_column(df, column)
+        return df[column].cummax()
+
+    def cumulative_min(self, df: pd.DataFrame, column: str) -> pd.Series:
+        """Накопительный минимум"""
+        column = self._find_column(df, column)
+        return df[column].cummin()
+
+    def moving_average(self, df: pd.DataFrame, column: str, window: int) -> pd.Series:
+        """Скользящее среднее"""
+        column = self._find_column(df, column)
+        return df[column].rolling(window=window).mean()
+
+    def ewma(self, df: pd.DataFrame, column: str, span: int = 10) -> pd.Series:
+        """Экспоненциальное скользящее среднее"""
+        column = self._find_column(df, column)
+        return df[column].ewm(span=span).mean()
+
+    # Conditional Logic (NEW)
+    def if_then_else(self, df: pd.DataFrame, condition_column: str, operator: str, threshold: Any,
+                     true_value: Any, false_value: Any) -> pd.Series:
+        """IF-THEN-ELSE логика"""
+        condition_column = self._find_column(df, condition_column)
+        ops = {
+            '<': lambda x, y: x < y,
+            '>': lambda x, y: x > y,
+            '==': lambda x, y: x == y,
+            '!=': lambda x, y: x != y,
+            '<=': lambda x, y: x <= y,
+            '>=': lambda x, y: x >= y,
+        }
+        mask = ops[operator](df[condition_column], threshold)
+        return mask.map({True: true_value, False: false_value})
+
+    def case_when(self, df: pd.DataFrame, conditions: List[Dict]) -> pd.Series:
+        """CASE WHEN (множественные условия)"""
+        result = pd.Series([None] * len(df), index=df.index)
+        for cond in conditions:
+            column = self._find_column(df, cond["column"])
+            operator = cond["operator"]
+            value = cond["value"]
+            then_value = cond["then"]
+            ops = {
+                '<': lambda x, y: x < y,
+                '>': lambda x, y: x > y,
+                '==': lambda x, y: x == y,
+                '!=': lambda x, y: x != y,
+            }
+            mask = ops[operator](df[column], value)
+            result[mask] = then_value
+        return result
+
+    def coalesce(self, df: pd.DataFrame, columns: List[str]) -> pd.Series:
+        """Первое непустое значение"""
+        result = None
+        for col in columns:
+            col_name = self._find_column(df, col)
+            if result is None:
+                result = df[col_name]
+            else:
+                result = result.fillna(df[col_name])
+        return result
+
+    # Aggregation Advanced (NEW)
+    def count_distinct(self, df: pd.DataFrame, column: str) -> int:
+        """Количество уникальных"""
+        column = self._find_column(df, column)
+        return int(df[column].nunique())
+
+    def first_value(self, df: pd.DataFrame, column: str, group_by: Optional[str] = None) -> Any:
+        """Первое значение"""
+        column = self._find_column(df, column)
+        if group_by:
+            group_by = self._find_column(df, group_by)
+            return df.groupby(group_by)[column].first()
+        return df[column].iloc[0] if len(df) > 0 else None
+
+    def last_value(self, df: pd.DataFrame, column: str, group_by: Optional[str] = None) -> Any:
+        """Последнее значение"""
+        column = self._find_column(df, column)
+        if group_by:
+            group_by = self._find_column(df, group_by)
+            return df.groupby(group_by)[column].last()
+        return df[column].iloc[-1] if len(df) > 0 else None
 
     # Продвинутые операции
     def vlookup(self, df: pd.DataFrame, lookup_value: Union[str, int, float], lookup_column: str, return_column: str) -> Any:
