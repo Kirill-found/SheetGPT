@@ -355,41 +355,44 @@ async function getActiveSheetData() {
   console.log('[SheetGPT] Getting active sheet data...');
 
   try {
-    // Используем Sheets API напрямую
-    const response = await chrome.runtime.sendMessage({
+    // ИСПРАВЛЕНИЕ: Пробуем Sheets API с коротким таймаутом, затем фоллбек на DOM
+    console.log('[SheetGPT] Trying Sheets API first...');
+
+    const apiPromise = chrome.runtime.sendMessage({
       action: 'GET_SHEET_DATA'
     });
 
-    if (!response.success) {
-      console.error('[SheetGPT] ❌ Error getting sheet data:', response.error);
+    // Race between API call and 5-second timeout
+    const timeoutPromise = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error('Sheets API timeout')), 5000)
+    );
 
-      // Если ошибка авторизации - бросаем исключение
-      if (response.error && response.error.includes('Auth')) {
-        throw new Error('Требуется авторизация Google Sheets. Пожалуйста, разрешите доступ к таблицам.');
-      }
+    const response = await Promise.race([apiPromise, timeoutPromise]);
 
-      // Для остальных ошибок возвращаем пустые данные (для генерации таблиц)
-      console.warn('[SheetGPT] ⚠️ Returning empty data - will trigger AI table generation');
-      return { headers: [], data: [] };
+    if (response && response.success) {
+      console.log('[SheetGPT] ✅ Got data from Sheets API:', response.result);
+      return response.result;
     }
 
-    console.log('[SheetGPT] ✅ Got sheet data:', response.result);
+    // If API returned error, fall through to DOM reading
+    console.warn('[SheetGPT] ⚠️ Sheets API failed, trying DOM reading...');
 
-    // Проверяем что данные действительно есть
-    const hasData = response.result.headers && response.result.headers.length > 0 &&
-                    response.result.data && response.result.data.length > 0;
-
-    if (hasData) {
-      console.log(`[SheetGPT] 📊 Loaded ${response.result.data.length} rows with ${response.result.headers.length} columns`);
-    } else {
-      console.log('[SheetGPT] 📭 Sheet is empty or has no data');
-    }
-
-    return response.result;
   } catch (error) {
-    console.error('[SheetGPT] ❌ Exception getting sheet data:', error);
-    throw error;
+    console.warn('[SheetGPT] ⚠️ Sheets API error:', error.message, '- falling back to DOM reading');
   }
+
+  // ФОЛЛБЕК: Read from DOM
+  console.log('[SheetGPT] 📖 Reading data from DOM...');
+  const domData = readSheetDataFromDOM();
+
+  if (domData && domData.headers && domData.headers.length > 0) {
+    console.log(`[SheetGPT] ✅ Got data from DOM: ${domData.data.length} rows`);
+    return domData;
+  }
+
+  // If both failed, return empty data for AI table generation
+  console.warn('[SheetGPT] ⚠️ Both API and DOM failed, returning empty data');
+  return { headers: [], data: [] };
 }
 
 async function insertTableToSheet(structuredData) {
