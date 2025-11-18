@@ -607,8 +607,95 @@ async function replaceDataInCurrentSheet(structuredData) {
   }
 }
 
+/**
+ * Highlight rows directly in DOM (NO OAuth needed!)
+ */
+function highlightRowsInDOM(rowIndices, colorName) {
+  console.log('[SheetGPT] Highlighting rows in DOM:', rowIndices, 'color:', colorName);
+
+  try {
+    // Convert color name to CSS color
+    const colorMap = {
+      'yellow': '#ffffe0',
+      'green': '#e0ffe0',
+      'red': '#ffe0e0',
+      'blue': '#e0f0ff',
+      'orange': '#ffe5cc'
+    };
+    const bgColor = colorMap[colorName?.toLowerCase()] || colorMap['yellow'];
+
+    let highlightedCount = 0;
+
+    // Find all rows in the sheet
+    // Google Sheets uses different selectors depending on the view
+    const rowSelectors = [
+      '.grid-row',           // Standard view
+      'tr.row',              // Alternative view
+      '[role="row"]'         // Accessibility role
+    ];
+
+    for (const selector of rowSelectors) {
+      const allRows = document.querySelectorAll(selector);
+
+      if (allRows.length > 0) {
+        console.log(`[SheetGPT] Found ${allRows.length} rows using selector: ${selector}`);
+
+        // Highlight specified rows (rowIndices are 1-based, where 1=headers, 2=first data row)
+        rowIndices.forEach(rowIndex => {
+          // Convert to 0-based index for DOM
+          const domIndex = rowIndex - 1;
+
+          if (domIndex >= 0 && domIndex < allRows.length) {
+            const row = allRows[domIndex];
+
+            // Apply background color to all cells in the row
+            const cells = row.querySelectorAll('[role="gridcell"], .cell, td');
+            cells.forEach(cell => {
+              cell.style.backgroundColor = bgColor;
+            });
+
+            highlightedCount++;
+            console.log(`[SheetGPT] ✅ Highlighted row ${rowIndex} (DOM index ${domIndex})`);
+          }
+        });
+
+        // If we successfully highlighted rows, break the loop
+        if (highlightedCount > 0) {
+          break;
+        }
+      }
+    }
+
+    if (highlightedCount === 0) {
+      throw new Error('Не удалось найти строки для подсветки в DOM');
+    }
+
+    console.log(`[SheetGPT] ✅ Total highlighted: ${highlightedCount} rows`);
+    return {
+      success: true,
+      message: `Выделено строк: ${rowIndices.join(', ')}`
+    };
+
+  } catch (error) {
+    console.error('[SheetGPT] Error highlighting rows in DOM:', error);
+    return {
+      success: false,
+      message: `Ошибка выделения: ${error.message}`
+    };
+  }
+}
+
 async function highlightRows(rows, color) {
   console.log('[SheetGPT] Highlight rows:', rows, 'with color', color);
+
+  // НОВЫЙ ПОДХОД: Сначала пробуем подсветить через DOM (без OAuth!)
+  const domResult = highlightRowsInDOM(rows, color);
+  if (domResult.success) {
+    console.log('[SheetGPT] ✅ Rows highlighted via DOM (no OAuth needed)');
+    return domResult;
+  }
+
+  console.log('[SheetGPT] DOM highlight failed, trying Sheets API...');
 
   try {
     // Convert color name to RGB
@@ -617,7 +704,7 @@ async function highlightRows(rows, color) {
     // Get current sheet name (fallback to Sheet1)
     const sheetName = 'Sheet1'; // TODO: Get actual active sheet name
 
-    // Highlight rows
+    // Highlight rows via Sheets API
     const response = await chrome.runtime.sendMessage({
       action: 'HIGHLIGHT_ROWS',
       data: {
@@ -631,7 +718,7 @@ async function highlightRows(rows, color) {
       throw new Error(response.error);
     }
 
-    console.log('[SheetGPT] ✅ Rows highlighted:', response.result);
+    console.log('[SheetGPT] ✅ Rows highlighted via API:', response.result);
     return {
       success: true,
       message: `Выделено строк: ${rows.join(', ')}`
