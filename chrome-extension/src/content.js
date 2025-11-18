@@ -386,8 +386,8 @@ function tryExtractFromContainer(container) {
              div.offsetWidth > 5 &&  // Снижено с 10 до 5
              div.offsetWidth < 800 &&   // Увеличено с 500 до 800
              div.offsetParent !== null &&
-             // Исключаем divs с вложенными divs (это контейнеры, а не ячейки)
-             div.querySelectorAll('div').length === 0;
+             // Исключаем большие контейнеры (много вложенных divs)
+             div.querySelectorAll('div').length < 10;  // Changed from === 0 to < 10
     });
 
     console.log(`[SheetGPT] Filtered to ${cellCandidates.length} cell candidates`);
