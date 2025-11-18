@@ -378,8 +378,6 @@ function tryExtractFromContainer(container) {
       const text = div.textContent?.trim();
 
       // Более мягкие критерии фильтрации
-      const nestedDivs = div.querySelectorAll('div').length;
-
       return text &&
              text.length > 0 &&
              text.length < 300 &&  // Увеличено с 200 до 300
@@ -387,10 +385,8 @@ function tryExtractFromContainer(container) {
              div.offsetHeight < 150 &&  // Увеличено с 100 до 150
              div.offsetWidth > 5 &&  // Снижено с 10 до 5
              div.offsetWidth < 800 &&   // Увеличено с 500 до 800
-             div.offsetParent !== null &&
-             // Исключаем большие контейнеры (много вложенных divs)
-             // Allow up to 50 nested divs (Google Sheets cells are complex)
-             nestedDivs < 50;  // Changed from < 10 to < 50
+             div.offsetParent !== null;
+             // Removed nested divs limit - Google Sheets cells have complex structure
     });
 
     console.log(`[SheetGPT] Filtered to ${cellCandidates.length} cell candidates`);
@@ -484,10 +480,11 @@ function guessColIndex(cell) {
   const row = cell.closest('tr') || cell.closest('[role="row"]') || cell.parentElement;
   if (row) {
     const cells = Array.from(row.querySelectorAll('td, [role="gridcell"], .cell'));
-    return cells.indexOf(cell);
+    const index = cells.indexOf(cell);
+    if (index !== -1) return index;  // Only use if found
   }
 
-  // Пробуем по offsetLeft
+  // FALLBACK: Пробуем по offsetLeft
   const left = cell.offsetLeft;
   return Math.floor(left / 100);  // Примерная ширина колонки
 }
