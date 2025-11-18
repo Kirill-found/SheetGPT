@@ -78,7 +78,7 @@ class AICodeExecutor:
 
             # Шаг 4: Форматируем ответ
             print(f"🔍 DEBUG: Before _format_response, safe_custom_context = {safe_custom_context}")
-            final_response = self._format_response(result, generated_code, query, sheet_data, safe_custom_context)
+            final_response = self._format_response(result, generated_code, query, sheet_data, safe_custom_context, df)
             print(f"🔍 DEBUG: After _format_response, professional_insights = {final_response.get('professional_insights')}")
             return final_response
 
@@ -581,7 +581,7 @@ Generate CORRECTED code that will work. Return ONLY the Python code."""
 
         return '\n'.join(analysis)
 
-    def _format_response(self, exec_result: Dict[str, Any], code: str, query: str, sheet_data: List[List[Any]], custom_context: Optional[str] = None) -> Dict[str, Any]:
+    def _format_response(self, exec_result: Dict[str, Any], code: str, query: str, sheet_data: List[List[Any]], custom_context: Optional[str] = None, original_df: Optional[pd.DataFrame] = None) -> Dict[str, Any]:
         """
         Форматирует финальный ответ
         С опциональными профессиональными инсайтами (если custom_context был указан)
@@ -629,7 +629,7 @@ Generate CORRECTED code that will work. Return ONLY the Python code."""
         # Определяем нужна ли таблица/график
         # CRITICAL: Передаём ОРИГИНАЛЬНЫЙ result (может быть DataFrame), а не result_dict!
         # Также передаём original df для merge операций
-        structured_data = self._generate_structured_data_if_needed(query, result, exec_result.get('summary', ''), original_df=df)
+        structured_data = self._generate_structured_data_if_needed(query, result, exec_result.get('summary', ''), original_df=original_df)
 
         # v6.5.6: УЛУЧШЕННАЯ логика для выделения строк с поиском
         highlight_keywords = ['выдели', 'подсвет', 'отметь', 'покаж', 'highlight', 'mark', 'топ', 'лучш', 'худш', 'строк', 'фамили']
