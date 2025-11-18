@@ -355,15 +355,7 @@ async function getActiveSheetData() {
   console.log('[SheetGPT] Getting active sheet data...');
 
   try {
-    // НОВЫЙ ПОДХОД: Сначала пробуем читать из DOM (без OAuth!)
-    const domData = readSheetDataFromDOM();
-    if (domData && domData.headers && domData.headers.length > 0) {
-      console.log('[SheetGPT] ✅ Using DOM data (no OAuth needed)');
-      return domData;
-    }
-
-    // Fallback: Используем Sheets API (если DOM не сработал)
-    console.log('[SheetGPT] DOM read failed, trying Sheets API...');
+    // Используем Sheets API напрямую
     const response = await chrome.runtime.sendMessage({
       action: 'GET_SHEET_DATA'
     });
@@ -396,7 +388,7 @@ async function getActiveSheetData() {
     return response.result;
   } catch (error) {
     console.error('[SheetGPT] ❌ Exception getting sheet data:', error);
-    throw error; // Пробрасываем ошибку дальше вместо возврата пустых данных
+    throw error;
   }
 }
 
@@ -769,15 +761,6 @@ function highlightRowsInDOM(rowIndices, colorName) {
 
 async function highlightRows(rows, color) {
   console.log('[SheetGPT] Highlight rows:', rows, 'with color', color);
-
-  // НОВЫЙ ПОДХОД: Сначала пробуем подсветить через DOM (без OAuth!)
-  const domResult = highlightRowsInDOM(rows, color);
-  if (domResult.success) {
-    console.log('[SheetGPT] ✅ Rows highlighted via DOM (no OAuth needed)');
-    return domResult;
-  }
-
-  console.log('[SheetGPT] DOM highlight failed, trying Sheets API...');
 
   try {
     // Convert color name to RGB
