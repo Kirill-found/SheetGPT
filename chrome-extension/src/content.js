@@ -257,14 +257,22 @@ function readSheetDataFromDOM() {
   console.log('[SheetGPT] Reading data from DOM...');
 
   try {
-    // СТРАТЕГИЯ 1: Найти grid container и работать внутри него
+    // СТРАТЕГИЯ 1: Прямой поиск ячеек Google Sheets по классам .s0-.s100
+    console.log('[SheetGPT] Trying direct cell search by Google Sheets classes...');
+    const directResult = tryDirectCellSearch();
+    if (directResult && validateSheetData(directResult)) {
+      console.log('[SheetGPT] ✅ Success with direct cell search');
+      return directResult;
+    }
+
+    // СТРАТЕГИЯ 2: Найти grid container и работать внутри него
     const gridContainers = [
-      '.grid4-inner-container',
-      '.waffle-background-container',
-      '.waffle',
+      '.waffle',  // Main table container
       'table.waffle',
       '[role="grid"]',
-      '.docs-sheet-container'
+      '.docs-sheet-container',
+      '.grid4-inner-container',
+      '.waffle-background-container'
     ];
 
     for (const containerSelector of gridContainers) {
@@ -281,7 +289,7 @@ function readSheetDataFromDOM() {
       }
     }
 
-    // СТРАТЕГИЯ 2: "Умный" поиск - найти все divs/cells и сгруппировать по координатам
+    // СТРАТЕГИЯ 3: "Умный" поиск - найти все divs/cells и сгруппировать по координатам
     console.log('[SheetGPT] Trying smart extraction by coordinates...');
     const smartResult = trySmartExtraction();
     if (smartResult && validateSheetData(smartResult)) {
@@ -289,7 +297,7 @@ function readSheetDataFromDOM() {
       return smartResult;
     }
 
-    // СТРАТЕГИЯ 3: Старые селекторы как fallback
+    // СТРАТЕГИЯ 4: Старые селекторы как fallback
     console.log('[SheetGPT] Trying legacy selectors...');
     const legacyResult = tryLegacySelectors();
     if (legacyResult && validateSheetData(legacyResult)) {
@@ -304,6 +312,115 @@ function readSheetDataFromDOM() {
     console.error('[SheetGPT] Error reading from DOM:', error);
     return null;
   }
+}
+
+/**
+ * Прямой поиск ячеек Google Sheets по классам .s0-.s100
+ */
+function tryDirectCellSearch() {
+  // Google Sheets использует классы .s0, .s1, .s2, ... для стилизации ячеек
+  // Ищем их напрямую
+  const cells = [];
+
+  // Собираем все ячейки с классами s0-s100
+  for (let i = 0; i <= 100; i++) {
+    const found = document.querySelectorAll(`.s${i}`);
+    cells.push(...Array.from(found));
+  }
+
+  console.log(`[SheetGPT] Found ${cells.length} cells with Google Sheets classes (.s0-.s100)`);
+
+  if (cells.length < 5) return null;
+
+  // DEBUG: Show first few cells
+  console.log('[SheetGPT] First 5 cells:',
+    cells.slice(0, 5).map(c => ({
+      text: c.textContent?.trim().substring(0, 30),
+      class: c.className,
+      top: c.offsetTop,
+      left: c.offsetLeft,
+      height: c.offsetHeight,
+      width: c.offsetWidth
+    }))
+  );
+
+  // Фильтруем: только видимые ячейки с текстом
+  const validCells = cells.filter(cell =>
+    cell.offsetParent !== null &&  // Visible
+    cell.offsetHeight > 0 &&
+    cell.offsetWidth > 0 &&
+    cell.textContent?.trim()
+  );
+
+  console.log(`[SheetGPT] After filtering: ${validCells.length} valid cells`);
+
+  if (validCells.length < 5) return null;
+
+  // Группируем по округленным координатам
+  // Округляем offsetTop и offsetLeft для группировки близких ячеек
+  const COORD_ROUND = 10;  // Округляем до 10px
+
+  const cellsByCoords = new Map();  // Map<string, cell>
+
+  for (const cell of validCells) {
+    // Округляем координаты
+    const roundedTop = Math.round(cell.offsetTop / COORD_ROUND) * COORD_ROUND;
+    const roundedLeft = Math.round(cell.offsetLeft / COORD_ROUND) * COORD_ROUND;
+    const key = `${roundedTop}_${roundedLeft}`;
+
+    // Берем первую ячейку в этой позиции (если дубликаты)
+    if (!cellsByCoords.has(key)) {
+      cellsByCoords.set(key, {
+        cell,
+        roundedTop,
+        roundedLeft,
+        text: cell.textContent.trim()
+      });
+    }
+  }
+
+  console.log(`[SheetGPT] After deduplication: ${cellsByCoords.size} unique positions`);
+
+  // Группируем по строкам (по roundedTop)
+  const rowsMap = new Map();  // Map<roundedTop, Map<roundedLeft, text>>
+
+  for (const cellData of cellsByCoords.values()) {
+    if (!rowsMap.has(cellData.roundedTop)) {
+      rowsMap.set(cellData.roundedTop, new Map());
+    }
+    rowsMap.get(cellData.roundedTop).set(cellData.roundedLeft, cellData.text);
+  }
+
+  console.log(`[SheetGPT] Grouped into ${rowsMap.size} rows`);
+
+  if (rowsMap.size < 2) return null;
+
+  // Сортируем строки по top coordinate
+  const sortedTops = Array.from(rowsMap.keys()).sort((a, b) => a - b);
+
+  // Сортируем колонки (собираем все уникальные left coordinates и сортируем)
+  const allLefts = new Set();
+  for (const row of rowsMap.values()) {
+    for (const left of row.keys()) {
+      allLefts.add(left);
+    }
+  }
+  const sortedLefts = Array.from(allLefts).sort((a, b) => a - b);
+
+  console.log(`[SheetGPT] Found ${sortedLefts.length} columns`);
+
+  // Строим таблицу
+  const data = sortedTops.map(top => {
+    const row = rowsMap.get(top);
+    return sortedLefts.map(left => row.get(left) || '');
+  });
+
+  if (data.length >= 2 && data[0].length >= 1) {
+    console.log(`[SheetGPT] ✅ Extracted ${data.length} rows, ${data[0].length} columns`);
+    return { headers: data[0], data: data.slice(1) };
+  }
+
+  return null;
 }
 
 /**
@@ -373,6 +490,15 @@ function tryExtractFromContainer(container) {
   console.log(`[SheetGPT] Found ${allDivs.length} divs in container`);
 
   if (allDivs.length >= 5) {  // Lowered from 10 to 5
+    // DEBUG: Sample first 10 divs to understand filtering
+    console.log('[SheetGPT] Sampling first 10 divs:', Array.from(allDivs).slice(0, 10).map(d => ({
+      text: d.textContent?.trim().substring(0, 30),
+      textLen: d.textContent?.trim().length,
+      height: d.offsetHeight,
+      width: d.offsetWidth,
+      visible: d.offsetParent !== null
+    })));
+
     const cellCandidates = Array.from(allDivs).filter(div => {
       // Фильтруем: должен иметь текст, небольшой размер (похож на ячейку), видим
       const text = div.textContent?.trim();
