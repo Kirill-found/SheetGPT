@@ -257,86 +257,303 @@ function readSheetDataFromDOM() {
   console.log('[SheetGPT] Reading data from DOM...');
 
   try {
-    // ИСПРАВЛЕНИЕ: Сначала пробуем найти строки глобально, потом фильтруем по контейнеру
-    const selectorStrategies = [
-      // Strategy 1: ARIA roles (most reliable)
-      { rows: '[role="row"]', cells: '[role="gridcell"], [role="columnheader"]' },
-      // Strategy 2: Table structure
-      { rows: 'table.waffle tbody tr', cells: 'td' },
-      // Strategy 3: Grid classes
-      { rows: '.grid-row, .ritz .grid-row', cells: '.cell, [role="gridcell"]' },
-      // Strategy 4: Any table rows
-      { rows: 'table tr', cells: 'td, th' },
-      // Strategy 5: Fallback to any grid-like structure
-      { rows: 'div[role="row"]', cells: 'div[role="gridcell"], div[role="columnheader"]' }
+    // СТРАТЕГИЯ 1: Найти grid container и работать внутри него
+    const gridContainers = [
+      '.grid4-inner-container',
+      '.waffle-background-container',
+      '.waffle',
+      'table.waffle',
+      '[role="grid"]',
+      '.docs-sheet-container'
     ];
 
-    // ИСПРАВЛЕНИЕ: Пробуем каждую стратегию и валидируем данные
-    for (const strategy of selectorStrategies) {
-      const foundRows = document.querySelectorAll(strategy.rows);
-      console.log(`[SheetGPT] Trying global selector "${strategy.rows}" → found ${foundRows.length} rows`);
+    for (const containerSelector of gridContainers) {
+      const container = document.querySelector(containerSelector);
+      if (!container) continue;
 
-      if (foundRows.length < 2) {
-        continue; // Need at least 2 rows (header + data)
+      console.log(`[SheetGPT] Found container: ${containerSelector}`);
+
+      // Попробуем разные способы извлечь данные из контейнера
+      const result = tryExtractFromContainer(container);
+      if (result && validateSheetData(result)) {
+        console.log(`[SheetGPT] ✅ Success with container "${containerSelector}"`);
+        return result;
       }
-
-      const rows = Array.from(foundRows);
-      const cellSelector = strategy.cells;
-
-      // Extract data
-      const data = [];
-      for (const row of rows.slice(0, 1000)) {
-        const cells = Array.from(row.querySelectorAll(cellSelector));
-        if (cells.length > 0) {
-          const rowData = cells.map(cell => cell.textContent.trim());
-          if (rowData.some(val => val)) {
-            data.push(rowData);
-          }
-        }
-      }
-
-      if (data.length < 1) {
-        console.warn(`[SheetGPT] No data found with strategy "${strategy.rows}"`);
-        continue;
-      }
-
-      const headers = data[0];
-
-      // ВАЛИДАЦИЯ: Пропускаем таблицы с подозрительными заголовками
-      const hasInvalidHeaders = headers.some(h => h && h.length > 100);
-      if (hasInvalidHeaders) {
-        console.warn(`[SheetGPT] ⚠️ Headers too long (> 100 chars) for strategy "${strategy.rows}", trying next...`);
-        console.warn('[SheetGPT] Suspicious headers:', headers);
-        continue; // Try next strategy
-      }
-
-      // ВАЛИДАЦИЯ: Проверяем что все строки имеют похожее число колонок
-      const rows_data = data.slice(1);
-      const avgColumns = data.reduce((sum, row) => sum + row.length, 0) / data.length;
-      const hasConsistentColumns = data.every(row => Math.abs(row.length - avgColumns) <= 2);
-
-      if (!hasConsistentColumns) {
-        console.warn(`[SheetGPT] ⚠️ Inconsistent column counts for strategy "${strategy.rows}", trying next...`);
-        continue;
-      }
-
-      // SUCCESS! Found valid data
-      console.log(`[SheetGPT] ✅ Using strategy: rows="${strategy.rows}", cells="${strategy.cells}"`);
-      console.log(`[SheetGPT] ✅ Read from DOM: ${rows_data.length} rows, ${headers.length} columns`);
-      console.log(`[SheetGPT] Headers:`, headers);
-      console.log(`[SheetGPT] First row:`, rows_data[0]);
-      console.log(`[SheetGPT] Second row:`, rows_data[1]);
-
-      return { headers, data: rows_data };
     }
 
-    // If we got here, no strategy worked
-    console.warn('[SheetGPT] No valid data found with any selector strategy');
+    // СТРАТЕГИЯ 2: "Умный" поиск - найти все divs/cells и сгруппировать по координатам
+    console.log('[SheetGPT] Trying smart extraction by coordinates...');
+    const smartResult = trySmartExtraction();
+    if (smartResult && validateSheetData(smartResult)) {
+      console.log('[SheetGPT] ✅ Success with smart extraction');
+      return smartResult;
+    }
+
+    // СТРАТЕГИЯ 3: Старые селекторы как fallback
+    console.log('[SheetGPT] Trying legacy selectors...');
+    const legacyResult = tryLegacySelectors();
+    if (legacyResult && validateSheetData(legacyResult)) {
+      console.log('[SheetGPT] ✅ Success with legacy selectors');
+      return legacyResult;
+    }
+
+    console.warn('[SheetGPT] ❌ All extraction strategies failed');
     return null;
+
   } catch (error) {
     console.error('[SheetGPT] Error reading from DOM:', error);
     return null;
   }
+}
+
+/**
+ * Попытка извлечь данные из конкретного контейнера
+ */
+function tryExtractFromContainer(container) {
+  // Ищем все элементы которые могут быть ячейками
+  const cellSelectors = [
+    '[data-col][data-row]',  // Cells with data attributes
+    '[role="gridcell"]',
+    '.cell',
+    '.s0, .s1, .s2, .s3, .s4, .s5',  // Google Sheets cell classes
+    'td'
+  ];
+
+  for (const cellSelector of cellSelectors) {
+    const cells = container.querySelectorAll(cellSelector);
+    if (cells.length < 5) continue;  // Need reasonable number of cells
+
+    console.log(`[SheetGPT] Found ${cells.length} cells with selector "${cellSelector}"`);
+
+    // Группируем ячейки по строкам
+    const rowsMap = new Map();
+
+    for (const cell of cells) {
+      // Пытаемся найти row index
+      const rowAttr = cell.getAttribute('data-row') ||
+                     cell.parentElement?.getAttribute('data-row') ||
+                     cell.closest('[data-row]')?.getAttribute('data-row');
+
+      const colAttr = cell.getAttribute('data-col') ||
+                     cell.parentElement?.getAttribute('data-col') ||
+                     cell.closest('[data-col]')?.getAttribute('data-col');
+
+      // Если нет data-атрибутов, пробуем по позиции
+      const rowIndex = rowAttr ? parseInt(rowAttr) : guessRowIndex(cell);
+      const colIndex = colAttr ? parseInt(colAttr) : guessColIndex(cell);
+
+      if (rowIndex !== null && colIndex !== null) {
+        if (!rowsMap.has(rowIndex)) {
+          rowsMap.set(rowIndex, new Map());
+        }
+        rowsMap.get(rowIndex).set(colIndex, cell.textContent.trim());
+      }
+    }
+
+    // Конвертируем Map в массив массивов
+    if (rowsMap.size >= 2) {
+      const sortedRows = Array.from(rowsMap.keys()).sort((a, b) => a - b);
+      const data = sortedRows.map(rowIdx => {
+        const row = rowsMap.get(rowIdx);
+        const sortedCols = Array.from(row.keys()).sort((a, b) => a - b);
+        return sortedCols.map(colIdx => row.get(colIdx) || '');
+      });
+
+      if (data.length >= 2 && data[0].length >= 1) {
+        console.log(`[SheetGPT] Extracted ${data.length} rows from container`);
+        return { headers: data[0], data: data.slice(1) };
+      }
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Угадать row index по позиции элемента
+ */
+function guessRowIndex(cell) {
+  // Пробуем найти родительский элемент строки
+  const rowParent = cell.closest('tr') ||
+                   cell.closest('[role="row"]') ||
+                   cell.closest('div[data-row]');
+
+  if (rowParent) {
+    const rowAttr = rowParent.getAttribute('data-row');
+    if (rowAttr) return parseInt(rowAttr);
+
+    // Считаем индекс среди siblings
+    const siblings = Array.from(rowParent.parentElement?.children || []);
+    return siblings.indexOf(rowParent);
+  }
+
+  // Пробуем по offsetTop
+  const top = cell.offsetTop;
+  return Math.floor(top / 21);  // Типичная высота строки ~21px
+}
+
+/**
+ * Угадать col index по позиции элемента
+ */
+function guessColIndex(cell) {
+  const colAttr = cell.getAttribute('data-col') ||
+                 cell.closest('[data-col]')?.getAttribute('data-col');
+  if (colAttr) return parseInt(colAttr);
+
+  // Считаем индекс среди siblings
+  const row = cell.closest('tr') || cell.closest('[role="row"]') || cell.parentElement;
+  if (row) {
+    const cells = Array.from(row.querySelectorAll('td, [role="gridcell"], .cell'));
+    return cells.indexOf(cell);
+  }
+
+  // Пробуем по offsetLeft
+  const left = cell.offsetLeft;
+  return Math.floor(left / 100);  // Примерная ширина колонки
+}
+
+/**
+ * "Умное" извлечение - найти все элементы похожие на ячейки
+ */
+function trySmartExtraction() {
+  // Ищем все элементы с классом содержащим "cell" или "s[0-9]"
+  const allElements = document.querySelectorAll('*');
+  const potentialCells = [];
+
+  for (const el of allElements) {
+    const className = el.className || '';
+    const hasDataAttrs = el.hasAttribute('data-row') || el.hasAttribute('data-col');
+    const isCell = /cell|^s\d+$/i.test(className) || hasDataAttrs;
+
+    if (isCell && el.textContent && el.offsetHeight > 10 && el.offsetWidth > 20) {
+      potentialCells.push(el);
+    }
+  }
+
+  console.log(`[SheetGPT] Smart extraction found ${potentialCells.length} potential cells`);
+
+  if (potentialCells.length < 5) return null;
+
+  // Группируем по координатам
+  const rowsMap = new Map();
+
+  for (const cell of potentialCells) {
+    const rowIdx = guessRowIndex(cell);
+    const colIdx = guessColIndex(cell);
+
+    if (rowIdx !== null && colIdx !== null && rowIdx < 1000 && colIdx < 100) {
+      if (!rowsMap.has(rowIdx)) {
+        rowsMap.set(rowIdx, new Map());
+      }
+      const text = cell.textContent.trim();
+      if (text) {
+        rowsMap.get(rowIdx).set(colIdx, text);
+      }
+    }
+  }
+
+  if (rowsMap.size >= 2) {
+    const sortedRows = Array.from(rowsMap.keys()).sort((a, b) => a - b).slice(0, 1000);
+    const data = sortedRows.map(rowIdx => {
+      const row = rowsMap.get(rowIdx);
+      const maxCol = Math.max(...Array.from(row.keys()));
+      const result = [];
+      for (let i = 0; i <= maxCol; i++) {
+        result.push(row.get(i) || '');
+      }
+      return result;
+    });
+
+    if (data.length >= 2 && data[0].length >= 1) {
+      return { headers: data[0], data: data.slice(1) };
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Старые селекторы как fallback
+ */
+function tryLegacySelectors() {
+  const selectorStrategies = [
+    { rows: '[role="row"]', cells: '[role="gridcell"], [role="columnheader"]' },
+    { rows: 'table.waffle tbody tr', cells: 'td' },
+    { rows: '.grid-row, .ritz .grid-row', cells: '.cell, [role="gridcell"]' },
+    { rows: 'table tr', cells: 'td, th' },
+    { rows: 'div[role="row"]', cells: 'div[role="gridcell"], div[role="columnheader"]' }
+  ];
+
+  for (const strategy of selectorStrategies) {
+    const foundRows = document.querySelectorAll(strategy.rows);
+    if (foundRows.length < 2) continue;
+
+    const data = [];
+    for (const row of Array.from(foundRows).slice(0, 1000)) {
+      const cells = Array.from(row.querySelectorAll(strategy.cells));
+      if (cells.length > 0) {
+        const rowData = cells.map(cell => cell.textContent.trim());
+        if (rowData.some(val => val)) {
+          data.push(rowData);
+        }
+      }
+    }
+
+    if (data.length >= 2 && data[0].length >= 1) {
+      console.log(`[SheetGPT] Legacy selector worked: "${strategy.rows}"`);
+      return { headers: data[0], data: data.slice(1) };
+    }
+  }
+
+  return null;
+}
+
+/**
+ * Валидация извлеченных данных
+ */
+function validateSheetData(result) {
+  if (!result || !result.headers || !result.data) {
+    return false;
+  }
+
+  const { headers, data } = result;
+
+  // Минимальные требования
+  if (headers.length < 1 || data.length < 1) {
+    console.warn('[SheetGPT] ⚠️ Not enough data:', { headers: headers.length, rows: data.length });
+    return false;
+  }
+
+  // Пропускаем таблицы с подозрительно длинными заголовками (UI элементы)
+  const hasInvalidHeaders = headers.some(h => h && h.length > 100);
+  if (hasInvalidHeaders) {
+    console.warn('[SheetGPT] ⚠️ Headers too long (> 100 chars)');
+    return false;
+  }
+
+  // Проверяем консистентность колонок
+  const allRows = [headers, ...data];
+  const avgColumns = allRows.reduce((sum, row) => sum + row.length, 0) / allRows.length;
+  const hasConsistentColumns = allRows.every(row => Math.abs(row.length - avgColumns) <= 3);
+
+  if (!hasConsistentColumns) {
+    console.warn('[SheetGPT] ⚠️ Inconsistent column counts');
+    return false;
+  }
+
+  // Проверяем что есть хоть какие-то непустые данные
+  const hasContent = data.some(row => row.some(cell => cell && cell.length > 0));
+  if (!hasContent) {
+    console.warn('[SheetGPT] ⚠️ No content in data rows');
+    return false;
+  }
+
+  console.log(`[SheetGPT] ✅ Validation passed: ${data.length} rows, ${headers.length} columns`);
+  console.log(`[SheetGPT] Headers:`, headers);
+  console.log(`[SheetGPT] First row:`, data[0]);
+  if (data[1]) console.log(`[SheetGPT] Second row:`, data[1]);
+
+  return true;
 }
 
 async function getActiveSheetData() {

@@ -1,0 +1,259 @@
+/**
+ * SheetGPT Chrome Extension - Sidebar Styles
+ */
+
+.sheetgpt-sidebar {
+  position: fixed;
+  top: 0;
+  right: 0;
+  width: 400px;
+  height: 100vh;
+  background: #ffffff;
+  box-shadow: -2px 0 10px rgba(0, 0, 0, 0.1);
+  z-index: 999999;
+  display: flex;
+  flex-direction: column;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+  transition: transform 0.3s ease;
+}
+
+.sheetgpt-sidebar-collapsed {
+  transform: translateX(100%);
+}
+
+.sheetgpt-sidebar-collapsed .sheetgpt-toggle-btn {
+  transform: translateX(-100%);
+}
+
+/* Toggle button */
+.sheetgpt-sidebar-header {
+  position: absolute;
+  left: -48px;
+  top: 50%;
+  transform: translateY(-50%);
+}
+
+.sheetgpt-toggle-btn {
+  width: 48px;
+  height: 48px;
+  background: #4285f4;
+  border: none;
+  border-radius: 24px 0 0 24px;
+  color: white;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: -2px 2px 8px rgba(0, 0, 0, 0.2);
+  transition: background 0.2s;
+}
+
+.sheetgpt-toggle-btn:hover {
+  background: #3367d6;
+}
+
+/* Header */
+.sheetgpt-header {
+  padding: 16px 20px;
+  border-bottom: 1px solid #e0e0e0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #f8f9fa;
+}
+
+.sheetgpt-header h2 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+  color: #202124;
+}
+
+.sheetgpt-close-btn {
+  background: none;
+  border: none;
+  font-size: 28px;
+  color: #5f6368;
+  cursor: pointer;
+  line-height: 1;
+  padding: 0;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  transition: background 0.2s;
+}
+
+.sheetgpt-close-btn:hover {
+  background: #e8eaed;
+}
+
+/* Chat area */
+.sheetgpt-sidebar-content {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.sheetgpt-chat {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.sheetgpt-message {
+  max-width: 85%;
+  padding: 12px 16px;
+  border-radius: 12px;
+  font-size: 14px;
+  line-height: 1.5;
+  animation: slideIn 0.2s ease;
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.sheetgpt-message-user {
+  align-self: flex-end;
+  background: #4285f4;
+  color: white;
+  border-bottom-right-radius: 4px;
+}
+
+.sheetgpt-message-ai {
+  align-self: flex-start;
+  background: #f1f3f4;
+  color: #202124;
+  border-bottom-left-radius: 4px;
+}
+
+.sheetgpt-message-content ul {
+  margin: 8px 0;
+  padding-left: 20px;
+}
+
+.sheetgpt-message-content li {
+  margin: 4px 0;
+}
+
+.sheetgpt-loading {
+  position: relative;
+}
+
+.sheetgpt-loading::after {
+  content: '';
+  display: inline-block;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: #5f6368;
+  animation: pulse 1.5s infinite;
+  margin-left: 4px;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 0.3;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+/* Insert button */
+.sheetgpt-insert-btn {
+  margin-top: 8px;
+  padding: 8px 16px;
+  background: #34a853;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 500;
+  transition: background 0.2s;
+}
+
+.sheetgpt-insert-btn:hover {
+  background: #2d8e47;
+}
+
+/* Input area */
+.sheetgpt-input-container {
+  padding: 16px;
+  border-top: 1px solid #e0e0e0;
+  display: flex;
+  gap: 8px;
+  background: #ffffff;
+}
+
+.sheetgpt-input {
+  flex: 1;
+  padding: 10px 12px;
+  border: 1px solid #dadce0;
+  border-radius: 8px;
+  font-size: 14px;
+  font-family: inherit;
+  resize: none;
+  outline: none;
+  transition: border-color 0.2s;
+}
+
+.sheetgpt-input:focus {
+  border-color: #4285f4;
+}
+
+.sheetgpt-send-btn {
+  width: 40px;
+  height: 40px;
+  background: #4285f4;
+  border: none;
+  border-radius: 8px;
+  color: white;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s;
+  flex-shrink: 0;
+}
+
+.sheetgpt-send-btn:hover {
+  background: #3367d6;
+}
+
+.sheetgpt-send-btn:disabled {
+  background: #dadce0;
+  cursor: not-allowed;
+}
+
+/* Scrollbar styling */
+.sheetgpt-chat::-webkit-scrollbar {
+  width: 8px;
+}
+
+.sheetgpt-chat::-webkit-scrollbar-track {
+  background: #f1f3f4;
+}
+
+.sheetgpt-chat::-webkit-scrollbar-thumb {
+  background: #dadce0;
+  border-radius: 4px;
+}
+
+.sheetgpt-chat::-webkit-scrollbar-thumb:hover {
+  background: #bdc1c6;
+}
