@@ -87,38 +87,49 @@ async function handleGetSheetData(tabId, tabUrl) {
     throw new Error('Not a valid Google Sheets URL');
   }
 
-  // Try to get sheet name with short timeout, use fallback if fails
-  let sheetName = 'Лист1'; // Russian Google Sheets default
-  try {
-    sheetName = await withTimeout(
-      getActiveSheetName(tabId),
-      2000, // Very short timeout to avoid hanging
-      'Get sheet name'
-    );
-    console.log('[Background] Got sheet name:', sheetName);
-  } catch (error) {
-    console.warn('[Background] Could not get sheet name, using fallback:', sheetName, error.message);
+  // ИСПРАВЛЕНИЕ: НЕ вызываем getActiveSheetName() - он вызывает зависание
+  // Вместо этого пробуем распространенные имена листов по порядку
+  const sheetNamesToTry = [
+    'Лист1',      // Russian default
+    'Sheet1',     // English default
+    'Лист 1',     // Russian with space
+    'Feuille 1',  // French
+    'Hoja 1',     // Spanish
+    'Tabelle1',   // German
+    'Planilha1'   // Portuguese
+  ];
+
+  console.log('[Background] Will try sheet names:', sheetNamesToTry);
+
+  let lastError = null;
+
+  // Try each sheet name until one works
+  for (const sheetName of sheetNamesToTry) {
+    try {
+      console.log(`[Background] Trying sheet name: "${sheetName}"...`);
+      const data = await withTimeout(
+        readSheetData(spreadsheetId, sheetName),
+        8000,
+        `Read sheet data "${sheetName}"`
+      );
+      console.log(`[Background] ✅ Success with "${sheetName}":`, data);
+
+      // Save successful sheet name for later use (e.g., highlighting)
+      await chrome.storage.local.set({
+        [`sheetName_${spreadsheetId}`]: sheetName
+      });
+      console.log(`[Background] 💾 Saved sheet name "${sheetName}" for spreadsheet ${spreadsheetId}`);
+
+      return data;
+    } catch (error) {
+      console.warn(`[Background] ❌ Failed with "${sheetName}":`, error.message);
+      lastError = error;
+      // Continue to next name
+    }
   }
 
-  // Try to read data, fallback to 'Sheet1' if Russian name fails
-  let data;
-  try {
-    data = await withTimeout(
-      readSheetData(spreadsheetId, sheetName),
-      10000,
-      'Read sheet data'
-    );
-  } catch (error) {
-    console.warn(`[Background] Failed with "${sheetName}", trying "Sheet1"...`, error.message);
-    data = await withTimeout(
-      readSheetData(spreadsheetId, 'Sheet1'),
-      10000,
-      'Read sheet data (Sheet1 fallback)'
-    );
-  }
-
-  console.log('[Background] ✅ Got sheet data:', data);
-  return data;
+  // If all names failed, throw the last error
+  throw new Error(`Could not read sheet data. Last error: ${lastError?.message || 'Unknown'}. Tried: ${sheetNamesToTry.join(', ')}`);
 }
 
 /**
@@ -182,7 +193,14 @@ async function handleHighlightRows(tabId, tabUrl, data) {
     throw new Error('Not a valid Google Sheets URL');
   }
 
-  const { sheetName, rowIndices, color } = data;
+  const { rowIndices, color } = data;
+
+  // Get saved sheet name from storage (saved by handleGetSheetData)
+  const storageKey = `sheetName_${spreadsheetId}`;
+  const storageData = await chrome.storage.local.get(storageKey);
+  const sheetName = storageData[storageKey] || 'Лист1'; // Fallback to Russian default
+
+  console.log(`[Background] Using sheet name "${sheetName}" for highlighting`);
 
   // Get sheet ID
   const sheetId = await getSheetIdByName(spreadsheetId, sheetName);
