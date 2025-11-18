@@ -171,7 +171,7 @@ async function handleSendMessage() {
     removeMessage(loadingId);
 
     // Показываем результат
-    displayResult(result);
+    await displayResult(result);
 
   } catch (error) {
     console.error('[SheetGPT] Error:', error);
@@ -203,7 +203,7 @@ function removeMessage(messageId) {
   document.getElementById(messageId)?.remove();
 }
 
-function displayResult(result) {
+async function displayResult(result) {
   let content = `<strong>${result.summary || 'Результат'}</strong>`;
 
   // Добавляем structured_data если есть
@@ -212,12 +212,33 @@ function displayResult(result) {
     content += `<br><button class="sheetgpt-insert-btn" data-result='${JSON.stringify(result)}'>Вставить таблицу</button>`;
   }
 
-  // Добавляем highlight если есть
-  if (result.highlight_rows && result.highlight_rows.length > 0) {
-    content += `<br><br><em>Выделено строк: ${result.highlight_rows.length}</em>`;
-  }
-
+  // Показываем сообщение
   const messageId = addMessage(content, 'ai');
+
+  // ИСПРАВЛЕНИЕ: Фактически вызываем подсветку строк!
+  if (result.highlight_rows && result.highlight_rows.length > 0) {
+    console.log('[SheetGPT] Applying highlight to rows:', result.highlight_rows);
+
+    try {
+      const highlightResult = await highlightRows(
+        result.highlight_rows,
+        result.highlight_color || 'yellow'
+      );
+
+      // Обновляем сообщение с результатом подсветки
+      const message = document.getElementById(messageId);
+      if (message) {
+        const icon = highlightResult.success ? '✅' : '❌';
+        message.innerHTML += `<br><br><em>${icon} ${highlightResult.message}</em>`;
+      }
+    } catch (error) {
+      console.error('[SheetGPT] Highlight error:', error);
+      const message = document.getElementById(messageId);
+      if (message) {
+        message.innerHTML += `<br><br><em>❌ Ошибка выделения: ${error.message}</em>`;
+      }
+    }
+  }
 
   // Добавляем обработчик для кнопки вставки
   setTimeout(() => {
