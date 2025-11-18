@@ -628,7 +628,8 @@ Generate CORRECTED code that will work. Return ONLY the Python code."""
 
         # Определяем нужна ли таблица/график
         # CRITICAL: Передаём ОРИГИНАЛЬНЫЙ result (может быть DataFrame), а не result_dict!
-        structured_data = self._generate_structured_data_if_needed(query, result, exec_result.get('summary', ''))
+        # Также передаём original df для merge операций
+        structured_data = self._generate_structured_data_if_needed(query, result, exec_result.get('summary', ''), original_df=df)
 
         # v6.5.6: УЛУЧШЕННАЯ логика для выделения строк с поиском
         highlight_keywords = ['выдели', 'подсвет', 'отметь', 'покаж', 'highlight', 'mark', 'топ', 'лучш', 'худш', 'строк', 'фамили']
@@ -821,7 +822,7 @@ Generate CORRECTED code that will work. Return ONLY the Python code."""
 
         return response
 
-    def _generate_structured_data_if_needed(self, query: str, result_dict: Any, summary: str) -> Optional[Dict[str, Any]]:
+    def _generate_structured_data_if_needed(self, query: str, result_dict: Any, summary: str, original_df: Optional[pd.DataFrame] = None) -> Optional[Dict[str, Any]]:
         """
         Определяет нужна ли таблица/график и генерирует structured_data
         """
@@ -840,18 +841,40 @@ Generate CORRECTED code that will work. Return ONLY the Python code."""
         # CRITICAL: Для split/merge операций result_dict - это DataFrame, НЕ dict!
         # Проверяем, является ли result_dict DataFrame (pandas)
         is_dataframe = hasattr(result_dict, 'shape') and hasattr(result_dict, 'columns')
+        is_series = isinstance(result_dict, pd.Series)
 
-        # Если это merge/concat операция с DataFrame - конвертируем в structured_data
-        if needs_merge and is_dataframe:
+        # Если это merge/concat операция - объединяем с оригинальной таблицей
+        if needs_merge and (is_dataframe or is_series) and original_df is not None:
             try:
                 import pandas as pd
-                df = result_dict
+
+                # Если result - это Series (одна колонка), добавляем к original_df
+                if is_series:
+                    df = original_df.copy()
+                    # Находим имя новой колонки (обычно это что-то типа "ФИО")
+                    new_column_name = result_dict.name if hasattr(result_dict, 'name') and result_dict.name else "Новая колонка"
+                    df[new_column_name] = result_dict.values
+                    print(f"[MERGE_DATA] Added Series as new column '{new_column_name}' to original df")
+
+                # Если result - DataFrame с меньшим количеством колонок чем оригинал
+                elif len(result_dict.columns) < len(original_df.columns):
+                    df = original_df.copy()
+                    # Добавляем новые колонки из result_dict
+                    for col in result_dict.columns:
+                        if col not in df.columns:
+                            df[col] = result_dict[col].values
+                    print(f"[MERGE_DATA] Merged result columns into original df")
+
+                # Если result - полный DataFrame, используем его как есть
+                else:
+                    df = result_dict
+                    print(f"[MERGE_DATA] Using result DataFrame as is")
 
                 # Конвертируем DataFrame в формат structured_data
                 headers = df.columns.tolist()
                 rows = df.values.tolist()
 
-                print(f"[MERGE_DATA] Converting merged DataFrame to structured_data: {len(rows)} rows, {len(headers)} columns")
+                print(f"[MERGE_DATA] Final structured_data: {len(rows)} rows, {len(headers)} columns")
                 print(f"[MERGE_DATA] Headers: {headers}")
 
                 return {
@@ -863,6 +886,8 @@ Generate CORRECTED code that will work. Return ONLY the Python code."""
                 }
             except Exception as e:
                 print(f"[ERROR] Converting merge DataFrame to structured_data: {e}")
+                import traceback
+                traceback.print_exc()
                 return None
 
         # Если это split операция с DataFrame - конвертируем в structured_data

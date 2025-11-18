@@ -1,12 +1,12 @@
 FROM python:3.11-slim
 
 # CRITICAL: Change this on EVERY deployment to force rebuild
-ARG CACHEBUST=20251117-2310-MERGE-SUPPORT-v7.2.3
-RUN echo "CACHE BUST: $CACHEBUST - Building v7.2.3 with merge/concat support"
-# v7.2.3: Add structured_data support for merge/concat operations (объедини ФИО, создай колонку)
+ARG CACHEBUST=20251117-2320-MERGE-WITH-ORIGINAL-v7.2.4
+RUN echo "CACHE BUST: $CACHEBUST - Building v7.2.4 - merge returns original+new columns"
+# v7.2.4: Fix merge to return ALL columns (original + new), not just new column
 
-LABEL version="7.2.3"
-LABEL description="SheetGPT API v7.2.3 - Returns structured_data for merge/concat operations"
+LABEL version="7.2.4"
+LABEL description="SheetGPT API v7.2.4 - Merge returns original columns + new column in same table"
 
 WORKDIR /app
 
@@ -16,7 +16,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 # CACHE BUST: Force copy layer to rebuild
 # CRITICAL: This RUN must be AFTER requirements but BEFORE COPY to break Docker cache
-RUN echo "CACHEBUST: 20251117-2310-v7.2.3-MERGE-SUPPORT - $(date)"
+RUN echo "CACHEBUST: 20251117-2320-v7.2.4-MERGE-WITH-ORIGINAL - $(date)"
 
 # Copy application
 COPY backend/ .
