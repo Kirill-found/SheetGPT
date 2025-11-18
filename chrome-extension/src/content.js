@@ -315,13 +315,14 @@ function tryExtractFromContainer(container) {
     '[data-col][data-row]',  // Cells with data attributes
     '[role="gridcell"]',
     '.cell',
-    '.s0, .s1, .s2, .s3, .s4, .s5',  // Google Sheets cell classes
-    'td'
+    '[class*="s"]',  // Any class containing "s" (Google Sheets uses s0, s1, s2, ...)
+    'td',
+    'div[role="gridcell"]'
   ];
 
   for (const cellSelector of cellSelectors) {
     const cells = container.querySelectorAll(cellSelector);
-    if (cells.length < 5) continue;  // Need reasonable number of cells
+    if (cells.length < 3) continue;  // Need reasonable number of cells (lowered from 5 to 3)
 
     console.log(`[SheetGPT] Found ${cells.length} cells with selector "${cellSelector}"`);
 
@@ -362,6 +363,58 @@ function tryExtractFromContainer(container) {
       if (data.length >= 2 && data[0].length >= 1) {
         console.log(`[SheetGPT] Extracted ${data.length} rows from container`);
         return { headers: data[0], data: data.slice(1) };
+      }
+    }
+  }
+
+  // FALLBACK: Если ничего не нашли, попробуем все divs внутри контейнера
+  console.log('[SheetGPT] No cells found with known selectors, trying all divs...');
+  const allDivs = container.querySelectorAll('div');
+  console.log(`[SheetGPT] Found ${allDivs.length} divs in container`);
+
+  if (allDivs.length >= 10) {
+    const cellCandidates = Array.from(allDivs).filter(div => {
+      // Фильтруем: должен иметь текст, небольшой размер (похож на ячейку), видим
+      const text = div.textContent?.trim();
+      return text &&
+             text.length < 200 &&  // Ячейки обычно не очень длинные
+             div.offsetHeight > 5 &&
+             div.offsetHeight < 100 &&  // Не очень высокий
+             div.offsetWidth > 10 &&
+             div.offsetWidth < 500 &&   // Не очень широкий
+             div.offsetParent !== null;
+    });
+
+    console.log(`[SheetGPT] Filtered to ${cellCandidates.length} cell candidates`);
+
+    if (cellCandidates.length >= 10) {
+      // Группируем по координатам
+      const rowsMap = new Map();
+
+      for (const cell of cellCandidates) {
+        const rowIdx = guessRowIndex(cell);
+        const colIdx = guessColIndex(cell);
+
+        if (rowIdx !== null && colIdx !== null && rowIdx < 1000 && colIdx < 50) {
+          if (!rowsMap.has(rowIdx)) {
+            rowsMap.set(rowIdx, new Map());
+          }
+          rowsMap.get(rowIdx).set(colIdx, cell.textContent.trim());
+        }
+      }
+
+      if (rowsMap.size >= 2) {
+        const sortedRows = Array.from(rowsMap.keys()).sort((a, b) => a - b);
+        const data = sortedRows.map(rowIdx => {
+          const row = rowsMap.get(rowIdx);
+          const sortedCols = Array.from(row.keys()).sort((a, b) => a - b);
+          return sortedCols.map(colIdx => row.get(colIdx) || '');
+        });
+
+        if (data.length >= 2 && data[0].length >= 1) {
+          console.log(`[SheetGPT] Extracted ${data.length} rows using div fallback`);
+          return { headers: data[0], data: data.slice(1) };
+        }
       }
     }
   }
@@ -421,18 +474,27 @@ function trySmartExtraction() {
   const potentialCells = [];
 
   for (const el of allElements) {
-    const className = el.className || '';
+    const className = String(el.className || '');
     const hasDataAttrs = el.hasAttribute('data-row') || el.hasAttribute('data-col');
-    const isCell = /cell|^s\d+$/i.test(className) || hasDataAttrs;
 
-    if (isCell && el.textContent && el.offsetHeight > 10 && el.offsetWidth > 20) {
+    // Проверяем: содержит "cell", или класс типа "s0", "s1", ..., или data-атрибуты
+    const isCell = /cell/i.test(className) ||
+                   /\bs\d+\b/.test(className) ||  // Match "s0", "s1", etc. as whole word
+                   hasDataAttrs;
+
+    // Фильтруем: должен иметь текст, разумный размер, и быть видимым
+    if (isCell &&
+        el.textContent &&
+        el.offsetHeight > 5 &&
+        el.offsetWidth > 10 &&
+        el.offsetParent !== null) {  // Check if visible
       potentialCells.push(el);
     }
   }
 
   console.log(`[SheetGPT] Smart extraction found ${potentialCells.length} potential cells`);
 
-  if (potentialCells.length < 5) return null;
+  if (potentialCells.length < 3) return null;  // Lowered from 5 to 3
 
   // Группируем по координатам
   const rowsMap = new Map();
