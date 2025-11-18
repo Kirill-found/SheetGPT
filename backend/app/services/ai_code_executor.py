@@ -826,6 +826,8 @@ Generate CORRECTED code that will work. Return ONLY the Python code."""
         """
         Определяет нужна ли таблица/график и генерирует structured_data
         """
+        import pandas as pd  # Import at the beginning
+
         # Ключевые слова для определения запроса на таблицу/график
         table_keywords = ['таблиц', 'создай табл', 'сделай табл', 'table', 'построй табл']
         chart_keywords = ['график', 'диаграмм', 'chart', 'построй', 'визуализ', 'plot', 'сделай']
@@ -846,8 +848,6 @@ Generate CORRECTED code that will work. Return ONLY the Python code."""
         # Если это merge/concat операция - объединяем с оригинальной таблицей
         if needs_merge and (is_dataframe or is_series) and original_df is not None:
             try:
-                import pandas as pd
-
                 # Если result - это Series (одна колонка), добавляем к original_df
                 if is_series:
                     df = original_df.copy()
