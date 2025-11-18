@@ -65,6 +65,18 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 });
 
 /**
+ * Timeout wrapper for async operations
+ */
+function withTimeout(promise, timeoutMs, operationName) {
+  return Promise.race([
+    promise,
+    new Promise((_, reject) =>
+      setTimeout(() => reject(new Error(`${operationName} timeout after ${timeoutMs/1000}s. OAuth authorization may be required. Please check chrome://extensions and reload the extension.`)), timeoutMs)
+    )
+  ]);
+}
+
+/**
  * Get data from active Google Sheet
  */
 async function handleGetSheetData(tabId, tabUrl) {
@@ -75,8 +87,18 @@ async function handleGetSheetData(tabId, tabUrl) {
     throw new Error('Not a valid Google Sheets URL');
   }
 
-  const sheetName = await getActiveSheetName(tabId);
-  const data = await readSheetData(spreadsheetId, sheetName);
+  // Add 10s timeout for OAuth operations
+  const sheetName = await withTimeout(
+    getActiveSheetName(tabId),
+    10000,
+    'Get sheet name'
+  );
+
+  const data = await withTimeout(
+    readSheetData(spreadsheetId, sheetName),
+    10000,
+    'Read sheet data'
+  );
 
   console.log('[Background] ✅ Got sheet data:', data);
   return data;
