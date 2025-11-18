@@ -67,6 +67,15 @@ class AICodeExecutor:
             print(f"\n🔍 DEBUG: custom_context = {custom_context}")
             print(f"🔍 DEBUG: safe_custom_context = {safe_custom_context}")
 
+            # v7.3.0: Проверка на создание таблицы из AI-знаний (без исходных данных)
+            if not sheet_data or len(sheet_data) == 0:
+                table_keywords = ['создай таблиц', 'сделай таблиц', 'построй таблиц', 'найди информац',
+                                  'покажи данные', 'список стран', 'список городов', 'информация о']
+                query_lower = query.lower()
+                if any(kw in query_lower for kw in table_keywords):
+                    print(f"[AI_TABLE_GEN] Detected request for table generation from knowledge")
+                    return self._generate_table_from_knowledge(query, safe_custom_context)
+
             # Шаг 1: Создаем DataFrame
             df = pd.DataFrame(sheet_data, columns=column_names)
 
@@ -900,6 +909,116 @@ Generate CORRECTED code that will work. Return ONLY the Python code."""
             import traceback
             traceback.print_exc()
             return None
+
+    def _generate_table_from_knowledge(self, query: str, custom_context: Optional[str] = None) -> Dict[str, Any]:
+        """
+        v7.3.0: Генерирует таблицу из знаний AI (без исходных данных)
+        Используется когда пользователь просит "создай таблицу со странами Европы" и т.д.
+        """
+        print(f"\n[AI_TABLE_GEN] Generating table from AI knowledge for query: {query}")
+
+        try:
+            # Создаём промпт для AI чтобы он вернул таблицу в формате JSON
+            system_prompt = """You are a data assistant. Generate tables based on user requests using your knowledge.
+
+CRITICAL RULES:
+1. Return data in JSON format with "headers" and "rows" fields
+2. "headers" is an array of column names
+3. "rows" is an array of arrays (each inner array is one row)
+4. Include only factual, accurate data
+5. Limit to 50 rows maximum
+6. Use simple column names in Russian if query is in Russian
+
+Example output format:
+{
+  "headers": ["Страна", "Население (млн)", "Столица"],
+  "rows": [
+    ["Германия", 83.2, "Берлин"],
+    ["Франция", 67.4, "Париж"],
+    ["Италия", 59.1, "Рим"]
+  ],
+  "summary": "Таблица создана с данными о 3 странах"
+}
+"""
+
+            user_prompt = f"""Generate a table based on this request:
+
+{query}
+
+Return ONLY valid JSON with "headers", "rows", and "summary" fields. No markdown, no explanations."""
+
+            # Вызываем OpenAI API
+            response = self.client.chat.completions.create(
+                model="gpt-4o",
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_prompt}
+                ],
+                temperature=0.3,  # Низкая температура для точности
+                max_tokens=4000
+            )
+
+            # Парсим ответ
+            ai_response = response.choices[0].message.content.strip()
+            print(f"[AI_TABLE_GEN] Raw AI response length: {len(ai_response)}")
+
+            # Удаляем markdown если есть
+            if ai_response.startswith("```json"):
+                ai_response = ai_response[7:]
+            if ai_response.startswith("```"):
+                ai_response = ai_response[3:]
+            if ai_response.endswith("```"):
+                ai_response = ai_response[:-3]
+            ai_response = ai_response.strip()
+
+            # Парсим JSON
+            import json
+            table_data = json.loads(ai_response)
+
+            headers = table_data.get("headers", [])
+            rows = table_data.get("rows", [])
+            summary = table_data.get("summary", f"Таблица создана. Строк: {len(rows)}")
+
+            print(f"[AI_TABLE_GEN] Generated table: {len(headers)} columns, {len(rows)} rows")
+
+            # Формируем ответ в стандартном формате
+            return {
+                "summary": summary,
+                "methodology": "Таблица создана на основе знаний AI (GPT-4)",
+                "key_findings": [f"Создана таблица с {len(rows)} записями", f"Колонки: {', '.join(headers[:5])}"],
+                "confidence": 0.9,
+                "response_type": "table_generation",
+                "structured_data": {
+                    "headers": headers,
+                    "rows": rows,
+                    "table_title": summary,
+                    "chart_recommended": None,
+                    "operation_type": "ai_generated"
+                },
+                "professional_insights": "Таблица создана автоматически на основе общедоступных знаний AI.",
+                "recommendations": ["Проверьте актуальность данных для критических задач"],
+                "warnings": ["Данные могут быть неактуальными. Для точных данных используйте официальные источники."],
+                "python_executed": False,
+                "ai_generated_table": True
+            }
+
+        except json.JSONDecodeError as e:
+            print(f"[ERROR] Failed to parse AI response as JSON: {e}")
+            print(f"[ERROR] AI response: {ai_response[:500]}")
+            return {
+                "summary": f"Ошибка: не удалось создать таблицу",
+                "error": f"AI вернул некорректный формат данных",
+                "response_type": "error"
+            }
+        except Exception as e:
+            print(f"[ERROR] Failed to generate table from knowledge: {e}")
+            import traceback
+            traceback.print_exc()
+            return {
+                "summary": f"Ошибка: {str(e)}",
+                "error": str(e),
+                "response_type": "error"
+            }
 
     def _generate_structured_data_if_needed(self, query: str, result_dict: Any, summary: str, original_df: Optional[pd.DataFrame] = None) -> Optional[Dict[str, Any]]:
         """
