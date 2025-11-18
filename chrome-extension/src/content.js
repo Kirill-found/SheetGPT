@@ -257,27 +257,48 @@ function readSheetDataFromDOM() {
   console.log('[SheetGPT] Reading data from DOM...');
 
   try {
+    // First, find the main grid container to avoid reading UI elements
+    const gridContainers = [
+      '[role="grid"]',           // ARIA grid
+      'table.waffle',            // Classic view
+      '.grid-container',         // New view
+      'table'                    // Fallback
+    ];
+
+    let gridContainer = null;
+    for (const selector of gridContainers) {
+      const container = document.querySelector(selector);
+      if (container) {
+        gridContainer = container;
+        console.log(`[SheetGPT] ✅ Found grid container: "${selector}"`);
+        break;
+      }
+    }
+
+    if (!gridContainer) {
+      console.warn('[SheetGPT] No grid container found');
+      return null;
+    }
+
     // Try multiple selector strategies for different Google Sheets versions
     const selectorStrategies = [
       // Strategy 1: ARIA roles (most reliable)
-      { rows: '[role="grid"] [role="row"]', cells: '[role="gridcell"]' },
+      { rows: '[role="row"]', cells: '[role="gridcell"]' },
       // Strategy 2: Table structure
-      { rows: '.waffle tbody tr, table.waffle tr', cells: 'td' },
+      { rows: 'tbody tr, tr', cells: 'td' },
       // Strategy 3: Grid classes
       { rows: '.grid-row, .ritz .grid-row', cells: '.cell, [role="gridcell"]' },
-      // Strategy 4: Generic rows in any table
-      { rows: 'tbody tr, table tr', cells: 'td, [role="gridcell"]' },
-      // Strategy 5: Role-based only
-      { rows: '[role="row"]', cells: '[role="gridcell"]' }
+      // Strategy 4: Generic rows
+      { rows: 'tr', cells: 'td, [role="gridcell"]' }
     ];
 
     let rows = [];
     let cellSelector = null;
 
-    // Try each strategy until we find rows
+    // Try each strategy until we find rows WITHIN the grid container
     for (const strategy of selectorStrategies) {
-      const foundRows = document.querySelectorAll(strategy.rows);
-      console.log(`[SheetGPT] Trying selector "${strategy.rows}" → found ${foundRows.length} rows`);
+      const foundRows = gridContainer.querySelectorAll(strategy.rows);
+      console.log(`[SheetGPT] Trying selector "${strategy.rows}" in grid → found ${foundRows.length} rows`);
 
       if (foundRows.length > 0) {
         rows = Array.from(foundRows);
@@ -312,6 +333,17 @@ function readSheetDataFromDOM() {
     const rows_data = data.slice(1);
 
     console.log(`[SheetGPT] ✅ Read from DOM: ${rows_data.length} rows, ${headers.length} columns`);
+    console.log(`[SheetGPT] Headers:`, headers);
+    console.log(`[SheetGPT] First row:`, rows_data[0]);
+    console.log(`[SheetGPT] Second row:`, rows_data[1]);
+
+    // Validate: all rows should have same number of columns as headers
+    const invalidRows = rows_data.filter(row => row.length !== headers.length);
+    if (invalidRows.length > 0) {
+      console.warn(`[SheetGPT] ⚠️ Found ${invalidRows.length} rows with mismatched column count!`);
+      console.warn(`[SheetGPT] Expected ${headers.length} columns, but found:`, invalidRows.map(r => r.length));
+    }
+
     return { headers, data: rows_data };
   } catch (error) {
     console.error('[SheetGPT] Error reading from DOM:', error);
@@ -647,22 +679,43 @@ function highlightRowsInDOM(rowIndices, colorName) {
 
     let highlightedCount = 0;
 
+    // First, find the main grid container (same as readSheetDataFromDOM)
+    const gridContainers = [
+      '[role="grid"]',
+      'table.waffle',
+      '.grid-container',
+      'table'
+    ];
+
+    let gridContainer = null;
+    for (const selector of gridContainers) {
+      const container = document.querySelector(selector);
+      if (container) {
+        gridContainer = container;
+        console.log(`[SheetGPT] Highlight: found grid container "${selector}"`);
+        break;
+      }
+    }
+
+    if (!gridContainer) {
+      throw new Error('Не найден контейнер таблицы');
+    }
+
     // Try multiple selector strategies (same as readSheetDataFromDOM)
     const selectorStrategies = [
-      { rows: '[role="grid"] [role="row"]', cells: '[role="gridcell"]' },
-      { rows: '.waffle tbody tr, table.waffle tr', cells: 'td' },
+      { rows: '[role="row"]', cells: '[role="gridcell"]' },
+      { rows: 'tbody tr, tr', cells: 'td' },
       { rows: '.grid-row, .ritz .grid-row', cells: '.cell, [role="gridcell"]' },
-      { rows: 'tbody tr, table tr', cells: 'td, [role="gridcell"]' },
-      { rows: '[role="row"]', cells: '[role="gridcell"]' }
+      { rows: 'tr', cells: 'td, [role="gridcell"]' }
     ];
 
     let allRows = [];
     let cellSelector = null;
 
-    // Find rows using any working strategy
+    // Find rows using any working strategy WITHIN the grid container
     for (const strategy of selectorStrategies) {
-      const foundRows = document.querySelectorAll(strategy.rows);
-      console.log(`[SheetGPT] Highlight: trying "${strategy.rows}" → ${foundRows.length} rows`);
+      const foundRows = gridContainer.querySelectorAll(strategy.rows);
+      console.log(`[SheetGPT] Highlight: trying "${strategy.rows}" in grid → ${foundRows.length} rows`);
 
       if (foundRows.length > 0) {
         allRows = Array.from(foundRows);
