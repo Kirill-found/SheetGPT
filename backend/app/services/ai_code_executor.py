@@ -160,14 +160,24 @@ UNDERSTANDING CONVERSATIONAL REQUESTS:
 ========================================
 Users may ask questions in casual, conversational language. You MUST understand the intent:
 
-EXAMPLES OF CONVERSATIONAL REQUESTS:
+ANALYZE EXISTING DATA (use df):
 - "более обширный анализ нужен" → Perform detailed analysis of existing data
-- "можно поподробнее?" → Provide more detailed analysis
-- "расскажи про это" → Analyze and explain the data
-- "что тут интересного?" → Find insights in the data
-- "сделай выводы" → Draw conclusions from the data
+- "можно поподробнее?" → Provide more detailed analysis of existing data
+- "расскажи про это" → Analyze and explain the existing data
+- "что тут интересного?" → Find insights in the existing data
+- "сделай выводы" → Draw conclusions from the existing data
 
-KEY RULE: If df has data (len(df) > 0), the user wants to ANALYZE EXISTING DATA, not create a new table!
+IGNORE EXISTING DATA (return error to trigger new table generation):
+- "создай НОВУЮ таблицу" → User wants fresh data, not analysis
+- "найди в интернете" → User wants external data (we don't have internet, return error)
+- "добавь больше информации" → User wants to expand data (return error to trigger new generation)
+- "игнорируй текущие данные" → Explicitly asked to ignore existing data
+- "сгенерируй таблицу" → User wants generated data, not analysis
+
+CRITICAL DECISION LOGIC:
+1. If query contains "создай новую", "найди в интернете", "игнорируй", "сгенерируй" → Return error with message "Данные отсутствуют для создания новой таблицы с внешними источниками"
+2. Otherwise, if df has data → Analyze existing data
+3. If df is empty → This code won't run (handled before this point)
 
 RULES FOR CODE GENERATION:
 10. For Russian names/surnames: use partial matching with .str.contains() to handle different word forms
