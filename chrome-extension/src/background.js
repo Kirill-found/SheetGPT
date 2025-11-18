@@ -87,18 +87,35 @@ async function handleGetSheetData(tabId, tabUrl) {
     throw new Error('Not a valid Google Sheets URL');
   }
 
-  // Add 10s timeout for OAuth operations
-  const sheetName = await withTimeout(
-    getActiveSheetName(tabId),
-    10000,
-    'Get sheet name'
-  );
+  // Try to get sheet name with short timeout, use fallback if fails
+  let sheetName = 'Лист1'; // Russian Google Sheets default
+  try {
+    sheetName = await withTimeout(
+      getActiveSheetName(tabId),
+      2000, // Very short timeout to avoid hanging
+      'Get sheet name'
+    );
+    console.log('[Background] Got sheet name:', sheetName);
+  } catch (error) {
+    console.warn('[Background] Could not get sheet name, using fallback:', sheetName, error.message);
+  }
 
-  const data = await withTimeout(
-    readSheetData(spreadsheetId, sheetName),
-    10000,
-    'Read sheet data'
-  );
+  // Try to read data, fallback to 'Sheet1' if Russian name fails
+  let data;
+  try {
+    data = await withTimeout(
+      readSheetData(spreadsheetId, sheetName),
+      10000,
+      'Read sheet data'
+    );
+  } catch (error) {
+    console.warn(`[Background] Failed with "${sheetName}", trying "Sheet1"...`, error.message);
+    data = await withTimeout(
+      readSheetData(spreadsheetId, 'Sheet1'),
+      10000,
+      'Read sheet data (Sheet1 fallback)'
+    );
+  }
 
   console.log('[Background] ✅ Got sheet data:', data);
   return data;
