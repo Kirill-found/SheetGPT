@@ -824,6 +824,9 @@ Generate CORRECTED code that will work. Return ONLY the Python code."""
         formula = self._generate_formula_for_merge(query, original_df, structured_data)
         if formula:
             response["formula"] = formula
+            # Добавляем формулу в summary чтобы она была видна в чате
+            original_summary = response.get("summary", "")
+            response["summary"] = f"{original_summary}\n\n📝 Формула для вставки в следующую колонку:\n{formula}"
             print(f"[FORMULA] Generated Google Sheets formula: {formula}")
 
         return response
