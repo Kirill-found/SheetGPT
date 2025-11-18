@@ -372,22 +372,40 @@ function tryExtractFromContainer(container) {
   const allDivs = container.querySelectorAll('div');
   console.log(`[SheetGPT] Found ${allDivs.length} divs in container`);
 
-  if (allDivs.length >= 10) {
+  if (allDivs.length >= 5) {  // Lowered from 10 to 5
     const cellCandidates = Array.from(allDivs).filter(div => {
       // Фильтруем: должен иметь текст, небольшой размер (похож на ячейку), видим
       const text = div.textContent?.trim();
+
+      // Более мягкие критерии фильтрации
       return text &&
-             text.length < 200 &&  // Ячейки обычно не очень длинные
-             div.offsetHeight > 5 &&
-             div.offsetHeight < 100 &&  // Не очень высокий
-             div.offsetWidth > 10 &&
-             div.offsetWidth < 500 &&   // Не очень широкий
-             div.offsetParent !== null;
+             text.length > 0 &&
+             text.length < 300 &&  // Увеличено с 200 до 300
+             div.offsetHeight > 3 &&  // Снижено с 5 до 3
+             div.offsetHeight < 150 &&  // Увеличено с 100 до 150
+             div.offsetWidth > 5 &&  // Снижено с 10 до 5
+             div.offsetWidth < 800 &&   // Увеличено с 500 до 800
+             div.offsetParent !== null &&
+             // Исключаем divs с вложенными divs (это контейнеры, а не ячейки)
+             div.querySelectorAll('div').length === 0;
     });
 
     console.log(`[SheetGPT] Filtered to ${cellCandidates.length} cell candidates`);
 
-    if (cellCandidates.length >= 10) {
+    // DEBUG: Show first few candidates
+    if (cellCandidates.length > 0) {
+      console.log('[SheetGPT] First 5 candidates:',
+        cellCandidates.slice(0, 5).map(c => ({
+          text: c.textContent.trim().substring(0, 50),
+          height: c.offsetHeight,
+          width: c.offsetWidth,
+          top: c.offsetTop,
+          left: c.offsetLeft
+        }))
+      );
+    }
+
+    if (cellCandidates.length >= 5) {  // Lowered from 10 to 5
       // Группируем по координатам
       const rowsMap = new Map();
 
@@ -395,13 +413,19 @@ function tryExtractFromContainer(container) {
         const rowIdx = guessRowIndex(cell);
         const colIdx = guessColIndex(cell);
 
+        console.log(`[SheetGPT] Cell "${cell.textContent.trim().substring(0, 20)}" → row=${rowIdx}, col=${colIdx}`);
+
         if (rowIdx !== null && colIdx !== null && rowIdx < 1000 && colIdx < 50) {
           if (!rowsMap.has(rowIdx)) {
             rowsMap.set(rowIdx, new Map());
           }
           rowsMap.get(rowIdx).set(colIdx, cell.textContent.trim());
+        } else {
+          console.warn(`[SheetGPT] Skipped cell: rowIdx=${rowIdx}, colIdx=${colIdx}`);
         }
       }
+
+      console.log(`[SheetGPT] Grouped into ${rowsMap.size} rows`);
 
       if (rowsMap.size >= 2) {
         const sortedRows = Array.from(rowsMap.keys()).sort((a, b) => a - b);
@@ -494,7 +518,21 @@ function trySmartExtraction() {
 
   console.log(`[SheetGPT] Smart extraction found ${potentialCells.length} potential cells`);
 
-  if (potentialCells.length < 3) return null;  // Lowered from 5 to 3
+  // DEBUG: Show first few cells
+  if (potentialCells.length > 0) {
+    console.log('[SheetGPT] First 5 potential cells:',
+      potentialCells.slice(0, 5).map(c => ({
+        text: c.textContent.trim().substring(0, 50),
+        className: c.className,
+        height: c.offsetHeight,
+        width: c.offsetWidth,
+        top: c.offsetTop,
+        left: c.offsetLeft
+      }))
+    );
+  }
+
+  if (potentialCells.length < 2) return null;  // Lowered from 3 to 2
 
   // Группируем по координатам
   const rowsMap = new Map();
