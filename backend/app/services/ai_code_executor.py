@@ -16,7 +16,14 @@ import traceback
 from io import StringIO
 import sys
 import re
-from app.services.web_search import get_web_search_service
+
+# Опциональный импорт веб-поиска (если ddgs не установлен, работаем без него)
+try:
+    from app.services.web_search import get_web_search_service
+    WEB_SEARCH_AVAILABLE = True
+except ImportError:
+    WEB_SEARCH_AVAILABLE = False
+    print("[WARNING] Web search module not available (ddgs not installed)")
 
 class AICodeExecutor:
     def __init__(self):
@@ -976,27 +983,32 @@ Generate CORRECTED code that will work. Return ONLY the Python code."""
             methodology_suffix = ""
             search_results = []  # Инициализируем пустой список
             if needs_web_search:
-                print(f"[WEB_SEARCH] Query requires web search, executing DuckDuckGo search...")
-                web_search_service = get_web_search_service()
-
-                # Создаём поисковый запрос (убираем "найди в интернете" и т.д.)
-                search_query = query
-                for keyword in web_search_keywords:
-                    search_query = search_query.replace(keyword, "")
-                search_query = search_query.strip()
-
-                print(f"[WEB_SEARCH] Search query: {search_query}")
-
-                # Выполняем поиск (получаем 15 результатов для большего контекста)
-                search_results = web_search_service.search(search_query, max_results=15)
-
-                if search_results:
-                    search_results_text = web_search_service.format_search_results_for_ai(search_results)
-                    print(f"[WEB_SEARCH] Found {len(search_results)} results, formatted for AI")
-                    methodology_suffix = f" + DuckDuckGo поиск ({len(search_results)} источников)"
+                if not WEB_SEARCH_AVAILABLE:
+                    print(f"[WEB_SEARCH] Web search requested but module not available (ddgs not installed)")
+                    print(f"[WEB_SEARCH] Falling back to AI knowledge")
+                    methodology_suffix = " (веб-поиск недоступен, использованы знания AI)"
                 else:
-                    print(f"[WEB_SEARCH] No results found, falling back to AI knowledge")
-                    methodology_suffix = " (веб-поиск не дал результатов, использованы знания AI)"
+                    print(f"[WEB_SEARCH] Query requires web search, executing DuckDuckGo search...")
+                    web_search_service = get_web_search_service()
+
+                    # Создаём поисковый запрос (убираем "найди в интернете" и т.д.)
+                    search_query = query
+                    for keyword in web_search_keywords:
+                        search_query = search_query.replace(keyword, "")
+                    search_query = search_query.strip()
+
+                    print(f"[WEB_SEARCH] Search query: {search_query}")
+
+                    # Выполняем поиск (получаем 15 результатов для большего контекста)
+                    search_results = web_search_service.search(search_query, max_results=15)
+
+                    if search_results:
+                        search_results_text = web_search_service.format_search_results_for_ai(search_results)
+                        print(f"[WEB_SEARCH] Found {len(search_results)} results, formatted for AI")
+                        methodology_suffix = f" + DuckDuckGo поиск ({len(search_results)} источников)"
+                    else:
+                        print(f"[WEB_SEARCH] No results found, falling back to AI knowledge")
+                        methodology_suffix = " (веб-поиск не дал результатов, использованы знания AI)"
 
             # Создаём промпт для AI чтобы он вернул таблицу в формате JSON
             system_prompt = """You are a data assistant. Generate tables based on user requests using your knowledge.
