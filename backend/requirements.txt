@@ -31,7 +31,11 @@ httpx==0.26.0
 pandas==2.2.0
 numpy==1.26.3
 
-# FORCE REBUILD: 11 Nov 2025 19:55 - v5.0.3-STRUCTURED-DATA-FINAL
-# AI generates Python code for 99% accuracy on all queries
-# CRITICAL: structured_data feature for table/chart creation in Google Sheets
+# Web Search (100% free, no API keys)
+ddgs==9.9.1
+
+# FORCE REBUILD: 18 Nov 2025 - v7.4.0-WEB-SEARCH
+# NEW: DuckDuckGo web search integration for real-time data
+# AI can now generate tables with fresh data from the internet
+# CRITICAL: web_search feature for generating tables from real-time internet data
 # Railway MUST rebuild when requirements.txt changes

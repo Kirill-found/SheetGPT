@@ -16,6 +16,7 @@ import traceback
 from io import StringIO
 import sys
 import re
+from app.services.web_search import get_web_search_service
 
 class AICodeExecutor:
     def __init__(self):
@@ -955,12 +956,48 @@ Generate CORRECTED code that will work. Return ONLY the Python code."""
 
     def _generate_table_from_knowledge(self, query: str, custom_context: Optional[str] = None) -> Dict[str, Any]:
         """
-        v7.3.0: Генерирует таблицу из знаний AI (без исходных данных)
-        Используется когда пользователь просит "создай таблицу со странами Европы" и т.д.
+        v7.4.0: Генерирует таблицу из знаний AI + веб-поиск через DuckDuckGo
+        Используется когда пользователь просит "создай таблицу со странами Европы" или "найди в интернете информацию о LLM моделях"
         """
         print(f"\n[AI_TABLE_GEN] Generating table from AI knowledge for query: {query}")
 
         try:
+            # Определяем нужен ли веб-поиск
+            web_search_keywords = [
+                'найди в интернете', 'поищи в интернете', 'найти в интернет',
+                'актуальн', 'последн', 'свеж', 'новейш', 'latest', 'current',
+                'search', 'recent', 'современн', 'real-time', 'реальн'
+            ]
+            query_lower = query.lower()
+            needs_web_search = any(kw in query_lower for kw in web_search_keywords)
+
+            # Веб-поиск если нужен
+            search_results_text = ""
+            methodology_suffix = ""
+            search_results = []  # Инициализируем пустой список
+            if needs_web_search:
+                print(f"[WEB_SEARCH] Query requires web search, executing DuckDuckGo search...")
+                web_search_service = get_web_search_service()
+
+                # Создаём поисковый запрос (убираем "найди в интернете" и т.д.)
+                search_query = query
+                for keyword in web_search_keywords:
+                    search_query = search_query.replace(keyword, "")
+                search_query = search_query.strip()
+
+                print(f"[WEB_SEARCH] Search query: {search_query}")
+
+                # Выполняем поиск (получаем 15 результатов для большего контекста)
+                search_results = web_search_service.search(search_query, max_results=15)
+
+                if search_results:
+                    search_results_text = web_search_service.format_search_results_for_ai(search_results)
+                    print(f"[WEB_SEARCH] Found {len(search_results)} results, formatted for AI")
+                    methodology_suffix = f" + DuckDuckGo поиск ({len(search_results)} источников)"
+                else:
+                    print(f"[WEB_SEARCH] No results found, falling back to AI knowledge")
+                    methodology_suffix = " (веб-поиск не дал результатов, использованы знания AI)"
+
             # Создаём промпт для AI чтобы он вернул таблицу в формате JSON
             system_prompt = """You are a data assistant. Generate tables based on user requests using your knowledge.
 
@@ -971,6 +1008,8 @@ CRITICAL RULES:
 4. Include only factual, accurate data
 5. Limit to 50 rows maximum
 6. Use simple column names in Russian if query is in Russian
+7. If web search results are provided, USE THEM as the primary source of data
+8. Synthesize information from multiple search results to create comprehensive table
 
 Example output format:
 {
@@ -984,7 +1023,19 @@ Example output format:
 }
 """
 
-            user_prompt = f"""Generate a table based on this request:
+            # Формируем user prompt с результатами поиска если есть
+            if search_results_text:
+                user_prompt = f"""Generate a table based on this request using the web search results below:
+
+REQUEST: {query}
+
+{search_results_text}
+
+IMPORTANT: Use the information from the web search results to create the table. Extract relevant data points, numbers, names, dates, etc.
+
+Return ONLY valid JSON with "headers", "rows", and "summary" fields. No markdown, no explanations."""
+            else:
+                user_prompt = f"""Generate a table based on this request:
 
 {query}
 
@@ -1025,24 +1076,34 @@ Return ONLY valid JSON with "headers", "rows", and "summary" fields. No markdown
             print(f"[AI_TABLE_GEN] Generated table: {len(headers)} columns, {len(rows)} rows")
 
             # Формируем ответ в стандартном формате
+            base_methodology = "Таблица создана на основе знаний AI (GPT-4)"
+            if needs_web_search and search_results:
+                base_methodology = f"Таблица создана на основе реальных данных из интернета через DuckDuckGo{methodology_suffix}"
+                warnings_list = ["Данные получены из интернета. Рекомендуется проверить критически важные данные из первоисточников."]
+                insights_text = f"Данные актуализированы из {len(search_results)} источников в реальном времени."
+            else:
+                warnings_list = ["Данные могут быть неактуальными. Для точных данных используйте официальные источники."]
+                insights_text = "Таблица создана автоматически на основе общедоступных знаний AI."
+
             return {
                 "summary": summary,
-                "methodology": "Таблица создана на основе знаний AI (GPT-4)",
+                "methodology": base_methodology,
                 "key_findings": [f"Создана таблица с {len(rows)} записями", f"Колонки: {', '.join(headers[:5])}"],
-                "confidence": 0.9,
+                "confidence": 0.92 if (needs_web_search and search_results) else 0.85,
                 "response_type": "table_generation",
                 "structured_data": {
                     "headers": headers,
                     "rows": rows,
                     "table_title": summary,
                     "chart_recommended": None,
-                    "operation_type": "ai_generated"
+                    "operation_type": "web_search_generated" if (needs_web_search and search_results) else "ai_generated"
                 },
-                "professional_insights": "Таблица создана автоматически на основе общедоступных знаний AI.",
+                "professional_insights": insights_text,
                 "recommendations": ["Проверьте актуальность данных для критических задач"],
-                "warnings": ["Данные могут быть неактуальными. Для точных данных используйте официальные источники."],
+                "warnings": warnings_list,
                 "python_executed": False,
-                "ai_generated_table": True
+                "ai_generated_table": True,
+                "web_search_used": needs_web_search and len(search_results) > 0 if search_results else False
             }
 
         except json.JSONDecodeError as e:
