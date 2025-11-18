@@ -17,6 +17,22 @@ from io import StringIO
 import sys
 import re
 
+
+class SafeStringIO(StringIO):
+    """
+    UTF-8 safe StringIO для Windows совместимости
+    Исправляет ошибку: 'charmap' codec can't encode characters
+    """
+    def write(self, s):
+        try:
+            return super().write(s)
+        except (UnicodeEncodeError, UnicodeDecodeError):
+            # Если ошибка кодировки, конвертируем в безопасную строку
+            if isinstance(s, bytes):
+                s = s.decode('utf-8', errors='replace')
+            # Преобразуем в строку и пытаемся снова
+            return super().write(str(s))
+
 # Опциональный импорт веб-поиска (если ddgs не установлен, работаем без него)
 try:
     from app.services.web_search import get_web_search_service
@@ -459,9 +475,9 @@ Return ONLY the Python code, no explanations."""
 
         safe_locals = {}
 
-        # Перехватываем stdout для отладки
+        # Перехватываем stdout для отладки (UTF-8 safe для Windows)
         old_stdout = sys.stdout
-        sys.stdout = mystdout = StringIO()
+        sys.stdout = mystdout = SafeStringIO()
 
         try:
             # v6.6.8: WRAPPER FIX - оборачиваем AI код в безопасный wrapper
@@ -484,8 +500,17 @@ confidence = 0.95
 
             # Выполняем обёрнутый код
             print("[TRACE 6] Executing wrapper code with exec()...")
-            exec(wrapper_code, safe_globals, safe_locals)
-            print("[TRACE 6] ✓ exec() COMPLETED successfully")
+            try:
+                exec(wrapper_code, safe_globals, safe_locals)
+                print("[TRACE 6] ✓ exec() COMPLETED successfully")
+            except UnicodeEncodeError as ue:
+                # Windows encoding fix - перекомпилируем код с UTF-8
+                print(f"[ENCODING FIX] Caught UnicodeEncodeError during exec: {ue}")
+                print(f"[ENCODING FIX] Attempting to fix encoding...")
+                # Компилируем код в UTF-8
+                code_obj = compile(wrapper_code, '<string>', 'exec', dont_inherit=True)
+                exec(code_obj, safe_globals, safe_locals)
+                print("[TRACE 6] ✓ exec() COMPLETED with encoding fix")
 
             # Восстанавливаем stdout
             sys.stdout = old_stdout
