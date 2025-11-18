@@ -68,12 +68,32 @@ class AICodeExecutor:
             print(f"🔍 DEBUG: safe_custom_context = {safe_custom_context}")
 
             # v7.3.0: Проверка на создание таблицы из AI-знаний (без исходных данных)
-            if not sheet_data or len(sheet_data) == 0:
+            # Улучшенная проверка на "пустые данные" - обрабатывает разные форматы от фронтенда
+            def is_empty_data(data):
+                """Проверяет что данные действительно пустые"""
+                if not data or len(data) == 0:
+                    return True
+                # Проверяем что все строки пустые
+                for row in data:
+                    if not row or len(row) == 0:
+                        continue
+                    # Проверяем что в строке есть хоть одно непустое значение
+                    has_data = False
+                    for cell in row:
+                        if cell is not None and cell != '' and cell != ' ':
+                            has_data = True
+                            break
+                    if has_data:
+                        return False
+                return True
+
+            if is_empty_data(sheet_data):
                 table_keywords = ['создай таблиц', 'сделай таблиц', 'построй таблиц', 'найди информац',
                                   'покажи данные', 'список стран', 'список городов', 'информация о']
                 query_lower = query.lower()
                 if any(kw in query_lower for kw in table_keywords):
-                    print(f"[AI_TABLE_GEN] Detected request for table generation from knowledge")
+                    print(f"[AI_TABLE_GEN] Detected empty data + table keywords, generating from knowledge")
+                    print(f"[AI_TABLE_GEN] sheet_data = {sheet_data}")
                     return self._generate_table_from_knowledge(query, safe_custom_context)
 
             # Шаг 1: Создаем DataFrame
