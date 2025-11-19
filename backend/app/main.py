@@ -44,15 +44,15 @@ app.add_middleware(
 async def startup_event():
     """Log startup information"""
     logger.info("="*60)
-    logger.info("SheetGPT API v7.5.5 STARTING - SPLIT DATA AUTO-RETURN")
+    logger.info("SheetGPT API v7.5.9 STARTING - AUTO NUMERIC CONVERSION")
     logger.info(f"Started at: {datetime.now()}")
     logger.info("Query Classifier: ENABLED (73% token savings)")
     logger.info("Fuzzy Column Matching: ENABLED (100% success rate)")
     logger.info("Metrics & Monitoring: ENABLED (real-time tracking)")
+    logger.info("Auto Numeric Conversion: ENABLED (fixes ALL functions at once)")
     logger.info("Split Category: SEPARATE from action (fixes GPT-4o confusion)")
     logger.info("Split Data: AUTO-RETURN if data already split (fixes 'разбей данные')")
     logger.info("Function Calling: 100 functions (2 sent for split queries)")
-    logger.info("String Number Parsing: ENABLED")
     logger.info("Accuracy target: 95%+ (80% → 95%+ expected)")
     logger.info("="*60)
 
@@ -117,6 +117,19 @@ async def process_formula(request: FormulaRequest):
 
         # Создаем DataFrame из данных
         df = pd.DataFrame(request.sheet_data, columns=request.column_names)
+
+        # v7.5.9 СИСТЕМНОЕ ИСПРАВЛЕНИЕ: Автоматическая конвертация числовых колонок
+        # Google Sheets API возвращает ВСЁ как строки → конвертируем числа автоматически
+        # Это исправляет ВСЕ функции (calculate_sum, filter_top_n, и т.д.) сразу
+        for col in df.columns:
+            # Пробуем конвертировать колонку в числа
+            converted = pd.to_numeric(df[col], errors='coerce')
+            # Если более 50% данных успешно конвертировались (не NaN) - используем numeric
+            if converted.notna().sum() > len(df) * 0.5:
+                df[col] = converted
+                logger.info(f"[AUTO-CONVERT v7.5.9] ✅ Колонка '{col}' → numeric (успешно: {converted.notna().sum()}/{len(df)})")
+            else:
+                logger.info(f"[AUTO-CONVERT v7.5.9] ⏭️  Колонка '{col}' → object (осталась строкой)")
 
         # Создаем caller и обрабатываем запрос
         caller = AIFunctionCaller()
