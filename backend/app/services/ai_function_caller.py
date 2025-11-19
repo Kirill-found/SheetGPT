@@ -320,7 +320,7 @@ class AIFunctionCaller:
             response["summary"] = func_result["message"]
             response["methodology"] = f"Использована функция {func_name} с параметрами: {params}"
 
-        elif func_name in ["filter_rows", "sort_data", "search_rows", "split_data", "remove_duplicates",
+        elif func_name in ["filter_rows", "filter_top_n", "filter_bottom_n", "sort_data", "search_rows", "split_data", "remove_duplicates",
                            "fill_missing", "aggregate_by_group", "pivot_table", "top_n_per_group"]:
             # Результат - DataFrame (таблица)
             if isinstance(func_result, pd.DataFrame) and not func_result.empty:
