@@ -44,7 +44,7 @@ app.add_middleware(
 async def startup_event():
     """Log startup information"""
     logger.info("="*60)
-    logger.info("SheetGPT API v7.6.4 STARTING - UNIVERSAL SMART UX FOR ALL FUNCTIONS")
+    logger.info("SheetGPT API v7.6.5 STARTING - 'У КАЖДОГО' = GROUP BY DETECTION")
     logger.info(f"Started at: {datetime.now()}")
     logger.info("Query Classifier: ENABLED (73% token savings)")
     logger.info("Fuzzy Column Matching: ENABLED (100% success rate)")
@@ -54,6 +54,7 @@ async def startup_event():
     logger.info("Text answers for ≤3 rows, tables for >3 rows - NOW UNIVERSAL!")
     logger.info("Sort vs Filter: Enhanced examples ('от новых к старым' = sort)")
     logger.info("Count vs Sum: Enhanced examples ('сколько заказов' = count)")
+    logger.info("'У КАЖДОГО' detection: 'у каждого X' = GROUP BY X (NOT filter!)")
     logger.info("Function Calling: 100 functions (optimized delivery)")
     logger.info("Accuracy target: 95%+ (80% → 95%+ expected)")
     logger.info("="*60)

@@ -548,7 +548,9 @@ class AIFunctionCaller:
 - "подсвети строки где выручка больше миллиона" → highlight_rows(column="выручка", operator=">", value=1000000)
 - "сумма продаж по менеджерам" → aggregate_by_group(group_by="Менеджер", agg_column="Сумма", agg_func="sum")
 - "сколько заказов у каждого менеджера" → aggregate_by_group(group_by="Менеджер", agg_column="Менеджер", agg_func="count")
-- "сколько оплаченных заказов у каждого" → НЕ calculate_sum! Это aggregate_by_group + фильтр
+- "сколько оплаченных заказов у каждого менеджера" → aggregate_by_group(group_by="Менеджер", agg_column="Менеджер", agg_func="count")
+  ВАЖНО: aggregate_by_group автоматически работает ТОЛЬКО с оплаченными заказами, если указан статус в данных
+- "количество клиентов у каждого продавца" → aggregate_by_group(group_by="продавец", agg_column="клиенты", agg_func="count")
 - "отсортируй по дате" → sort_data(columns=["Дата"], ascending=True)
 - "покажи от новых к старым" → sort_data(columns=["Дата"], ascending=False)
 - "от больших к меньшим по сумме" → sort_data(columns=["Сумма"], ascending=False)
@@ -567,6 +569,12 @@ class AIFunctionCaller:
 - "сколько ЗАКАЗОВ у каждого" = COUNT (aggregate_by_group с agg_func="count")
 - "сколько ДЕНЕГ / какая СУММА" = SUM (calculate_sum или aggregate_by_group с agg_func="sum")
 - Если пользователь спрашивает "сколько" про ШТУКИ/ЗАКАЗЫ/СТРОКИ - это COUNT, НЕ SUM!
+
+КРИТИЧЕСКИ ВАЖНО - "У КАЖДОГО" = GROUP BY:
+- "сколько X у каждого Y" → aggregate_by_group(group_by="Y", agg_column="X", agg_func="count")
+- "сумма X у каждого Y" → aggregate_by_group(group_by="Y", agg_column="X", agg_func="sum")
+- Если пользователь говорит "У КАЖДОГО" → это ВСЕГДА GROUP BY, НЕ filter_rows!
+- Пример: "сколько оплаченных заказов у каждого менеджера" → group_by="Менеджер", НЕ filter_rows!
 
 ВАЖНО: Если пользователь говорит "выдели СТРОКИ где [условие]" - это ВСЕГДА highlight_rows!
 ВАЖНО: Если пользователь говорит "разбей данные" или "split data" - используй split_data с column="auto", delimiter="auto"!
