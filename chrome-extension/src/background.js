@@ -3,8 +3,8 @@
  * Handles OAuth and Sheets API operations
  */
 
-// Import Sheets API module (path relative to extension root)
-importScripts('src/sheets-api.js');
+// Import Sheets API module (path relative to current directory)
+importScripts('sheets-api.js');
 
 console.log('[Background] Service worker started');
 
@@ -87,49 +87,46 @@ async function handleGetSheetData(tabId, tabUrl) {
     throw new Error('Not a valid Google Sheets URL');
   }
 
-  // ИСПРАВЛЕНИЕ: НЕ вызываем getActiveSheetName() - он вызывает зависание
-  // Вместо этого пробуем распространенные имена листов по порядку
-  const sheetNamesToTry = [
-    'Лист1',      // Russian default
-    'Sheet1',     // English default
-    'Лист 1',     // Russian with space
-    'Feuille 1',  // French
-    'Hoja 1',     // Spanish
-    'Tabelle1',   // German
-    'Planilha1'   // Portuguese
-  ];
+  try {
+    // v7.5.6 FIX: Определяем активный лист пользователя
+    console.log('[Background] 🎯 Getting ACTIVE sheet name...');
+    const activeSheetName = await withTimeout(
+      getActiveSheetName(tabId),
+      5000,
+      'Get active sheet name'
+    );
+    console.log(`[Background] ✅ Active sheet: "${activeSheetName}"`);
 
-  console.log('[Background] Will try sheet names:', sheetNamesToTry);
+    // Читаем данные ТОЛЬКО из активного листа
+    console.log(`[Background] 📖 Reading data from ACTIVE sheet: "${activeSheetName}"...`);
+    const data = await withTimeout(
+      readSheetData(spreadsheetId, activeSheetName),
+      8000,
+      `Read sheet data "${activeSheetName}"`
+    );
 
-  let lastError = null;
-
-  // Try each sheet name until one works
-  for (const sheetName of sheetNamesToTry) {
-    try {
-      console.log(`[Background] Trying sheet name: "${sheetName}"...`);
-      const data = await withTimeout(
-        readSheetData(spreadsheetId, sheetName),
-        8000,
-        `Read sheet data "${sheetName}"`
-      );
-      console.log(`[Background] ✅ Success with "${sheetName}":`, data);
-
-      // Save successful sheet name for later use (e.g., highlighting)
-      await chrome.storage.local.set({
-        [`sheetName_${spreadsheetId}`]: sheetName
-      });
-      console.log(`[Background] 💾 Saved sheet name "${sheetName}" for spreadsheet ${spreadsheetId}`);
-
-      return data;
-    } catch (error) {
-      console.warn(`[Background] ❌ Failed with "${sheetName}":`, error.message);
-      lastError = error;
-      // Continue to next name
+    // Проверяем что данные не пустые
+    if (!data.headers || data.headers.length === 0 || !data.data || data.data.length === 0) {
+      throw new Error(`Active sheet "${activeSheetName}" is empty or has no data`);
     }
-  }
 
-  // If all names failed, throw the last error
-  throw new Error(`Could not read sheet data. Last error: ${lastError?.message || 'Unknown'}. Tried: ${sheetNamesToTry.join(', ')}`);
+    console.log(`[Background] ✅ Got data from "${activeSheetName}":`, {
+      headers: data.headers,
+      rows: data.data.length
+    });
+
+    // Save successful sheet name for later use (e.g., highlighting)
+    await chrome.storage.local.set({
+      [`sheetName_${spreadsheetId}`]: activeSheetName
+    });
+    console.log(`[Background] 💾 Saved sheet name "${activeSheetName}" for spreadsheet ${spreadsheetId}`);
+
+    return data;
+
+  } catch (error) {
+    console.error('[Background] ❌ Error getting sheet data:', error);
+    throw error;
+  }
 }
 
 /**

@@ -1732,9 +1732,11 @@ class FunctionRegistry:
 
         if condition:
             filtered_df = self.filter_rows(df, **condition)
-            return filtered_df[column].sum()
+            # v7.5.6 FIX: Convert to numeric to handle string numbers from Sheets API
+            return pd.to_numeric(filtered_df[column], errors='coerce').sum()
 
-        return df[column].sum()
+        # v7.5.6 FIX: Convert to numeric to handle string numbers from Sheets API
+        return pd.to_numeric(df[column], errors='coerce').sum()
 
     def calculate_average(self, df: pd.DataFrame, column: str, condition: Optional[Dict] = None) -> float:
         """Среднее значение"""
@@ -1743,9 +1745,11 @@ class FunctionRegistry:
 
         if condition:
             filtered_df = self.filter_rows(df, **condition)
-            return filtered_df[column].mean()
+            # v7.5.6 FIX: Convert to numeric to handle string numbers from Sheets API
+            return pd.to_numeric(filtered_df[column], errors='coerce').mean()
 
-        return df[column].mean()
+        # v7.5.6 FIX: Convert to numeric to handle string numbers from Sheets API
+        return pd.to_numeric(df[column], errors='coerce').mean()
 
     def calculate_median(self, df: pd.DataFrame, column: str) -> float:
         """Медиана"""
