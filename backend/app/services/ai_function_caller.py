@@ -324,19 +324,53 @@ class AIFunctionCaller:
                            "fill_missing", "aggregate_by_group", "pivot_table", "top_n_per_group"]:
             # Результат - DataFrame (таблица)
             if isinstance(func_result, pd.DataFrame) and not func_result.empty:
-                headers = func_result.columns.tolist()
-                rows = func_result.head(100).values.tolist()
+                # v7.6.0 UX FIX: Для маленьких результатов (1-3 строки) - текстовый ответ вместо таблицы
+                if func_name in ["filter_top_n", "filter_bottom_n"] and len(func_result) <= 3:
+                    # Генерируем человекочитаемый ответ
+                    result_lines = []
 
-                response["structured_data"] = {
-                    "headers": headers,
-                    "rows": rows,
-                    "table_title": self._generate_table_title(func_name, params, len(func_result)),
-                    "chart_recommended": None,
-                    "operation_type": "function_result"
-                }
+                    for idx, row in func_result.iterrows():
+                        # Формируем строку типа "Ноутбук - 150000 руб"
+                        row_desc = []
+                        for col, val in row.items():
+                            # Форматируем числа с разделителями
+                            if isinstance(val, (int, float)) and not pd.isna(val):
+                                row_desc.append(f"{col}: {val:,.0f}".replace(",", " "))
+                            elif not pd.isna(val):
+                                row_desc.append(f"{col}: {val}")
+                        result_lines.append(" | ".join(row_desc))
 
-                response["summary"] = f"Выполнена операция: {func_name}. Получено {len(func_result)} строк"
-                response["methodology"] = f"Использована встроенная функция {func_name} с параметрами: {params}"
+                    # Определяем заголовок в зависимости от функции
+                    if func_name == "filter_top_n":
+                        if len(func_result) == 1:
+                            prefix = "Максимальное значение"
+                        else:
+                            prefix = f"Топ {len(func_result)}"
+                    else:  # filter_bottom_n
+                        if len(func_result) == 1:
+                            prefix = "Минимальное значение"
+                        else:
+                            prefix = f"Худшие {len(func_result)}"
+
+                    response["summary"] = f"{prefix}:\n" + "\n".join([f"{i+1}. {line}" for i, line in enumerate(result_lines)])
+                    response["methodology"] = f"Найдено методом {func_name}"
+                    # НЕ создаем structured_data - пользователь видит только текст в чате
+
+                else:
+                    # Большой результат (>3 строк) или другие функции - создаем таблицу
+                    headers = func_result.columns.tolist()
+                    rows = func_result.head(100).values.tolist()
+
+                    response["structured_data"] = {
+                        "headers": headers,
+                        "rows": rows,
+                        "table_title": self._generate_table_title(func_name, params, len(func_result)),
+                        "chart_recommended": None,
+                        "operation_type": "function_result"
+                    }
+
+                    response["summary"] = f"Выполнена операция: {func_name}. Получено {len(func_result)} строк"
+                    response["methodology"] = f"Использована встроенная функция {func_name} с параметрами: {params}"
 
         elif func_name in ["calculate_sum", "calculate_average", "calculate_median", "calculate_percentile",
                            "calculate_max", "calculate_min", "calculate_count", "calculate_count_all",

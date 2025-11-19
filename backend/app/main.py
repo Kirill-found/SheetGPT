@@ -44,15 +44,15 @@ app.add_middleware(
 async def startup_event():
     """Log startup information"""
     logger.info("="*60)
-    logger.info("SheetGPT API v7.5.9 STARTING - AUTO NUMERIC CONVERSION")
+    logger.info("SheetGPT API v7.6.0 STARTING - SMART UX FOR SMALL RESULTS")
     logger.info(f"Started at: {datetime.now()}")
     logger.info("Query Classifier: ENABLED (73% token savings)")
     logger.info("Fuzzy Column Matching: ENABLED (100% success rate)")
     logger.info("Metrics & Monitoring: ENABLED (real-time tracking)")
     logger.info("Auto Numeric Conversion: ENABLED (fixes ALL functions at once)")
+    logger.info("Smart UX: Text answers for 1-3 rows, tables for >3 rows")
     logger.info("Split Category: SEPARATE from action (fixes GPT-4o confusion)")
-    logger.info("Split Data: AUTO-RETURN if data already split (fixes 'разбей данные')")
-    logger.info("Function Calling: 100 functions (2 sent for split queries)")
+    logger.info("Function Calling: 100 functions (optimized delivery)")
     logger.info("Accuracy target: 95%+ (80% → 95%+ expected)")
     logger.info("="*60)
 
