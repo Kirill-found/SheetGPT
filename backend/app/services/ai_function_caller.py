@@ -324,36 +324,43 @@ class AIFunctionCaller:
                            "fill_missing", "aggregate_by_group", "pivot_table", "top_n_per_group"]:
             # Результат - DataFrame (таблица)
             if isinstance(func_result, pd.DataFrame) and not func_result.empty:
-                # v7.6.0 UX FIX: Для маленьких результатов (1-3 строки) - текстовый ответ вместо таблицы
-                if func_name in ["filter_top_n", "filter_bottom_n"] and len(func_result) <= 3:
+                # v7.6.4 UX FIX: Для ЛЮБЫХ маленьких результатов (1-3 строки) - текстовый ответ вместо таблицы
+                # Распространяем Smart UX на aggregate_by_group, filter_rows, и все другие функции
+                if len(func_result) <= 3:
                     # Генерируем человекочитаемый ответ
                     result_lines = []
 
                     for idx, row in func_result.iterrows():
-                        # Формируем строку типа "Ноутбук - 150000 руб"
+                        # Формируем строку типа "Иванов: 4 заказа | Сумма: 150 000"
                         row_desc = []
                         for col, val in row.items():
                             # Форматируем числа с разделителями
                             if isinstance(val, (int, float)) and not pd.isna(val):
-                                row_desc.append(f"{col}: {val:,.0f}".replace(",", " "))
+                                # Целые числа без .00, дробные с 2 знаками
+                                if val == int(val):
+                                    row_desc.append(f"{col}: {int(val):,}".replace(",", " "))
+                                else:
+                                    row_desc.append(f"{col}: {val:,.2f}".replace(",", " "))
                             elif not pd.isna(val):
                                 row_desc.append(f"{col}: {val}")
                         result_lines.append(" | ".join(row_desc))
 
                     # Определяем заголовок в зависимости от функции
                     if func_name == "filter_top_n":
-                        if len(func_result) == 1:
-                            prefix = "Максимальное значение"
-                        else:
-                            prefix = f"Топ {len(func_result)}"
-                    else:  # filter_bottom_n
-                        if len(func_result) == 1:
-                            prefix = "Минимальное значение"
-                        else:
-                            prefix = f"Худшие {len(func_result)}"
+                        prefix = "Максимальное значение" if len(func_result) == 1 else f"Топ {len(func_result)}"
+                    elif func_name == "filter_bottom_n":
+                        prefix = "Минимальное значение" if len(func_result) == 1 else f"Худшие {len(func_result)}"
+                    elif func_name == "aggregate_by_group":
+                        prefix = "Результат группировки"
+                    elif func_name == "filter_rows":
+                        prefix = "Найдено строк"
+                    elif func_name == "sort_data":
+                        prefix = "Отсортировано"
+                    else:
+                        prefix = "Результат"
 
                     response["summary"] = f"{prefix}:\n" + "\n".join([f"{i+1}. {line}" for i, line in enumerate(result_lines)])
-                    response["methodology"] = f"Найдено методом {func_name}"
+                    response["methodology"] = f"Использована функция {func_name} с параметрами: {params}"
                     # НЕ создаем structured_data - пользователь видит только текст в чате
 
                 else:
