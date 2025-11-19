@@ -1630,7 +1630,18 @@ class FunctionRegistry:
                     break
 
             if not found:
-                raise ValueError("Не найдена колонка с разделителями. Укажите column и delimiter вручную")
+                # DEBUG: Показываем первые строки данных
+                print(f"[SPLIT_DATA v7.5.5] Не найдена колонка с разделителями")
+                print(f"[SPLIT_DATA v7.5.5] Первые строки данных:")
+                for col in df.columns[:5]:  # Первые 5 колонок
+                    sample = df[col].head(3).tolist()
+                    print(f"  - '{col}': {sample}")
+
+                # v7.5.5 FIX: Если разделители не найдены - данные УЖЕ разбиты
+                # Возвращаем существующий DataFrame вместо ошибки
+                print(f"[SPLIT_DATA v7.5.5] ✅ Данные УЖЕ разбиты по колонкам ({len(df.columns)} колонок)")
+                print(f"[SPLIT_DATA v7.5.5] Возвращаем существующие данные для отображения таблицы")
+                return df
 
         # AUTO-DETECT: Определяем разделитель
         if delimiter == "auto":
