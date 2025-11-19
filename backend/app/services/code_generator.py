@@ -300,8 +300,7 @@ def format_code_result(
         # If large dict - create table
         if len(result) > 3:
             response["structured_data"] = {
-                "table_title": f"Результаты: {query}",
-                "columns": ["Параметр", "Значение"],
+                "headers": ["Параметр", "Значение"],
                 "rows": [[str(k), str(v)] for k, v in result.items()]
             }
 
@@ -323,8 +322,7 @@ def format_code_result(
             # Table
             response["summary"] = f"Найдено строк: {rows_count}"
             response["structured_data"] = {
-                "table_title": f"Результаты: {query}",
-                "columns": result.columns.tolist(),
+                "headers": result.columns.tolist(),
                 "rows": result.values.tolist()
             }
 
