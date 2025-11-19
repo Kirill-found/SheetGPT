@@ -129,20 +129,66 @@ class AIFunctionCaller:
 
                 return result
 
-            # Шаг 6: Если функция не выбрана - возвращаем текстовый ответ
+            # Шаг 6: Если функция не выбрана - FALLBACK со всеми функциями
             else:
                 print(f"[FUNCTION_CALLER] No function matched for query: {query}")
+
+                # v7.5.0 FALLBACK: Если использовали filtered functions, retry со ВСЕМИ
+                if len(filtered_function_defs) < len(all_function_defs):
+                    print(f"[CLASSIFIER FALLBACK] Retrying with ALL {len(all_function_defs)} functions...")
+
+                    # Retry с полным набором функций
+                    response = await self.client.chat.completions.create(
+                        model=self.model,
+                        messages=[
+                            {"role": "system", "content": system_prompt},
+                            {"role": "user", "content": query}
+                        ],
+                        functions=all_function_defs,  # ВСЕ 100 функций
+                        function_call="auto",
+                        temperature=0.1
+                    )
+
+                    message = response.choices[0].message
+
+                    # Если теперь нашлась функция - выполняем
+                    if message.function_call:
+                        print(f"[CLASSIFIER FALLBACK] SUCCESS! Found function: {message.function_call.name}")
+                        function_used = message.function_call.name
+                        result = await self._execute_function_call(
+                            message.function_call,
+                            df,
+                            query,
+                            sheet_data,
+                            column_names
+                        )
+
+                        # Log metrics (fallback success)
+                        duration_ms = (time.time() - start_time) * 1000
+                        metrics_collector.log_execution(
+                            function_name=function_used,
+                            success=result.get("response_type") != "error",
+                            duration_ms=duration_ms,
+                            query=query,
+                            confidence=result.get("confidence", 0),
+                            num_functions_sent=len(all_function_defs),
+                            categories=["fallback"] + categories
+                        )
+
+                        return result
+
+                # Если и со всеми функциями не нашли - возвращаем текстовый ответ
                 success = False
 
-                # v7.5.0: Log metrics (no function match)
+                # v7.5.0: Log metrics (no function match even with fallback)
                 duration_ms = (time.time() - start_time) * 1000
                 metrics_collector.log_execution(
                     function_name="NO_MATCH",
                     success=False,
                     duration_ms=duration_ms,
                     query=query,
-                    error="No function matched",
-                    num_functions_sent=len(filtered_function_defs),
+                    error="No function matched even after fallback",
+                    num_functions_sent=len(all_function_defs) if len(filtered_function_defs) < len(all_function_defs) else len(filtered_function_defs),
                     categories=categories
                 )
 

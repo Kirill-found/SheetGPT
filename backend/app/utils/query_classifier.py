@@ -54,11 +54,12 @@ class QueryClassifier:
                 r'\b(january|february|march|april|may|june|july|august|september|october|november|december)',
             ],
             "action": [
-                r'\b(подсвет|выдел|создай|добав|удали|измени)',
-                r'\b(highlight|create|add|delete|modify|update)',
+                r'\b(подсвет|выдел|создай|добав|удали|измени|разбей|раздели)',
+                r'\b(highlight|create|add|delete|modify|update|split|break)',
                 r'\b(график|диаграмм|chart)',
                 r'\b(таблиц)',
                 r'\b(table)',
+                r'\b(ячейк)',  # "по ячейкам"
             ],
             "insight": [
                 r'\b(тренд|аномал|рекоменд|анализ|сравн)',
