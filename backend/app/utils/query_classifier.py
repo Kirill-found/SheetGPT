@@ -53,13 +53,18 @@ class QueryClassifier:
                 r'\b(январ|феврал|март|апрел|ма[йя]|июн|июл|август|сентябр|октябр|ноябр|декабр)',
                 r'\b(january|february|march|april|may|june|july|august|september|october|november|december)',
             ],
+            "split": [
+                r'\b(разбей|раздели)',
+                r'\b(split|break)',
+                r'\b(ячейк)',  # "по ячейкам"
+                r'\b(разделит)',
+            ],
             "action": [
-                r'\b(подсвет|выдел|создай|добав|удали|измени|разбей|раздели)',
-                r'\b(highlight|create|add|delete|modify|update|split|break)',
+                r'\b(подсвет|выдел|создай|добав|удали|измени)',
+                r'\b(highlight|create|add|delete|modify|update)',
                 r'\b(график|диаграмм|chart)',
                 r'\b(таблиц)',
                 r'\b(table)',
-                r'\b(ячейк)',  # "по ячейкам"
             ],
             "insight": [
                 r'\b(тренд|аномал|рекоменд|анализ|сравн)',
@@ -199,6 +204,10 @@ class QueryClassifier:
                 "filter_by_date_range",
                 "group_by_month",
                 "group_by_quarter",
+            ],
+            "split": [
+                "split_data",
+                "split_column",
             ],
             "action": [
                 "highlight_rows",
