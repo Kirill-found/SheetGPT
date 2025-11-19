@@ -44,11 +44,12 @@ app.add_middleware(
 async def startup_event():
     """Log startup information"""
     logger.info("="*60)
-    logger.info("SheetGPT API v7.5.0 STARTING - PERFORMANCE & RELIABILITY")
+    logger.info("SheetGPT API v7.5.3 STARTING - SPLIT DATA AUTO-DETECT FIX")
     logger.info(f"Started at: {datetime.now()}")
     logger.info("Query Classifier: ENABLED (73% token savings)")
     logger.info("Fuzzy Column Matching: ENABLED (100% success rate)")
     logger.info("Metrics & Monitoring: ENABLED (real-time tracking)")
+    logger.info("Split Data: AUTO-DETECT column & delimiter (fixes 'разбей данные')")
     logger.info("Function Calling: 100 functions (10-30 sent per query)")
     logger.info("String Number Parsing: ENABLED")
     logger.info("Accuracy target: 95%+ (80% → 95%+ expected)")

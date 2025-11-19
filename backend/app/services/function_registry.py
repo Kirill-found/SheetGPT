@@ -251,21 +251,22 @@ class FunctionRegistry:
 
             {
                 "name": "split_data",
-                "description": "Разбиение строк по разделителю. Используй для 'разбей по запятым', 'split data'",
+                "description": "Разбиение строк по разделителю. ВАЖНО: Поддерживает auto-detect! Используй column='auto' и delimiter='auto' для автоматического определения. Используй для 'разбей данные по ячейкам', 'split data', 'разбей все данные'",
                 "parameters": {
                     "type": "object",
                     "properties": {
                         "column": {
                             "type": "string",
-                            "description": "Колонка для разбиения"
+                            "description": "Колонка для разбиения. Используй 'auto' для автоопределения колонки с разделителями",
+                            "default": "auto"
                         },
                         "delimiter": {
                             "type": "string",
-                            "description": "Разделитель (запятая, точка с запятой и т.д.)",
-                            "default": ","
+                            "description": "Разделитель (|, запятая, точка с запятой и т.д.). Используй 'auto' для автоопределения",
+                            "default": "auto"
                         }
                     },
-                    "required": ["column"]
+                    "required": []
                 }
             },
 
@@ -1601,16 +1602,62 @@ class FunctionRegistry:
             "message": f"Выделено {len(rows)} строк где {column} {operator} {value}, цвет: {color}"
         }
 
-    def split_data(self, df: pd.DataFrame, column: str, delimiter: str = ",") -> pd.DataFrame:
-        """Разбиение строк по разделителю"""
+    def split_data(self, df: pd.DataFrame, column: str = "auto", delimiter: str = "auto") -> pd.DataFrame:
+        """
+        Разбиение строк по разделителю
+
+        Поддерживает auto-detect:
+        - column="auto" → автоматически находит колонку с разделителями
+        - delimiter="auto" → автоматически определяет разделитель (|, ,, ;)
+        """
+        # AUTO-DETECT: Находим колонку с разделителями
+        if column == "auto":
+            possible_delimiters = ["|", ",", ";", "\t"]
+            found = False
+
+            for col in df.columns:
+                # Проверяем первые 5 строк на наличие разделителей
+                sample = df[col].astype(str).head(5)
+                for delim in possible_delimiters:
+                    if sample.str.contains(f"\\{delim}" if delim in ["|", "."] else delim, regex=True).any():
+                        column = col
+                        if delimiter == "auto":
+                            delimiter = delim
+                        found = True
+                        print(f"[SPLIT_DATA] Auto-detected column: '{column}', delimiter: '{delimiter}'")
+                        break
+                if found:
+                    break
+
+            if not found:
+                raise ValueError("Не найдена колонка с разделителями. Укажите column и delimiter вручную")
+
+        # AUTO-DETECT: Определяем разделитель
+        if delimiter == "auto":
+            possible_delimiters = ["|", ",", ";", "\t"]
+            sample = df[column].astype(str).head(5)
+
+            for delim in possible_delimiters:
+                if sample.str.contains(f"\\{delim}" if delim in ["|", "."] else delim, regex=True).any():
+                    delimiter = delim
+                    print(f"[SPLIT_DATA] Auto-detected delimiter: '{delimiter}'")
+                    break
+
+            if delimiter == "auto":
+                raise ValueError("Не найден разделитель в данных. Укажите delimiter вручную")
+
         if column not in df.columns:
             raise ValueError(f"Колонка '{column}' не найдена")
 
-        # Разбиваем первую строку чтобы получить заголовки
-        split_result = df[column].str.split(delimiter, expand=True)
+        # Разбиваем строки по разделителю
+        split_result = df[column].astype(str).str.split(delimiter, expand=True)
+
+        # Очищаем пробелы в каждой ячейке
+        split_result = split_result.applymap(lambda x: x.strip() if isinstance(x, str) else x)
 
         # Используем первую строку как заголовки
         headers = split_result.iloc[0].values.tolist()
+        headers = [h if h else f"Column_{i+1}" for i, h in enumerate(headers)]  # Пустые заголовки → Column_1, Column_2...
 
         # Остальные строки - данные
         data_rows = split_result.iloc[1:].values.tolist()

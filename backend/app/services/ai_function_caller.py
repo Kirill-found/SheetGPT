@@ -509,8 +509,11 @@ class AIFunctionCaller:
 - "отсортируй по дате" → sort_data
 - "топ 5 по выручке" → sort_data или top_n_per_group
 - "процент от общей суммы" → calculate_percentage
+- "разбей данные по ячейкам" → split_data(column="auto", delimiter="auto")
+  (система автоматически найдет колонку с разделителями типа |, , или ; и разобьёт данные)
 
 ВАЖНО: Если пользователь говорит "выдели СТРОКИ где [условие]" - это ВСЕГДА highlight_rows!
+ВАЖНО: Если пользователь говорит "разбей данные" или "split data" - используй split_data с column="auto", delimiter="auto"!
 """
 
         if custom_context:
