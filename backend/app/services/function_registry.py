@@ -1977,12 +1977,18 @@ class FunctionRegistry:
     def filter_top_n(self, df: pd.DataFrame, column: str, n: int) -> pd.DataFrame:
         """Топ N значений"""
         column = self._find_column(df, column)
-        return df.nlargest(n, column)
+        # v7.5.7 FIX: Convert to numeric for nlargest to work with string numbers
+        df_copy = df.copy()
+        df_copy[column] = pd.to_numeric(df_copy[column], errors='coerce')
+        return df_copy.nlargest(n, column)
 
     def filter_bottom_n(self, df: pd.DataFrame, column: str, n: int) -> pd.DataFrame:
         """Худшие N значений"""
         column = self._find_column(df, column)
-        return df.nsmallest(n, column)
+        # v7.5.7 FIX: Convert to numeric for nsmallest to work with string numbers
+        df_copy = df.copy()
+        df_copy[column] = pd.to_numeric(df_copy[column], errors='coerce')
+        return df_copy.nsmallest(n, column)
 
     def filter_outliers(self, df: pd.DataFrame, column: str, method: str = "iqr", threshold: float = 1.5) -> pd.DataFrame:
         """Исключить выбросы"""
