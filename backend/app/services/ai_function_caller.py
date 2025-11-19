@@ -539,7 +539,9 @@ class AIFunctionCaller:
 - "выдели щетки где сумма меньше 100000" → highlight_rows(column="сумма", operator="<", value=100000)
   (система найдет "Заказали на сумму" или "Сумма продаж" автоматически)
 - "подсвети строки где выручка больше миллиона" → highlight_rows(column="выручка", operator=">", value=1000000)
-- "сумма продаж по менеджерам" → aggregate_by_group
+- "сумма продаж по менеджерам" → aggregate_by_group(group_by="Менеджер", agg_column="Сумма", agg_func="sum")
+- "сколько заказов у каждого менеджера" → aggregate_by_group(group_by="Менеджер", agg_column="Менеджер", agg_func="count")
+- "сколько оплаченных заказов у каждого" → НЕ calculate_sum! Это aggregate_by_group + фильтр
 - "отсортируй по дате" → sort_data(columns=["Дата"], ascending=True)
 - "покажи от новых к старым" → sort_data(columns=["Дата"], ascending=False)
 - "от больших к меньшим по сумме" → sort_data(columns=["Сумма"], ascending=False)
@@ -553,6 +555,11 @@ class AIFunctionCaller:
 - "от новых к старым" / "от больших к меньшим" = СОРТИРОВКА (sort_data)
 - "покажи ГДЕ дата < X" / "только строки ГДЕ сумма > Y" = ФИЛЬТРАЦИЯ (filter_rows)
 - Если пользователь НЕ указывает условие - это СОРТИРОВКА!
+
+КРИТИЧЕСКИ ВАЖНО - COUNT vs SUM:
+- "сколько ЗАКАЗОВ у каждого" = COUNT (aggregate_by_group с agg_func="count")
+- "сколько ДЕНЕГ / какая СУММА" = SUM (calculate_sum или aggregate_by_group с agg_func="sum")
+- Если пользователь спрашивает "сколько" про ШТУКИ/ЗАКАЗЫ/СТРОКИ - это COUNT, НЕ SUM!
 
 ВАЖНО: Если пользователь говорит "выдели СТРОКИ где [условие]" - это ВСЕГДА highlight_rows!
 ВАЖНО: Если пользователь говорит "разбей данные" или "split data" - используй split_data с column="auto", delimiter="auto"!
