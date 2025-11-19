@@ -1530,12 +1530,28 @@ class FunctionRegistry:
         if operator == "contains":
             mask = df[column].astype(str).str.contains(str(value), case=False, na=False)
         else:
-            # Для числовых операторов пытаемся преобразовать колонку в числа
+            # v7.6.1 FIX: Определяем тип данных (дата или число)
+            is_date_comparison = False
+
+            # Проверяем, является ли value датой (формат YYYY-MM-DD или DD-MM-YYYY)
+            if isinstance(value, str) and re.match(r'\d{4}-\d{2}-\d{2}|\d{2}-\d{2}-\d{4}', value):
+                is_date_comparison = True
+
             if operator in ['<', '>', '<=', '>=']:
-                column_data = self._parse_numeric_column(df[column])
-                # Преобразуем value тоже, если это строка
-                if isinstance(value, str):
-                    value = float(re.sub(r'[^\d.-]', '', value)) if value else 0
+                if is_date_comparison:
+                    # Конвертируем в datetime для сравнения дат
+                    try:
+                        column_data = pd.to_datetime(df[column], errors='coerce')
+                        value = pd.to_datetime(value, errors='coerce')
+                    except:
+                        # Fallback to string comparison
+                        column_data = df[column]
+                else:
+                    # Конвертируем в числа для сравнения чисел
+                    column_data = self._parse_numeric_column(df[column])
+                    # Преобразуем value тоже, если это строка
+                    if isinstance(value, str):
+                        value = float(re.sub(r'[^\d.-]', '', value)) if value else 0
             else:
                 column_data = df[column]
 
