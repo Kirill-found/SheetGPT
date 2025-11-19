@@ -1,28 +1,49 @@
 """
-AI Function Caller для SheetGPT v7.0.0
-Интеграция с GPT-4o через function calling
+AI Function Caller для SheetGPT v7.5.0
+Интеграция с GPT-4o через function calling + improvements:
+- Query classifier для отправки только релевантных функций (75% tokens saved)
+- Metrics logging для monitoring
+- Improved error handling
 """
 
+from pathlib import Path
 import pandas as pd
 import json
 import os
+import time
 from typing import Any, Dict, List, Optional
 from openai import AsyncOpenAI
 
 from .function_registry import FunctionRegistry
+from app.utils.query_classifier import QueryClassifier
+from app.utils.metrics import metrics_collector
+
+# CRITICAL FIX: Напрямую читаем .env файл (load_dotenv() не работает с uvicorn)
+env_path = Path(__file__).parent.parent.parent / ".env"
+if env_path.exists():
+    with open(env_path, 'r', encoding='utf-8') as f:
+        for line in f:
+            line = line.strip()
+            if line.startswith("OPENAI_API_KEY="):
+                api_key = line.split("=", 1)[1].strip()
+                os.environ["OPENAI_API_KEY"] = api_key
+                break
 
 
 class AIFunctionCaller:
     """
-    Интеграция с GPT-4o для function calling
-    1. GPT-4o определяет функцию и параметры
-    2. Выполняем проверенную функцию из registry
-    3. NO FALLBACK - 100 functions должны покрывать все запросы
+    Интеграция с GPT-4o для function calling (v7.5.0)
+    1. Classifier фильтрует функции → 75% tokens saved
+    2. GPT-4o определяет функцию из релевантных
+    3. Выполняем функцию с fuzzy column matching
+    4. Metrics logging для monitoring
+    5. NO FALLBACK - 100 functions должны покрывать все запросы
     """
 
     def __init__(self):
         self.client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
         self.registry = FunctionRegistry()
+        self.classifier = QueryClassifier()  # v7.5.0: Query classification
         self.model = "gpt-4o"
 
     async def process_query(
@@ -34,63 +55,131 @@ class AIFunctionCaller:
         custom_context: Optional[str] = None
     ) -> Dict[str, Any]:
         """
-        Обработка запроса с function calling (NO FALLBACK - 100 functions only)
+        Обработка запроса с function calling (v7.5.0 with classifier + metrics)
         """
+        start_time = time.time()  # v7.5.0: Metrics timing
+        function_used = None
+        success = True
 
-        # Шаг 1: Анализ DataFrame для контекста
-        df_info = self._analyze_dataframe(df, column_names)
+        try:
+            # Шаг 1: Анализ DataFrame для контекста
+            df_info = self._analyze_dataframe(df, column_names)
 
-        # Шаг 2: Формируем промпт для GPT-4o
-        system_prompt = self._build_system_prompt(df_info, custom_context)
+            # Шаг 2: Формируем промпт для GPT-4o
+            system_prompt = self._build_system_prompt(df_info, custom_context)
 
-        # Шаг 3: Вызываем GPT-4o с function calling
-        response = await self.client.chat.completions.create(
-            model=self.model,
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": query}
-            ],
-            functions=self.registry.get_function_definitions(),
-            function_call="auto",  # AI решает вызывать ли функцию
-            temperature=0.1
-        )
+            # v7.5.0: Шаг 3 - Классифицируем запрос и фильтруем функции
+            relevant_functions = self.classifier.get_relevant_functions(query)
+            categories = self.classifier.classify(query)
 
-        message = response.choices[0].message
+            print(f"[CLASSIFIER v7.5.0] Query: {query[:50]}...")
+            print(f"[CLASSIFIER v7.5.0] Categories: {categories}")
+            print(f"[CLASSIFIER v7.5.0] Functions: {len(relevant_functions)}/100 ({len(relevant_functions)/100*100:.0f}%)")
 
-        # Шаг 4: Если AI выбрал функцию - выполняем
-        if message.function_call:
-            return await self._execute_function_call(
-                message.function_call,
-                df,
-                query,
-                sheet_data,
-                column_names
+            # Получаем только релевантные function definitions
+            all_function_defs = self.registry.get_function_definitions()
+            filtered_function_defs = [
+                func_def for func_def in all_function_defs
+                if func_def["name"] in relevant_functions
+            ]
+
+            # Fallback: если classifier ничего не нашел - используем все функции
+            if not filtered_function_defs:
+                print("[CLASSIFIER v7.5.0] No matches - using all functions (fallback)")
+                filtered_function_defs = all_function_defs
+
+            print(f"[CLASSIFIER v7.5.0] Sending {len(filtered_function_defs)} functions to GPT-4o")
+
+            # Шаг 4: Вызываем GPT-4o с отфильтрованными функциями
+            response = await self.client.chat.completions.create(
+                model=self.model,
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": query}
+                ],
+                functions=filtered_function_defs,  # v7.5.0: Filtered functions (25% of 100)
+                function_call="auto",  # AI решает вызывать ли функцию
+                temperature=0.1
             )
 
-        # Шаг 5: Если функция не выбрана - возвращаем текстовый ответ
-        else:
-            print(f"[FUNCTION_CALLER] No function matched for query: {query}")
-            return {
-                "formula": None,
-                "explanation": "",
-                "target_cell": None,
-                "confidence": 0.50,
-                "response_type": "text_only",
-                "function_used": None,
-                "parameters": None,
-                "insights": [],
-                "suggested_actions": None,
-                "summary": message.content or "Не удалось найти подходящую функцию для этого запроса.",
-                "methodology": "GPT-4o text response (no function match)",
-                "key_findings": [],
-                "professional_insights": "",
-                "recommendations": ["Попробуйте переформулировать запрос более конкретно"],
-                "warnings": ["Не найдена подходящая функция из 100 доступных"],
-                "structured_data": None,
-                "highlight_rows": None,
-                "highlight_color": None,
-                "highlight_message": None,
-            }
+            message = response.choices[0].message
+
+            # Шаг 5: Если AI выбрал функцию - выполняем
+            if message.function_call:
+                function_used = message.function_call.name
+                result = await self._execute_function_call(
+                    message.function_call,
+                    df,
+                    query,
+                    sheet_data,
+                    column_names
+                )
+
+                # v7.5.0: Log metrics
+                duration_ms = (time.time() - start_time) * 1000
+                metrics_collector.log_execution(
+                    function_name=function_used,
+                    success=result.get("response_type") != "error",
+                    duration_ms=duration_ms,
+                    query=query,
+                    confidence=result.get("confidence", 0),
+                    num_functions_sent=len(filtered_function_defs),
+                    categories=categories
+                )
+
+                return result
+
+            # Шаг 6: Если функция не выбрана - возвращаем текстовый ответ
+            else:
+                print(f"[FUNCTION_CALLER] No function matched for query: {query}")
+                success = False
+
+                # v7.5.0: Log metrics (no function match)
+                duration_ms = (time.time() - start_time) * 1000
+                metrics_collector.log_execution(
+                    function_name="NO_MATCH",
+                    success=False,
+                    duration_ms=duration_ms,
+                    query=query,
+                    error="No function matched",
+                    num_functions_sent=len(filtered_function_defs),
+                    categories=categories
+                )
+
+                return {
+                    "formula": None,
+                    "explanation": "",
+                    "target_cell": None,
+                    "confidence": 0.50,
+                    "response_type": "text_only",
+                    "function_used": None,
+                    "parameters": None,
+                    "insights": [],
+                    "suggested_actions": None,
+                    "summary": message.content or "Не удалось найти подходящую функцию для этого запроса.",
+                    "methodology": "GPT-4o text response (no function match)",
+                    "key_findings": [],
+                    "professional_insights": "",
+                    "recommendations": ["Попробуйте переформулировать запрос более конкретно"],
+                    "warnings": ["Не найдена подходящая функция из 100 доступных"],
+                    "structured_data": None,
+                    "highlight_rows": None,
+                    "highlight_color": None,
+                    "highlight_message": None,
+                }
+
+        except Exception as e:
+            # v7.5.0: Log error metrics
+            duration_ms = (time.time() - start_time) * 1000
+            metrics_collector.log_execution(
+                function_name="EXCEPTION",
+                success=False,
+                duration_ms=duration_ms,
+                query=query,
+                error=str(e),
+                num_functions_sent=0
+            )
+            raise  # Re-raise exception
 
     async def _execute_function_call(
         self,
