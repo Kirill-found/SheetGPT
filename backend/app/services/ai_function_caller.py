@@ -1,9 +1,10 @@
 """
-AI Function Caller для SheetGPT v7.5.0
-Интеграция с GPT-4o через function calling + improvements:
-- Query classifier для отправки только релевантных функций (75% tokens saved)
-- Metrics logging для monitoring
-- Improved error handling
+AI Function Caller для SheetGPT v7.8.0 - Hybrid Intelligence
+3-tier decision system:
+- TIER 1: Pattern Detection (10-15 patterns, 0 tokens)
+- TIER 2: Query Complexity Classifier (GPT-4o-mini, ~100 tokens)
+- TIER 3A: Function Calling for simple queries (GPT-4o, ~500 tokens)
+- TIER 3B: Code Generation for complex queries (GPT-4o, ~1000 tokens)
 """
 
 from pathlib import Path
@@ -17,6 +18,8 @@ from openai import AsyncOpenAI
 from .function_registry import FunctionRegistry
 from app.utils.query_classifier import QueryClassifier
 from app.utils.metrics import metrics_collector
+from .query_complexity_classifier import classify_query_complexity
+from .code_generator import generate_and_execute_code
 
 # CRITICAL FIX: Напрямую читаем .env файл (load_dotenv() не работает с uvicorn)
 env_path = Path(__file__).parent.parent.parent / ".env"
@@ -46,6 +49,203 @@ class AIFunctionCaller:
         self.classifier = QueryClassifier()  # v7.5.0: Query classification
         self.model = "gpt-4o"
 
+    def _detect_and_handle_pattern(self, query: str, df: pd.DataFrame, column_names: List[str]) -> Optional[Dict[str, Any]]:
+        """
+        v7.7.0: Rule-Based Pattern Detection
+        Detect known problematic patterns and handle them directly, bypassing GPT-4o
+        Returns: result dict if pattern detected and handled, None otherwise
+        """
+        import re
+        from difflib import get_close_matches
+
+        query_lower = query.lower()
+
+        # PATTERN 1: "топ N" / "лучшие N" / "худшие N" queries
+        # Example: "топ 3 заказа в Москве", "5 лучших продаж"
+        top_keywords = ["топ", "лучш", "худш", "самы", "наиболь", "наименьш"]
+        if any(k in query_lower for k in top_keywords):
+            # Extract N (number)
+            numbers = re.findall(r'\d+', query)
+            if numbers:
+                n = int(numbers[0])
+                print(f"[PATTERN DETECTOR v7.7.0] Detected TOP_N pattern: n={n}")
+
+                # Determine column to sort by (usually "Сумма" or similar)
+                numeric_cols = df.select_dtypes(include=['number']).columns.tolist()
+                if numeric_cols:
+                    sort_col = numeric_cols[0]  # Default to first numeric column
+
+                    # Check for condition (e.g., "в Москве")
+                    # Extract location/status keywords
+                    condition_col = None
+                    condition_value = None
+
+                    # Common filter patterns
+                    if " в " in query_lower:
+                        # "топ 3 в Москве" → filter by location
+                        location_cols = [c for c in column_names if any(k in c.lower() for k in ["город", "регион", "location"])]
+                        if location_cols:
+                            condition_col = location_cols[0]
+                            # Extract value after "в"
+                            match = re.search(r' в (\w+)', query, re.IGNORECASE)
+                            if match:
+                                condition_value = match.group(1)
+
+                    # Determine direction (top or bottom)
+                    is_bottom = any(k in query_lower for k in ["худш", "наименьш", "мин"])
+
+                    # Call appropriate function
+                    registry = FunctionRegistry()
+
+                    if is_bottom:
+                        func = registry.functions["filter_bottom_n"]
+                        func_name = "filter_bottom_n"
+                        params = {"column": sort_col, "n": n}
+                    else:
+                        func = registry.functions["filter_top_n"]
+                        func_name = "filter_top_n"
+                        params = {"column": sort_col, "n": n}
+
+                    # Add condition if detected - filter df first
+                    filtered_df = df
+                    if condition_col and condition_value:
+                        print(f"[PATTERN DETECTOR v7.7.0] With condition: {condition_col} == {condition_value}")
+                        # Filter df first, then apply top_n
+                        filtered_df = df[df[condition_col] == condition_value]
+                        print(f"[PATTERN DETECTOR v7.7.0] Filtered: {len(filtered_df)} rows (from {len(df)})")
+
+                    print(f"[PATTERN DETECTOR v7.7.0] Calling {func_name} with {params}")
+                    result_df = func(filtered_df, **params)
+
+                    # Format response
+                    return self._format_pattern_response(
+                        result_df=result_df,
+                        function_name=func_name,
+                        params=params,
+                        query=query
+                    )
+
+        # PATTERN 2: "у каждого" / "у всех" / "для каждого" queries
+        # Example: "сколько оплаченных заказов у каждого менеджера"
+        group_by_keywords = ["у каждого", "у всех", "для каждого", "по каждому"]
+        if any(k in query_lower for k in group_by_keywords):
+            print(f"[PATTERN DETECTOR v7.8.0] Detected GROUP_BY pattern")
+
+            # Extract group column (word after "каждого"/"всех")
+            for keyword in group_by_keywords:
+                if keyword in query_lower:
+                    idx = query_lower.find(keyword)
+                    after_keyword = query[idx + len(keyword):].strip()
+                    words_after = after_keyword.split()
+                    if words_after:
+                        group_word = words_after[0].strip('?,.')
+                        # Find closest matching column
+                        matches = get_close_matches(group_word, column_names, n=1, cutoff=0.4)
+                        if matches:
+                            group_col = matches[0]
+                            print(f"[PATTERN DETECTOR v7.8.0] Group column: {group_col}")
+
+                            # Check for filter condition (e.g., "оплаченных")
+                            filtered_df = df
+                            if any(k in query_lower for k in ["оплачен", "paid", "completed"]):
+                                # Find status column
+                                status_cols = [c for c in column_names if any(k in c.lower() for k in ["статус", "status", "state"])]
+                                if status_cols:
+                                    status_col = status_cols[0]
+                                    # Filter for "Оплачен"
+                                    filtered_df = df[df[status_col].str.contains("плачен", case=False, na=False)]
+                                    print(f"[PATTERN DETECTOR v7.8.0] Filtered by {status_col}: {len(filtered_df)} rows (from {len(df)})")
+
+                            # Determine aggregation function
+                            if any(k in query_lower for k in ["сколько", "количество", "число"]):
+                                agg_func = "count"
+                            elif any(k in query_lower for k in ["сумма", "итого", "всего"]):
+                                agg_func = "sum"
+                            elif any(k in query_lower for k in ["средн", "average"]):
+                                agg_func = "mean"
+                            else:
+                                agg_func = "count"  # Default
+
+                            print(f"[PATTERN DETECTOR v7.8.0] Agg function: {agg_func}")
+
+                            # Determine agg_column (column to aggregate)
+                            # For count, use first column; for sum/mean, use numeric column
+                            if agg_func == "count":
+                                agg_col = column_names[0]  # Any column works for count
+                            else:
+                                # Find numeric column (exclude group column)
+                                numeric_cols = filtered_df.select_dtypes(include=['number']).columns.tolist()
+                                numeric_cols = [c for c in numeric_cols if c != group_col]
+                                agg_col = numeric_cols[0] if numeric_cols else column_names[0]
+
+                            print(f"[PATTERN DETECTOR v7.8.0] Agg column: {agg_col}")
+
+                            # Call aggregate_by_group
+                            registry = FunctionRegistry()
+                            func = registry.functions["aggregate_by_group"]
+                            params = {
+                                "group_by": [group_col],  # Must be a list
+                                "agg_column": agg_col,  # FIXED: Use proper agg column
+                                "agg_func": agg_func
+                            }
+
+                            print(f"[PATTERN DETECTOR v7.8.0] Calling aggregate_by_group with {params}")
+                            result_df = func(filtered_df, **params)  # Use filtered_df
+
+                            return self._format_pattern_response(
+                                result_df=result_df,
+                                function_name="aggregate_by_group",
+                                params=params,
+                                query=query
+                            )
+
+        # No pattern detected
+        return None
+
+    def _format_pattern_response(self, result_df: pd.DataFrame, function_name: str, params: Dict, query: str) -> Dict[str, Any]:
+        """Format response for pattern-detected queries"""
+        print(f"[PATTERN DETECTOR v7.7.0] Result: {len(result_df)} rows")
+
+        # Generate summary based on result
+        if len(result_df) <= 3:
+            # Small result - text answer (Smart UX from v7.6.4)
+            result_lines = []
+            for idx, row in result_df.iterrows():
+                row_desc = []
+                for col, val in row.items():
+                    if isinstance(val, (int, float)) and not pd.isna(val):
+                        if val == int(val):
+                            row_desc.append(f"{col}: {int(val):,}".replace(",", " "))
+                        else:
+                            row_desc.append(f"{col}: {val:,.2f}".replace(",", " "))
+                    elif not pd.isna(val):
+                        row_desc.append(f"{col}: {val}")
+                result_lines.append(" | ".join(row_desc))
+
+            summary = "Результат:\n" + "\n".join([f"{i+1}. {line}" for i, line in enumerate(result_lines)])
+        else:
+            # Large result - will create table
+            summary = f"Найдено {len(result_df)} записей. Результат отправлен в новый лист."
+
+        return {
+            "formula": None,
+            "explanation": f"Запрос обработан автоматическим детектором паттернов v7.7.0",
+            "target_cell": None,
+            "confidence": 0.99,  # High confidence for rule-based
+            "response_type": "analysis",
+            "function_used": function_name,
+            "parameters": params,
+            "summary": summary,
+            "methodology": f"Использован детектор паттернов v7.7.0. Функция: {function_name}. Параметры: {params}",
+            "key_findings": [f"Обработано записей: {len(result_df)}"],
+            "insights": [],
+            "structured_data": {
+                "headers": result_df.columns.tolist(),
+                "rows": result_df.values.tolist(),
+                "table_title": f"Результат: {query[:50]}..."
+            } if len(result_df) > 3 else None
+        }
+
     async def process_query(
         self,
         query: str,
@@ -61,6 +261,71 @@ class AIFunctionCaller:
         function_used = None
         success = True
 
+        try:
+            # v7.7.0: RULE-BASED PATTERN DETECTION
+            # Check for known problematic patterns and handle them directly
+            pattern_result = self._detect_and_handle_pattern(query, df, column_names)
+            if pattern_result:
+                print(f"[PATTERN DETECTOR v7.7.0] Pattern detected and handled successfully!")
+                print(f"[PATTERN DETECTOR v7.7.0] Function: {pattern_result.get('function_used')}")
+
+                # Log metrics for pattern-detected queries
+                duration_ms = (time.time() - start_time) * 1000
+                metrics_collector.log_execution(
+                    function_name=pattern_result.get('function_used'),
+                    success=True,
+                    duration_ms=duration_ms,
+                    query=query,
+                    num_functions_sent=0,  # Bypassed GPT-4o
+                    categories=["pattern_detected"]
+                )
+
+                return pattern_result
+        except Exception as e:
+            print(f"[PATTERN DETECTOR v7.7.0] Error in pattern detection: {e}")
+            # Continue with normal GPT-4o flow if pattern detection fails
+            pass
+
+        # v7.8.0: TIER 2 - Query Complexity Classifier
+        # Determine whether to use Function Calling (simple) or Code Generation (complex)
+        try:
+            print(f"[TIER 2 v7.8.0] Classifying query complexity...")
+            complexity = await classify_query_complexity(query, column_names)
+            print(f"[TIER 2 v7.8.0] Complexity: {complexity.upper()}")
+
+            if complexity == "complex":
+                # TIER 3B: Code Generation for complex queries
+                print(f"[TIER 3B v7.8.0] Using Code Generation for complex query")
+                result = await generate_and_execute_code(
+                    query=query,
+                    df=df,
+                    column_names=column_names,
+                    custom_context=custom_context
+                )
+
+                # Log metrics
+                duration_ms = (time.time() - start_time) * 1000
+                metrics_collector.log_execution(
+                    function_name="code_generation",
+                    success=result.get("python_executed", False),
+                    duration_ms=duration_ms,
+                    query=query,
+                    confidence=result.get("confidence", 0.99),
+                    num_functions_sent=0,  # No functions sent
+                    categories=["complex_query", "code_generation"]
+                )
+
+                return result
+
+            # If simple, continue to TIER 3A (Function Calling)
+            print(f"[TIER 3A v7.8.0] Using Function Calling for simple query")
+
+        except Exception as e:
+            print(f"[TIER 2 v7.8.0] Error in complexity classification: {e}")
+            print(f"[TIER 2 v7.8.0] Falling back to Function Calling (TIER 3A)")
+            # Continue with Function Calling on error
+
+        # v7.8.0: TIER 3A - Function Calling (for simple queries)
         try:
             # Шаг 1: Анализ DataFrame для контекста
             df_info = self._analyze_dataframe(df, column_names)
@@ -527,12 +792,29 @@ class AIFunctionCaller:
 {df_info}
 
 ПРАВИЛА:
-1. Названия колонок могут быть НЕТОЧНЫМИ - система найдет похожую колонку
-2. Для выделения строк ВСЕГДА используй highlight_rows (работает с "выдели", "подсвети", "отметь")
-3. Для фильтрации ВСЕГДА используй filter_rows (работает с "покажи где", "найди где")
-4. Для сортировки ВСЕГДА используй sort_data
-5. Для вычислений (сумма, среднее и т.д.) используй calculate_* функции
-6. Для группировки используй aggregate_by_group или pivot_table
+1. **АБСОЛЮТНЫЙ ПРИОРИТЕТ - ПРОВЕРЯЙ ПЕРВЫМ ДЕЛОМ!**
+   Если в запросе есть слова "У КАЖДОГО", "У ВСЕХ", "ДЛЯ КАЖДОГО", "ПО КАЖДОМУ":
+   → НЕМЕДЛЕННО используй aggregate_by_group(group_by="Y", agg_func="count" или "sum")
+   → ИГНОРИРУЙ ВСЕ ОСТАЛЬНЫЕ СЛОВА (фильтр, статус, условия) - они обрабатываются внутри aggregate_by_group!
+   → ЗАПРЕЩЕНО использовать: calculate_sum, calculate_count, filter_rows, ANY OTHER FUNCTION!
+
+   ПРАВИЛЬНЫЕ примеры:
+   - "сколько заказов у каждого менеджера" → aggregate_by_group(group_by="Менеджер", agg_column="Менеджер", agg_func="count")
+   - "сколько оплаченных заказов у каждого менеджера" → aggregate_by_group(group_by="Менеджер", agg_column="Менеджер", agg_func="count")
+   - "сумма продаж у каждого клиента" → aggregate_by_group(group_by="клиент", agg_column="продажи", agg_func="sum")
+
+   НЕПРАВИЛЬНЫЕ примеры (НИКОГДА НЕ ДЕЛАЙ ТАК):
+   - "сколько заказов у каждого менеджера" → calculate_sum (НЕПРАВИЛЬНО!)
+   - "сколько оплаченных заказов у каждого" → calculate_count (НЕПРАВИЛЬНО!)
+   - "сколько оплаченных заказов у каждого менеджера" → filter_rows (НЕПРАВИЛЬНО! Даже если есть слово "оплаченных", всё равно используй aggregate_by_group!)
+   - "сколько X у каждого Y" → filter_rows (НЕПРАВИЛЬНО!)
+
+2. Названия колонок могут быть НЕТОЧНЫМИ - система найдет похожую колонку
+3. Для выделения строк ВСЕГДА используй highlight_rows (работает с "выдели", "подсвети", "отметь")
+4. Для фильтрации ВСЕГДА используй filter_rows (работает с "покажи где", "найди где") - НО ТОЛЬКО ЕСЛИ НЕТ "У КАЖДОГО"!
+5. Для сортировки ВСЕГДА используй sort_data
+6. Для вычислений (сумма, среднее и т.д.) используй calculate_* функции - НО ТОЛЬКО ЕСЛИ НЕТ "У КАЖДОГО"!
+7. Для группировки используй aggregate_by_group или pivot_table
 
 КРИТИЧЕСКИ ВАЖНО - ПОВЕДЕНИЕ AI:
 - Можешь задать ОДИН уточняющий вопрос если задача неясна
