@@ -246,6 +246,39 @@ class AIFunctionCaller:
             } if len(result_df) > 3 else None
         }
 
+    def _validate_query(self, query: str) -> tuple[bool, str]:
+        """
+        v7.8.3: Валидация запроса перед обработкой
+
+        Returns:
+            (is_valid, error_message) - True если запрос валидный, False + сообщение если нет
+        """
+        # Проверка 1: Минимальная длина
+        if len(query.strip()) < 3:
+            return False, "Запрос слишком короткий. Минимум 3 символа."
+
+        # Проверка 2: Содержит ли хотя бы одну гласную (русскую или английскую)
+        # Бессмысленные запросы типа "asdfghjkl" не имеют нормального распределения гласных
+        vowels_ru = set('аеёиоуыэюяАЕЁИОУЫЭЮЯ')
+        vowels_en = set('aeiouAEIOU')
+        query_chars = set(query.lower())
+
+        has_vowels = bool(query_chars & (vowels_ru | vowels_en))
+        if not has_vowels:
+            return False, "Не могу понять запрос. Пожалуйста, используйте осмысленные слова."
+
+        # Проверка 3: Процент гласных (должен быть разумным)
+        # В нормальных словах гласных 20-50%, в "asdfghjkl" - 0%
+        total_letters = sum(1 for c in query if c.isalpha())
+        if total_letters > 0:
+            vowel_count = sum(1 for c in query.lower() if c in vowels_ru or c in vowels_en)
+            vowel_ratio = vowel_count / total_letters
+
+            if vowel_ratio < 0.15:  # Менее 15% гласных = подозрительно
+                return False, "Не могу понять запрос. Пожалуйста, сформулируйте вопрос понятнее."
+
+        return True, ""
+
     async def process_query(
         self,
         query: str,
@@ -260,6 +293,20 @@ class AIFunctionCaller:
         start_time = time.time()  # v7.5.0: Metrics timing
         function_used = None
         success = True
+
+        # v7.8.3: Валидация запроса
+        is_valid, error_message = self._validate_query(query)
+        if not is_valid:
+            print(f"[QUERY VALIDATOR v7.8.3] Invalid query: {query}")
+            print(f"[QUERY VALIDATOR v7.8.3] Reason: {error_message}")
+            return {
+                "summary": error_message,
+                "explanation": "Система не смогла обработать ваш запрос. Пожалуйста, перефразируйте вопрос используя понятные слова.",
+                "response_type": "error",
+                "confidence": 0.0,
+                "methodology": "Запрос не прошел валидацию",
+                "key_findings": []
+            }
 
         try:
             # v7.7.0: RULE-BASED PATTERN DETECTION
