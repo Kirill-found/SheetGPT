@@ -475,11 +475,32 @@ class FunctionRegistry:
 
             {
                 "name": "calculate_count",
-                "description": "Количество непустых значений. Используй для 'сколько', 'количество непустых', 'count'",
+                "description": "Количество непустых значений. Используй для 'сколько', 'количество', 'count'. ВАЖНО: 'сколько ЗАКАЗОВ' = COUNT (не SUM!). Поддерживает фильтрацию (например: 'сколько заказов ждут оплаты' → column='Товар', condition={column:'Статус', operator:'contains', value:'Ожидает'})",
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "column": {"type": "string", "description": "Колонка для подсчета"}
+                        "column": {
+                            "type": "string",
+                            "description": "Колонка для подсчета (обычно та, по которой считаем количество записей)"
+                        },
+                        "condition": {
+                            "type": "object",
+                            "description": "Фильтр перед подсчетом (опционально). Структура: {column: 'название_колонки', operator: '==' или 'contains', value: 'значение'}. Пример: {column: 'Статус', operator: 'contains', value: 'Ожидает'}",
+                            "properties": {
+                                "column": {
+                                    "type": "string",
+                                    "description": "Колонка для фильтрации"
+                                },
+                                "operator": {
+                                    "type": "string",
+                                    "description": "Оператор сравнения: '==', '!=', '>', '<', '>=', '<=', 'contains'"
+                                },
+                                "value": {
+                                    "description": "Значение для сравнения (string, number, или boolean)"
+                                }
+                            },
+                            "required": ["column", "operator", "value"]
+                        }
                     },
                     "required": ["column"]
                 }
@@ -1874,9 +1895,14 @@ class FunctionRegistry:
         column = self._find_column(df, column)
         return df[column].min()
 
-    def calculate_count(self, df: pd.DataFrame, column: str) -> int:
+    def calculate_count(self, df: pd.DataFrame, column: str, condition: Optional[Dict] = None) -> int:
         """Количество непустых значений"""
         column = self._find_column(df, column)
+
+        if condition:
+            filtered_df = self.filter_rows(df, **condition)
+            return int(filtered_df[column].count())
+
         return int(df[column].count())
 
     def calculate_count_all(self, df: pd.DataFrame, column: Optional[str] = None) -> int:

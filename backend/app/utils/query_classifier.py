@@ -22,6 +22,8 @@ class QueryClassifier:
                 r'\b(sum|average|avg|median|percentile|variance|correlation|weighted)',
                 r'\b(итог|всего|общ)',
                 r'\b(total)',
+                r'\b(сколько|количество|число)',  # ADD: pattern for COUNT queries
+                r'\b(count|how many)',  # ADD: English pattern for COUNT
             ],
             "filter": [
                 r'\b(фильтр|найд|покаж|где|только|выбер|отбор)',
@@ -111,6 +113,7 @@ class QueryClassifier:
             "math": [
                 "calculate_sum",
                 "calculate_average",
+                "calculate_count",  # ADD: count function for "сколько" queries
                 "calculate_median",
                 "calculate_percentile",
                 "calculate_std_dev",

@@ -27,8 +27,8 @@ logger = logging.getLogger(__name__)
 # Create FastAPI app with VERSION 7.4.0 - 100 Functions, NO FALLBACK
 app = FastAPI(
     title="SheetGPT API",
-    version="7.4.0",  # v7.4.0: 100 functions system, removed Tier 2 (Code Executor) and Tier 3 fallbacks
-    description="AI-powered spreadsheet assistant with 100 Functions (95%+ accuracy target), smart column matching, and automatic string number parsing. NO FALLBACK to code execution."
+    version="7.8.5",  # v7.8.5: Fixed calculate_count to support conditional filtering - "сколько заказов ждут оплаты" now returns COUNT instead of SUM
+    description="AI-powered spreadsheet assistant with 3-Tier Hybrid Intelligence: Pattern Detection → Query Classifier → Function Calling / Code Generation. Smart COUNT vs SUM disambiguation."
 )
 
 # Configure CORS
@@ -44,7 +44,7 @@ app.add_middleware(
 async def startup_event():
     """Log startup information"""
     logger.info("="*60)
-    logger.info("SheetGPT API v7.8.4 STARTING - HYBRID INTELLIGENCE")
+    logger.info("SheetGPT API v7.8.5 STARTING - HYBRID INTELLIGENCE")
     logger.info(f"Started at: {datetime.now()}")
     logger.info("")
     logger.info("🚀 NEW: 3-Tier Hybrid Decision System")
