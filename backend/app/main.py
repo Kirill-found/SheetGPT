@@ -24,10 +24,10 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Create FastAPI app with VERSION 7.8.13 - Fixed get_unique_values to work correctly
+# Create FastAPI app with VERSION 7.8.14 - Intelligent display_mode for sidebar vs new sheet
 app = FastAPI(
     title="SheetGPT API",
-    version="7.8.13",  # v7.8.13: Fixed get_unique_values - added patterns to QueryClassifier, improved count_distinct description, added to DataFrame processing
+    version="7.8.14",  # v7.8.14: Added intelligent display_mode - simple lists (get_unique_values, ≤15 rows) → sidebar, complex tables → new sheet
     description="AI-powered spreadsheet assistant with 3-Tier Hybrid Intelligence: Pattern Detection → Query Classifier → Function Calling / Code Generation. Smart COUNT vs SUM, compound query filtering, GROUP BY detection, revenue temporal queries."
 )
 

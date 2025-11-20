@@ -695,12 +695,28 @@ class AIFunctionCaller:
                     headers = func_result.columns.tolist()
                     rows = func_result.head(100).values.tolist()
 
+                    # v7.8.14: Интеллектуальный display_mode - GPT-4o решает sidebar vs new sheet
+                    num_rows = len(func_result)
+                    num_cols = len(func_result.columns)
+
+                    # Логика определения display_mode:
+                    # 1. Простые списки (get_unique_values, search_rows) до 15 строк и 2 колонок → sidebar
+                    # 2. Одноколоночные списки до 10 строк → sidebar
+                    # 3. Все остальное (сложные таблицы, большие результаты) → new sheet
+                    if func_name in ["get_unique_values", "search_rows"] and num_rows <= 15 and num_cols <= 2:
+                        display_mode = "sidebar_only"
+                    elif num_rows <= 10 and num_cols == 1:
+                        display_mode = "sidebar_only"
+                    else:
+                        display_mode = "create_sheet"
+
                     response["structured_data"] = {
                         "headers": headers,
                         "rows": rows,
                         "table_title": self._generate_table_title(func_name, params, len(func_result)),
                         "chart_recommended": None,
-                        "operation_type": "function_result"
+                        "operation_type": "function_result",
+                        "display_mode": display_mode  # NEW: Указывает frontend где отображать
                     }
 
                     response["summary"] = f"Выполнена операция: {func_name}. Получено {len(func_result)} строк"

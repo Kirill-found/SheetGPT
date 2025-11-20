@@ -383,8 +383,9 @@ let isProcessing = false;
           console.log('[UI] operation_type:', result.structured_data.operation_type);
           console.log('[UI] Data:', result.structured_data);
 
-          // КРИТИЧНО: Проверяем operation_type чтобы определить куда отправлять данные
+          // КРИТИЧНО: Проверяем operation_type и display_mode чтобы определить куда отправлять данные
           const isSplitOperation = result.structured_data.operation_type === 'split';
+          const displayMode = result.structured_data.display_mode || 'create_sheet'; // v7.8.14: default to create_sheet
 
           if (isSplitOperation) {
             // SPLIT OPERATION: заменяем данные в ТЕКУЩЕМ листе
@@ -428,6 +429,10 @@ let isProcessing = false;
                 scrollToBottom();
               })
               .replaceDataInCurrentSheet(result.structured_data);
+          } else if (displayMode === 'sidebar_only') {
+            // v7.8.14: SIDEBAR DISPLAY: показываем таблицу прямо в sidebar (для простых списков)
+            console.log('[UI] SIDEBAR DISPLAY: Showing table in sidebar (simple list)');
+            displayTableInSidebar(result.structured_data, container);
           } else {
             // TABLE/CHART OPERATION: создаём НОВЫЙ лист
             console.log('[UI] TABLE/CHART OPERATION: Creating new sheet');
@@ -582,6 +587,88 @@ let isProcessing = false;
       bubble.appendChild(errorBox);
       errorDiv.appendChild(bubble);
       container.appendChild(errorDiv);
+
+      scrollToBottom();
+    }
+
+    // v7.8.14: Отображение простых таблиц прямо в sidebar (без создания нового листа)
+    function displayTableInSidebar(structuredData, container) {
+      console.log('[UI] displayTableInSidebar called with:', structuredData);
+
+      const messageDiv = document.createElement('div');
+      messageDiv.className = 'message ai';
+
+      const bubble = document.createElement('div');
+      bubble.className = 'message-bubble';
+
+      // Title
+      if (structuredData.table_title) {
+        const titleDiv = document.createElement('div');
+        titleDiv.style.fontWeight = 'bold';
+        titleDiv.style.marginBottom = '8px';
+        titleDiv.textContent = structuredData.table_title;
+        bubble.appendChild(titleDiv);
+      }
+
+      // Create table
+      const table = document.createElement('table');
+      table.style.width = '100%';
+      table.style.borderCollapse = 'collapse';
+      table.style.fontSize = '13px';
+      table.style.marginTop = '8px';
+
+      // Headers
+      if (structuredData.headers && structuredData.headers.length > 0) {
+        const thead = document.createElement('thead');
+        const headerRow = document.createElement('tr');
+        structuredData.headers.forEach(header => {
+          const th = document.createElement('th');
+          th.textContent = header;
+          th.style.padding = '6px 8px';
+          th.style.borderBottom = '2px solid #ddd';
+          th.style.textAlign = 'left';
+          th.style.backgroundColor = '#f5f5f5';
+          headerRow.appendChild(th);
+        });
+        thead.appendChild(headerRow);
+        table.appendChild(thead);
+      }
+
+      // Rows
+      if (structuredData.rows && structuredData.rows.length > 0) {
+        const tbody = document.createElement('tbody');
+        structuredData.rows.forEach((row, index) => {
+          const tr = document.createElement('tr');
+          tr.style.backgroundColor = index % 2 === 0 ? '#ffffff' : '#f9f9f9';
+
+          row.forEach(cell => {
+            const td = document.createElement('td');
+            td.textContent = cell !== null && cell !== undefined ? cell : '';
+            td.style.padding = '6px 8px';
+            td.style.borderBottom = '1px solid #eee';
+            tr.appendChild(td);
+          });
+
+          tbody.appendChild(tr);
+        });
+        table.appendChild(tbody);
+      }
+
+      bubble.appendChild(table);
+      messageDiv.appendChild(bubble);
+      container.appendChild(messageDiv);
+
+      // Success message
+      const resultDiv = document.createElement('div');
+      resultDiv.className = 'message ai';
+      const resultBubble = document.createElement('div');
+      resultBubble.className = 'message-bubble';
+      const resultBox = document.createElement('div');
+      resultBox.className = 'content-box success';
+      resultBox.textContent = '✅ Результаты отображены в sidebar';
+      resultBubble.appendChild(resultBox);
+      resultDiv.appendChild(resultBubble);
+      container.appendChild(resultDiv);
 
       scrollToBottom();
     }
