@@ -40,7 +40,7 @@ async def init_db():
     """Инициализация базы данных (создание таблиц)"""
     async with engine.begin() as conn:
         # Импортируем все модели
-        from app.models import user, subscription
+        from app.models import user, subscription, telegram_user
 
         # Создаем таблицы
         await conn.run_sync(Base.metadata.create_all)
