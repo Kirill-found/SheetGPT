@@ -24,10 +24,10 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Create FastAPI app with VERSION 7.8.10 - CRITICAL FIX: QueryClassifier function names
+# Create FastAPI app with VERSION 7.8.11 - Extended sort patterns
 app = FastAPI(
     title="SheetGPT API",
-    version="7.8.10",  # v7.8.10: CRITICAL FIX - QueryClassifier function_map now uses REAL function names from FunctionRegistry. Was: 90% fake functions → GPT-4o got only 4 funcs. Now: 100% real → GPT-4o gets 10-30 funcs. Fixes "от новых к старым" sort bug where sort_data was missing from GPT-4o's available functions.
+    version="7.8.11",  # v7.8.11: Added price/cost sorting patterns to QueryClassifier - "от дешевых к дорогим", "по цене", "по стоимости", "сначала дешевые/дорогие" now correctly trigger sort_data instead of filter_rows
     description="AI-powered spreadsheet assistant with 3-Tier Hybrid Intelligence: Pattern Detection → Query Classifier → Function Calling / Code Generation. Smart COUNT vs SUM, compound query filtering, GROUP BY detection, revenue temporal queries."
 )
 
