@@ -2,9 +2,14 @@ from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sess
 from sqlalchemy.orm import declarative_base
 from app.core.config import settings
 
+# Fix DATABASE_URL for asyncpg (Railway uses postgresql:// by default)
+database_url = settings.DATABASE_URL
+if database_url.startswith("postgresql://"):
+    database_url = database_url.replace("postgresql://", "postgresql+asyncpg://", 1)
+
 # Создаем async engine
 engine = create_async_engine(
-    settings.DATABASE_URL,
+    database_url,
     echo=True if settings.ENVIRONMENT == "development" else False,
     future=True,
     pool_pre_ping=True,
