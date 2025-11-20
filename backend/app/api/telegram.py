@@ -305,6 +305,35 @@ async def reset_daily_limits(
     }
 
 
+@router.get("/test-db")
+async def test_database_connection(db: AsyncSession = Depends(get_db)):
+    """
+    Тестовый эндпоинт для проверки подключения к БД
+    Возвращает детальную информацию об ошибке
+    """
+    try:
+        # Пробуем выполнить простой запрос
+        from sqlalchemy import text
+        result = await db.execute(text("SELECT 1"))
+        row = result.fetchone()
+
+        return {
+            "success": True,
+            "message": "Database connection OK",
+            "result": row[0] if row else None
+        }
+    except Exception as e:
+        import traceback
+        error_details = {
+            "success": False,
+            "error": str(e),
+            "error_type": type(e).__name__,
+            "traceback": traceback.format_exc()
+        }
+        logger.error(f"Database connection test failed: {error_details}")
+        return error_details
+
+
 @router.post("/init-db")
 async def init_telegram_database(
     admin_key: str = Header(...),
@@ -335,4 +364,9 @@ async def init_telegram_database(
         }
     except Exception as e:
         logger.error(f"Failed to create telegram_users table: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        import traceback
+        return {
+            "success": False,
+            "error": str(e),
+            "traceback": traceback.format_exc()
+        }
