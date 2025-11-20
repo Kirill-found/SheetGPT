@@ -646,7 +646,7 @@ class AIFunctionCaller:
             response["methodology"] = f"Использована функция {func_name} с параметрами: {params}"
 
         elif func_name in ["filter_rows", "filter_top_n", "filter_bottom_n", "sort_data", "search_rows", "split_data", "remove_duplicates",
-                           "fill_missing", "aggregate_by_group", "pivot_table", "top_n_per_group"]:
+                           "fill_missing", "aggregate_by_group", "pivot_table", "top_n_per_group", "get_unique_values"]:
             # Результат - DataFrame (таблица)
             if isinstance(func_result, pd.DataFrame) and not func_result.empty:
                 # v7.6.4 UX FIX: Для ЛЮБЫХ маленьких результатов (1-3 строки) - текстовый ответ вместо таблицы
@@ -681,6 +681,8 @@ class AIFunctionCaller:
                         prefix = "Найдено строк"
                     elif func_name == "sort_data":
                         prefix = "Отсортировано"
+                    elif func_name == "get_unique_values":
+                        prefix = "Уникальные значения"
                     else:
                         prefix = "Результат"
 

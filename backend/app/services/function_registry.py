@@ -1477,7 +1477,7 @@ class FunctionRegistry:
             # ========== AGGREGATION ADVANCED (NEW) ==========
             {
                 "name": "count_distinct",
-                "description": "Количество уникальных значений. Используй для 'сколько уникальных', 'COUNT DISTINCT'",
+                "description": "КОЛИЧЕСТВО (число) уникальных значений. Используй ТОЛЬКО для 'сколько уникальных', 'COUNT DISTINCT'. НЕ используй для 'какие', 'список' - для этого есть get_unique_values!",
                 "parameters": {
                     "type": "object",
                     "properties": {

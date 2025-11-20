@@ -76,6 +76,8 @@ class QueryClassifier:
                 r'\b(график|диаграмм|chart)',
                 r'\b(таблиц)',
                 r'\b(table)',
+                r'\b(какие|какой|список|покажи\s+уникальн|все\s+уникальн)',  # ADD: "какие города", "список менеджеров", "покажи уникальные"
+                r'\b(which|what|list\s+of|show\s+unique|all\s+unique)',  # ADD: English equivalents
             ],
         }
 

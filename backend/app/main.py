@@ -24,10 +24,10 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Create FastAPI app with VERSION 7.8.12 - Added get_unique_values function
+# Create FastAPI app with VERSION 7.8.13 - Fixed get_unique_values to work correctly
 app = FastAPI(
     title="SheetGPT API",
-    version="7.8.12",  # v7.8.12: Added get_unique_values function - "какие города", "список менеджеров", "покажи уникальные" now return LIST of values instead of count
+    version="7.8.13",  # v7.8.13: Fixed get_unique_values - added patterns to QueryClassifier, improved count_distinct description, added to DataFrame processing
     description="AI-powered spreadsheet assistant with 3-Tier Hybrid Intelligence: Pattern Detection → Query Classifier → Function Calling / Code Generation. Smart COUNT vs SUM, compound query filtering, GROUP BY detection, revenue temporal queries."
 )
 
