@@ -324,7 +324,7 @@ class FunctionRegistry:
             # ========== ВЫЧИСЛЕНИЯ ==========
             {
                 "name": "calculate_sum",
-                "description": "Сумма значений в колонке. Используй для 'сумма', 'итого', 'total'. Поддерживает фильтрацию перед вычислением (например: 'сумма продаж в Москве' → column='Сумма', condition={column:'Город', operator:'==', value:'Москва'})",
+                "description": "Сумма значений в колонке. ОБЯЗАТЕЛЬНО используй для 'сумма', 'итого', 'total', 'выручка', 'доход', 'оборот', 'продажи', 'прибыль'. Поддерживает фильтрацию перед вычислением. Примеры: 'сумма продаж в Москве' → column='Сумма', condition={column:'Город', operator:'==', value:'Москва'}; 'выручка оплаченных' → condition={column:'Статус', operator:'==', value:'Оплачен'}; 'выручка в феврале' → condition={column:'Дата', operator:'contains', value:'2024-02'}; 'продажи за 2023' → condition={column:'Дата', operator:'contains', value:'2023'}",
                 "parameters": {
                     "type": "object",
                     "properties": {
@@ -334,7 +334,7 @@ class FunctionRegistry:
                         },
                         "condition": {
                             "type": "object",
-                            "description": "Фильтр перед вычислением (опционально). Структура: {column: 'название_колонки', operator: '==' или 'contains' или '>' или '<', value: 'значение'}. Пример: {column: 'Статус', operator: '==', value: 'Оплачен'}",
+                            "description": "Фильтр перед вычислением (опционально). Структура: {column: 'название_колонки', operator: '==' или 'contains' или '>' или '<', value: 'значение'}. Для фильтрации по месяцу используй 'contains' с датой в формате YYYY-MM (например: {column:'Дата', operator:'contains', value:'2024-02'} для февраля). Примеры: {column:'Статус', operator:'==', value:'Оплачен'}; {column:'Дата', operator:'contains', value:'2024-02'}",
                             "properties": {
                                 "column": {
                                     "type": "string",

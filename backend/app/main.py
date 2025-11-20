@@ -27,8 +27,8 @@ logger = logging.getLogger(__name__)
 # Create FastAPI app with VERSION 7.4.0 - 100 Functions, NO FALLBACK
 app = FastAPI(
     title="SheetGPT API",
-    version="7.8.7",  # v7.8.7: Fixed aggregate_by_group description to include "у каждого", "для каждого" keywords - now GPT-4o correctly identifies grouping queries
-    description="AI-powered spreadsheet assistant with 3-Tier Hybrid Intelligence: Pattern Detection → Query Classifier → Function Calling / Code Generation. Smart COUNT vs SUM, compound query filtering, GROUP BY detection."
+    version="7.8.8",  # v7.8.8: Enhanced calculate_sum to recognize revenue keywords (выручка, доход, оборот) and support date filtering via contains operator for temporal queries like "выручка в феврале"
+    description="AI-powered spreadsheet assistant with 3-Tier Hybrid Intelligence: Pattern Detection → Query Classifier → Function Calling / Code Generation. Smart COUNT vs SUM, compound query filtering, GROUP BY detection, revenue temporal queries."
 )
 
 # Configure CORS
@@ -44,7 +44,7 @@ app.add_middleware(
 async def startup_event():
     """Log startup information"""
     logger.info("="*60)
-    logger.info("SheetGPT API v7.8.7 STARTING - HYBRID INTELLIGENCE + GROUP BY FIX")
+    logger.info("SheetGPT API v7.8.8 STARTING - HYBRID INTELLIGENCE + REVENUE TEMPORAL QUERIES")
     logger.info(f"Started at: {datetime.now()}")
     logger.info("")
     logger.info("🚀 NEW: 3-Tier Hybrid Decision System")
