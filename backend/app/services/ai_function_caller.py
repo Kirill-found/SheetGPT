@@ -62,12 +62,25 @@ class AIFunctionCaller:
 
         # PATTERN 1: "топ N" / "лучшие N" / "худшие N" queries
         # Example: "топ 3 заказа в Москве", "5 лучших продаж"
+        # v7.8.6 FIX: Skip Pattern Detector if query has adjectives (compound conditions)
+        # Let GPT-4o handle complex queries via Function Calling
+        adjective_keywords = ["оплачен", "ожида", "отмен", "актив", "неактив", " в ", "из "]
+        has_adjectives = any(k in query_lower for k in adjective_keywords)
+
         top_keywords = ["топ", "лучш", "худш", "самы", "наиболь", "наименьш"]
         if any(k in query_lower for k in top_keywords):
             # Extract N (number)
             numbers = re.findall(r'\d+', query)
             if numbers:
                 n = int(numbers[0])
+
+                # v7.8.6: If query has compound conditions, skip Pattern Detector
+                # Let GPT-4o + Function Calling handle it (more intelligent)
+                if has_adjectives:
+                    print(f"[PATTERN DETECTOR v7.8.6] TOP_N with compound conditions detected: '{query[:50]}...'")
+                    print(f"[PATTERN DETECTOR v7.8.6] Skipping Pattern Detector - passing to GPT-4o Function Calling")
+                    return None  # Pass to Query Classifier + Function Calling
+
                 print(f"[PATTERN DETECTOR v7.7.0] Detected TOP_N pattern: n={n}")
 
                 # Determine column to sort by (usually "Сумма" or similar)

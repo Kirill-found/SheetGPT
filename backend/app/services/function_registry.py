@@ -756,12 +756,31 @@ class FunctionRegistry:
 
             {
                 "name": "filter_top_n",
-                "description": "Топ N значений по колонке. Используй для 'топ 10', 'лучшие N'",
+                "description": "Топ N значений по колонке. Используй для 'топ 10', 'лучшие N'. ВАЖНО: поддерживает фильтрацию перед отбором топа (например: 'топ 3 самых дорогих оплаченных заказа' → column='Сумма', n=3, condition={column:'Статус', operator:'equals', value:'Оплачен'}). Для 'топ N в Москве' → добавь condition={column:'Город', operator:'equals', value:'Москва'}",
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "column": {"type": "string"},
-                        "n": {"type": "integer"}
+                        "column": {
+                            "type": "string",
+                            "description": "Колонка для сортировки (например: 'Сумма', 'Дата')"
+                        },
+                        "n": {
+                            "type": "integer",
+                            "description": "Количество записей для отбора"
+                        },
+                        "condition": {
+                            "type": "object",
+                            "description": "Фильтр перед отбором топ N (опционально). Применяется ДО сортировки и отбора",
+                            "properties": {
+                                "column": {"type": "string", "description": "Колонка для фильтрации"},
+                                "operator": {
+                                    "type": "string",
+                                    "description": "Оператор: equals, not_equals, contains, greater_than, less_than"
+                                },
+                                "value": {"description": "Значение для сравнения"}
+                            },
+                            "required": ["column", "operator", "value"]
+                        }
                     },
                     "required": ["column", "n"]
                 }
@@ -769,12 +788,31 @@ class FunctionRegistry:
 
             {
                 "name": "filter_bottom_n",
-                "description": "Худшие N значений. Используй для 'худшие 10', 'последние N'",
+                "description": "Худшие N значений. Используй для 'худшие 10', 'последние N'. ВАЖНО: поддерживает фильтрацию перед отбором (например: '5 самых дешевых оплаченных заказов' → column='Сумма', n=5, condition={column:'Статус', operator:'equals', value:'Оплачен'})",
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "column": {"type": "string"},
-                        "n": {"type": "integer"}
+                        "column": {
+                            "type": "string",
+                            "description": "Колонка для сортировки (например: 'Сумма', 'Дата')"
+                        },
+                        "n": {
+                            "type": "integer",
+                            "description": "Количество записей для отбора"
+                        },
+                        "condition": {
+                            "type": "object",
+                            "description": "Фильтр перед отбором худших N (опционально). Применяется ДО сортировки и отбора",
+                            "properties": {
+                                "column": {"type": "string", "description": "Колонка для фильтрации"},
+                                "operator": {
+                                    "type": "string",
+                                    "description": "Оператор: equals, not_equals, contains, greater_than, less_than"
+                                },
+                                "value": {"description": "Значение для сравнения"}
+                            },
+                            "required": ["column", "operator", "value"]
+                        }
                     },
                     "required": ["column", "n"]
                 }
@@ -2045,17 +2083,29 @@ class FunctionRegistry:
         column = self._find_column(df, column)
         return df[df[column].astype(str).str.contains(pattern, regex=True, na=False)]
 
-    def filter_top_n(self, df: pd.DataFrame, column: str, n: int) -> pd.DataFrame:
+    def filter_top_n(self, df: pd.DataFrame, column: str, n: int, condition: Optional[Dict] = None) -> pd.DataFrame:
         """Топ N значений"""
         column = self._find_column(df, column)
+
+        # v7.8.6 FIX: Apply condition filter BEFORE selecting top N
+        # Example: "топ 3 оплаченных заказа" → filter by status FIRST, then get top 3
+        if condition:
+            df = self.filter_rows(df, **condition)
+
         # v7.5.7 FIX: Convert to numeric for nlargest to work with string numbers
         df_copy = df.copy()
         df_copy[column] = pd.to_numeric(df_copy[column], errors='coerce')
         return df_copy.nlargest(n, column)
 
-    def filter_bottom_n(self, df: pd.DataFrame, column: str, n: int) -> pd.DataFrame:
+    def filter_bottom_n(self, df: pd.DataFrame, column: str, n: int, condition: Optional[Dict] = None) -> pd.DataFrame:
         """Худшие N значений"""
         column = self._find_column(df, column)
+
+        # v7.8.6 FIX: Apply condition filter BEFORE selecting bottom N
+        # Example: "5 самых дешевых оплаченных" → filter by status FIRST, then get bottom 5
+        if condition:
+            df = self.filter_rows(df, **condition)
+
         # v7.5.7 FIX: Convert to numeric for nsmallest to work with string numbers
         df_copy = df.copy()
         df_copy[column] = pd.to_numeric(df_copy[column], errors='coerce')
