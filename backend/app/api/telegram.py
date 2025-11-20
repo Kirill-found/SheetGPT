@@ -303,3 +303,36 @@ async def reset_daily_limits(
         "success": True,
         "message": f"Reset daily limits for {len(users)} users"
     }
+
+
+@router.post("/init-db")
+async def init_telegram_database(
+    admin_key: str = Header(...),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Создать таблицу telegram_users в базе данных
+    (Вызывается один раз при первом деплое)
+    """
+    # Простая проверка админского ключа
+    if admin_key != "sheetgpt_admin_2025":  # TODO: Использовать env variable
+        raise HTTPException(status_code=403, detail="Invalid admin key")
+
+    try:
+        # Import model
+        from app.core.database import engine, Base
+        from app.models import telegram_user
+
+        # Create table
+        async with engine.begin() as conn:
+            await conn.run_sync(TelegramUser.__table__.create, checkfirst=True)
+
+        logger.info("telegram_users table created successfully")
+
+        return {
+            "success": True,
+            "message": "telegram_users table created successfully"
+        }
+    except Exception as e:
+        logger.error(f"Failed to create telegram_users table: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
