@@ -24,10 +24,10 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Create FastAPI app with VERSION 7.4.0 - 100 Functions, NO FALLBACK
+# Create FastAPI app with VERSION 7.8.10 - CRITICAL FIX: QueryClassifier function names
 app = FastAPI(
     title="SheetGPT API",
-    version="7.8.8",  # v7.8.8: Enhanced calculate_sum to recognize revenue keywords (выручка, доход, оборот) and support date filtering via contains operator for temporal queries like "выручка в феврале"
+    version="7.8.10",  # v7.8.10: CRITICAL FIX - QueryClassifier function_map now uses REAL function names from FunctionRegistry. Was: 90% fake functions → GPT-4o got only 4 funcs. Now: 100% real → GPT-4o gets 10-30 funcs. Fixes "от новых к старым" sort bug where sort_data was missing from GPT-4o's available functions.
     description="AI-powered spreadsheet assistant with 3-Tier Hybrid Intelligence: Pattern Detection → Query Classifier → Function Calling / Code Generation. Smart COUNT vs SUM, compound query filtering, GROUP BY detection, revenue temporal queries."
 )
 
@@ -44,7 +44,7 @@ app.add_middleware(
 async def startup_event():
     """Log startup information"""
     logger.info("="*60)
-    logger.info("SheetGPT API v7.8.8 STARTING - HYBRID INTELLIGENCE + REVENUE TEMPORAL QUERIES")
+    logger.info("SheetGPT API v7.8.10 STARTING - CRITICAL FIX: QueryClassifier function names")
     logger.info(f"Started at: {datetime.now()}")
     logger.info("")
     logger.info("🚀 NEW: 3-Tier Hybrid Decision System")
