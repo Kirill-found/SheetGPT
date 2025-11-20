@@ -24,10 +24,10 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Create FastAPI app with VERSION 7.8.11 - Extended sort patterns
+# Create FastAPI app with VERSION 7.8.12 - Added get_unique_values function
 app = FastAPI(
     title="SheetGPT API",
-    version="7.8.11",  # v7.8.11: Added price/cost sorting patterns to QueryClassifier - "от дешевых к дорогим", "по цене", "по стоимости", "сначала дешевые/дорогие" now correctly trigger sort_data instead of filter_rows
+    version="7.8.12",  # v7.8.12: Added get_unique_values function - "какие города", "список менеджеров", "покажи уникальные" now return LIST of values instead of count
     description="AI-powered spreadsheet assistant with 3-Tier Hybrid Intelligence: Pattern Detection → Query Classifier → Function Calling / Code Generation. Smart COUNT vs SUM, compound query filtering, GROUP BY detection, revenue temporal queries."
 )
 

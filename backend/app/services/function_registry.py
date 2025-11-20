@@ -140,6 +140,7 @@ class FunctionRegistry:
 
             # Aggregation Advanced (NEW)
             "count_distinct": self.count_distinct,
+            "get_unique_values": self.get_unique_values,
             "first_value": self.first_value,
             "last_value": self.last_value,
         }
@@ -1487,6 +1488,18 @@ class FunctionRegistry:
             },
 
             {
+                "name": "get_unique_values",
+                "description": "Получить СПИСОК уникальных значений из колонки. ОБЯЗАТЕЛЬНО используй для 'какие', 'какие значения', 'список городов/менеджеров/продуктов', 'покажи уникальные', 'все уникальные'. Возвращает DataFrame со списком значений, НЕ количество!",
+                "parameters": {
+                    "type": "object",
+                    "properties": {
+                        "column": {"type": "string", "description": "Колонка из которой нужно получить уникальные значения"}
+                    },
+                    "required": ["column"]
+                }
+            },
+
+            {
                 "name": "first_value",
                 "description": "Первое значение (глобально или по группам). Используй для 'первое значение', 'FIRST_VALUE'",
                 "parameters": {
@@ -2465,6 +2478,14 @@ class FunctionRegistry:
         """Количество уникальных"""
         column = self._find_column(df, column)
         return int(df[column].nunique())
+
+    def get_unique_values(self, df: pd.DataFrame, column: str) -> pd.DataFrame:
+        """Получить список уникальных значений из колонки"""
+        column = self._find_column(df, column)
+        unique_vals = df[column].dropna().unique()
+        # Возвращаем DataFrame с одной колонкой для consistency
+        result_df = pd.DataFrame({column: sorted(unique_vals)})
+        return result_df
 
     def first_value(self, df: pd.DataFrame, column: str, group_by: Optional[str] = None) -> Any:
         """Первое значение"""

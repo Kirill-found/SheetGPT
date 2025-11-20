@@ -211,6 +211,7 @@ class QueryClassifier:
                 "ewma",
                 "fill_missing",
                 "first_value",
+                "get_unique_values",
                 "highlight_rows",
                 "if_then_else",
                 "lag_column",
@@ -219,7 +220,7 @@ class QueryClassifier:
                 "moving_average",
                 "remove_duplicates",
                 "search_rows",
-            ],  # 18 functions
+            ],  # 19 functions
         }
 
         return function_map.get(category, [])
