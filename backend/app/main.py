@@ -13,6 +13,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.schemas.requests import FormulaRequest
 from app.schemas.responses import FormulaResponse
 from app.config import settings
+from app.api.telegram import router as telegram_router
 import logging
 from datetime import datetime
 import os
@@ -24,11 +25,11 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Create FastAPI app with VERSION 7.8.14 - Intelligent display_mode for sidebar vs new sheet
+# Create FastAPI app with VERSION 7.8.15 - Added trend analysis category
 app = FastAPI(
     title="SheetGPT API",
-    version="7.8.14",  # v7.8.14: Added intelligent display_mode - simple lists (get_unique_values, ≤15 rows) → sidebar, complex tables → new sheet
-    description="AI-powered spreadsheet assistant with 3-Tier Hybrid Intelligence: Pattern Detection → Query Classifier → Function Calling / Code Generation. Smart COUNT vs SUM, compound query filtering, GROUP BY detection, revenue temporal queries."
+    version="7.8.15",  # v7.8.15: Added "trend" category in QueryClassifier for questions like "Растут ли продажи?" - partial support, full implementation in progress
+    description="AI-powered spreadsheet assistant with 3-Tier Hybrid Intelligence: Pattern Detection → Query Classifier → Function Calling / Code Generation. Smart COUNT vs SUM, compound query filtering, GROUP BY detection, revenue temporal queries, trend analysis."
 )
 
 # Configure CORS
@@ -39,6 +40,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Include Telegram API router
+app.include_router(telegram_router)
 
 @app.on_event("startup")
 async def startup_event():
