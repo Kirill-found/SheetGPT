@@ -842,15 +842,23 @@ Generate CORRECTED code that will work. Return ONLY the Python code."""
                     print(f"[TOP_HIGHLIGHT] WARNING: Could not extract indices from result, using first N rows")
                     rows_to_highlight = list(range(2, 2 + count))
 
-                if 'топ' in query_lower or 'лучш' in query_lower:
-                    highlight_color = requested_color or '#90EE90'
-                    highlight_message = f'Выделены топ {len(rows_to_highlight)} товаров'
-                elif 'худш' in query_lower or 'минимальн' in query_lower:
-                    highlight_color = requested_color or '#FFB6C1'
-                    highlight_message = f'Выделены {len(rows_to_highlight)} минимальных значений'
+                # Умное определение цвета на основе ключевых слов в запросе
+                positive_keywords = ['топ', 'лучш', 'больш', 'макс', 'выше', 'высок', 'наибольш']
+                negative_keywords = ['худш', 'минимальн', 'отмен', 'ошибк', 'проблем', 'меньш', 'низк', 'наименьш']
+                neutral_keywords = ['оплачен', 'успешн', 'завершен', 'выполнен', 'активн']
+
+                if any(keyword in query_lower for keyword in positive_keywords):
+                    highlight_color = requested_color or '#90EE90'  # Green для положительных/высоких
+                    highlight_message = f'Выделены {len(rows_to_highlight)} строк (зеленый - высокие/топ значения)'
+                elif any(keyword in query_lower for keyword in negative_keywords):
+                    highlight_color = requested_color or '#FFB6C1'  # Red для негативных/низких/отмененных
+                    highlight_message = f'Выделены {len(rows_to_highlight)} строк (красный - проблемные/низкие значения)'
+                elif any(keyword in query_lower for keyword in neutral_keywords):
+                    highlight_color = requested_color or '#ADD8E6'  # Blue для нейтральных/информационных
+                    highlight_message = f'Выделены {len(rows_to_highlight)} строк (синий - информация)'
                 else:
-                    highlight_color = requested_color or '#FFFF00'
-                    highlight_message = f'Выделены {len(rows_to_highlight)} строк'
+                    highlight_color = requested_color or '#FFFF00'  # Yellow только как fallback
+                    highlight_message = f'Выделены {len(rows_to_highlight)} строк (желтый - общая подсветка)'
 
                 highlighting_data = {
                     "action_type": "highlight_rows",

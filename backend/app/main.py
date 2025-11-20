@@ -44,7 +44,7 @@ app.add_middleware(
 async def startup_event():
     """Log startup information"""
     logger.info("="*60)
-    logger.info("SheetGPT API v7.8.1 STARTING - HYBRID INTELLIGENCE")
+    logger.info("SheetGPT API v7.8.2 STARTING - HYBRID INTELLIGENCE")
     logger.info(f"Started at: {datetime.now()}")
     logger.info("")
     logger.info("🚀 NEW: 3-Tier Hybrid Decision System")
@@ -88,7 +88,7 @@ async def root():
     """Health check endpoint"""
     return {
         "name": "SheetGPT API",
-        "version": "7.8.1",  # v7.8.1: Hotfix - Fixed structured_data format for Chrome Extension compatibility
+        "version": "7.8.2",  # v7.8.2: Smart Color Selection - different highlights get different colors based on query context
         "status": "operational",
         "engine": "AI Code Executor",
         "features": {
