@@ -44,7 +44,7 @@ app.add_middleware(
 async def startup_event():
     """Log startup information"""
     logger.info("="*60)
-    logger.info("SheetGPT API v7.8.3 STARTING - HYBRID INTELLIGENCE")
+    logger.info("SheetGPT API v7.8.4 STARTING - HYBRID INTELLIGENCE")
     logger.info(f"Started at: {datetime.now()}")
     logger.info("")
     logger.info("🚀 NEW: 3-Tier Hybrid Decision System")
@@ -88,7 +88,7 @@ async def root():
     """Health check endpoint"""
     return {
         "name": "SheetGPT API",
-        "version": "7.8.3",  # v7.8.3: Query Validation - rejects nonsensical queries like "asdfghjkl"
+        "version": "7.8.4",  # v7.8.4: Fixed conditional aggregation - "средний чек в Москве" now filters correctly
         "status": "operational",
         "engine": "AI Code Executor",
         "features": {

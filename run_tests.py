@@ -46,7 +46,7 @@ def run_test(test_case, test_data):
             response_type = result.get("response_type")
             summary = result.get("summary", "")
 
-            print(f"\n✅ SUCCESS ({elapsed:.2f}s)")
+            print(f"\n[OK] SUCCESS ({elapsed:.2f}s)")
             print(f"Function used: {function_used}")
             print(f"Response type: {response_type}")
             print(f"Summary: {summary[:200]}...")
@@ -54,11 +54,11 @@ def run_test(test_case, test_data):
             # Детальная проверка
             success = True
             if function_used != test_case["expected_function"]:
-                print(f"⚠️  WARNING: Expected {test_case['expected_function']}, got {function_used}")
+                print(f"[WARN] WARNING: Expected {test_case['expected_function']}, got {function_used}")
                 success = False
 
             if response_type == "error":
-                print(f"❌ ERROR: {result.get('warnings', [])}")
+                print(f"[ERROR] ERROR: {result.get('warnings', [])}")
                 success = False
 
             return {
@@ -71,7 +71,7 @@ def run_test(test_case, test_data):
                 "summary": summary
             }
         else:
-            print(f"❌ HTTP ERROR: {response.status_code}")
+            print(f"[ERROR] HTTP ERROR: {response.status_code}")
             print(f"Response: {response.text[:500]}")
             return {
                 "test_id": test_case["id"],
@@ -82,7 +82,7 @@ def run_test(test_case, test_data):
             }
 
     except Exception as e:
-        print(f"❌ EXCEPTION: {e}")
+        print(f"[ERROR] EXCEPTION: {e}")
         return {
             "test_id": test_case["id"],
             "category": test_case["category"],
@@ -104,7 +104,7 @@ def main():
     tests = data["tests"]
 
     print(f"\nTotal tests: {len(tests)}")
-    print(f"Test data: {len(test_data['sheet_data'])} rows × {len(test_data['column_names'])} columns")
+    print(f"Test data: {len(test_data['sheet_data'])} rows x {len(test_data['column_names'])} columns")
 
     # Запуск тестов
     results = []
@@ -122,8 +122,8 @@ def main():
     failed = len(results) - successful
     accuracy = (successful / len(results)) * 100
 
-    print(f"\n✅ Successful: {successful}/{len(results)} ({accuracy:.1f}%)")
-    print(f"❌ Failed: {failed}/{len(results)}")
+    print(f"\n[OK] Successful: {successful}/{len(results)} ({accuracy:.1f}%)")
+    print(f"[FAIL] Failed: {failed}/{len(results)}")
 
     # Детали по категориям
     print("\nBy category:")
@@ -138,7 +138,7 @@ def main():
 
     for cat, stats in categories.items():
         acc = (stats["success"] / stats["total"]) * 100
-        status = "✅" if stats["success"] == stats["total"] else "⚠️"
+        status = "[OK]" if stats["success"] == stats["total"] else "[WARN]"
         print(f"  {status} {cat}: {stats['success']}/{stats['total']} ({acc:.0f}%)")
 
     # Средняя скорость
@@ -163,9 +163,9 @@ def main():
     print(f"TARGET: 95%+ accuracy")
     print(f"ACTUAL: {accuracy:.1f}%")
     if accuracy >= 95:
-        print("🎉 SUCCESS! Target achieved!")
+        print("[SUCCESS] Target achieved!")
     else:
-        print(f"⚠️  Need improvement: {95 - accuracy:.1f}% to go")
+        print(f"[WARN] Need improvement: {95 - accuracy:.1f}% to go")
     print("="*80 + "\n")
 
 if __name__ == "__main__":

@@ -26,6 +26,9 @@ class FormulaResponse(BaseModel):
     highlight_rows: Optional[List[int]] = Field(None, description="Номера строк для выделения (1-indexed)")
     highlight_color: Optional[str] = Field(None, description="Цвет выделения (hex, например #FFFF00)")
     highlight_message: Optional[str] = Field(None, description="Сообщение о выделенных строках")
+    # v7.4.0: Function calling metadata
+    function_used: Optional[str] = Field(None, description="Название использованной функции")
+    parameters: Optional[dict] = Field(None, description="Параметры вызванной функции")
 
     class Config:
         json_schema_extra = {

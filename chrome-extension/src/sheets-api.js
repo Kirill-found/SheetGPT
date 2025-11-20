@@ -88,12 +88,46 @@ async function getActiveSheetName(tabId) {
 }
 
 /**
- * Read data from active sheet
+ * Get all sheet names from spreadsheet
  */
-async function readSheetData(spreadsheetId, sheetName, range = 'A1:Z1000') {
+async function getAllSheetNames(spreadsheetId) {
+  try {
+    const token = await getAuthToken();
+    const response = await fetch(
+      `${SHEETS_API_BASE}/${spreadsheetId}?fields=sheets.properties`,
+      {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      }
+    );
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(`Sheets API error: ${error.error?.message || response.statusText}`);
+    }
+
+    const data = await response.json();
+    const sheetNames = data.sheets.map(sheet => sheet.properties.title);
+    console.log('[SheetsAPI] All sheet names:', sheetNames);
+    return sheetNames;
+  } catch (error) {
+    console.error('[SheetsAPI] Error getting sheet names:', error);
+    throw error;
+  }
+}
+
+/**
+ * Read data from active sheet
+ * Default limit: 500 rows for performance optimization
+ */
+async function readSheetData(spreadsheetId, sheetName, range = 'A1:Z500') {
   try {
     const token = await getAuthToken();
     const fullRange = `${sheetName}!${range}`;
+
+    console.log(`[SheetsAPI] Reading range: ${fullRange}`);
 
     const response = await fetch(
       `${SHEETS_API_BASE}/${spreadsheetId}/values/${encodeURIComponent(fullRange)}`,
@@ -111,15 +145,19 @@ async function readSheetData(spreadsheetId, sheetName, range = 'A1:Z1000') {
     }
 
     const data = await response.json();
-    console.log('[SheetsAPI] Read data:', data);
+    console.log('[SheetsAPI] API Response:', data);
+    console.log('[SheetsAPI] Has values?', !!data.values, 'Length:', data.values?.length || 0);
 
     if (!data.values || data.values.length === 0) {
+      console.warn('[SheetsAPI] ⚠️ No data found in range:', fullRange);
       return { headers: [], data: [] };
     }
 
     // First row as headers, rest as data
     const headers = data.values[0] || [];
     const rows = data.values.slice(1);
+
+    console.log('[SheetsAPI] ✅ Parsed data:', { headers, rowCount: rows.length });
 
     return { headers, data: rows };
   } catch (error) {

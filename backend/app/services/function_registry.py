@@ -324,7 +324,7 @@ class FunctionRegistry:
             # ========== ВЫЧИСЛЕНИЯ ==========
             {
                 "name": "calculate_sum",
-                "description": "Сумма значений в колонке. Используй для 'сумма', 'итого', 'total'",
+                "description": "Сумма значений в колонке. Используй для 'сумма', 'итого', 'total'. Поддерживает фильтрацию перед вычислением (например: 'сумма продаж в Москве' → column='Сумма', condition={column:'Город', operator:'==', value:'Москва'})",
                 "parameters": {
                     "type": "object",
                     "properties": {
@@ -334,12 +334,21 @@ class FunctionRegistry:
                         },
                         "condition": {
                             "type": "object",
-                            "description": "Условие для фильтрации (опционально)",
+                            "description": "Фильтр перед вычислением (опционально). Структура: {column: 'название_колонки', operator: '==' или 'contains' или '>' или '<', value: 'значение'}. Пример: {column: 'Статус', operator: '==', value: 'Оплачен'}",
                             "properties": {
-                                "column": {"type": "string"},
-                                "operator": {"type": "string"},
-                                "value": {"type": ["string", "number"]}
-                            }
+                                "column": {
+                                    "type": "string",
+                                    "description": "Колонка для фильтрации"
+                                },
+                                "operator": {
+                                    "type": "string",
+                                    "description": "Оператор сравнения: '==', '!=', '>', '<', '>=', '<=', 'contains'"
+                                },
+                                "value": {
+                                    "description": "Значение для сравнения (string, number, или boolean)"
+                                }
+                            },
+                            "required": ["column", "operator", "value"]
                         }
                     },
                     "required": ["column"]
@@ -348,7 +357,7 @@ class FunctionRegistry:
 
             {
                 "name": "calculate_average",
-                "description": "Среднее значение. Используй для 'среднее', 'average', 'mean'",
+                "description": "Среднее значение. Используй для 'среднее', 'average', 'mean'. Поддерживает фильтрацию перед вычислением (например: 'средний чек в Москве' → column='Сумма', condition={column:'Город', operator:'==', value:'Москва'})",
                 "parameters": {
                     "type": "object",
                     "properties": {
@@ -358,7 +367,21 @@ class FunctionRegistry:
                         },
                         "condition": {
                             "type": "object",
-                            "description": "Условие для фильтрации (опционально)"
+                            "description": "Фильтр перед вычислением (опционально). Структура: {column: 'название_колонки', operator: '==' или 'contains' или '>' или '<', value: 'значение'}. Пример: {column: 'Город', operator: '==', value: 'Москва'}",
+                            "properties": {
+                                "column": {
+                                    "type": "string",
+                                    "description": "Колонка для фильтрации"
+                                },
+                                "operator": {
+                                    "type": "string",
+                                    "description": "Оператор сравнения: '==', '!=', '>', '<', '>=', '<=', 'contains'"
+                                },
+                                "value": {
+                                    "description": "Значение для сравнения (string, number, или boolean)"
+                                }
+                            },
+                            "required": ["column", "operator", "value"]
                         }
                     },
                     "required": ["column"]

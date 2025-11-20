@@ -1,0 +1,98 @@
+{
+  "timestamp": "2025-11-19T10:08:16.073834",
+  "total_tests": 10,
+  "successful": 8,
+  "failed": 2,
+  "accuracy": 80.0,
+  "avg_response_time": 4.9876161336898805,
+  "results": [
+    {
+      "test_id": 1,
+      "category": "Base - Highlighting",
+      "success": true,
+      "function_used": "highlight_rows",
+      "response_type": "function_call",
+      "elapsed": 11.404622316360474,
+      "summary": "Выделено 4 строк где Продажи > 100000, цвет: yellow"
+    },
+    {
+      "test_id": 2,
+      "category": "Base - Filtering",
+      "success": true,
+      "function_used": "filter_rows",
+      "response_type": "function_call",
+      "elapsed": 3.936922550201416,
+      "summary": "Выполнена операция: filter_rows. Получено 4 строк"
+    },
+    {
+      "test_id": 3,
+      "category": "Base - Math",
+      "success": false,
+      "function_used": "calculate_sum",
+      "response_type": "error",
+      "elapsed": 4.06052827835083,
+      "summary": "Ошибка выполнения функции calculate_sum"
+    },
+    {
+      "test_id": 4,
+      "category": "Base - Grouping",
+      "success": true,
+      "function_used": "aggregate_by_group",
+      "response_type": "function_call",
+      "elapsed": 4.356097221374512,
+      "summary": "Выполнена операция: aggregate_by_group. Получено 3 строк"
+    },
+    {
+      "test_id": 5,
+      "category": "NEW - Math Operations",
+      "success": true,
+      "function_used": "calculate_max",
+      "response_type": "function_call",
+      "elapsed": 3.703280210494995,
+      "summary": "Результат: 165000"
+    },
+    {
+      "test_id": 6,
+      "category": "NEW - Filtering Advanced",
+      "success": true,
+      "function_used": "filter_top_n",
+      "response_type": "function_call",
+      "elapsed": 3.9864144325256348,
+      "summary": "Выполнена функция filter_top_n"
+    },
+    {
+      "test_id": 7,
+      "category": "NEW - Text Advanced",
+      "success": true,
+      "function_used": "uppercase",
+      "response_type": "function_call",
+      "elapsed": 3.797150135040283,
+      "summary": "Выполнена функция uppercase"
+    },
+    {
+      "test_id": 8,
+      "category": "NEW - Date Advanced",
+      "success": true,
+      "function_used": "extract_year",
+      "response_type": "function_call",
+      "elapsed": 3.794254779815674,
+      "summary": "Выполнена функция extract_year"
+    },
+    {
+      "test_id": 9,
+      "category": "NEW - Window Functions",
+      "success": true,
+      "function_used": "moving_average",
+      "response_type": "function_call",
+      "elapsed": 3.707597255706787,
+      "summary": "Выполнена функция moving_average"
+    },
+    {
+      "test_id": 10,
+      "category": "NEW - Conditional Logic",
+      "success": false,
+      "error": "HTTP 500",
+      "elapsed": 7.129294157028198
+    }
+  ]
+}

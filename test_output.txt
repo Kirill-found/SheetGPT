@@ -1,0 +1,118 @@
+
+================================================================================
+SheetGPT v7.4.0 - 10 Functions Test Suite
+Started at: 2025-11-18 22:21:57.168189
+================================================================================
+
+Total tests: 10
+Test data: 10 rows x 5 columns
+
+================================================================================
+TEST #1: Base - Highlighting
+Function: highlight_rows
+Query: 'выдели желтым строки где продажи больше 100000'
+================================================================================
+[ERROR] HTTP ERROR: 500
+Response: {"detail":"The api_key client option must be set either by passing api_key to the client or by setting the OPENAI_API_KEY environment variable"}
+
+================================================================================
+TEST #2: Base - Filtering
+Function: filter_rows
+Query: 'покажи строки где менеджер Иванов'
+================================================================================
+[ERROR] HTTP ERROR: 500
+Response: {"detail":"The api_key client option must be set either by passing api_key to the client or by setting the OPENAI_API_KEY environment variable"}
+
+================================================================================
+TEST #3: Base - Math
+Function: calculate_sum
+Query: 'сумма продаж'
+================================================================================
+[ERROR] HTTP ERROR: 500
+Response: {"detail":"The api_key client option must be set either by passing api_key to the client or by setting the OPENAI_API_KEY environment variable"}
+
+================================================================================
+TEST #4: Base - Grouping
+Function: aggregate_by_group
+Query: 'сумма продаж по менеджерам'
+================================================================================
+[ERROR] HTTP ERROR: 500
+Response: {"detail":"The api_key client option must be set either by passing api_key to the client or by setting the OPENAI_API_KEY environment variable"}
+
+================================================================================
+TEST #5: NEW - Math Operations
+Function: calculate_max
+Query: 'максимальная сумма продаж'
+================================================================================
+[ERROR] HTTP ERROR: 500
+Response: {"detail":"The api_key client option must be set either by passing api_key to the client or by setting the OPENAI_API_KEY environment variable"}
+
+================================================================================
+TEST #6: NEW - Filtering Advanced
+Function: filter_top_n
+Query: 'топ 3 по продажам'
+================================================================================
+[ERROR] HTTP ERROR: 500
+Response: {"detail":"The api_key client option must be set either by passing api_key to the client or by setting the OPENAI_API_KEY environment variable"}
+
+================================================================================
+TEST #7: NEW - Text Advanced
+Function: uppercase
+Query: 'преобразуй продукт в верхний регистр'
+================================================================================
+[ERROR] HTTP ERROR: 500
+Response: {"detail":"The api_key client option must be set either by passing api_key to the client or by setting the OPENAI_API_KEY environment variable"}
+
+================================================================================
+TEST #8: NEW - Date Advanced
+Function: extract_year
+Query: 'извлеки год из даты'
+================================================================================
+[ERROR] HTTP ERROR: 500
+Response: {"detail":"The api_key client option must be set either by passing api_key to the client or by setting the OPENAI_API_KEY environment variable"}
+
+================================================================================
+TEST #9: NEW - Window Functions
+Function: moving_average
+Query: 'скользящее среднее продаж за 3 периода'
+================================================================================
+[ERROR] HTTP ERROR: 500
+Response: {"detail":"The api_key client option must be set either by passing api_key to the client or by setting the OPENAI_API_KEY environment variable"}
+
+================================================================================
+TEST #10: NEW - Conditional Logic
+Function: if_then_else
+Query: 'если продажи больше 100000 то 'Высокие' иначе 'Низкие''
+================================================================================
+[ERROR] HTTP ERROR: 500
+Response: {"detail":"The api_key client option must be set either by passing api_key to the client or by setting the OPENAI_API_KEY environment variable"}
+
+================================================================================
+TEST RESULTS SUMMARY
+================================================================================
+
+[OK] Successful: 0/10 (0.0%)
+[FAIL] Failed: 10/10
+
+By category:
+  [WARN] Base - Highlighting: 0/1 (0%)
+  [WARN] Base - Filtering: 0/1 (0%)
+  [WARN] Base - Math: 0/1 (0%)
+  [WARN] Base - Grouping: 0/1 (0%)
+  [WARN] NEW - Math Operations: 0/1 (0%)
+  [WARN] NEW - Filtering Advanced: 0/1 (0%)
+  [WARN] NEW - Text Advanced: 0/1 (0%)
+  [WARN] NEW - Date Advanced: 0/1 (0%)
+  [WARN] NEW - Window Functions: 0/1 (0%)
+  [WARN] NEW - Conditional Logic: 0/1 (0%)
+
+Average response time: 2.06s
+
+Results saved to: test_results_20251118_222222.json
+
+================================================================================
+TARGET: 95%+ accuracy
+ACTUAL: 0.0%
+[WARN] Need improvement: 95.0% to go
+================================================================================
+

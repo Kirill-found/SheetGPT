@@ -1,0 +1,80 @@
+{
+  "timestamp": "2025-11-18T22:22:22.814336",
+  "total_tests": 10,
+  "successful": 0,
+  "failed": 10,
+  "accuracy": 0.0,
+  "avg_response_time": 2.0632432460784913,
+  "results": [
+    {
+      "test_id": 1,
+      "category": "Base - Highlighting",
+      "success": false,
+      "error": "HTTP 500",
+      "elapsed": 2.119569778442383
+    },
+    {
+      "test_id": 2,
+      "category": "Base - Filtering",
+      "success": false,
+      "error": "HTTP 500",
+      "elapsed": 2.062299966812134
+    },
+    {
+      "test_id": 3,
+      "category": "Base - Math",
+      "success": false,
+      "error": "HTTP 500",
+      "elapsed": 2.050647497177124
+    },
+    {
+      "test_id": 4,
+      "category": "Base - Grouping",
+      "success": false,
+      "error": "HTTP 500",
+      "elapsed": 2.0519051551818848
+    },
+    {
+      "test_id": 5,
+      "category": "NEW - Math Operations",
+      "success": false,
+      "error": "HTTP 500",
+      "elapsed": 2.031944751739502
+    },
+    {
+      "test_id": 6,
+      "category": "NEW - Filtering Advanced",
+      "success": false,
+      "error": "HTTP 500",
+      "elapsed": 2.071556568145752
+    },
+    {
+      "test_id": 7,
+      "category": "NEW - Text Advanced",
+      "success": false,
+      "error": "HTTP 500",
+      "elapsed": 2.0582923889160156
+    },
+    {
+      "test_id": 8,
+      "category": "NEW - Date Advanced",
+      "success": false,
+      "error": "HTTP 500",
+      "elapsed": 2.078900098800659
+    },
+    {
+      "test_id": 9,
+      "category": "NEW - Window Functions",
+      "success": false,
+      "error": "HTTP 500",
+      "elapsed": 2.0504069328308105
+    },
+    {
+      "test_id": 10,
+      "category": "NEW - Conditional Logic",
+      "success": false,
+      "error": "HTTP 500",
+      "elapsed": 2.0569093227386475
+    }
+  ]
+}

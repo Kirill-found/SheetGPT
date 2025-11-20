@@ -1,0 +1,94 @@
+{
+  "timestamp": "2025-11-19T10:02:31.249396",
+  "total_tests": 10,
+  "successful": 0,
+  "failed": 10,
+  "accuracy": 0.0,
+  "avg_response_time": 5.410866618156433,
+  "results": [
+    {
+      "test_id": 1,
+      "category": "Base - Highlighting",
+      "success": false,
+      "function_used": null,
+      "response_type": "function_call",
+      "elapsed": 4.325701951980591,
+      "summary": "Выделено 4 строк где Продажи > 100000, цвет: yellow"
+    },
+    {
+      "test_id": 2,
+      "category": "Base - Filtering",
+      "success": false,
+      "function_used": null,
+      "response_type": "function_call",
+      "elapsed": 3.908646583557129,
+      "summary": "Выполнена операция: filter_rows. Получено 4 строк"
+    },
+    {
+      "test_id": 3,
+      "category": "Base - Math",
+      "success": false,
+      "function_used": null,
+      "response_type": "error",
+      "elapsed": 4.0989062786102295,
+      "summary": "Ошибка выполнения функции calculate_sum"
+    },
+    {
+      "test_id": 4,
+      "category": "Base - Grouping",
+      "success": false,
+      "function_used": null,
+      "response_type": "function_call",
+      "elapsed": 3.9290037155151367,
+      "summary": "Выполнена операция: aggregate_by_group. Получено 3 строк"
+    },
+    {
+      "test_id": 5,
+      "category": "NEW - Math Operations",
+      "success": false,
+      "function_used": null,
+      "response_type": "function_call",
+      "elapsed": 8.087074041366577,
+      "summary": "Результат: 165000"
+    },
+    {
+      "test_id": 6,
+      "category": "NEW - Filtering Advanced",
+      "success": false,
+      "error": "HTTP 500",
+      "elapsed": 7.174895763397217
+    },
+    {
+      "test_id": 7,
+      "category": "NEW - Text Advanced",
+      "success": false,
+      "function_used": null,
+      "response_type": "function_call",
+      "elapsed": 3.8038556575775146,
+      "summary": "Выполнена функция uppercase"
+    },
+    {
+      "test_id": 8,
+      "category": "NEW - Date Advanced",
+      "success": false,
+      "error": "HTTP 500",
+      "elapsed": 7.492592096328735
+    },
+    {
+      "test_id": 9,
+      "category": "NEW - Window Functions",
+      "success": false,
+      "function_used": null,
+      "response_type": "function_call",
+      "elapsed": 3.854005813598633,
+      "summary": "Выполнена функция moving_average"
+    },
+    {
+      "test_id": 10,
+      "category": "NEW - Conditional Logic",
+      "success": false,
+      "error": "HTTP 500",
+      "elapsed": 7.433984279632568
+    }
+  ]
+}

@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Test OAuth - SheetGPT</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 600px;
+      margin: 50px auto;
+      padding: 20px;
+    }
+    button {
+      background: #4285f4;
+      color: white;
+      border: none;
+      padding: 12px 24px;
+      font-size: 16px;
+      border-radius: 4px;
+      cursor: pointer;
+      margin: 10px 0;
+    }
+    button:hover {
+      background: #357ae8;
+    }
+    #result {
+      margin-top: 20px;
+      padding: 15px;
+      background: #f5f5f5;
+      border-radius: 4px;
+      white-space: pre-wrap;
+      font-family: monospace;
+      font-size: 12px;
+    }
+    .error {
+      background: #ffebee;
+      color: #c62828;
+    }
+    .success {
+      background: #e8f5e9;
+      color: #2e7d32;
+    }
+  </style>
+</head>
+<body>
+  <h1>SheetGPT OAuth Test</h1>
+
+  <p>Нажмите кнопку чтобы проверить OAuth авторизацию:</p>
+
+  <button onclick="testAuth()">Проверить OAuth</button>
+  <button onclick="clearAuth()">Сбросить OAuth</button>
+
+  <div id="result"></div>
+
+  <script>
+    async function testAuth() {
+      const resultDiv = document.getElementById('result');
+      resultDiv.textContent = 'Проверяю OAuth...';
+      resultDiv.className = '';
+
+      try {
+        const response = await chrome.runtime.sendMessage({ action: 'CHECK_AUTH' });
+
+        if (response.success && response.result.authenticated) {
+          resultDiv.textContent = '✅ OAuth работает!\n\nВы авторизованы и можете использовать Google Sheets API.';
+          resultDiv.className = 'success';
+        } else {
+          resultDiv.textContent = '❌ OAuth не работает\n\nОшибка: ' + (response.result?.error || response.error || 'Unknown');
+          resultDiv.className = 'error';
+        }
+      } catch (error) {
+        resultDiv.textContent = '❌ Ошибка проверки OAuth:\n\n' + error.message;
+        resultDiv.className = 'error';
+      }
+    }
+
+    async function clearAuth() {
+      const resultDiv = document.getElementById('result');
+      resultDiv.textContent = 'Сбрасываю OAuth токены...';
+      resultDiv.className = '';
+
+      try {
+        // Get current token
+        chrome.identity.getAuthToken({ interactive: false }, (token) => {
+          if (token) {
+            // Remove token
+            chrome.identity.removeCachedAuthToken({ token: token }, () => {
+              resultDiv.textContent = '✅ OAuth токены сброшены\n\nПопробуйте снова нажать "Проверить OAuth"';
+              resultDiv.className = 'success';
+            });
+          } else {
+            resultDiv.textContent = '⚠️ Нет сохранённых токенов';
+            resultDiv.className = '';
+          }
+        });
+      } catch (error) {
+        resultDiv.textContent = '❌ Ошибка сброса:\n\n' + error.message;
+        resultDiv.className = 'error';
+      }
+    }
+  </script>
+</body>
+</html>
