@@ -216,48 +216,48 @@ class AIFunctionCaller:
         return None
 
     def _format_pattern_response(self, result_df: pd.DataFrame, function_name: str, params: Dict, query: str) -> Dict[str, Any]:
-        """Format response for pattern-detected queries"""
-        print(f"[PATTERN DETECTOR v7.7.0] Result: {len(result_df)} rows")
+        """Format response - COMPACT & STRUCTURED v7.9.0"""
+        sort_column = params.get("column", None)
+        id_column = result_df.columns[0] if len(result_df.columns) > 0 else None
 
-        # Generate summary based on result
-        if len(result_df) <= 3:
-            # Small result - text answer (Smart UX from v7.6.4)
+        if len(result_df) <= 10:
             result_lines = []
             for idx, row in result_df.iterrows():
-                row_desc = []
-                for col, val in row.items():
-                    if isinstance(val, (int, float)) and not pd.isna(val):
-                        if val == int(val):
-                            row_desc.append(f"{col}: {int(val):,}".replace(",", " "))
-                        else:
-                            row_desc.append(f"{col}: {val:,.2f}".replace(",", " "))
-                    elif not pd.isna(val):
-                        row_desc.append(f"{col}: {val}")
-                result_lines.append(" | ".join(row_desc))
+                id_val = row[id_column] if id_column else f"#{idx+1}"
+                sort_val = row[sort_column] if sort_column and sort_column in row else None
+                if sort_val is not None:
+                    if isinstance(sort_val, (int, float)) and not pd.isna(sort_val):
+                        sort_fmt = f"{int(sort_val):,}".replace(",", " ") if sort_val == int(sort_val) else f"{sort_val:,.2f}"
+                    else:
+                        sort_fmt = str(sort_val)
+                    result_lines.append(f"{id_val} — {sort_fmt}")
+                else:
+                    result_lines.append(str(id_val))
 
-            summary = "Результат:\n" + "\n".join([f"{i+1}. {line}" for i, line in enumerate(result_lines)])
+            if function_name == "filter_top_n":
+                title = f"Топ {len(result_df)} по «{sort_column}»"
+            elif function_name == "filter_bottom_n":
+                title = f"Худшие {len(result_df)} по «{sort_column}»"
+            else:
+                title = "Результат"
+
+            summary = f"{title}:
+" + "
+".join([f"{i+1}. {line}" for i, line in enumerate(result_lines)])
+            methodology = f"Обоснование: данные отсортированы по колонке «{sort_column}» (убывание), выбраны топ-{len(result_df)}."
         else:
-            # Large result - will create table
-            summary = f"Найдено {len(result_df)} записей. Результат отправлен в новый лист."
+            summary = f"Найдено {len(result_df)} записей."
+            methodology = f"Сортировка по: {sort_column}"
 
         return {
-            "formula": None,
-            "explanation": f"Запрос обработан автоматическим детектором паттернов v7.7.0",
-            "target_cell": None,
-            "confidence": 0.99,  # High confidence for rule-based
-            "response_type": "analysis",
-            "function_used": function_name,
-            "parameters": params,
-            "summary": summary,
-            "methodology": f"Использован детектор паттернов v7.7.0. Функция: {function_name}. Параметры: {params}",
-            "key_findings": [f"Обработано записей: {len(result_df)}"],
-            "insights": [],
-            "structured_data": {
-                "headers": result_df.columns.tolist(),
-                "rows": result_df.values.tolist(),
-                "table_title": f"Результат: {query[:50]}..."
-            } if len(result_df) > 3 else None
+            "formula": None, "explanation": "", "target_cell": None, "confidence": 0.99,
+            "response_type": "analysis", "function_used": function_name, "parameters": params,
+            "summary": summary, "methodology": methodology,
+            "key_findings": [f"Найдено: {len(result_df)}", f"По: {sort_column}"], "insights": [],
+            "structured_data": {"headers": result_df.columns.tolist(), "rows": result_df.values.tolist(),
+                "table_title": f"Результат: {query[:50]}..."} if len(result_df) > 10 else None
         }
+
 
     def _validate_query(self, query: str) -> tuple[bool, str]:
         """
@@ -670,24 +670,30 @@ class AIFunctionCaller:
                                 row_desc.append(f"{col}: {val}")
                         result_lines.append(" | ".join(row_desc))
 
-                    # Определяем заголовок в зависимости от функции
+                    # v7.9.0: Компактный вывод
+                    sort_col = params.get("column", "")
                     if func_name == "filter_top_n":
-                        prefix = "Максимальное значение" if len(func_result) == 1 else f"Топ {len(func_result)}"
+                        prefix = f"Топ {len(func_result)} по «{sort_col}»"
                     elif func_name == "filter_bottom_n":
-                        prefix = "Минимальное значение" if len(func_result) == 1 else f"Худшие {len(func_result)}"
-                    elif func_name == "aggregate_by_group":
-                        prefix = "Результат группировки"
-                    elif func_name == "filter_rows":
-                        prefix = "Найдено строк"
-                    elif func_name == "sort_data":
-                        prefix = "Отсортировано"
-                    elif func_name == "get_unique_values":
-                        prefix = "Уникальные значения"
+                        prefix = f"Худшие {len(func_result)} по «{sort_col}»"
                     else:
                         prefix = "Результат"
 
-                    response["summary"] = f"{prefix}:\n" + "\n".join([f"{i+1}. {line}" for i, line in enumerate(result_lines)])
-                    response["methodology"] = f"Использована функция {func_name} с параметрами: {params}"
+                    id_col = func_result.columns[0]
+                    compact_lines = []
+                    for idx, row in func_result.iterrows():
+                        id_val = row[id_col]
+                        sort_val = row.get(sort_col) if sort_col else None
+                        if sort_val is not None and isinstance(sort_val, (int, float)) and not pd.isna(sort_val):
+                            sort_fmt = f"{int(sort_val):,}".replace(",", " ") if sort_val == int(sort_val) else f"{sort_val:,.2f}"
+                            compact_lines.append(f"{id_val} — {sort_fmt}")
+                        else:
+                            compact_lines.append(str(id_val))
+
+                    response["summary"] = f"{prefix}:
+" + "
+".join([f"{i+1}. {line}" for i, line in enumerate(compact_lines)])
+                    response["methodology"] = f"Обоснование: сортировка по «{sort_col}», топ-{len(func_result)}."
                     # НЕ создаем structured_data - пользователь видит только текст в чате
 
                 else:
