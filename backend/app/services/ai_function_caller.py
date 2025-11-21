@@ -219,23 +219,21 @@ class AIFunctionCaller:
         """Format response for pattern-detected queries"""
         print(f"[PATTERN DETECTOR v7.7.0] Result: {len(result_df)} rows")
 
-        # Generate summary based on result
-        if len(result_df) <= 3:
-            # Small result - text answer (Smart UX from v7.6.4)
+        # v7.9.0: Compact format - ID + sort value
+        sort_col = params.get("column", "")
+        id_col = result_df.columns[0] if len(result_df.columns) > 0 else None
+        if len(result_df) <= 10:
             result_lines = []
             for idx, row in result_df.iterrows():
-                row_desc = []
-                for col, val in row.items():
-                    if isinstance(val, (int, float)) and not pd.isna(val):
-                        if val == int(val):
-                            row_desc.append(f"{col}: {int(val):,}".replace(",", " "))
-                        else:
-                            row_desc.append(f"{col}: {val:,.2f}".replace(",", " "))
-                    elif not pd.isna(val):
-                        row_desc.append(f"{col}: {val}")
-                result_lines.append(" | ".join(row_desc))
-
-            summary = "Результат:\n" + "\n".join([f"{i+1}. {line}" for i, line in enumerate(result_lines)])
+                id_val = row[id_col] if id_col else idx
+                sort_val = row.get(sort_col) if sort_col else None
+                if sort_val is not None and isinstance(sort_val, (int, float)) and not pd.isna(sort_val):
+                    fmt = f"{int(sort_val):,}".replace(",", " ") if sort_val == int(sort_val) else f"{sort_val:,.2f}"
+                    result_lines.append(f"{id_val} - {fmt}")
+                else:
+                    result_lines.append(str(id_val))
+            title = f"Top {len(result_df)} by '{sort_col}'" if function_name == "filter_top_n" else "Result"
+            summary = f"{title}:" + chr(10) + chr(10).join([f"{i+1}. {ln}" for i, ln in enumerate(result_lines)])
         else:
             # Large result - will create table
             summary = f"Найдено {len(result_df)} записей. Результат отправлен в новый лист."
