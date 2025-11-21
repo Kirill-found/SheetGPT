@@ -8,8 +8,9 @@ Railway deployment: 2024-11-19 - PERFORMANCE & RELIABILITY IMPROVEMENTS
 from dotenv import load_dotenv
 load_dotenv()  # Load .env file FIRST
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Header, Depends
 from fastapi.middleware.cors import CORSMiddleware
+from typing import Optional
 from app.schemas.requests import FormulaRequest
 from app.schemas.responses import FormulaResponse
 from app.config import settings
@@ -127,7 +128,10 @@ async def health_check():
     }
 
 @app.post("/api/v1/formula", response_model=FormulaResponse)
-async def process_formula(request: FormulaRequest):
+async def process_formula(
+    request: FormulaRequest,
+    x_api_token: Optional[str] = Header(None, alias="X-API-Token")
+):
     """
     Main endpoint v7.4.0 - Function Calling ONLY (NO FALLBACK)
     - 100 проверенных функций
@@ -148,6 +152,25 @@ async def process_formula(request: FormulaRequest):
 
         # Создаем DataFrame из данных
         df = pd.DataFrame(request.sheet_data, columns=request.column_names)
+
+        # v7.9.1: Count query usage if API token provided
+        if x_api_token:
+            try:
+                from app.core.database import AsyncSessionLocal
+                from sqlalchemy import select
+                from app.models.telegram_user import TelegramUser
+                async with AsyncSessionLocal() as db:
+                    result = await db.execute(
+                        select(TelegramUser).where(TelegramUser.api_token == x_api_token)
+                    )
+                    user = result.scalar_one_or_none()
+                    if user:
+                        user.queries_used_today += 1
+                        user.total_queries += 1
+                        await db.commit()
+                        logger.info(f"[USAGE] User {user.telegram_user_id}: {user.queries_used_today}/{user.queries_limit}")
+            except Exception as e:
+                logger.warning(f"[USAGE] Failed to count query: {e}")
 
         # v7.5.9 СИСТЕМНОЕ ИСПРАВЛЕНИЕ: Автоматическая конвертация числовых колонок
         # Google Sheets API возвращает ВСЁ как строки → конвертируем числа автоматически
