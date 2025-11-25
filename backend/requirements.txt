@@ -35,7 +35,5 @@ numpy==1.26.3
 # Web Search (100% free, no API keys) - TEMPORARILY DISABLED due to Railway build issues
 # ddgs==9.9.1
 
-# FORCE REBUILD: 18 Nov 2025 - v7.4.0-HOTFIX
-# TEMPORARY: Disabled ddgs to fix Railway deployment
-# Web search will be re-enabled after investigating Railway build environment
+# FORCE REBUILD: 25 Nov 2025 - v8.0.0 Two-Stage AI Processing
 # Railway MUST rebuild when requirements.txt changes
