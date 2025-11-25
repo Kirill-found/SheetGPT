@@ -1,10 +1,15 @@
 """
 Упрощенная версия для быстрого теста (без БД)
++ Telegram Bot в фоновом потоке
 """
+import threading
+import logging
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
 from app.api import formula
+
+logger = logging.getLogger(__name__)
 
 # Создаем FastAPI приложение
 app = FastAPI(
@@ -28,12 +33,39 @@ app.add_middleware(
 app.include_router(formula.router)
 
 
+def start_telegram_bot():
+    """Запуск Telegram бота в отдельном потоке"""
+    try:
+        from app.telegram_bot import SheetGPTBot
+
+        token = settings.TELEGRAM_BOT_TOKEN
+        admin_id = settings.TELEGRAM_ADMIN_ID
+
+        if not token:
+            logger.warning("TELEGRAM_BOT_TOKEN not set - bot disabled")
+            return
+
+        logger.info(f"Starting Telegram bot (admin_id: {admin_id})")
+        bot = SheetGPTBot(token=token, admin_id=admin_id)
+        bot.run()
+    except Exception as e:
+        logger.error(f"Failed to start Telegram bot: {e}")
+
+
 @app.on_event("startup")
 async def startup_event():
     """Инициализация при запуске"""
     print(f"Starting {settings.PROJECT_NAME} v{settings.VERSION}")
     print(f"Environment: {settings.ENVIRONMENT}")
     print(f"Server running (without DB for quick start)")
+
+    # Запускаем Telegram бота в отдельном потоке
+    if settings.TELEGRAM_BOT_TOKEN:
+        bot_thread = threading.Thread(target=start_telegram_bot, daemon=True)
+        bot_thread.start()
+        print("Telegram bot started in background thread")
+    else:
+        print("Telegram bot disabled (no token)")
 
 
 @app.get("/", tags=["root"])
@@ -53,7 +85,8 @@ async def health_check():
     return {
         "status": "healthy",
         "environment": settings.ENVIRONMENT,
-        "gemini_configured": settings.GEMINI_API_KEY != "your-gemini-api-key-here"
+        "gemini_configured": settings.GEMINI_API_KEY != "your-gemini-api-key-here",
+        "telegram_bot_enabled": bool(settings.TELEGRAM_BOT_TOKEN)
     }
 
 
