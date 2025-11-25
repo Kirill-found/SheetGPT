@@ -212,11 +212,11 @@ let isProcessing = false;
         const badge = document.createElement('div');
         badge.className = 'response-badge ' + responseType;
         if (responseType === 'analysis') {
-          badge.textContent = '📊 Анализ';
+          badge.textContent = 'Анализ';
         } else if (responseType === 'action') {
-          badge.textContent = '⚡ Действие';
+          badge.textContent = 'Действие';
         } else {
-          badge.textContent = '📝 Формула';
+          badge.textContent = 'Формула';
         }
         bubble.appendChild(badge);
 
@@ -243,14 +243,14 @@ let isProcessing = false;
           actions.className = 'action-buttons';
 
           const insertBtn = document.createElement('button');
-          insertBtn.className = 'btn btn-primary btn-sm';
-          insertBtn.innerHTML = '<svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg> Вставить';
+          insertBtn.className = 'action-btn';
+          insertBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 4v16m8-8H4"></path></svg> Вставить';
           insertBtn.onclick = () => insertFormula(result.formula, result.target_cell);
           actions.appendChild(insertBtn);
 
           const copyBtn = document.createElement('button');
-          copyBtn.className = 'btn btn-secondary btn-sm';
-          copyBtn.innerHTML = '<svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg> Копировать';
+          copyBtn.className = 'action-btn secondary';
+          copyBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg> Копировать';
           copyBtn.onclick = () => copyToClipboard(result.formula);
           actions.appendChild(copyBtn);
 
@@ -516,15 +516,11 @@ let isProcessing = false;
       loadingDiv.className = 'message ai';
       loadingDiv.id = 'loading';
 
-      const bubble = document.createElement('div');
-      bubble.className = 'message-bubble';
-
       const loading = document.createElement('div');
       loading.className = 'loading-indicator';
-      loading.innerHTML = '<div class="loading-dot"></div><div class="loading-dot"></div><div class="loading-dot"></div>';
+      loading.innerHTML = '<div class="loading-dots"><span></span><span></span><span></span></div><span class="loading-text">Думаю...</span>';
 
-      bubble.appendChild(loading);
-      loadingDiv.appendChild(bubble);
+      loadingDiv.appendChild(loading);
       container.appendChild(loadingDiv);
 
       scrollToBottom();
@@ -705,13 +701,13 @@ let isProcessing = false;
         .withSuccessHandler(function(context) {
           document.getElementById('customContextInput').value = context || '';
           document.getElementById('charCount').textContent = (context || '').length;
-          document.getElementById('settingsModal').style.display = 'flex';
+          document.getElementById('settingsModal').classList.add('show');
         })
         .getCustomContext();
     }
 
     function closeSettings() {
-      document.getElementById('settingsModal').style.display = 'none';
+      document.getElementById('settingsModal').classList.remove('show');
     }
 
     function saveSettings() {
