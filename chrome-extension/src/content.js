@@ -1,9 +1,117 @@
 /**
  * SheetGPT Chrome Extension - Content Script
  * Инжектит sidebar в Google Sheets
+ *
+ * v7.9.4: Added extension context validation and auto-recovery
  */
 
 console.log('[SheetGPT] Content script loaded');
+
+// v7.9.4: Check if extension context is valid
+function isExtensionContextValid() {
+  try {
+    // Try to access chrome.runtime.id - this will throw if context is invalid
+    return !!(chrome.runtime && chrome.runtime.id);
+  } catch (e) {
+    return false;
+  }
+}
+
+// v7.9.4: Show reload notification when context is invalidated
+function showReloadNotification() {
+  // Remove existing notification if present
+  const existing = document.getElementById('sheetgpt-reload-notification');
+  if (existing) existing.remove();
+
+  const notification = document.createElement('div');
+  notification.id = 'sheetgpt-reload-notification';
+  notification.innerHTML = `
+    <div style="
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      background: linear-gradient(135deg, #6366F1 0%, #A855F7 100%);
+      color: white;
+      padding: 16px 20px;
+      border-radius: 12px;
+      box-shadow: 0 4px 20px rgba(99, 102, 241, 0.4);
+      z-index: 9999999;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      max-width: 320px;
+      animation: slideIn 0.3s ease;
+    ">
+      <style>
+        @keyframes slideIn {
+          from { transform: translateX(100%); opacity: 0; }
+          to { transform: translateX(0); opacity: 1; }
+        }
+      </style>
+      <div style="font-weight: 600; margin-bottom: 8px; font-size: 14px;">
+        🔄 SheetGPT обновился
+      </div>
+      <div style="font-size: 13px; opacity: 0.95; margin-bottom: 12px;">
+        Расширение было обновлено. Перезагрузите страницу для продолжения работы.
+      </div>
+      <button id="sheetgpt-reload-btn" style="
+        background: white;
+        color: #6366F1;
+        border: none;
+        padding: 8px 16px;
+        border-radius: 6px;
+        font-weight: 600;
+        cursor: pointer;
+        font-size: 13px;
+        transition: transform 0.2s;
+      ">
+        Перезагрузить страницу
+      </button>
+      <button id="sheetgpt-dismiss-btn" style="
+        background: transparent;
+        color: white;
+        border: 1px solid rgba(255,255,255,0.3);
+        padding: 8px 16px;
+        border-radius: 6px;
+        cursor: pointer;
+        font-size: 13px;
+        margin-left: 8px;
+      ">
+        Позже
+      </button>
+    </div>
+  `;
+
+  document.body.appendChild(notification);
+
+  // Add event listeners
+  document.getElementById('sheetgpt-reload-btn')?.addEventListener('click', () => {
+    window.location.reload();
+  });
+
+  document.getElementById('sheetgpt-dismiss-btn')?.addEventListener('click', () => {
+    notification.remove();
+  });
+}
+
+// v7.9.4: Wrap chrome.runtime.sendMessage with context check
+async function safeSendMessage(message) {
+  if (!isExtensionContextValid()) {
+    console.warn('[SheetGPT] Extension context invalidated, showing reload notification');
+    showReloadNotification();
+    throw new Error('Extension context invalidated. Please reload the page.');
+  }
+
+  try {
+    return await chrome.runtime.sendMessage(message);
+  } catch (error) {
+    if (error.message?.includes('Extension context invalidated') ||
+        error.message?.includes('context invalidated')) {
+      console.warn('[SheetGPT] Extension context invalidated during sendMessage');
+      showReloadNotification();
+      throw new Error('Extension context invalidated. Please reload the page.');
+    }
+    throw error;
+  }
+}
 
 // Слушаем сообщения от popup
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
@@ -254,12 +362,13 @@ async function getActiveSheetData() {
   console.log('[SheetGPT] Getting active sheet data via Sheets API...');
 
   try {
-    const response = await chrome.runtime.sendMessage({
+    // v7.9.4: Use safeSendMessage to handle context invalidation
+    const response = await safeSendMessage({
       action: 'GET_SHEET_DATA'
     });
 
     if (!response) {
-      throw new Error('Нет ответа от background script. Перезагрузите расширение в chrome://extensions');
+      throw new Error('Нет ответа от background script. Перезагрузите страницу (F5)');
     }
 
     if (!response.success) {
@@ -395,11 +504,26 @@ function sendMessageToSidebar(data) {
 async function processQuery(query) {
   console.log('[SheetGPT] Processing query:', query);
 
+  // v7.9.4: Check context before any operations
+  if (!isExtensionContextValid()) {
+    showReloadNotification();
+    throw new Error('Extension context invalidated. Please reload the page.');
+  }
+
   // Get data from active sheet (TODO: implement real sheet reading)
   const sheetData = await getActiveSheetData();
 
-  // Get custom context from storage
-  const { customContext } = await chrome.storage.local.get('customContext');
+  // Get custom context from storage (v7.9.4: with context check)
+  let customContext = '';
+  try {
+    const result = await chrome.storage.local.get('customContext');
+    customContext = result.customContext;
+  } catch (e) {
+    if (e.message?.includes('Extension context invalidated')) {
+      showReloadNotification();
+      throw new Error('Extension context invalidated. Please reload the page.');
+    }
+  }
 
   // Call SheetGPT API
   const response = await fetch('https://sheetgpt-production.up.railway.app/api/v1/formula', {
@@ -424,13 +548,39 @@ async function processQuery(query) {
 }
 
 async function getCustomContext() {
-  const { customContext } = await chrome.storage.local.get('customContext');
-  return customContext || '';
+  // v7.9.4: Context validation
+  if (!isExtensionContextValid()) {
+    showReloadNotification();
+    throw new Error('Extension context invalidated. Please reload the page.');
+  }
+  try {
+    const { customContext } = await chrome.storage.local.get('customContext');
+    return customContext || '';
+  } catch (e) {
+    if (e.message?.includes('Extension context invalidated')) {
+      showReloadNotification();
+      throw new Error('Extension context invalidated. Please reload the page.');
+    }
+    throw e;
+  }
 }
 
 async function saveCustomContext(context) {
-  await chrome.storage.local.set({ customContext: context });
-  return { success: true, message: 'Настройки сохранены' };
+  // v7.9.4: Context validation
+  if (!isExtensionContextValid()) {
+    showReloadNotification();
+    throw new Error('Extension context invalidated. Please reload the page.');
+  }
+  try {
+    await chrome.storage.local.set({ customContext: context });
+    return { success: true, message: 'Настройки сохранены' };
+  } catch (e) {
+    if (e.message?.includes('Extension context invalidated')) {
+      showReloadNotification();
+      throw new Error('Extension context invalidated. Please reload the page.');
+    }
+    throw e;
+  }
 }
 
 async function insertFormula(formula, targetCell) {
@@ -459,8 +609,8 @@ async function createTableAndChart(structuredData) {
     }).replace(/[,\s:]/g, '_');
     const sheetTitle = `SheetGPT_${timestamp}`;
 
-    // Create new sheet with data
-    const response = await chrome.runtime.sendMessage({
+    // Create new sheet with data (v7.9.4: use safeSendMessage)
+    const response = await safeSendMessage({
       action: 'CREATE_NEW_SHEET',
       data: {
         sheetTitle,
@@ -493,8 +643,8 @@ async function replaceDataInCurrentSheet(structuredData) {
     // Convert structured data to 2D array
     const values = convertStructuredDataToValues(structuredData);
 
-    // Get current sheet name
-    const sheetNameResponse = await chrome.runtime.sendMessage({
+    // Get current sheet name (v7.9.4: use safeSendMessage)
+    const sheetNameResponse = await safeSendMessage({
       action: 'GET_SHEET_DATA'
     });
 
@@ -506,8 +656,8 @@ async function replaceDataInCurrentSheet(structuredData) {
     // TODO: Get actual active sheet name from page DOM
     const sheetName = 'Sheet1';
 
-    // Write data to current sheet
-    const response = await chrome.runtime.sendMessage({
+    // Write data to current sheet (v7.9.4: use safeSendMessage)
+    const response = await safeSendMessage({
       action: 'WRITE_SHEET_DATA',
       data: {
         sheetName,
@@ -545,8 +695,8 @@ async function highlightRows(rows, color) {
     // Get current sheet name (fallback to Sheet1)
     const sheetName = 'Sheet1'; // TODO: Get actual active sheet name
 
-    // Highlight rows via Sheets API
-    const response = await chrome.runtime.sendMessage({
+    // Highlight rows via Sheets API (v7.9.4: use safeSendMessage)
+    const response = await safeSendMessage({
       action: 'HIGHLIGHT_ROWS',
       data: {
         sheetName,
