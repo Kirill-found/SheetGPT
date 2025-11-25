@@ -261,10 +261,132 @@ async def process_formula(
 
         return response_dict
 
+    except ValueError as e:
+        # Ошибки валидации данных
+        logger.warning(f"[VALIDATION ERROR] {str(e)}")
+        raise HTTPException(
+            status_code=422,
+            detail={
+                "error_type": "validation_error",
+                "message": str(e),
+                "user_message": "Проверьте корректность данных и запроса",
+                "retryable": False
+            }
+        )
+    except TimeoutError as e:
+        # Таймаут выполнения
+        logger.error(f"[TIMEOUT] Request timed out: {str(e)}")
+        raise HTTPException(
+            status_code=504,
+            detail={
+                "error_type": "timeout",
+                "message": "Превышено время выполнения запроса",
+                "user_message": "Сервер перегружен, попробуйте через несколько секунд",
+                "retryable": True
+            }
+        )
+    except ConnectionError as e:
+        # Ошибки соединения с AI API
+        logger.error(f"[CONNECTION ERROR] AI service unavailable: {str(e)}")
+        raise HTTPException(
+            status_code=503,
+            detail={
+                "error_type": "service_unavailable",
+                "message": "AI сервис временно недоступен",
+                "user_message": "Сервис временно недоступен, повторите попытку",
+                "retryable": True
+            }
+        )
     except Exception as e:
-        logger.error(f"[ERROR] Processing failed: {str(e)}")
+        error_msg = str(e)
+        logger.error(f"[ERROR] Processing failed: {error_msg}")
         logger.exception(e)
-        raise HTTPException(status_code=500, detail=str(e))
+
+        # Классифицируем ошибку для более понятного сообщения
+        error_response = classify_backend_error(error_msg)
+
+        raise HTTPException(
+            status_code=error_response["status_code"],
+            detail={
+                "error_type": error_response["error_type"],
+                "message": error_msg,
+                "user_message": error_response["user_message"],
+                "retryable": error_response["retryable"]
+            }
+        )
+
+
+def classify_backend_error(error_msg: str) -> dict:
+    """Классификация ошибок для понятных сообщений пользователю"""
+    error_lower = error_msg.lower()
+
+    # OpenAI API ошибки
+    if "rate limit" in error_lower or "too many requests" in error_lower:
+        return {
+            "status_code": 429,
+            "error_type": "rate_limit",
+            "user_message": "Превышен лимит запросов. Подождите минуту и повторите.",
+            "retryable": True
+        }
+
+    if "context length" in error_lower or "maximum context" in error_lower:
+        return {
+            "status_code": 422,
+            "error_type": "context_too_large",
+            "user_message": "Слишком много данных. Уменьшите объём таблицы.",
+            "retryable": False
+        }
+
+    if "invalid api key" in error_lower or "authentication" in error_lower:
+        return {
+            "status_code": 500,
+            "error_type": "configuration_error",
+            "user_message": "Ошибка конфигурации сервера. Обратитесь в поддержку.",
+            "retryable": False
+        }
+
+    # Ошибки данных
+    if "empty" in error_lower or "no data" in error_lower or "данные отсутствуют" in error_lower:
+        return {
+            "status_code": 422,
+            "error_type": "no_data",
+            "user_message": "Недостаточно данных для выполнения запроса.",
+            "retryable": False
+        }
+
+    if "column" in error_lower and ("not found" in error_lower or "не найден" in error_lower):
+        return {
+            "status_code": 422,
+            "error_type": "column_not_found",
+            "user_message": "Указанная колонка не найдена в таблице.",
+            "retryable": False
+        }
+
+    # Сетевые ошибки
+    if "connection" in error_lower or "network" in error_lower or "timeout" in error_lower:
+        return {
+            "status_code": 503,
+            "error_type": "network_error",
+            "user_message": "Проблема с соединением. Повторите попытку.",
+            "retryable": True
+        }
+
+    # Ошибки выполнения кода
+    if "execution" in error_lower or "syntax" in error_lower or "python" in error_lower:
+        return {
+            "status_code": 500,
+            "error_type": "execution_error",
+            "user_message": "Ошибка обработки запроса. Попробуйте переформулировать.",
+            "retryable": False
+        }
+
+    # Общая ошибка
+    return {
+        "status_code": 500,
+        "error_type": "internal_error",
+        "user_message": "Произошла ошибка. Попробуйте ещё раз.",
+        "retryable": True
+    }
 
 @app.get("/api/v1/version")
 async def get_version():

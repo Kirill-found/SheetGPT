@@ -435,7 +435,8 @@ class AIFunctionCaller:
                     df,
                     query,
                     sheet_data,
-                    column_names
+                    column_names,
+                    custom_context
                 )
 
                 # v7.5.0: Log metrics
@@ -483,7 +484,8 @@ class AIFunctionCaller:
                             df,
                             query,
                             sheet_data,
-                            column_names
+                            column_names,
+                            custom_context
                         )
 
                         # Log metrics (fallback success)
@@ -556,10 +558,11 @@ class AIFunctionCaller:
         df: pd.DataFrame,
         query: str,
         sheet_data: List[List[Any]],
-        column_names: List[str]
+        column_names: List[str],
+        custom_context: Optional[str] = None
     ) -> Dict[str, Any]:
         """
-        Выполнение function call (NO FALLBACK)
+        Выполнение function call с FALLBACK на Code Generation при ошибке
         """
         func_name = function_call.name
         params = json.loads(function_call.arguments)
@@ -570,9 +573,42 @@ class AIFunctionCaller:
         # Выполняем функцию из registry
         result = self.registry.execute(func_name, df, **params)
 
+        # v7.9.2: Валидация результата
+        if result["success"]:
+            validation = self._validate_function_result(result, func_name, params, df)
+            if not validation["valid"]:
+                print(f"[VALIDATION v7.9.2] Result validation failed: {validation['reason']}")
+                result["success"] = False
+                result["error"] = validation["reason"]
+
         if not result["success"]:
             print(f"[FUNCTION_CALLER] Function failed: {result['error']}")
-            # NO FALLBACK - возвращаем ошибку
+            print(f"[FALLBACK v7.9.2] Attempting Code Generation fallback...")
+
+            # v7.9.2: FALLBACK на Code Generation при ошибке функции
+            try:
+                code_result = await generate_and_execute_code(
+                    query=query,
+                    df=df,
+                    column_names=column_names,
+                    custom_context=custom_context
+                )
+
+                # Проверяем успешность Code Generation
+                if code_result.get("python_executed", False) or code_result.get("summary"):
+                    print(f"[FALLBACK v7.9.2] Code Generation succeeded!")
+                    code_result["_fallback_from"] = f"function_{func_name}"
+                    code_result["_original_error"] = result['error']
+                    return code_result
+                else:
+                    print(f"[FALLBACK v7.9.2] Code Generation also failed")
+                    # Продолжаем к возврату ошибки
+
+            except Exception as fallback_error:
+                print(f"[FALLBACK v7.9.2] Code Generation fallback exception: {fallback_error}")
+                # Продолжаем к возврату ошибки
+
+            # Если fallback тоже не сработал - возвращаем информативную ошибку
             return {
                 "formula": None,
                 "explanation": "",
@@ -583,12 +619,16 @@ class AIFunctionCaller:
                 "parameters": params,
                 "insights": [],
                 "suggested_actions": None,
-                "summary": f"Ошибка выполнения функции {func_name}",
-                "methodology": f"Попытка вызова {func_name} с параметрами {params}",
+                "summary": f"Не удалось выполнить запрос",
+                "methodology": f"Попытка 1: {func_name} с параметрами {params}. Попытка 2: Code Generation.",
                 "key_findings": [],
                 "professional_insights": "",
-                "recommendations": ["Проверьте правильность названий колонок и параметров"],
-                "warnings": [f"Ошибка: {result['error']}"],
+                "recommendations": [
+                    "Проверьте правильность названий колонок",
+                    "Попробуйте переформулировать запрос",
+                    "Убедитесь что в таблице есть нужные данные"
+                ],
+                "warnings": [f"Ошибка функции: {result['error']}"],
                 "structured_data": None,
                 "highlight_rows": None,
                 "highlight_color": None,
@@ -597,6 +637,91 @@ class AIFunctionCaller:
 
         # Форматируем ответ
         return self._format_response(result, func_name, params, query, df)
+
+    def _validate_function_result(
+        self,
+        result: Dict[str, Any],
+        func_name: str,
+        params: Dict[str, Any],
+        df: pd.DataFrame
+    ) -> Dict[str, Any]:
+        """
+        v7.9.2: Валидация результата выполнения функции
+        Проверяет что результат имеет смысл и соответствует ожиданиям
+
+        Returns:
+            {"valid": True/False, "reason": str}
+        """
+        func_result = result.get("result")
+
+        # 1. Проверка на None результат
+        if func_result is None:
+            return {"valid": False, "reason": "Функция вернула пустой результат"}
+
+        # 2. Для DataFrame результатов
+        if isinstance(func_result, pd.DataFrame):
+            # Пустой DataFrame может быть валидным результатом фильтрации
+            # но если запрашивали top_n, это проблема
+            if func_result.empty:
+                if func_name in ["filter_top_n", "filter_bottom_n", "top_n_per_group"]:
+                    return {"valid": False, "reason": "Не найдено записей для ранжирования. Проверьте данные."}
+                elif func_name in ["filter_rows", "search_rows"]:
+                    # Пустой результат фильтрации - допустимо
+                    return {"valid": True, "reason": ""}
+
+            # Проверка на слишком большой результат (>95% данных для filter)
+            if func_name in ["filter_rows", "search_rows"]:
+                if len(func_result) > len(df) * 0.95:
+                    print(f"[VALIDATION] Warning: Filter returned {len(func_result)}/{len(df)} rows (>95%)")
+                    # Это предупреждение, не ошибка
+
+        # 3. Для числовых результатов
+        if isinstance(func_result, (int, float)):
+            # Проверка на NaN
+            if pd.isna(func_result):
+                return {"valid": False, "reason": "Результат вычисления не определен (NaN). Возможно, в колонке нет числовых данных."}
+
+            # Проверка на Infinity
+            if not pd.isna(func_result) and (func_result == float('inf') or func_result == float('-inf')):
+                return {"valid": False, "reason": "Результат вычисления бесконечность. Проверьте данные на нули."}
+
+            # Для процентов - должно быть в разумных пределах
+            if func_name == "calculate_percentage":
+                # Процент может быть > 100% в некоторых случаях, но не 10000%
+                if abs(func_result) > 10000:
+                    print(f"[VALIDATION] Warning: Percentage value seems unusually high: {func_result}")
+
+        # 4. Для Series результатов
+        if isinstance(func_result, pd.Series):
+            # Все NaN
+            if func_result.isna().all():
+                return {"valid": False, "reason": "Все вычисленные значения пустые. Проверьте тип данных в колонке."}
+
+        # 5. Для highlight_rows
+        if func_name == "highlight_rows":
+            if isinstance(func_result, dict):
+                rows = func_result.get("highlight_rows", [])
+                if not rows:
+                    # Пустой результат выделения - не ошибка, просто не нашли строк
+                    return {"valid": True, "reason": ""}
+
+        # 6. Проверка специфичных функций
+        if func_name == "aggregate_by_group":
+            if isinstance(func_result, pd.DataFrame):
+                # Проверяем что group_by колонка в результате
+                group_cols = params.get("group_by", [])
+                if isinstance(group_cols, str):
+                    group_cols = [group_cols]
+
+                # Reset index чтобы проверить
+                if func_result.index.name in group_cols or any(c in func_result.columns for c in group_cols):
+                    return {"valid": True, "reason": ""}
+                else:
+                    # Возможно результат всё равно валидный, просто с другой структурой
+                    pass
+
+        # По умолчанию считаем результат валидным
+        return {"valid": True, "reason": ""}
 
     def _format_response(
         self,

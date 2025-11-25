@@ -9,21 +9,24 @@ import re
 
 class QueryClassifier:
     """
-    Классифицирует запрос пользователя и возвращает релевантные категории функций
+    v7.9.2: Улучшенный классификатор запросов с более точными паттернами
 
     Вместо отправки 100 функций → отправляем 10-30 релевантных
     """
 
     def __init__(self):
-        # Паттерны для каждой категории (русские + английские)
+        # v7.9.2: Расширенные паттерны для каждой категории (русские + английские)
         self.patterns = {
             "math": [
                 r'\b(сумм|средн|медиан|процентил|дисперс|корреляц|взвешен)',
                 r'\b(sum|average|avg|median|percentile|variance|correlation|weighted)',
                 r'\b(итог|всего|общ)',
                 r'\b(total)',
-                r'\b(сколько|количество|число)',  # ADD: pattern for COUNT queries
-                r'\b(count|how many)',  # ADD: English pattern for COUNT
+                r'\b(сколько|количество|число)',  # COUNT queries
+                r'\b(count|how many)',  # English COUNT
+                r'\b(минимальн|максимальн|мин\b|макс\b)',  # min/max
+                r'\b(minimum|maximum|min\b|max\b)',
+                r'\b(стандартн.*отклонен|вариаци)',  # статистика
             ],
             "filter": [
                 r'\b(фильтр|найд|покаж|где|только|выбер|отбор)',
@@ -32,43 +35,63 @@ class QueryClassifier:
                 r'\b(top|best|worst|bottom|greater|less|equal)',
                 r'\b(уникальн|дубликат|пуст)',
                 r'\b(unique|duplicate|empty)',
+                r'\b(выше|ниже|между|от\s+\d+\s+до)',  # между значениями
+                r'\b(above|below|between)',
+                r'\b(не\s+равн|не\s+содерж|исключ)',  # отрицания
+                r'\b(not\s+equal|exclude|except)',
             ],
             "group": [
                 r'\b(группиров|сгруппир|сводн|агрегац)',
                 r'\b(group|pivot|aggregate)',
                 r'\b(по.*менеджер|по.*продукт|по.*категор|по.*город)',
                 r'\b(by\s+\w+)',
+                r'\b(у\s+каждого|у\s+всех|для\s+каждого)',  # v7.9.2: КРИТИЧНО для GROUP BY
+                r'\b(каждый\s+\w+|для\s+всех)',
+                r'\b(each|every|per)',
+                r'\b(разбивк|распределен)',  # распределение
             ],
             "sort": [
                 r'\b(сортир|ранжир|упорядоч)',
                 r'\b(sort|rank|order)',
-                r'\b(от\s+нов.*\s+к\s+стар|от\s+стар.*\s+к\s+нов)',  # "от новых к старым", "от старых к новым"
-                r'\b(сначала\s+нов|сначала\s+стар)',  # "сначала новые", "сначала старые"
-                r'\b(по\s+дат|по\s+возраст|по\s+убыван)',  # "по дате", "по возрастанию", "по убыванию"
-                r'\b(от\s+больш.*\s+к\s+меньш|от\s+меньш.*\s+к\s+больш)',  # "от большего к меньшему"
-                r'\b(от\s+дешев.*\s+к\s+дорог|от\s+дорог.*\s+к\s+дешев)',  # "от дешевых к дорогим", "от дорогих к дешевым"
-                r'\b(сначала\s+дешев|сначала\s+дорог)',  # "сначала дешевые", "сначала дорогие"
-                r'\b(по\s+цен|по\s+стоимост|по\s+сумм)',  # "по цене", "по стоимости", "по сумме"
-                r'\b(oldest\s+first|newest\s+first|by\s+date)',  # English temporal sorting
-                r'\b(cheapest\s+first|most\s+expensive\s+first|by\s+price)',  # English price sorting
+                r'\b(от\s+нов.*\s+к\s+стар|от\s+стар.*\s+к\s+нов)',
+                r'\b(сначала\s+нов|сначала\s+стар)',
+                r'\b(по\s+дат|по\s+возраст|по\s+убыван)',
+                r'\b(от\s+больш.*\s+к\s+меньш|от\s+меньш.*\s+к\s+больш)',
+                r'\b(от\s+дешев.*\s+к\s+дорог|от\s+дорог.*\s+к\s+дешев)',
+                r'\b(сначала\s+дешев|сначала\s+дорог)',
+                r'\b(по\s+цен|по\s+стоимост|по\s+сумм)',
+                r'\b(oldest\s+first|newest\s+first|by\s+date)',
+                r'\b(cheapest\s+first|most\s+expensive\s+first|by\s+price)',
+                r'\b(a-z|z-a|a-я|я-а)',  # алфавитная сортировка
+                r'\b(по\s+алфавит|alphabetic)',
             ],
             "text": [
                 r'\b(текст|строк|поиск|найд.*слов|содерж)',
                 r'\b(text|string|search|find.*word|contains)',
                 r'\b(конкатенац|объедин|разделит)',
                 r'\b(concat|join|split)',
+                r'\b(регистр|заглавн|строчн)',  # операции с регистром
+                r'\b(uppercase|lowercase|capitalize)',
+                r'\b(длин.*текст|длин.*строк)',  # длина текста
+                r'\b(trim|strip)',  # удаление пробелов
             ],
             "date": [
                 r'\b(дат|день|месяц|год|период)',
                 r'\b(date|day|month|year|period)',
                 r'\b(январ|феврал|март|апрел|ма[йя]|июн|июл|август|сентябр|октябр|ноябр|декабр)',
                 r'\b(january|february|march|april|may|june|july|august|september|october|november|december)',
+                r'\b(неделя|квартал|полугод)',  # периоды
+                r'\b(week|quarter|half-year)',
+                r'\b(сегодн|вчер|завтр|прошл)',  # относительные даты
+                r'\b(today|yesterday|tomorrow|last)',
+                r'\b(\d{4}[-/]\d{2}|\d{2}[-/]\d{4})',  # форматы дат
             ],
             "split": [
                 r'\b(разбей|раздели)',
                 r'\b(split|break)',
-                r'\b(ячейк)',  # "по ячейкам"
+                r'\b(ячейк)',
                 r'\b(разделит)',
+                r'\b(колонк.*из\s+одн|одну.*колонк.*в)',  # split колонки
             ],
             "action": [
                 r'\b(подсвет|выдел|создай|добав|удали|измени)',
@@ -76,9 +99,34 @@ class QueryClassifier:
                 r'\b(график|диаграмм|chart)',
                 r'\b(таблиц)',
                 r'\b(table)',
-                r'\b(какие|какой|список|покажи\s+уникальн|все\s+уникальн)',  # ADD: "какие города", "список менеджеров", "покажи уникальные"
-                r'\b(which|what|list\s+of|show\s+unique|all\s+unique)',  # ADD: English equivalents
+                r'\b(какие|какой|список|покажи\s+уникальн|все\s+уникальн)',
+                r'\b(which|what|list\s+of|show\s+unique|all\s+unique)',
+                r'\b(перечисл|назов|перечень)',  # перечисления
             ],
+            # v7.9.2: Новая категория для условных операций
+            "conditional": [
+                r'\b(если|когда|при\s+условии)',
+                r'\b(if|when|case)',
+                r'\b(оплачен|неоплачен|активн|неактивн)',  # статусы
+                r'\b(paid|unpaid|active|inactive)',
+                r'\b(статус|состояни)',
+                r'\b(status|state)',
+            ],
+            # v7.9.2: Новая категория для статистического анализа
+            "statistics": [
+                r'\b(тренд|динамик|рост|падени)',
+                r'\b(trend|growth|decline)',
+                r'\b(прогноз|предсказ)',
+                r'\b(forecast|predict)',
+                r'\b(скольз.*средн|moving\s+average)',
+                r'\b(выброс|аномал)',  # outliers
+                r'\b(outlier|anomal)',
+            ],
+        }
+
+        # v7.9.2: Приоритетные категории (проверяются первыми)
+        self.priority_patterns = {
+            "group": [r'\b(у\s+каждого|у\s+всех|для\s+каждого|по\s+каждому)'],  # GROUP BY имеет высший приоритет
         }
 
         # Дефолтные категории если ничего не подошло
@@ -223,6 +271,30 @@ class QueryClassifier:
                 "remove_duplicates",
                 "search_rows",
             ],  # 19 functions
+            # v7.9.2: Новые категории
+            "conditional": [
+                "case_when",
+                "if_then_else",
+                "filter_rows",
+                "filter_in_list",
+                "filter_not_in_list",
+                "coalesce",
+                "fill_missing",
+            ],  # 7 functions
+            "statistics": [
+                "moving_average",
+                "ewma",
+                "calculate_std",
+                "calculate_variance",
+                "detect_outliers",
+                "filter_outliers",
+                "calculate_z_score",
+                "calculate_skewness",
+                "calculate_kurtosis",
+                "calculate_iqr",
+                "lag_column",
+                "lead_column",
+            ],  # 12 functions
         }
 
         return function_map.get(category, [])

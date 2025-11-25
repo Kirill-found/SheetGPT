@@ -4,25 +4,113 @@ console.log('[Sidebar] Initializing event listeners...');
 let messageIdCounter = 0;
 const pendingMessages = new Map();
 
-// Send message to content script via postMessage
-function sendMessageToContentScript(action, data) {
-  console.log('[Sidebar] sendMessageToContentScript called with:', { action, data });
+// ===== RETRY CONFIGURATION =====
+const RETRY_CONFIG = {
+  maxRetries: 3,
+  baseDelay: 1000,      // 1 second
+  maxDelay: 10000,      // 10 seconds max
+  backoffMultiplier: 2,
+  timeout: 45000,       // 45 seconds per attempt (increased from 30)
+  retryableErrors: [
+    'Request timeout',
+    'Network error',
+    'Failed to fetch',
+    'ERR_NETWORK',
+    'ERR_CONNECTION',
+    'ETIMEDOUT',
+    '502',
+    '503',
+    '504',
+    'temporarily unavailable'
+  ]
+};
+
+// Check if error is retryable
+function isRetryableError(error) {
+  const errorMessage = error?.message?.toLowerCase() || String(error).toLowerCase();
+  return RETRY_CONFIG.retryableErrors.some(retryable =>
+    errorMessage.includes(retryable.toLowerCase())
+  );
+}
+
+// Calculate delay with exponential backoff + jitter
+function getRetryDelay(attempt) {
+  const exponentialDelay = RETRY_CONFIG.baseDelay * Math.pow(RETRY_CONFIG.backoffMultiplier, attempt);
+  const jitter = Math.random() * 0.3 * exponentialDelay; // 0-30% jitter
+  return Math.min(exponentialDelay + jitter, RETRY_CONFIG.maxDelay);
+}
+
+// Update loading indicator with retry info
+function updateLoadingStatus(message) {
+  const loadingText = document.querySelector('#loading .loading-text');
+  if (loadingText) {
+    loadingText.textContent = message;
+  }
+}
+
+// Single attempt to send message
+function sendMessageAttempt(action, data, messageId) {
   return new Promise((resolve, reject) => {
-    const messageId = ++messageIdCounter;
     pendingMessages.set(messageId, { resolve, reject });
 
     const message = { action, data, messageId };
     console.log('[Sidebar] Sending message to parent:', message);
     window.parent.postMessage(message, '*');
 
-    // Timeout after 30 seconds
+    // Timeout for this attempt
     setTimeout(() => {
       if (pendingMessages.has(messageId)) {
         pendingMessages.delete(messageId);
         reject(new Error('Request timeout'));
       }
-    }, 30000);
+    }, RETRY_CONFIG.timeout);
   });
+}
+
+// Send message to content script via postMessage with retry logic
+async function sendMessageToContentScript(action, data) {
+  console.log('[Sidebar] sendMessageToContentScript called with:', { action, data });
+
+  let lastError;
+
+  for (let attempt = 0; attempt <= RETRY_CONFIG.maxRetries; attempt++) {
+    const messageId = ++messageIdCounter;
+
+    try {
+      if (attempt > 0) {
+        const delay = getRetryDelay(attempt - 1);
+        console.log(`[Sidebar] Retry attempt ${attempt}/${RETRY_CONFIG.maxRetries} after ${Math.round(delay)}ms delay`);
+        updateLoadingStatus(`Повторная попытка ${attempt}/${RETRY_CONFIG.maxRetries}...`);
+        await new Promise(resolve => setTimeout(resolve, delay));
+      }
+
+      const result = await sendMessageAttempt(action, data, messageId);
+
+      if (attempt > 0) {
+        console.log(`[Sidebar] ✅ Retry successful on attempt ${attempt + 1}`);
+        updateLoadingStatus('Думаю...');
+      }
+
+      return result;
+
+    } catch (error) {
+      lastError = error;
+      console.warn(`[Sidebar] Attempt ${attempt + 1} failed:`, error.message);
+
+      // Check if we should retry
+      if (attempt < RETRY_CONFIG.maxRetries && isRetryableError(error)) {
+        console.log(`[Sidebar] Error is retryable, will retry...`);
+        continue;
+      }
+
+      // Non-retryable error or max retries reached
+      break;
+    }
+  }
+
+  // All retries exhausted
+  console.error(`[Sidebar] ❌ All ${RETRY_CONFIG.maxRetries + 1} attempts failed`);
+  throw lastError;
 }
 
 // Listen for responses from content script
@@ -560,31 +648,128 @@ let isProcessing = false;
       const errorBox = document.createElement('div');
       errorBox.className = 'content-box error';
 
-      // Проверяем на специфичные ошибки и даём подсказки
-      if (errorMessage.includes('Данные отсутствуют') || errorMessage.includes('невозможно создать')) {
-        errorBox.innerHTML = `
-          <div style="margin-bottom: 8px;">❌ ${errorMessage}</div>
-          <div style="font-size: 13px; color: #666; margin-top: 8px; padding-top: 8px; border-top: 1px solid #eee;">
-            💡 <strong>Попробуйте:</strong><br/>
-            • Переформулируйте запрос более конкретно<br/>
-            • Укажите конкретные примеры (например: "GPT-4, Claude, Gemini")<br/>
-            • Используйте более простые запросы с базовыми данными<br/>
-            <br/>
-            <strong>Примеры успешных запросов:</strong><br/>
-            • "Создай таблицу с топ-10 стран Европы по населению"<br/>
-            • "Создай таблицу планет солнечной системы"<br/>
-            • "Создай таблицу химических элементов (первые 10)"
-          </div>
-        `;
-      } else {
-        errorBox.textContent = 'Ошибка: ' + errorMessage;
-      }
+      // Классифицируем ошибку для пользователя
+      const errorInfo = classifyError(errorMessage);
+
+      errorBox.innerHTML = `
+        <div style="margin-bottom: 8px;">${errorInfo.icon} ${errorInfo.title}</div>
+        <div style="font-size: 13px; color: #666; margin-top: 8px; padding-top: 8px; border-top: 1px solid #eee;">
+          ${errorInfo.description}
+          ${errorInfo.suggestions ? `
+            <div style="margin-top: 10px;">
+              💡 <strong>Что попробовать:</strong><br/>
+              ${errorInfo.suggestions.map(s => `• ${s}`).join('<br/>')}
+            </div>
+          ` : ''}
+        </div>
+      `;
 
       bubble.appendChild(errorBox);
       errorDiv.appendChild(bubble);
       container.appendChild(errorDiv);
 
       scrollToBottom();
+    }
+
+    // Классификация ошибок для понятных сообщений пользователю
+    function classifyError(errorMessage) {
+      const lowerMsg = errorMessage.toLowerCase();
+
+      // Таймаут / сетевые ошибки
+      if (lowerMsg.includes('timeout') || lowerMsg.includes('timed out')) {
+        return {
+          icon: '⏱️',
+          title: 'Превышено время ожидания',
+          description: 'Сервер не ответил вовремя. Было выполнено несколько попыток подключения.',
+          suggestions: [
+            'Попробуйте ещё раз через несколько секунд',
+            'Проверьте интернет-соединение',
+            'Упростите запрос, если он сложный'
+          ]
+        };
+      }
+
+      // Сетевые ошибки
+      if (lowerMsg.includes('network') || lowerMsg.includes('fetch') || lowerMsg.includes('connection')) {
+        return {
+          icon: '🌐',
+          title: 'Ошибка сети',
+          description: 'Не удалось подключиться к серверу.',
+          suggestions: [
+            'Проверьте подключение к интернету',
+            'Попробуйте обновить страницу',
+            'Повторите запрос через несколько минут'
+          ]
+        };
+      }
+
+      // Серверные ошибки (502, 503, 504)
+      if (lowerMsg.includes('502') || lowerMsg.includes('503') || lowerMsg.includes('504') ||
+          lowerMsg.includes('unavailable') || lowerMsg.includes('server error')) {
+        return {
+          icon: '🔧',
+          title: 'Сервер временно недоступен',
+          description: 'Сервис перегружен или проводится техническое обслуживание.',
+          suggestions: [
+            'Подождите 30-60 секунд и повторите',
+            'Если проблема сохраняется, попробуйте позже'
+          ]
+        };
+      }
+
+      // Ошибки данных
+      if (lowerMsg.includes('данные отсутствуют') || lowerMsg.includes('невозможно создать') ||
+          lowerMsg.includes('no data') || lowerMsg.includes('empty')) {
+        return {
+          icon: '📊',
+          title: 'Не удалось получить данные',
+          description: 'AI не смог найти или сгенерировать запрошенную информацию.',
+          suggestions: [
+            'Переформулируйте запрос более конкретно',
+            'Укажите конкретные примеры данных',
+            'Попробуйте запрос с более известными данными'
+          ]
+        };
+      }
+
+      // Ошибки авторизации
+      if (lowerMsg.includes('auth') || lowerMsg.includes('token') || lowerMsg.includes('unauthorized') ||
+          lowerMsg.includes('401') || lowerMsg.includes('403')) {
+        return {
+          icon: '🔐',
+          title: 'Ошибка авторизации',
+          description: 'Требуется повторная авторизация в Google.',
+          suggestions: [
+            'Обновите страницу Google Sheets',
+            'Переустановите расширение если проблема повторяется'
+          ]
+        };
+      }
+
+      // Ошибки формулы
+      if (lowerMsg.includes('formula') || lowerMsg.includes('syntax') || lowerMsg.includes('parse')) {
+        return {
+          icon: '📝',
+          title: 'Ошибка в формуле',
+          description: 'Не удалось создать корректную формулу для вашего запроса.',
+          suggestions: [
+            'Попробуйте описать задачу другими словами',
+            'Укажите конкретные ячейки или диапазоны',
+            'Разбейте сложный запрос на несколько простых'
+          ]
+        };
+      }
+
+      // Неизвестная ошибка
+      return {
+        icon: '❌',
+        title: 'Произошла ошибка',
+        description: errorMessage,
+        suggestions: [
+          'Попробуйте повторить запрос',
+          'Если ошибка повторяется, обновите страницу'
+        ]
+      };
     }
 
     // v7.8.14: Отображение простых таблиц прямо в sidebar (без создания нового листа)
