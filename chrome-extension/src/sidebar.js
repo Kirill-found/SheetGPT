@@ -210,13 +210,13 @@ let isProcessing = false;
         // Response type badge
         const responseType = result.response_type || 'formula';
         const badge = document.createElement('div');
-        badge.className = 'response-badge';
+        badge.className = 'response-badge ' + responseType;
         if (responseType === 'analysis') {
-          badge.textContent = 'Анализ';
+          badge.textContent = '📊 Анализ';
         } else if (responseType === 'action') {
-          badge.textContent = 'Действия';
+          badge.textContent = '⚡ Действие';
         } else {
-          badge.textContent = 'Формула';
+          badge.textContent = '📝 Формула';
         }
         bubble.appendChild(badge);
 
@@ -243,14 +243,14 @@ let isProcessing = false;
           actions.className = 'action-buttons';
 
           const insertBtn = document.createElement('button');
-          insertBtn.className = 'btn-primary btn-sm';
-          insertBtn.textContent = 'Вставить формулу';
+          insertBtn.className = 'btn btn-primary btn-sm';
+          insertBtn.innerHTML = '<svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg> Вставить';
           insertBtn.onclick = () => insertFormula(result.formula, result.target_cell);
           actions.appendChild(insertBtn);
 
           const copyBtn = document.createElement('button');
-          copyBtn.className = 'btn-secondary btn-sm';
-          copyBtn.textContent = 'Скопировать';
+          copyBtn.className = 'btn btn-secondary btn-sm';
+          copyBtn.innerHTML = '<svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg> Копировать';
           copyBtn.onclick = () => copyToClipboard(result.formula);
           actions.appendChild(copyBtn);
 
@@ -739,9 +739,10 @@ let isProcessing = false;
       const dropdown = document.getElementById('historyDropdown');
       const isVisible = dropdown.classList.contains('show');
 
-      if (isVisible) {
-        dropdown.classList.remove('show');
-      } else {
+      // Close any open dropdowns first
+      document.querySelectorAll('.dropdown.show').forEach(d => d.classList.remove('show'));
+
+      if (!isVisible) {
         loadHistory();
         dropdown.classList.add('show');
       }
@@ -755,22 +756,22 @@ let isProcessing = false;
       chatHistoryData = savedHistory ? JSON.parse(savedHistory) : [];
 
       if (chatHistoryData.length === 0) {
-        historyList.innerHTML = '<div class="history-empty">История пуста</div>';
+        historyList.innerHTML = '<div class="dropdown-empty">История пуста</div>';
         return;
       }
 
       historyList.innerHTML = '';
       chatHistoryData.forEach((item, index) => {
         const li = document.createElement('li');
-        li.className = 'history-item';
+        li.className = 'dropdown-item';
         li.onclick = () => loadChat(index);
 
         const title = document.createElement('div');
-        title.className = 'history-item-title';
+        title.className = 'dropdown-item-title';
         title.textContent = item.title || item.firstMessage || 'Новый чат';
 
         const time = document.createElement('div');
-        time.className = 'history-item-time';
+        time.className = 'dropdown-item-meta';
         time.textContent = formatTime(item.timestamp);
 
         li.appendChild(title);
@@ -870,8 +871,35 @@ let isProcessing = false;
       }
     });
 
+// ===== THEME MANAGEMENT =====
+function initTheme() {
+  const savedTheme = localStorage.getItem('sheetgpt_theme');
+  const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+  const theme = savedTheme || (prefersDark ? 'dark' : 'light');
+  document.documentElement.setAttribute('data-theme', theme);
+  console.log('[Sidebar] Theme initialized:', theme);
+}
+
+function toggleTheme() {
+  const currentTheme = document.documentElement.getAttribute('data-theme');
+  const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+  document.documentElement.setAttribute('data-theme', newTheme);
+  localStorage.setItem('sheetgpt_theme', newTheme);
+  console.log('[Sidebar] Theme toggled to:', newTheme);
+}
+
+// Initialize theme on load
+initTheme();
+
 // ===== EVENT LISTENERS INITIALIZATION =====
 console.log('[Sidebar] Setting up event listeners...');
+
+// Theme toggle
+const themeToggle = document.getElementById('themeToggle');
+if (themeToggle) {
+  themeToggle.addEventListener('click', toggleTheme);
+  console.log('[Sidebar] ✅ Theme toggle listener attached');
+}
 
 // Send button
 const sendBtn = document.getElementById('sendBtn');
