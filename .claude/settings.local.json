@@ -1,0 +1,18 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git add:*)",
+      "Bash(git commit -m \"$(cat <<''EOF''\nUI Redesign: Modern sidebar with Dark Mode support\n\n- New brand gradient color scheme (purple: #6366F1 → #A855F7)\n- Full Dark Mode support with theme toggle button\n- Glassmorphism effects with backdrop blur\n- Improved animations (spring transitions, floating icon)\n- Redesigned Empty State with 2x3 template grid\n- Updated message bubbles with gradient backgrounds\n- Formula code blocks with syntax highlighting style\n- Responsive badge components for response types\n- Modern input area with focus effects\n- Theme preference saved to localStorage\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n\nCo-Authored-By: Claude <noreply@anthropic.com>\nEOF\n)\")",
+      "Bash(git push:*)",
+      "Bash(powershell:*)",
+      "Bash(git commit:*)",
+      "Bash(gh pr create:*)",
+      "Bash(git checkout:*)",
+      "Bash(git pull:*)",
+      "Bash(git merge:*)",
+      "Bash(git stash:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

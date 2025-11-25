@@ -675,6 +675,21 @@ let isProcessing = false;
     function classifyError(errorMessage) {
       const lowerMsg = errorMessage.toLowerCase();
 
+      // v7.9.3: Extension context invalidated - расширение обновилось
+      if (lowerMsg.includes('extension context invalidated') ||
+          lowerMsg.includes('context invalidated') ||
+          lowerMsg.includes('extension context')) {
+        return {
+          icon: '🔄',
+          title: 'Расширение обновилось',
+          description: 'Расширение было обновлено. Требуется перезагрузка страницы.',
+          suggestions: [
+            'Закройте эту вкладку и откройте Google Sheets заново',
+            'Или нажмите Ctrl+Shift+R для полной перезагрузки'
+          ]
+        };
+      }
+
       // Таймаут / сетевые ошибки
       if (lowerMsg.includes('timeout') || lowerMsg.includes('timed out')) {
         return {
