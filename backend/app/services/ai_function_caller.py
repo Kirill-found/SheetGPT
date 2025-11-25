@@ -212,6 +212,114 @@ class AIFunctionCaller:
                                 query=query
                             )
 
+        # PATTERN 3: "выдели" / "подсвети" / "отметь" queries - v7.9.5
+        # CRITICAL: These MUST use highlight_rows, NOT search_rows
+        # Example: "выдели все строки с Сидоровым"
+        highlight_keywords = ["выдели", "подсвети", "отметь", "highlight", "mark"]
+        if any(k in query_lower for k in highlight_keywords):
+            print(f"[PATTERN DETECTOR v7.9.5] Detected HIGHLIGHT pattern: '{query[:50]}...'")
+
+            # Extract the search term (name/value to highlight)
+            # Common patterns: "с Сидоровым", "где сумма > X", "Иванова", etc.
+
+            # Pattern: "с [Name]" or "с [Value]"
+            import re
+            search_term = None
+            target_column = None
+
+            # Try to find "с [Name]"
+            match = re.search(r'\s+с\s+(\w+)', query, re.IGNORECASE)
+            if match:
+                search_term = match.group(1)
+                print(f"[PATTERN DETECTOR v7.9.5] Found search term via 'с X': {search_term}")
+
+            # Try to find "[Name]а" / "[Name]ым" (Russian case endings)
+            if not search_term:
+                # Look for capitalized words that might be names
+                words = query.split()
+                for word in words:
+                    # Skip keywords
+                    if word.lower() in ['выдели', 'все', 'строки', 'где', 'подсвети', 'отметь']:
+                        continue
+                    # Check if it looks like a name (capitalized or contains capital letters)
+                    if len(word) > 2 and (word[0].isupper() or any(c.isupper() for c in word)):
+                        # Remove Russian case endings
+                        clean_word = re.sub(r'(ым|ом|ой|ым|ого|ему|а|у|е|ы|и|ов|ев|ёв)$', '', word, flags=re.IGNORECASE)
+                        if clean_word:
+                            search_term = clean_word
+                            print(f"[PATTERN DETECTOR v7.9.5] Found search term via name detection: {search_term}")
+                            break
+
+            if search_term:
+                # Try to guess the column - look for person-related columns
+                person_columns = [c for c in column_names if any(
+                    k in c.lower() for k in ['менеджер', 'manager', 'имя', 'name', 'фио', 'сотрудник', 'employee', 'клиент', 'client']
+                )]
+
+                if person_columns:
+                    target_column = person_columns[0]
+                    print(f"[PATTERN DETECTOR v7.9.5] Using column: {target_column}")
+                else:
+                    # No person column found, use first text column
+                    text_cols = [c for c in column_names if df[c].dtype == 'object']
+                    if text_cols:
+                        target_column = text_cols[0]
+                        print(f"[PATTERN DETECTOR v7.9.5] Using first text column: {target_column}")
+
+                if target_column:
+                    # Call highlight_rows
+                    registry = FunctionRegistry()
+                    func = registry.functions["highlight_rows"]
+                    params = {
+                        "column": target_column,
+                        "operator": "contains",
+                        "value": search_term
+                    }
+
+                    print(f"[PATTERN DETECTOR v7.9.5] Calling highlight_rows with {params}")
+                    result = func(df, **params)
+
+                    if result.get("highlight_rows"):
+                        return {
+                            "formula": None,
+                            "explanation": f"Выделены строки где '{target_column}' содержит '{search_term}'",
+                            "target_cell": None,
+                            "confidence": 0.99,
+                            "response_type": "highlight",
+                            "function_used": "highlight_rows",
+                            "parameters": params,
+                            "summary": result.get("message", f"Выделено {len(result['highlight_rows'])} строк"),
+                            "methodology": f"Использован детектор паттернов v7.9.5. Функция: highlight_rows. Поиск '{search_term}' в колонке '{target_column}'",
+                            "key_findings": [f"Выделено строк: {len(result['highlight_rows'])}"],
+                            "insights": [],
+                            "highlight_rows": result["highlight_rows"],
+                            "highlight_color": result.get("highlight_color", {"red": 1, "green": 1, "blue": 0.8}),
+                            "highlight_message": result.get("message"),
+                            "structured_data": None
+                        }
+                    else:
+                        return {
+                            "formula": None,
+                            "explanation": f"Не найдено строк где '{target_column}' содержит '{search_term}'",
+                            "target_cell": None,
+                            "confidence": 0.99,
+                            "response_type": "highlight",
+                            "function_used": "highlight_rows",
+                            "parameters": params,
+                            "summary": f"Не найдено строк с '{search_term}' в колонке '{target_column}'",
+                            "methodology": f"Использован детектор паттернов v7.9.5",
+                            "key_findings": ["Ничего не найдено"],
+                            "insights": [],
+                            "highlight_rows": [],
+                            "highlight_color": None,
+                            "highlight_message": f"Не найдено строк с '{search_term}'",
+                            "structured_data": None
+                        }
+
+            # If we couldn't extract search term, pass to GPT-4o but with hint
+            print(f"[PATTERN DETECTOR v7.9.5] Could not extract search term, passing to GPT-4o with highlight hint")
+            # Don't return None here - let it fall through but GPT-4o will have strong prompt guidance
+
         # No pattern detected
         return None
 
@@ -993,7 +1101,23 @@ class AIFunctionCaller:
 {df_info}
 
 ПРАВИЛА:
-1. **АБСОЛЮТНЫЙ ПРИОРИТЕТ - ПРОВЕРЯЙ ПЕРВЫМ ДЕЛОМ!**
+1. **АБСОЛЮТНЫЙ ПРИОРИТЕТ #1 - ВЫДЕЛЕНИЕ СТРОК!**
+   Если в запросе есть слова "ВЫДЕЛИ", "ПОДСВЕТИ", "ОТМЕТЬ", "HIGHLIGHT":
+   → НЕМЕДЛЕННО используй highlight_rows()
+   → НЕ используй search_rows - это ДРУГАЯ функция для ПОИСКА, не выделения!
+   → НЕ используй filter_rows - это ДРУГАЯ функция для ФИЛЬТРАЦИИ!
+
+   ПРАВИЛЬНЫЕ примеры "выдели":
+   - "выдели все строки с Сидоровым" → highlight_rows(column="Менеджер", operator="contains", value="Сидоров")
+   - "выдели строки где сумма > 100000" → highlight_rows(column="Сумма", operator=">", value=100000)
+   - "подсвети желтым менеджера Иванова" → highlight_rows(column="Менеджер", operator="contains", value="Иванов", color="yellow")
+   - "отметь все заказы из Москвы" → highlight_rows(column="Город", operator="contains", value="Москва")
+
+   НЕПРАВИЛЬНЫЕ примеры (НИКОГДА НЕ ДЕЛАЙ ТАК для "выдели"):
+   - "выдели строки с Сидоровым" → search_rows (НЕПРАВИЛЬНО! search_rows для ПОИСКА, highlight_rows для ВЫДЕЛЕНИЯ)
+   - "выдели строки с Сидоровым" → filter_rows (НЕПРАВИЛЬНО! filter_rows для ФИЛЬТРАЦИИ)
+
+2. **АБСОЛЮТНЫЙ ПРИОРИТЕТ #2 - GROUP BY!**
    Если в запросе есть слова "У КАЖДОГО", "У ВСЕХ", "ДЛЯ КАЖДОГО", "ПО КАЖДОМУ":
    → НЕМЕДЛЕННО используй aggregate_by_group(group_by="Y", agg_func="count" или "sum")
    → ИГНОРИРУЙ ВСЕ ОСТАЛЬНЫЕ СЛОВА (фильтр, статус, условия) - они обрабатываются внутри aggregate_by_group!
@@ -1010,12 +1134,12 @@ class AIFunctionCaller:
    - "сколько оплаченных заказов у каждого менеджера" → filter_rows (НЕПРАВИЛЬНО! Даже если есть слово "оплаченных", всё равно используй aggregate_by_group!)
    - "сколько X у каждого Y" → filter_rows (НЕПРАВИЛЬНО!)
 
-2. Названия колонок могут быть НЕТОЧНЫМИ - система найдет похожую колонку
-3. Для выделения строк ВСЕГДА используй highlight_rows (работает с "выдели", "подсвети", "отметь")
-4. Для фильтрации ВСЕГДА используй filter_rows (работает с "покажи где", "найди где") - НО ТОЛЬКО ЕСЛИ НЕТ "У КАЖДОГО"!
-5. Для сортировки ВСЕГДА используй sort_data
-6. Для вычислений (сумма, среднее и т.д.) используй calculate_* функции - НО ТОЛЬКО ЕСЛИ НЕТ "У КАЖДОГО"!
-7. Для группировки используй aggregate_by_group или pivot_table
+3. Названия колонок могут быть НЕТОЧНЫМИ - система найдет похожую колонку
+4. Для выделения строк ВСЕГДА используй highlight_rows (работает с "выдели", "подсвети", "отметь") - НИКОГДА search_rows!
+5. Для фильтрации ВСЕГДА используй filter_rows (работает с "покажи где", "найди где") - НО ТОЛЬКО ЕСЛИ НЕТ "У КАЖДОГО"!
+6. Для сортировки ВСЕГДА используй sort_data
+7. Для вычислений (сумма, среднее и т.д.) используй calculate_* функции - НО ТОЛЬКО ЕСЛИ НЕТ "У КАЖДОГО"!
+8. Для группировки используй aggregate_by_group или pivot_table
 
 КРИТИЧЕСКИ ВАЖНО - ПОВЕДЕНИЕ AI:
 - Можешь задать ОДИН уточняющий вопрос если задача неясна
@@ -1025,19 +1149,29 @@ class AIFunctionCaller:
 - После уточнения пользователя = ТОЛЬКО вызов функции, НИКАКИХ объяснений
 
 ПРИМЕРЫ ХОРОШИХ ВЫЗОВОВ:
+
+**ВЫДЕЛЕНИЕ (highlight_rows) - используй для "выдели", "подсвети", "отметь":**
+- "выдели все строки с Сидоровым" → highlight_rows(column="Менеджер", operator="contains", value="Сидоров")
 - "выдели желтым где продажи < 100000" → highlight_rows(column="продажи", operator="<", value=100000, color="yellow")
 - "выдели щетки где сумма меньше 100000" → highlight_rows(column="сумма", operator="<", value=100000)
   (система найдет "Заказали на сумму" или "Сумма продаж" автоматически)
 - "подсвети строки где выручка больше миллиона" → highlight_rows(column="выручка", operator=">", value=1000000)
+- "отметь заказы Иванова" → highlight_rows(column="Менеджер", operator="contains", value="Иванов")
+
+**ГРУППИРОВКА (aggregate_by_group) - используй для "у каждого", "для всех", "по группам":**
 - "сумма продаж по менеджерам" → aggregate_by_group(group_by="Менеджер", agg_column="Сумма", agg_func="sum")
 - "сколько заказов у каждого менеджера" → aggregate_by_group(group_by="Менеджер", agg_column="Менеджер", agg_func="count")
 - "сколько оплаченных заказов у каждого менеджера" → aggregate_by_group(group_by="Менеджер", agg_column="Менеджер", agg_func="count")
   ВАЖНО: aggregate_by_group автоматически работает ТОЛЬКО с оплаченными заказами, если указан статус в данных
 - "количество клиентов у каждого продавца" → aggregate_by_group(group_by="продавец", agg_column="клиенты", agg_func="count")
+
+**СОРТИРОВКА (sort_data):**
 - "отсортируй по дате" → sort_data(columns=["Дата"], ascending=True)
 - "покажи от новых к старым" → sort_data(columns=["Дата"], ascending=False)
 - "от больших к меньшим по сумме" → sort_data(columns=["Сумма"], ascending=False)
 - "от старых к новым" → sort_data(columns=["Дата"], ascending=True)
+
+**ДРУГОЕ:**
 - "топ 5 по выручке" → filter_top_n(column="выручка", n=5)
 - "процент от общей суммы" → calculate_percentage
 - "разбей данные по ячейкам" → split_data(column="auto", delimiter="auto")
