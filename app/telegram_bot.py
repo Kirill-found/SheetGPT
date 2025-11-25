@@ -5,20 +5,17 @@ Telegram бот для работы с SheetGPT API.
 Позволяет отправлять Excel/CSV файлы и получать анализ данных.
 """
 
-import asyncio
 import logging
 import os
 import io
 import pandas as pd
 from datetime import datetime
-from typing import Optional
 
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram import Update
 from telegram.ext import (
     Application,
     CommandHandler,
     MessageHandler,
-    CallbackQueryHandler,
     ContextTypes,
     filters,
 )
