@@ -20,6 +20,7 @@ from app.utils.query_classifier import QueryClassifier
 from app.utils.metrics import metrics_collector
 from .query_complexity_classifier import classify_query_complexity
 from .code_generator import generate_and_execute_code
+from .two_stage_processor import TwoStageProcessor
 
 # CRITICAL FIX: Напрямую читаем .env файл (load_dotenv() не работает с uvicorn)
 env_path = Path(__file__).parent.parent.parent / ".env"
@@ -48,6 +49,8 @@ class AIFunctionCaller:
         self.registry = FunctionRegistry()
         self.classifier = QueryClassifier()  # v7.5.0: Query classification
         self.model = "gpt-4o"
+        self.two_stage_processor = TwoStageProcessor(self.client)  # v8.0.0: Two-stage processing
+        self.use_two_stage = True  # v8.0.0: Enable two-stage by default
 
     def _detect_and_handle_pattern(self, query: str, df: pd.DataFrame, column_names: List[str]) -> Optional[Dict[str, Any]]:
         """
@@ -491,7 +494,66 @@ class AIFunctionCaller:
             print(f"[TIER 2 v7.8.0] Falling back to Function Calling (TIER 3A)")
             # Continue with Function Calling on error
 
-        # v7.8.0: TIER 3A - Function Calling (for simple queries)
+        # v8.0.0: TWO-STAGE PROCESSING (новая архитектура)
+        # Этап 1: Понимание запроса (без функций)
+        # Этап 2: Выбор функции (с понятым контекстом)
+        if self.use_two_stage:
+            try:
+                print(f"[TWO-STAGE v8.0.0] Starting two-stage processing...")
+                all_function_defs = self.registry.get_function_definitions()
+
+                two_stage_result = await self.two_stage_processor.process(
+                    query=query,
+                    df=df,
+                    column_names=column_names,
+                    all_functions=all_function_defs
+                )
+
+                if two_stage_result:
+                    # Создаем FunctionCall-like объект для execute_function_call
+                    class FunctionCallWrapper:
+                        def __init__(self, name, arguments):
+                            self.name = name
+                            self.arguments = json.dumps(arguments)
+
+                    function_call = FunctionCallWrapper(
+                        two_stage_result["name"],
+                        two_stage_result["arguments"]
+                    )
+
+                    function_used = two_stage_result["name"]
+                    result = await self._execute_function_call(
+                        function_call,
+                        df,
+                        query,
+                        sheet_data,
+                        column_names,
+                        custom_context
+                    )
+
+                    # Добавляем информацию о понимании
+                    result["_two_stage_understanding"] = two_stage_result.get("understanding")
+
+                    # Log metrics
+                    duration_ms = (time.time() - start_time) * 1000
+                    metrics_collector.log_execution(
+                        function_name=function_used,
+                        success=result.get("response_type") != "error",
+                        duration_ms=duration_ms,
+                        query=query,
+                        confidence=result.get("confidence", 0),
+                        num_functions_sent=15,  # Примерно столько отправляем на Stage 2
+                        categories=["two_stage_v8"]
+                    )
+
+                    return result
+                else:
+                    print(f"[TWO-STAGE v8.0.0] Two-stage failed, falling back to legacy...")
+
+            except Exception as e:
+                print(f"[TWO-STAGE v8.0.0] Error: {e}, falling back to legacy...")
+
+        # v7.8.0: TIER 3A - Function Calling (legacy/fallback)
         try:
             # Шаг 1: Анализ DataFrame для контекста
             df_info = self._analyze_dataframe(df, column_names)
