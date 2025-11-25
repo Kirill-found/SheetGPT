@@ -7,18 +7,51 @@ const SHEETS_API_BASE = 'https://sheets.googleapis.com/v4/spreadsheets';
 
 /**
  * Get OAuth token for Google Sheets API
+ * v7.9.4: Added token refresh and better error handling
  */
-async function getAuthToken() {
+async function getAuthToken(forceRefresh = false) {
   return new Promise((resolve, reject) => {
-    chrome.identity.getAuthToken({ interactive: true }, (token) => {
-      if (chrome.runtime.lastError) {
-        console.error('[SheetsAPI] Auth error:', chrome.runtime.lastError);
-        reject(new Error(chrome.runtime.lastError.message));
+    // If force refresh, first remove cached token
+    if (forceRefresh) {
+      console.log('[SheetsAPI] Force refreshing token...');
+      chrome.identity.getAuthToken({ interactive: false }, (cachedToken) => {
+        if (cachedToken) {
+          chrome.identity.removeCachedAuthToken({ token: cachedToken }, () => {
+            console.log('[SheetsAPI] Cached token removed, getting new one...');
+            getNewToken(resolve, reject);
+          });
+        } else {
+          getNewToken(resolve, reject);
+        }
+      });
+    } else {
+      getNewToken(resolve, reject);
+    }
+  });
+}
+
+function getNewToken(resolve, reject) {
+  chrome.identity.getAuthToken({ interactive: true }, (token) => {
+    if (chrome.runtime.lastError) {
+      const errorMsg = chrome.runtime.lastError.message;
+      console.error('[SheetsAPI] Auth error:', errorMsg);
+
+      // v7.9.4: Provide clearer error messages
+      if (errorMsg.includes('OAuth2 not granted') || errorMsg.includes('user denied')) {
+        reject(new Error('Пользователь отклонил доступ к Google Sheets. Нажмите на иконку расширения и разрешите доступ.'));
+      } else if (errorMsg.includes('invalid_client') || errorMsg.includes('client_id')) {
+        reject(new Error('Ошибка конфигурации OAuth. Обратитесь к разработчику.'));
+      } else if (errorMsg.includes('network') || errorMsg.includes('fetch')) {
+        reject(new Error('Ошибка сети при авторизации. Проверьте интернет-соединение.'));
       } else {
-        console.log('[SheetsAPI] ✅ Got auth token');
-        resolve(token);
+        reject(new Error(`Ошибка авторизации Google: ${errorMsg}`));
       }
-    });
+    } else if (!token) {
+      reject(new Error('Не удалось получить токен авторизации. Попробуйте перезагрузить страницу.'));
+    } else {
+      console.log('[SheetsAPI] ✅ Got auth token');
+      resolve(token);
+    }
   });
 }
 
@@ -121,13 +154,14 @@ async function getAllSheetNames(spreadsheetId) {
 /**
  * Read data from active sheet
  * Default limit: 500 rows for performance optimization
+ * v7.9.4: Added automatic token refresh on 401 errors
  */
-async function readSheetData(spreadsheetId, sheetName, range = 'A1:Z500') {
+async function readSheetData(spreadsheetId, sheetName, range = 'A1:Z500', _retryCount = 0) {
   try {
-    const token = await getAuthToken();
+    const token = await getAuthToken(_retryCount > 0); // Force refresh on retry
     const fullRange = `${sheetName}!${range}`;
 
-    console.log(`[SheetsAPI] Reading range: ${fullRange}`);
+    console.log(`[SheetsAPI] Reading range: ${fullRange}${_retryCount > 0 ? ' (retry #' + _retryCount + ')' : ''}`);
 
     const response = await fetch(
       `${SHEETS_API_BASE}/${spreadsheetId}/values/${encodeURIComponent(fullRange)}`,
@@ -138,6 +172,12 @@ async function readSheetData(spreadsheetId, sheetName, range = 'A1:Z500') {
         }
       }
     );
+
+    // v7.9.4: Auto-retry with token refresh on 401/403
+    if ((response.status === 401 || response.status === 403) && _retryCount < 1) {
+      console.log('[SheetsAPI] Got 401/403, refreshing token and retrying...');
+      return readSheetData(spreadsheetId, sheetName, range, _retryCount + 1);
+    }
 
     if (!response.ok) {
       const error = await response.json();

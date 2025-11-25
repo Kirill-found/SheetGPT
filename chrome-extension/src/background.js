@@ -50,6 +50,11 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           result = await checkAuth();
           break;
 
+        case 'FORCE_REAUTH':
+          // v7.9.4: Force re-authentication by removing cached token
+          result = await forceReauth();
+          break;
+
         default:
           throw new Error(`Unknown action: ${action}`);
       }
@@ -219,4 +224,49 @@ async function checkAuth() {
   } catch (error) {
     return { authenticated: false, error: error.message };
   }
+}
+
+/**
+ * v7.9.4: Force re-authentication by clearing cached tokens
+ */
+async function forceReauth() {
+  console.log('[Background] Force re-authentication requested');
+
+  return new Promise((resolve, reject) => {
+    // First get the current token (non-interactive)
+    chrome.identity.getAuthToken({ interactive: false }, (token) => {
+      if (token) {
+        console.log('[Background] Removing cached token...');
+        // Remove the cached token
+        chrome.identity.removeCachedAuthToken({ token }, () => {
+          console.log('[Background] Token removed, requesting new auth...');
+          // Now get a new token interactively
+          chrome.identity.getAuthToken({ interactive: true }, (newToken) => {
+            if (chrome.runtime.lastError) {
+              console.error('[Background] Re-auth failed:', chrome.runtime.lastError);
+              reject(new Error(chrome.runtime.lastError.message));
+            } else if (newToken) {
+              console.log('[Background] ✅ Re-authentication successful');
+              resolve({ success: true, message: 'Авторизация обновлена' });
+            } else {
+              reject(new Error('Не удалось получить новый токен'));
+            }
+          });
+        });
+      } else {
+        // No cached token, just get a new one
+        console.log('[Background] No cached token, requesting new auth...');
+        chrome.identity.getAuthToken({ interactive: true }, (newToken) => {
+          if (chrome.runtime.lastError) {
+            reject(new Error(chrome.runtime.lastError.message));
+          } else if (newToken) {
+            console.log('[Background] ✅ Authentication successful');
+            resolve({ success: true, message: 'Авторизация выполнена' });
+          } else {
+            reject(new Error('Не удалось получить токен'));
+          }
+        });
+      }
+    });
+  });
 }
