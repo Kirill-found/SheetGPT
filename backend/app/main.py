@@ -22,6 +22,7 @@ from app.api.telegram import router as telegram_router
 import logging
 from datetime import datetime
 import os
+import threading
 
 # Configure logging
 logging.basicConfig(
@@ -48,6 +49,26 @@ app.add_middleware(
 
 # Include Telegram API router
 app.include_router(telegram_router)
+
+
+def start_telegram_bot():
+    """Запуск Telegram бота в отдельном потоке"""
+    try:
+        from app.telegram_bot import SheetGPTBot
+
+        token = settings.TELEGRAM_BOT_TOKEN
+        admin_id = settings.TELEGRAM_ADMIN_ID
+
+        if not token:
+            logger.warning("TELEGRAM_BOT_TOKEN not set - bot disabled")
+            return
+
+        logger.info(f"Starting Telegram bot (admin_id: {admin_id})")
+        bot = SheetGPTBot(token=token, admin_id=admin_id)
+        bot.run()
+    except Exception as e:
+        logger.error(f"Failed to start Telegram bot: {e}")
+
 
 @app.on_event("startup")
 async def startup_event():
@@ -77,6 +98,15 @@ async def startup_event():
     logger.info("  - 'сколько у каждого' -> aggregate_by_group")
     logger.info("")
     logger.info("="*60)
+
+    # Запускаем Telegram бота в отдельном потоке
+    if settings.TELEGRAM_BOT_TOKEN:
+        bot_thread = threading.Thread(target=start_telegram_bot, daemon=True)
+        bot_thread.start()
+        logger.info("Telegram bot started in background thread")
+    else:
+        logger.info("Telegram bot disabled (no token)")
+
 
 @app.get("/")
 async def root():

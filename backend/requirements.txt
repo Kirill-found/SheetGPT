@@ -31,6 +31,10 @@ httpx==0.28.1
 # Данные и вычисления
 pandas==2.2.0
 numpy==1.26.3
+openpyxl>=3.0.0
+
+# Telegram Bot
+python-telegram-bot>=20.0,<22.0
 
 # Web Search (100% free, no API keys) - TEMPORARILY DISABLED due to Railway build issues
 # ddgs==9.9.1
