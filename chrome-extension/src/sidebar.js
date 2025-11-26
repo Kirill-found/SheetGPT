@@ -41,22 +41,21 @@ async function validateLicense(licenseKey, silent = false) {
     console.log('[Sidebar] License API response status:', response.status);
 
     if (!response.ok) {
-      if (response.status === 404) {
-        console.log('[Sidebar] License not found');
-        return false;
-      }
       throw new Error(`HTTP ${response.status}`);
     }
 
     const data = await response.json();
     console.log('[Sidebar] License API response:', data);
 
-    if (data.success && data.license_key) {
+    // API returns {success: true/false, license_key, message} with status 200
+    if (data.success === true && data.license_key) {
       // Save valid license
       localStorage.setItem(LICENSE_STORAGE_KEY, data.license_key);
       return true;
     }
 
+    // License not found or invalid - API returns success: false
+    console.log('[Sidebar] License validation failed:', data.message);
     return false;
   } catch (error) {
     console.error('[Sidebar] License validation error:', error);
