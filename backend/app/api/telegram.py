@@ -319,6 +319,12 @@ class LicenseResponse(BaseModel):
     message: str
     telegram_user_id: Optional[int] = None
     subscription_tier: Optional[str] = None
+    # Дополнительные данные для Chrome Extension
+    username: Optional[str] = None
+    first_name: Optional[str] = None
+    queries_used_today: Optional[int] = None
+    queries_limit: Optional[int] = None
+    total_queries: Optional[int] = None
 
 
 @router.post("/license/generate", response_model=LicenseResponse)
@@ -414,7 +420,12 @@ async def validate_license_key(
         license_key=license_key,
         message="License key is valid",
         telegram_user_id=user.telegram_user_id,
-        subscription_tier=user.subscription_tier
+        subscription_tier=user.subscription_tier,
+        username=user.username,
+        first_name=user.first_name,
+        queries_used_today=user.queries_used_today,
+        queries_limit=user.queries_limit,
+        total_queries=user.total_queries
     )
 
 
@@ -461,7 +472,110 @@ async def activate_license(
         license_key=license_key,
         message="License activated successfully",
         telegram_user_id=user.telegram_user_id,
-        subscription_tier=user.subscription_tier
+        subscription_tier=user.subscription_tier,
+        username=user.username,
+        first_name=user.first_name,
+        queries_used_today=user.queries_used_today,
+        queries_limit=user.queries_limit,
+        total_queries=user.total_queries
+    )
+
+
+class UsageIncrementResponse(BaseModel):
+    success: bool
+    queries_used_today: int
+    queries_limit: int
+    queries_remaining: int
+    can_make_query: bool
+    message: str
+
+
+@router.post("/license/{license_key}/increment-usage", response_model=UsageIncrementResponse)
+async def increment_usage_by_license(
+    license_key: str,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Увеличить счётчик использования по лицензионному ключу.
+    Вызывается из Chrome Extension после каждого запроса.
+    """
+    license_key = license_key.strip().upper()
+    logger.info(f"Incrementing usage for license: {license_key}")
+
+    result = await db.execute(
+        select(TelegramUser).where(TelegramUser.license_key == license_key)
+    )
+    user = result.scalar_one_or_none()
+
+    if not user:
+        raise HTTPException(status_code=404, detail="License not found")
+
+    if not user.is_active:
+        raise HTTPException(status_code=403, detail="License inactive")
+
+    # Проверяем лимит перед инкрементом
+    if not user.can_make_query():
+        queries_remaining = max(0, user.queries_limit - user.queries_used_today)
+        return UsageIncrementResponse(
+            success=False,
+            queries_used_today=user.queries_used_today,
+            queries_limit=user.queries_limit,
+            queries_remaining=queries_remaining,
+            can_make_query=False,
+            message="Daily limit exceeded"
+        )
+
+    # Инкрементим использование
+    user.increment_usage()
+    await db.commit()
+    await db.refresh(user)
+
+    queries_remaining = -1 if user.subscription_tier == "premium" else max(0, user.queries_limit - user.queries_used_today)
+
+    logger.info(f"Usage incremented for {license_key}: {user.queries_used_today}/{user.queries_limit}")
+
+    return UsageIncrementResponse(
+        success=True,
+        queries_used_today=user.queries_used_today,
+        queries_limit=user.queries_limit,
+        queries_remaining=queries_remaining,
+        can_make_query=user.can_make_query(),
+        message="Usage incremented"
+    )
+
+
+@router.get("/license/{license_key}/status", response_model=LicenseResponse)
+async def get_status_by_license(
+    license_key: str,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Получить текущий статус пользователя по лицензионному ключу.
+    """
+    license_key = license_key.strip().upper()
+
+    result = await db.execute(
+        select(TelegramUser).where(TelegramUser.license_key == license_key)
+    )
+    user = result.scalar_one_or_none()
+
+    if not user:
+        return LicenseResponse(
+            success=False,
+            message="License not found"
+        )
+
+    return LicenseResponse(
+        success=True,
+        license_key=license_key,
+        message="Status retrieved",
+        telegram_user_id=user.telegram_user_id,
+        subscription_tier=user.subscription_tier,
+        username=user.username,
+        first_name=user.first_name,
+        queries_used_today=user.queries_used_today,
+        queries_limit=user.queries_limit,
+        total_queries=user.total_queries
     )
 
 

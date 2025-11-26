@@ -1,6 +1,8 @@
 // ===== LICENSE VALIDATION =====
 const LICENSE_API_URL = 'https://sheetgpt-production.up.railway.app/api/v1/telegram/license/validate';
+const LICENSE_STATUS_URL = 'https://sheetgpt-production.up.railway.app/api/v1/telegram/license';
 const LICENSE_STORAGE_KEY = 'sheetgpt_license_key';
+const USER_DATA_STORAGE_KEY = 'sheetgpt_user_data';
 
 // Check if license is valid on startup
 async function checkLicense() {
@@ -47,10 +49,29 @@ async function validateLicense(licenseKey, silent = false) {
     const data = await response.json();
     console.log('[Sidebar] License API response:', data);
 
-    // API returns {success: true/false, license_key, message} with status 200
+    // API returns {success: true/false, license_key, message, username, etc.} with status 200
     if (data.success === true && data.license_key) {
       // Save valid license
       localStorage.setItem(LICENSE_STORAGE_KEY, data.license_key);
+
+      // Save user data for settings menu
+      const userData = {
+        telegram_user_id: data.telegram_user_id,
+        username: data.username,
+        first_name: data.first_name,
+        subscription_tier: data.subscription_tier || 'free',
+        queries_used_today: data.queries_used_today || 0,
+        queries_limit: data.queries_limit || 10,
+        total_queries: data.total_queries || 0
+      };
+      localStorage.setItem(USER_DATA_STORAGE_KEY, JSON.stringify(userData));
+      console.log('[Sidebar] User data saved:', userData);
+
+      // Update settings menu if available
+      if (window.SheetGPTSettings) {
+        window.SheetGPTSettings.setUserData(userData);
+      }
+
       return true;
     }
 
@@ -449,6 +470,13 @@ let isProcessing = false;
 
       if (!message || isProcessing) return;
 
+      // Check usage limit before sending query
+      if (window.SheetGPTSettings && !window.SheetGPTSettings.canMakeRequest()) {
+        window.SheetGPTSettings.showToast('Лимит запросов исчерпан', 'error');
+        window.SheetGPTSettings.openUpgradeModal();
+        return;
+      }
+
       // v9.0.1: Save query for display_mode detection
       window.lastUserQuery = message;
 
@@ -741,8 +769,56 @@ let isProcessing = false;
 
       if (result) {
         addAIResponse(result);
+        // Increment usage after successful query
+        incrementUsage();
       } else {
         handleError({message: 'Пустой ответ от сервера'});
+      }
+    }
+
+    // Increment usage via API
+    async function incrementUsage() {
+      const licenseKey = localStorage.getItem(LICENSE_STORAGE_KEY);
+      if (!licenseKey) {
+        console.warn('[Sidebar] No license key for usage tracking');
+        return;
+      }
+
+      try {
+        const response = await fetch(`${LICENSE_STATUS_URL}/${encodeURIComponent(licenseKey)}/increment-usage`, {
+          method: 'POST',
+          headers: { 'Accept': 'application/json' }
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          console.log('[Sidebar] Usage incremented:', data);
+
+          // Update local storage
+          const userData = JSON.parse(localStorage.getItem(USER_DATA_STORAGE_KEY) || '{}');
+          userData.queries_used_today = data.queries_used_today;
+          userData.queries_limit = data.queries_limit;
+          localStorage.setItem(USER_DATA_STORAGE_KEY, JSON.stringify(userData));
+
+          // Update settings menu
+          if (window.SheetGPTSettings) {
+            window.SheetGPTSettings.setUserData(userData);
+          }
+
+          // Show warning if limit almost reached
+          if (!data.can_make_query) {
+            if (window.SheetGPTSettings) {
+              window.SheetGPTSettings.showToast('Лимит запросов исчерпан', 'error');
+              window.SheetGPTSettings.openUpgradeModal();
+            }
+          } else if (data.queries_remaining <= 3 && data.queries_remaining > 0) {
+            if (window.SheetGPTSettings) {
+              window.SheetGPTSettings.showToast(`Осталось ${data.queries_remaining} запросов`, 'warning');
+            }
+          }
+        }
+      } catch (error) {
+        console.error('[Sidebar] Usage increment error:', error);
       }
     }
 

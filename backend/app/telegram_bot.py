@@ -314,7 +314,7 @@ SheetGPT работает как расширение для Google Chrome, ко
         )
 
     async def show_my_license(self, query):
-        """Показать текущий ключ напрямую из БД"""
+        """Показать текущий ключ и статистику использования"""
         user_id = query.from_user.id
         text = "❌ База данных не настроена"
 
@@ -330,6 +330,19 @@ SheetGPT работает как расширение для Google Chrome, ко
                     if db_user and db_user.license_key:
                         license_key = db_user.license_key
                         tier = db_user.subscription_tier or 'free'
+                        queries_used = db_user.queries_used_today or 0
+                        queries_limit = db_user.queries_limit or 10
+                        total_queries = db_user.total_queries or 0
+
+                        # Создаём прогресс-бар
+                        if tier == 'premium':
+                            usage_info = "∞ Безлимит"
+                        else:
+                            progress = min(queries_used / queries_limit, 1.0) if queries_limit > 0 else 0
+                            filled = int(progress * 10)
+                            bar = '█' * filled + '░' * (10 - filled)
+                            remaining = max(0, queries_limit - queries_used)
+                            usage_info = f"`[{bar}]` {queries_used}/{queries_limit}\n📈 Осталось: **{remaining}**"
 
                         text = f"""
 🔑 **Твой лицензионный ключ**
@@ -338,8 +351,13 @@ SheetGPT работает как расширение для Google Chrome, ко
 {license_key}
 ```
 
-📊 Тариф: {tier.capitalize()}
-✅ Статус: Активен
+📊 **Тариф:** {tier.capitalize()}
+✅ **Статус:** Активен
+
+**Использование сегодня:**
+{usage_info}
+
+📊 Всего запросов: {total_queries}
 """
                     else:
                         text = "❌ У тебя нет лицензионного ключа. Нажми 'Сгенерировать ключ'."
@@ -355,22 +373,47 @@ SheetGPT работает как расширение для Google Chrome, ко
         )
 
     async def show_subscription(self, query):
-        """Раздел Подписка"""
+        """Раздел Подписка - показывает реальные данные из БД"""
         user_id = query.from_user.id
-        # TODO: проверить статус подписки из БД
-        has_subscription = False  # Заглушка
 
-        if has_subscription:
-            text = """
+        # Получаем данные из БД
+        subscription_tier = "free"
+        queries_used = 0
+        queries_limit = 10
+        total_queries = 0
+        premium_until = None
+
+        if self.async_session_factory:
+            try:
+                from app.models.telegram_user import TelegramUser
+                async with self.async_session_factory() as session:
+                    result = await session.execute(
+                        select(TelegramUser).where(TelegramUser.telegram_user_id == user_id)
+                    )
+                    user = result.scalar_one_or_none()
+                    if user:
+                        subscription_tier = user.subscription_tier or "free"
+                        queries_used = user.queries_used_today or 0
+                        queries_limit = user.queries_limit or 10
+                        total_queries = user.total_queries or 0
+                        premium_until = user.premium_until
+            except Exception as e:
+                logger.error(f"Error getting subscription: {e}")
+
+        is_premium = subscription_tier == "premium"
+
+        if is_premium:
+            premium_date = premium_until.strftime('%d.%m.%Y') if premium_until else 'Бессрочно'
+            text = f"""
 💳 **Подписка**
 
 ✅ У тебя активная подписка **Premium**
 
-📅 Действует до: 01.02.2025
-🔄 Автопродление: Включено
+📅 Действует до: {premium_date}
+📊 Всего запросов: {total_queries}
 
 Что включено:
-• Безлимитные запросы
+• ∞ Безлимитные запросы
 • Приоритетная поддержка
 • Все будущие обновления
 """
@@ -379,19 +422,28 @@ SheetGPT работает как расширение для Google Chrome, ко
                 [InlineKeyboardButton("« Назад в меню", callback_data="menu_back")]
             ]
         else:
-            text = """
+            # Создаём прогресс-бар
+            progress = min(queries_used / queries_limit, 1.0) if queries_limit > 0 else 0
+            filled = int(progress * 10)
+            bar = '█' * filled + '░' * (10 - filled)
+            remaining = max(0, queries_limit - queries_used)
+
+            text = f"""
 💳 **Подписка**
 
-У тебя сейчас **Бесплатный** план.
+📊 **Тариф:** Free
 
-Лимиты бесплатного плана:
-• 10 запросов в день
-• Базовые функции
+**Использование сегодня:**
+`[{bar}]` {queries_used}/{queries_limit}
 
-Хочешь больше возможностей? Выбери тариф:
+📈 Осталось запросов: **{remaining}**
+🔄 Сброс: в полночь (МСК)
+📊 Всего запросов: {total_queries}
+
+Хочешь больше? Переходи на Premium!
 """
             keyboard = [
-                [InlineKeyboardButton("📋 Посмотреть тарифы", callback_data="sub_plans")],
+                [InlineKeyboardButton("⭐ Получить Unlimited", callback_data="sub_plans")],
                 [InlineKeyboardButton("« Назад в меню", callback_data="menu_back")]
             ]
 

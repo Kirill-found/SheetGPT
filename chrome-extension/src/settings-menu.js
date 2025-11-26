@@ -17,13 +17,18 @@ const PLANS = {
   }
 };
 
+// ===== КОНСТАНТЫ =====
+const USER_DATA_STORAGE_KEY = 'sheetgpt_user_data';
+const LICENSE_STORAGE_KEY = 'sheetgpt_license_key';
+
 // ===== СОСТОЯНИЕ =====
 let userState = {
-  email: 'user@example.com',
-  plan: 'free', // 'free' | 'unlimited'
-  requestsUsed: 7,
+  username: null,
+  first_name: null,
+  telegram_user_id: null,
+  plan: 'free', // 'free' | 'premium'
+  requestsUsed: 0,
   requestsLimit: 10,
-  resetDate: null, // Date когда сбросится лимит
 };
 
 // ===== ИНИЦИАЛИЗАЦИЯ =====
@@ -102,17 +107,26 @@ function initModals() {
   const contextInput = document.getElementById('customContextInput');
   const charCount = document.getElementById('charCount');
 
+  // Загрузить сохранённый контекст при открытии модала
+  if (contextInput) {
+    const savedContext = localStorage.getItem('sheetgpt_context') || '';
+    contextInput.value = savedContext;
+    if (charCount) charCount.textContent = savedContext.length;
+  }
+
   cancelPersonalizeBtn?.addEventListener('click', () => {
     closeModal('personalizeModal');
   });
 
   savePersonalizeBtn?.addEventListener('click', () => {
-    savePersonalization(contextInput.value);
+    if (contextInput) {
+      savePersonalization(contextInput.value);
+    }
     closeModal('personalizeModal');
   });
 
   contextInput?.addEventListener('input', () => {
-    charCount.textContent = contextInput.value.length;
+    if (charCount) charCount.textContent = contextInput.value.length;
   });
 
   // Upgrade modal
@@ -149,66 +163,82 @@ function closeModal(modalId) {
 
 // ===== USER STATE =====
 function loadUserState() {
-  // Загрузить из localStorage или от API
-  const saved = localStorage.getItem('sheetgpt_user');
+  // Загрузить из localStorage (данные от API через sidebar.js)
+  const saved = localStorage.getItem(USER_DATA_STORAGE_KEY);
+  console.log('[SettingsMenu] Loading user data:', saved);
+
   if (saved) {
     try {
-      userState = { ...userState, ...JSON.parse(saved) };
+      const data = JSON.parse(saved);
+      userState = {
+        username: data.username || null,
+        first_name: data.first_name || null,
+        telegram_user_id: data.telegram_user_id || null,
+        plan: data.subscription_tier || 'free',
+        requestsUsed: data.queries_used_today || 0,
+        requestsLimit: data.queries_limit || 10,
+      };
+      console.log('[SettingsMenu] User state loaded:', userState);
     } catch (e) {
-      console.error('Error loading user state:', e);
+      console.error('[SettingsMenu] Error loading user state:', e);
     }
   }
-
-  // Проверить сброс лимита
-  checkLimitReset();
 }
 
 function saveUserState() {
-  localStorage.setItem('sheetgpt_user', JSON.stringify(userState));
+  // Сохраняем в том же формате что и sidebar.js
+  const data = {
+    username: userState.username,
+    first_name: userState.first_name,
+    telegram_user_id: userState.telegram_user_id,
+    subscription_tier: userState.plan,
+    queries_used_today: userState.requestsUsed,
+    queries_limit: userState.requestsLimit,
+  };
+  localStorage.setItem(USER_DATA_STORAGE_KEY, JSON.stringify(data));
 }
 
-function checkLimitReset() {
-  if (userState.plan === 'unlimited') return;
-
-  const now = new Date();
-  const resetDate = userState.resetDate ? new Date(userState.resetDate) : null;
-
-  if (!resetDate || now >= resetDate) {
-    // Сбросить лимит
-    userState.requestsUsed = 0;
-
-    // Установить следующий сброс (завтра в полночь)
-    const tomorrow = new Date(now);
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    tomorrow.setHours(0, 0, 0, 0);
-    userState.resetDate = tomorrow.toISOString();
-
-    saveUserState();
-  }
+// Функция для обновления данных из sidebar.js
+function setUserData(data) {
+  console.log('[SettingsMenu] setUserData called:', data);
+  userState = {
+    username: data.username || null,
+    first_name: data.first_name || null,
+    telegram_user_id: data.telegram_user_id || null,
+    plan: data.subscription_tier || 'free',
+    requestsUsed: data.queries_used_today || 0,
+    requestsLimit: data.queries_limit || 10,
+  };
+  updateUsageDisplay();
 }
 
 // ===== USAGE DISPLAY =====
 function updateUsageDisplay() {
-  const emailEl = document.getElementById('userEmail');
+  const usernameEl = document.getElementById('userEmail'); // элемент для имени пользователя
   const badgeEl = document.getElementById('planBadge');
   const countEl = document.getElementById('usageCount');
   const barFillEl = document.getElementById('usageBarFill');
   const resetEl = document.getElementById('usageReset');
   const upgradeLinkEl = document.getElementById('upgradeBtn');
 
-  // Email
-  if (emailEl) {
-    emailEl.textContent = userState.email;
+  // Username (показываем @username или first_name)
+  if (usernameEl) {
+    const displayName = userState.username
+      ? `@${userState.username}`
+      : userState.first_name || 'Пользователь';
+    usernameEl.textContent = displayName;
   }
 
   // Plan badge
   if (badgeEl) {
-    badgeEl.textContent = userState.plan === 'unlimited' ? 'UNLIMITED' : 'FREE';
-    badgeEl.classList.toggle('unlimited', userState.plan === 'unlimited');
+    const isPremium = userState.plan === 'premium' || userState.plan === 'unlimited';
+    badgeEl.textContent = isPremium ? 'UNLIMITED' : 'FREE';
+    badgeEl.classList.toggle('unlimited', isPremium);
   }
 
   // Usage count & bar
-  if (userState.plan === 'unlimited') {
+  const isPremium = userState.plan === 'premium' || userState.plan === 'unlimited';
+  if (isPremium) {
     if (countEl) countEl.textContent = '∞';
     if (barFillEl) {
       barFillEl.style.width = '100%';
@@ -236,29 +266,17 @@ function updateUsageDisplay() {
     }
 
     if (resetEl) {
-      resetEl.textContent = getResetText();
+      resetEl.textContent = 'Обновление: в полночь';
     }
 
-    if (upgradeLinkEl) upgradeLinkEl.style.display = 'inline-flex';
+    if (upgradeLinkEl) upgradeLinkEl.style.display = 'flex';
   }
-}
 
-function getResetText() {
-  if (!userState.resetDate) return 'Обновление: завтра';
-
-  const now = new Date();
-  const reset = new Date(userState.resetDate);
-  const diffMs = reset - now;
-  const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
-
-  if (diffHours < 1) {
-    const diffMins = Math.floor(diffMs / (1000 * 60));
-    return `Обновление: ${diffMins} мин`;
-  } else if (diffHours < 24) {
-    return `Обновление: ${diffHours} ч`;
-  } else {
-    return 'Обновление: завтра';
-  }
+  console.log('[SettingsMenu] Usage display updated:', {
+    used: userState.requestsUsed,
+    limit: userState.requestsLimit,
+    plan: userState.plan
+  });
 }
 
 // ===== REQUEST TRACKING =====
@@ -321,23 +339,40 @@ function activateUnlimited() {
 }
 
 function handleLogout() {
-  // Очистить состояние
-  localStorage.removeItem('sheetgpt_user');
-  localStorage.removeItem('sheetgpt_context');
-  localStorage.removeItem('sheetgpt_history');
+  console.log('[SettingsMenu] Logout initiated');
 
-  // Редирект или обновление
-  // google.script.run.logout(); // Для Google Apps Script
+  // Очистить ВСЕ данные
+  localStorage.removeItem(LICENSE_STORAGE_KEY);      // Лицензионный ключ
+  localStorage.removeItem(USER_DATA_STORAGE_KEY);    // Данные пользователя
+  localStorage.removeItem('sheetgpt_context');       // Персонализация
+  localStorage.removeItem('sheetgpt_history');       // История
+
+  // Сбросить состояние
+  userState = {
+    username: null,
+    first_name: null,
+    telegram_user_id: null,
+    plan: 'free',
+    requestsUsed: 0,
+    requestsLimit: 10,
+  };
 
   showToast('Выход выполнен', 'info');
 
   // Закрыть dropdown
   document.getElementById('settingsDropdown')?.classList.remove('show');
 
-  // Перезагрузить или показать login
+  // Показать экран активации (не перезагружать страницу)
   setTimeout(() => {
-    location.reload();
-  }, 1000);
+    const overlay = document.getElementById('licenseOverlay');
+    if (overlay) {
+      overlay.classList.remove('hidden');
+      console.log('[SettingsMenu] License overlay shown');
+    } else {
+      // Fallback: перезагрузить страницу
+      location.reload();
+    }
+  }, 500);
 }
 
 // ===== TOAST NOTIFICATIONS =====
@@ -417,14 +452,11 @@ window.SheetGPTSettings = {
   openUpgradeModal: () => openModal('upgradeModal'),
   showToast,
   getUserState: () => ({ ...userState }),
-  setUserEmail: (email) => {
-    userState.email = email;
-    saveUserState();
-    updateUsageDisplay();
-  },
+  // Установка данных пользователя из sidebar.js
+  setUserData,
   setPlan: (plan) => {
     userState.plan = plan;
-    if (plan === 'unlimited') {
+    if (plan === 'premium' || plan === 'unlimited') {
       userState.requestsUsed = 0;
     }
     saveUserState();
