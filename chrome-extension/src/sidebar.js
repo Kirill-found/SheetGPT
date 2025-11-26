@@ -1011,38 +1011,7 @@ let isProcessing = false;
       });
     }
 
-    // Settings Modal
-    function openSettings() {
-      google.script.run
-        .withSuccessHandler(function(context) {
-          document.getElementById('customContextInput').value = context || '';
-          document.getElementById('charCount').textContent = (context || '').length;
-          document.getElementById('settingsModal').classList.add('show');
-        })
-        .getCustomContext();
-    }
-
-    function closeSettings() {
-      document.getElementById('settingsModal').classList.remove('show');
-    }
-
-    function saveSettings() {
-      const context = document.getElementById('customContextInput').value.trim();
-
-      google.script.run
-        .withSuccessHandler(function(result) {
-          if (result.success) {
-            alert('Настройки сохранены!');
-            closeSettings();
-          } else {
-            alert('Ошибка сохранения: ' + result.error);
-          }
-        })
-        .withFailureHandler(function(error) {
-          alert('Ошибка: ' + error.message);
-        })
-        .saveCustomContext(context);
-    }
+    // Settings Modal - handled by settings-menu.js
 
     // Chat History Functions
     let chatHistoryData = [];
@@ -1243,25 +1212,6 @@ if (historyBtn) {
   console.log('[Sidebar] ✅ History button listener attached');
 }
 
-// Settings button
-const settingsBtn = document.getElementById('settingsBtn');
-if (settingsBtn) {
-  settingsBtn.addEventListener('click', openSettings);
-  console.log('[Sidebar] ✅ Settings button listener attached');
-}
-
-// Save settings button
-const saveSettingsBtn = document.getElementById('saveSettingsBtn');
-if (saveSettingsBtn) {
-  saveSettingsBtn.addEventListener('click', saveSettings);
-  console.log('[Sidebar] ✅ Save settings button listener attached');
-}
-
-// Cancel settings button
-const cancelSettingsBtn = document.getElementById('cancelSettingsBtn');
-if (cancelSettingsBtn) {
-  cancelSettingsBtn.addEventListener('click', closeSettings);
-  console.log('[Sidebar] ✅ Cancel settings button listener attached');
-}
+// Settings button - handled by settings-menu.js
 
 console.log('[Sidebar] Event listeners initialized');
