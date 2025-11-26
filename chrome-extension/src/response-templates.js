@@ -251,13 +251,25 @@ function renderAIResponse(result) {
 
   let html = '';
 
-  // v9.0.1: Проверяем, нужно ли создавать таблицу на отдельном листе
+  // v9.0.2: Проверяем display_mode - сначала от бэкенда, потом локально
   const userQuery = (window.lastUserQuery || '').toLowerCase();
   const wantsNewSheet = userQuery.includes('отдельн') || userQuery.includes('новом листе') ||
                        userQuery.includes('новый лист') || userQuery.includes('создай лист') ||
                        userQuery.includes('в листе') || userQuery.includes('на листе');
   const rowCount = result.structured_data?.rows?.length || 0;
-  const shouldCreateSheet = wantsNewSheet || rowCount > 50;
+
+  // v9.0.2: Используем ту же логику что и в sidebar.js
+  let displayMode = result.structured_data?.display_mode;
+  if (!displayMode) {
+    if (wantsNewSheet) {
+      displayMode = 'create_sheet';
+    } else if (rowCount > 50) {
+      displayMode = 'create_sheet';
+    } else {
+      displayMode = 'sidebar_only';
+    }
+  }
+  const shouldCreateSheet = displayMode === 'create_sheet';
 
   // Проверяем есть ли highlight_rows
   if (result.highlight_rows && result.highlight_rows.length > 0) {

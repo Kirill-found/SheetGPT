@@ -605,11 +605,30 @@ let isProcessing = false;
             // TABLE/CHART OPERATION: создаём НОВЫЙ лист
             console.log('[UI] TABLE/CHART OPERATION: Creating new sheet');
 
-            // v9.0.1: Debug logging before calling createTableAndChart
+            // v9.0.2: Enhanced debug logging and validation before calling createTableAndChart
             console.log('[UI] Calling createTableAndChart with:', result.structured_data);
             console.log('[UI] structured_data keys:', result.structured_data ? Object.keys(result.structured_data) : 'null');
             console.log('[UI] headers:', result.structured_data?.headers);
+            console.log('[UI] rows:', result.structured_data?.rows);
             console.log('[UI] rows count:', result.structured_data?.rows?.length);
+
+            // v9.0.2: Pre-call validation
+            if (!result.structured_data?.headers || !result.structured_data?.rows) {
+              console.error('[UI] ❌ ERROR: structured_data missing headers or rows!');
+              console.error('[UI] Full result object:', JSON.stringify(result, null, 2));
+              const errorDiv = document.createElement('div');
+              errorDiv.className = 'message ai';
+              const errorBubble = document.createElement('div');
+              errorBubble.className = 'message-bubble';
+              const errorBox = document.createElement('div');
+              errorBox.className = 'content-box error';
+              errorBox.textContent = '❌ Ошибка: данные таблицы отсутствуют или повреждены';
+              errorBubble.appendChild(errorBox);
+              errorDiv.appendChild(errorBubble);
+              container.appendChild(errorDiv);
+              scrollToBottom();
+              return;
+            }
 
             google.script.run
               .withSuccessHandler(function(tableResult) {

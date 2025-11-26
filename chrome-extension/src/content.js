@@ -598,7 +598,7 @@ async function createTableAndChart(structuredData) {
   console.log('[SheetGPT] structuredData:', JSON.stringify(structuredData, null, 2));
 
   try {
-    // Validate input
+    // v9.0.2: Enhanced validation
     if (!structuredData) {
       throw new Error('structuredData is null or undefined');
     }
@@ -608,10 +608,28 @@ async function createTableAndChart(structuredData) {
     console.log('[SheetGPT] rows:', structuredData.rows);
     console.log('[SheetGPT] rows count:', structuredData.rows?.length);
 
+    // v9.0.2: Validate that we have actual data to write
+    if (!structuredData.headers || !Array.isArray(structuredData.headers) || structuredData.headers.length === 0) {
+      throw new Error('No headers in structured data');
+    }
+
+    if (!structuredData.rows || !Array.isArray(structuredData.rows)) {
+      throw new Error('No rows array in structured data');
+    }
+
+    if (structuredData.rows.length === 0) {
+      console.warn('[SheetGPT] ⚠️ Warning: rows array is empty, creating sheet with headers only');
+    }
+
     // Convert structured data to 2D array
     const values = convertStructuredDataToValues(structuredData);
     console.log('[SheetGPT] Converted values:', values);
     console.log('[SheetGPT] Values length:', values.length);
+
+    // v9.0.2: Double-check values before sending
+    if (!values || values.length === 0) {
+      throw new Error('Converted values array is empty');
+    }
 
     // Generate sheet title
     const timestamp = new Date().toLocaleString('ru-RU', {
