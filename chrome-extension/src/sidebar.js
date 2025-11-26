@@ -1,12 +1,11 @@
 // ===== DEBUG: SCRIPT LOADED =====
 console.log('🚀🚀🚀 SIDEBAR.JS IS LOADING! 🚀🚀🚀');
-alert('sidebar.js загружен!');
 
 // ===== LICENSE VALIDATION =====
 const LICENSE_API_URL = 'https://sheetgpt-production.up.railway.app/api/v1/telegram/license/validate';
 const LICENSE_STATUS_URL = 'https://sheetgpt-production.up.railway.app/api/v1/telegram/license';
-const LICENSE_STORAGE_KEY = 'sheetgpt_license_key';
-const USER_DATA_STORAGE_KEY = 'sheetgpt_user_data';
+// Note: LICENSE_STORAGE_KEY and USER_DATA_STORAGE_KEY are defined in settings-menu.js
+// Use them directly since settings-menu.js loads first
 
 // Check if license is valid on startup
 async function checkLicense() {
