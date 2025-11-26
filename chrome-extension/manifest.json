@@ -47,7 +47,7 @@
   },
   "web_accessible_resources": [
     {
-      "resources": ["src/sidebar.html", "src/sidebar.js"],
+      "resources": ["src/sidebar.html", "src/sidebar.js", "src/response-templates.js"],
       "matches": ["https://docs.google.com/*"]
     }
   ]
