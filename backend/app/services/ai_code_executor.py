@@ -919,9 +919,13 @@ Generate CORRECTED code that will work. Return ONLY the Python code."""
         else:
             print(f"❌ No highlighting data generated")
 
+        # v8.0.0: CLEAN UP SUMMARY - fix raw data dumps
+        raw_summary = exec_result.get('summary', 'Результат вычислен')
+        clean_summary = self._cleanup_summary(raw_summary, result, query, original_df)
+
         # Базовый ответ
         response = {
-            "summary": exec_result.get('summary', 'Результат вычислен'),
+            "summary": clean_summary,
             "methodology": exec_result.get('methodology', 'Автоматический анализ с помощью Python'),
             "key_findings": key_findings,
             "confidence": exec_result.get('confidence', 0.95),
@@ -963,6 +967,97 @@ Generate CORRECTED code that will work. Return ONLY the Python code."""
             print(f"[FORMULA] Generated Google Sheets formula: {formula}")
 
         return response
+
+    def _cleanup_summary(self, raw_summary: str, result: Any, query: str, df: Optional[pd.DataFrame]) -> str:
+        """
+        v8.0.0: Очищает summary от "каши" и форматирует красиво
+        Если AI вернул raw data dump - пересчитываем и форматируем правильно
+        """
+        if not raw_summary:
+            return "Результат вычислен"
+
+        # Детектируем "плохой" summary - raw data dump
+        bad_patterns = [
+            'Менеджер:',  # Raw row dump
+            ' | ',  # Pipe-separated dump
+            'продукт:',
+            'Сумма:',
+            'Дата:',
+            'Статус:',
+        ]
+
+        is_bad_summary = sum(1 for p in bad_patterns if p in raw_summary) >= 2
+
+        if not is_bad_summary:
+            # Summary выглядит нормально
+            return raw_summary
+
+        print(f"[CLEANUP] Detected bad summary, reformatting...")
+        print(f"[CLEANUP] Raw: {raw_summary[:200]}...")
+
+        # Пытаемся извлечь имя из запроса
+        query_lower = query.lower()
+        name = None
+
+        # Ищем имена в запросе
+        common_names = ['петров', 'иванов', 'сидоров', 'кузнецов', 'смирнов', 'попов', 'васильев', 'михайлов']
+        for n in common_names:
+            if n in query_lower:
+                name = n.capitalize()
+                break
+
+        # Если не нашли в списке - ищем слово после "а "
+        if not name and query_lower.startswith('а '):
+            parts = query.split()
+            if len(parts) >= 2:
+                name = parts[1].rstrip('?').capitalize()
+
+        # Пытаемся посчитать сумму из result
+        total_sum = None
+        row_count = 0
+
+        if result is not None:
+            if hasattr(result, '__len__'):
+                row_count = len(result)
+
+            # Если result - DataFrame, считаем сумму по числовым колонкам
+            if hasattr(result, 'select_dtypes'):
+                try:
+                    numeric_cols = result.select_dtypes(include=['number']).columns
+                    if len(numeric_cols) > 0:
+                        # Берем колонку с "Сумма" в названии или первую числовую
+                        sum_col = None
+                        for col in numeric_cols:
+                            if 'сумм' in str(col).lower():
+                                sum_col = col
+                                break
+                        if not sum_col:
+                            sum_col = numeric_cols[0]
+                        total_sum = result[sum_col].sum()
+                except Exception as e:
+                    print(f"[CLEANUP] Error calculating sum: {e}")
+
+            # Если result - число
+            elif isinstance(result, (int, float)):
+                total_sum = result
+
+        # Форматируем красивый summary
+        if name and total_sum is not None:
+            clean = f"Сумма продаж {name}: {total_sum:,.0f} руб."
+            if row_count > 0:
+                clean += f"\n(найдено записей: {row_count})"
+        elif total_sum is not None:
+            clean = f"Результат: {total_sum:,.0f}"
+            if row_count > 0:
+                clean += f" (записей: {row_count})"
+        elif row_count > 0:
+            clean = f"Найдено записей: {row_count}"
+        else:
+            # Fallback - просто обрезаем длинный summary
+            clean = raw_summary[:200] + "..." if len(raw_summary) > 200 else raw_summary
+
+        print(f"[CLEANUP] Clean summary: {clean}")
+        return clean
 
     def _generate_formula_for_merge(self, query: str, original_df: Optional[pd.DataFrame], structured_data: Optional[Dict]) -> Optional[str]:
         """
