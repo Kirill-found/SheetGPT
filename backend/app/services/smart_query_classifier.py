@@ -23,6 +23,7 @@ class QueryComplexity(Enum):
     SIMPLE = "simple"      # Pattern matching - 0 tokens
     MEDIUM = "medium"      # Function Calling - ~300 tokens
     COMPLEX = "complex"    # Text-to-Pandas - ~500 tokens
+    GENERATE = "generate"  # Generate data from LLM knowledge - ~500 tokens
 
 
 @dataclass
@@ -97,6 +98,19 @@ class SmartQueryClassifier:
         r"(топ.?\d+.*(для|по|в)\s*кажд)",                        # Top N per group
     ]
 
+    # ===== GENERATE INDICATORS =====
+    # Запросы на генерацию данных из знаний LLM (не из таблицы)
+    GENERATE_INDICATORS = [
+        r"(создай|сделай|составь|сгенерируй)\s+(сравнительн|таблиц|список)",  # Создай таблицу
+        r"(сравн\w+\s+таблиц)",                                   # Сравнительная таблица
+        r"(список|перечень|таблиц\w*)\s+(с\s+)?(модел|характеристик|параметр)",  # Список с характеристиками
+        r"(напиши|выведи|покажи)\s+.*(информаци|данн\w+)\s+(о|про|об)",  # Информация о чем-то
+        r"(какие|what)\s+(бывают|есть|существуют)",               # Какие бывают X
+        r"(топ|лучши[еx]|популярн\w+)\s+\d*\s*(моделей|продуктов|компаний)",  # Топ X чего-то
+        r"(llm|gpt|модел\w+\s+языков)",                           # LLM модели
+        r"(характеристик\w*|параметр\w*|спецификаци)",            # Характеристики
+    ]
+
     def classify(self, query: str, column_names: List[str] = None) -> ClassificationResult:
         """
         Классифицирует запрос и возвращает рекомендуемую стратегию.
@@ -109,6 +123,15 @@ class SmartQueryClassifier:
             ClassificationResult с рекомендацией
         """
         query_lower = query.lower().strip()
+
+        # 0. Проверяем GENERATE patterns (генерация данных из знаний LLM)
+        for pattern in self.GENERATE_INDICATORS:
+            if re.search(pattern, query_lower, re.IGNORECASE):
+                return ClassificationResult(
+                    complexity=QueryComplexity.GENERATE,
+                    confidence=0.90,
+                    reason=f"Generate pattern detected: {pattern[:30]}..."
+                )
 
         # 1. Проверяем SIMPLE patterns (0 tokens!)
         for pattern_name, regex, func_name, param_extractor in self.SIMPLE_PATTERNS:

@@ -157,7 +157,10 @@ class HybridProcessor:
         Self-correction: при ошибке передаём её в следующую попытку.
         """
         try:
-            if classification.complexity == QueryComplexity.SIMPLE:
+            if classification.complexity == QueryComplexity.GENERATE:
+                # Генерация данных из знаний LLM (не из таблицы)
+                result = await self._execute_generate(query, custom_context)
+            elif classification.complexity == QueryComplexity.SIMPLE:
                 result = await self._execute_simple(query, df, classification)
             elif classification.complexity == QueryComplexity.MEDIUM:
                 result = await self._execute_medium(query, df, schema_prompt, custom_context, previous_error)
@@ -315,6 +318,96 @@ class HybridProcessor:
                 "explanation": message.content
             }
 
+    async def _execute_generate(
+        self,
+        query: str,
+        custom_context: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """
+        Генерирует данные из знаний LLM (не из таблицы).
+        Для запросов типа "создай таблицу с моделями LLM"
+        ~500 tokens, ~1500ms
+        """
+        logger.info(f"[HYBRID v9] Generating data from LLM knowledge: {query[:50]}...")
+
+        system_prompt = """Ты эксперт по созданию информативных таблиц и списков.
+
+ЗАДАЧА: Создай таблицу с данными по запросу пользователя.
+
+ПРАВИЛА:
+1. Используй свои знания для генерации актуальной информации
+2. Возвращай данные ТОЛЬКО в JSON формате
+3. Формат ответа:
+```json
+{
+  "headers": ["Колонка1", "Колонка2", "Колонка3"],
+  "rows": [
+    ["значение1", "значение2", "значение3"],
+    ["значение4", "значение5", "значение6"]
+  ],
+  "summary": "Краткое описание таблицы"
+}
+```
+4. Добавляй релевантные колонки (название, характеристики, цена, рейтинг и т.д.)
+5. Минимум 3-5 строк данных
+6. Данные должны быть актуальными и полезными
+
+ВАЖНО: Возвращай ТОЛЬКО JSON, без дополнительного текста!"""
+
+        if custom_context:
+            system_prompt += f"\n\nКОНТЕКСТ: {custom_context}"
+
+        try:
+            response = await self.client.chat.completions.create(
+                model="gpt-4o",  # Use best model for knowledge generation
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": query}
+                ],
+                temperature=0.3,
+                max_tokens=2000
+            )
+
+            content = response.choices[0].message.content
+            logger.info(f"[HYBRID v9] Generated response: {len(content)} chars")
+
+            # Извлекаем JSON из ответа
+            import json
+            import re
+
+            # Пробуем найти JSON в markdown блоке
+            json_match = re.search(r'```(?:json)?\s*(.*?)\s*```', content, re.DOTALL)
+            if json_match:
+                json_str = json_match.group(1)
+            else:
+                # Пробуем парсить весь ответ как JSON
+                json_str = content.strip()
+
+            data = json.loads(json_str)
+
+            if "headers" not in data or "rows" not in data:
+                raise ValueError("Invalid JSON format: missing headers or rows")
+
+            logger.info(f"[HYBRID v9] ✅ Generated table: {len(data['rows'])} rows")
+
+            return {
+                "success": True,
+                "response_type": "table",
+                "summary": data.get("summary", f"Сгенерировано: {len(data['rows'])} строк"),
+                "structured_data": {
+                    "headers": data["headers"],
+                    "rows": data["rows"]
+                },
+                "generated_from_knowledge": True
+            }
+
+        except json.JSONDecodeError as e:
+            logger.error(f"[HYBRID v9] JSON parse error: {e}")
+            raise ValueError(f"Не удалось распарсить ответ LLM: {e}")
+        except Exception as e:
+            logger.error(f"[HYBRID v9] Generate error: {e}")
+            raise
+
     async def _execute_complex(
         self,
         query: str,
@@ -426,8 +519,9 @@ class HybridProcessor:
         return {
             QueryComplexity.SIMPLE: "Pattern Matching (0 tokens)",
             QueryComplexity.MEDIUM: "Function Calling (gpt-4o-mini)",
-            QueryComplexity.COMPLEX: "Text-to-Pandas (gpt-4o)"
-        }[complexity]
+            QueryComplexity.COMPLEX: "Text-to-Pandas (gpt-4o)",
+            QueryComplexity.GENERATE: "Knowledge Generation (gpt-4o)"
+        }.get(complexity, "Unknown")
 
     def _create_error_response(self, error: str, elapsed: float) -> Dict[str, Any]:
         """Создаёт response при ошибке."""
