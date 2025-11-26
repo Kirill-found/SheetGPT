@@ -1,3 +1,7 @@
+// ===== DEBUG: SCRIPT LOADED =====
+console.log('🚀🚀🚀 SIDEBAR.JS IS LOADING! 🚀🚀🚀');
+alert('sidebar.js загружен!');
+
 // ===== LICENSE VALIDATION =====
 const LICENSE_API_URL = 'https://sheetgpt-production.up.railway.app/api/v1/telegram/license/validate';
 const LICENSE_STATUS_URL = 'https://sheetgpt-production.up.railway.app/api/v1/telegram/license';

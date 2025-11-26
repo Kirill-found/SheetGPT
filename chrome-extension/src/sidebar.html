@@ -1802,7 +1802,7 @@
         />
       </div>
 
-      <button id="activateBtn" class="license-btn">
+      <button id="activateBtn" class="license-btn" onclick="console.log('INLINE CLICK!'); if(typeof handleActivation === 'function') handleActivation(); else alert('handleActivation not defined!');">
         Активировать
       </button>
 
