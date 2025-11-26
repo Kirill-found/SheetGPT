@@ -441,6 +441,9 @@ let isProcessing = false;
 
       if (!message || isProcessing) return;
 
+      // v9.0.1: Save query for display_mode detection
+      window.lastUserQuery = message;
+
       // Hide empty state
       document.getElementById('emptyState').style.display = 'none';
 
@@ -522,12 +525,35 @@ let isProcessing = false;
           console.log('[UI] Processing structured_data');
           console.log('[UI] operation_type:', result.structured_data.operation_type);
           console.log('[UI] Data:', result.structured_data);
+          console.log('[UI] Rows count:', result.structured_data.rows ? result.structured_data.rows.length : 0);
 
           // КРИТИЧНО: Проверяем operation_type и display_mode чтобы определить куда отправлять данные
           const isSplitOperation = result.structured_data.operation_type === 'split';
-          // v9.0.0: По умолчанию показываем в sidebar, создаём лист только для больших таблиц (>50 строк)
           const rowCount = result.structured_data.rows ? result.structured_data.rows.length : 0;
-          const displayMode = result.structured_data.display_mode || (rowCount > 50 ? 'create_sheet' : 'sidebar_only');
+
+          // v9.0.1: Проверяем, просил ли пользователь явно создать отдельный лист
+          const userQuery = (window.lastUserQuery || '').toLowerCase();
+          const wantsNewSheet = userQuery.includes('отдельн') || userQuery.includes('новом листе') ||
+                               userQuery.includes('новый лист') || userQuery.includes('создай лист') ||
+                               userQuery.includes('в листе') || userQuery.includes('на листе');
+
+          // Логика выбора display_mode:
+          // 1. Если явно указан в ответе - используем его
+          // 2. Если пользователь просит отдельный лист - create_sheet
+          // 3. Если > 50 строк - create_sheet
+          // 4. Иначе - sidebar_only
+          let displayMode = result.structured_data.display_mode;
+          if (!displayMode) {
+            if (wantsNewSheet) {
+              displayMode = 'create_sheet';
+              console.log('[UI] User requested new sheet explicitly');
+            } else if (rowCount > 50) {
+              displayMode = 'create_sheet';
+            } else {
+              displayMode = 'sidebar_only';
+            }
+          }
+          console.log('[UI] Display mode:', displayMode);
 
           if (isSplitOperation) {
             // SPLIT OPERATION: заменяем данные в ТЕКУЩЕМ листе

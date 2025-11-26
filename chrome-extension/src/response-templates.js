@@ -251,9 +251,24 @@ function renderAIResponse(result) {
 
   let html = '';
 
+  // v9.0.1: Проверяем, нужно ли создавать таблицу на отдельном листе
+  const userQuery = (window.lastUserQuery || '').toLowerCase();
+  const wantsNewSheet = userQuery.includes('отдельн') || userQuery.includes('новом листе') ||
+                       userQuery.includes('новый лист') || userQuery.includes('создай лист') ||
+                       userQuery.includes('в листе') || userQuery.includes('на листе');
+  const rowCount = result.structured_data?.rows?.length || 0;
+  const shouldCreateSheet = wantsNewSheet || rowCount > 50;
+
   // Проверяем есть ли highlight_rows
   if (result.highlight_rows && result.highlight_rows.length > 0) {
     html = createHighlightResponse(result);
+  } else if (result.structured_data && shouldCreateSheet) {
+    // v9.0.1: Если нужен отдельный лист - не рисуем таблицу в sidebar, только уведомление
+    // Таблица будет создана через createTableAndChart в sidebar.js
+    html = createAnalysisResponse({
+      ...result,
+      summary: result.summary || `Создаю таблицу (${rowCount} строк)...`
+    });
   } else if (result.structured_data) {
     html = createTableResponse({...result, ...result.structured_data});
   } else {
