@@ -164,7 +164,11 @@ async function handleWriteSheetData(tabId, tabUrl, data) {
  * Create a new sheet and write data
  */
 async function handleCreateNewSheet(tabId, tabUrl, data) {
-  console.log('[Background] Creating new sheet:', data);
+  console.log('[Background] Creating new sheet, received data:', JSON.stringify(data, null, 2));
+  console.log('[Background] data.sheetTitle:', data?.sheetTitle);
+  console.log('[Background] data.values:', data?.values);
+  console.log('[Background] data.values length:', data?.values?.length);
+  console.log('[Background] data.values[0] (headers):', data?.values?.[0]);
 
   const spreadsheetId = getSpreadsheetIdFromUrl(tabUrl);
   if (!spreadsheetId) {
@@ -173,13 +177,26 @@ async function handleCreateNewSheet(tabId, tabUrl, data) {
 
   const { sheetTitle, values } = data;
 
+  // v9.0.2: Validate values before creating sheet
+  if (!values || !Array.isArray(values)) {
+    console.error('[Background] ❌ ERROR: values is not an array!', values);
+    throw new Error('Invalid data: values must be an array');
+  }
+
+  if (values.length === 0) {
+    console.error('[Background] ❌ ERROR: values array is empty!');
+    throw new Error('Invalid data: values array is empty');
+  }
+
+  console.log('[Background] ✅ Validated values:', values.length, 'rows');
+
   // Create new sheet
   const sheetProperties = await createNewSheet(spreadsheetId, sheetTitle);
   console.log('[Background] ✅ Sheet created:', sheetProperties);
 
   // Write data to new sheet
   await writeSheetData(spreadsheetId, sheetTitle, values, 'A1');
-  console.log('[Background] ✅ Data written to new sheet');
+  console.log('[Background] ✅ Data written to new sheet:', values.length, 'rows');
 
   return { sheetProperties, rowsWritten: values.length };
 }

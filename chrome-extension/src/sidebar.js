@@ -351,9 +351,17 @@ function convertArgsToData(method, args) {
     case 'insertFormula':
       return { formula: args[0], targetCell: args[1] };
     case 'createTableAndChart':
-      return { structuredData: args[0] };
+      // v9.0.2: Deep clone to ensure data is properly serialized
+      const data = args[0];
+      console.log('[Sidebar] convertArgsToData createTableAndChart input:', data);
+      console.log('[Sidebar] headers:', data?.headers);
+      console.log('[Sidebar] rows count:', data?.rows?.length);
+      // Force deep clone via JSON to ensure proper serialization
+      const cloned = JSON.parse(JSON.stringify(data));
+      console.log('[Sidebar] cloned data rows count:', cloned?.rows?.length);
+      return { structuredData: cloned };
     case 'replaceDataInCurrentSheet':
-      return { structuredData: args[0] };
+      return { structuredData: JSON.parse(JSON.stringify(args[0])) };
     case 'highlightRows':
       return { rows: args[0], color: args[1] };
     default:
