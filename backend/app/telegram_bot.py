@@ -1,24 +1,27 @@
 """
-SheetGPT Telegram Bot v1.0.0
+SheetGPT Telegram Bot v2.0.0
 
-Telegram бот для работы с SheetGPT API.
-Позволяет отправлять Excel/CSV файлы и получать анализ данных.
+Telegram бот с интерактивным меню для SheetGPT.
 """
 
 import logging
 import os
 import io
 import asyncio
+import secrets
 import pandas as pd
 from datetime import datetime
+from typing import Optional
 
-from telegram import Update
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
     Application,
     CommandHandler,
     MessageHandler,
+    CallbackQueryHandler,
     ContextTypes,
     filters,
+    ConversationHandler,
 )
 import httpx
 
@@ -32,8 +35,18 @@ logger = logging.getLogger(__name__)
 # API URL (внутренний вызов)
 API_URL = os.getenv("SHEETGPT_API_URL", "http://localhost:8000")
 
-# Хранилище данных пользователей (в памяти для MVP)
+# Хранилище данных (в памяти для MVP)
 user_data_store = {}
+user_licenses = {}  # user_id -> license_key
+user_reviews = []   # [{user_id, username, rating, text, date}]
+
+# Состояния для ConversationHandler
+WAITING_REVIEW_RATING, WAITING_REVIEW_TEXT, WAITING_SUPPORT_MESSAGE = range(3)
+
+# Ссылки (можно вынести в config)
+CHROME_EXTENSION_URL = "https://chrome.google.com/webstore/detail/sheetgpt"  # TODO: заменить на реальную
+INSTALLATION_GUIDE_URL = "https://docs.google.com/document/d/YOUR_DOC_ID"  # TODO: заменить на реальную
+SUPPORT_CHAT_URL = "https://t.me/sheetgpt_support"  # TODO: создать чат поддержки
 
 
 class SheetGPTBot:
@@ -44,328 +57,513 @@ class SheetGPTBot:
         self.admin_id = admin_id
         self.application = None
 
+    def get_main_menu_keyboard(self):
+        """Создание главного меню с кнопками"""
+        keyboard = [
+            [InlineKeyboardButton("🌐 Chrome Extension", callback_data="menu_extension")],
+            [InlineKeyboardButton("📖 Инструкция по установке", callback_data="menu_guide")],
+            [InlineKeyboardButton("🔑 Лицензионный ключ", callback_data="menu_license")],
+            [InlineKeyboardButton("💳 Подписка", callback_data="menu_subscription")],
+            [InlineKeyboardButton("🆘 Поддержка", callback_data="menu_support")],
+            [InlineKeyboardButton("⭐ Отзывы", callback_data="menu_reviews")],
+        ]
+        return InlineKeyboardMarkup(keyboard)
+
+    def get_back_button(self):
+        """Кнопка возврата в главное меню"""
+        return InlineKeyboardMarkup([
+            [InlineKeyboardButton("« Назад в меню", callback_data="menu_back")]
+        ])
+
     async def start(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """Команда /start"""
+        """Команда /start - показываем главное меню"""
         user = update.effective_user
         logger.info(f"User {user.id} ({user.username}) started bot")
 
         welcome_text = f"""
-Привет, {user.first_name}!
+Привет, {user.first_name}! 👋
 
-Я SheetGPT Bot - твой AI-помощник для работы с таблицами.
+Добро пожаловать в **SheetGPT Bot** - твой AI-помощник для работы с Google Sheets.
 
-**Что я умею:**
-- Анализировать Excel/CSV файлы
-- Генерировать формулы
-- Находить данные по условиям
-- Создавать сводки и отчёты
-
-**Как использовать:**
-1. Отправь мне Excel (.xlsx) или CSV файл
-2. Задай вопрос по данным
-
-**Примеры запросов:**
-- "Сумма продаж по менеджерам"
-- "Топ 5 товаров по выручке"
-- "Выдели строки где сумма > 10000"
-- "Средняя цена товаров"
-
-**Команды:**
-/start - Начать работу
-/help - Справка
-/status - Статус
-/clear - Очистить данные
-
-Загрузи файл, чтобы начать!
+Выбери нужный раздел:
 """
-        await update.message.reply_text(welcome_text, parse_mode='Markdown')
+        await update.message.reply_text(
+            welcome_text,
+            parse_mode='Markdown',
+            reply_markup=self.get_main_menu_keyboard()
+        )
+
+    async def menu_callback(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Обработка нажатий на кнопки меню"""
+        query = update.callback_query
+        await query.answer()
+
+        data = query.data
+
+        if data == "menu_back":
+            await self.show_main_menu(query)
+        elif data == "menu_extension":
+            await self.show_extension(query)
+        elif data == "menu_guide":
+            await self.show_guide(query)
+        elif data == "menu_license":
+            await self.show_license(query, context)
+        elif data == "menu_subscription":
+            await self.show_subscription(query)
+        elif data == "menu_support":
+            await self.show_support(query)
+        elif data == "menu_reviews":
+            await self.show_reviews(query)
+        elif data == "license_generate":
+            await self.generate_license(query, context)
+        elif data == "license_show":
+            await self.show_my_license(query)
+        elif data == "sub_plans":
+            await self.show_subscription_plans(query)
+        elif data == "sub_cancel":
+            await self.cancel_subscription(query)
+        elif data == "reviews_add":
+            await self.start_review(query, context)
+        elif data == "reviews_view":
+            await self.view_reviews(query)
+        elif data.startswith("rating_"):
+            await self.save_rating(query, context, data)
+
+    async def show_main_menu(self, query):
+        """Показать главное меню"""
+        text = """
+**SheetGPT Bot** - Главное меню
+
+Выбери нужный раздел:
+"""
+        await query.edit_message_text(
+            text,
+            parse_mode='Markdown',
+            reply_markup=self.get_main_menu_keyboard()
+        )
+
+    async def show_extension(self, query):
+        """Раздел Chrome Extension"""
+        text = f"""
+🌐 **Chrome Extension**
+
+SheetGPT работает как расширение для Google Chrome, которое интегрируется напрямую в Google Sheets.
+
+**Возможности:**
+• AI-анализ данных прямо в таблице
+• Генерация формул на естественном языке
+• Автоматическая подсветка данных
+• Создание графиков и отчётов
+
+👇 Нажми кнопку ниже для установки:
+"""
+        keyboard = [
+            [InlineKeyboardButton("📥 Установить расширение", url=CHROME_EXTENSION_URL)],
+            [InlineKeyboardButton("« Назад в меню", callback_data="menu_back")]
+        ]
+        await query.edit_message_text(
+            text,
+            parse_mode='Markdown',
+            reply_markup=InlineKeyboardMarkup(keyboard)
+        )
+
+    async def show_guide(self, query):
+        """Раздел Инструкция по установке"""
+        text = f"""
+📖 **Инструкция по установке**
+
+Подробная инструкция по установке и настройке SheetGPT.
+
+**Содержание:**
+1. Установка Chrome Extension
+2. Активация лицензии
+3. Первый запуск
+4. Основные функции
+5. Часто задаваемые вопросы
+
+👇 Открой инструкцию:
+"""
+        keyboard = [
+            [InlineKeyboardButton("📄 Открыть инструкцию", url=INSTALLATION_GUIDE_URL)],
+            [InlineKeyboardButton("« Назад в меню", callback_data="menu_back")]
+        ]
+        await query.edit_message_text(
+            text,
+            parse_mode='Markdown',
+            reply_markup=InlineKeyboardMarkup(keyboard)
+        )
+
+    async def show_license(self, query, context):
+        """Раздел Лицензионный ключ"""
+        user_id = query.from_user.id
+        has_license = user_id in user_licenses
+
+        if has_license:
+            text = f"""
+🔑 **Лицензионный ключ**
+
+✅ У тебя уже есть лицензионный ключ!
+
+Выбери действие:
+"""
+            keyboard = [
+                [InlineKeyboardButton("👁 Показать мой ключ", callback_data="license_show")],
+                [InlineKeyboardButton("🔄 Сгенерировать новый", callback_data="license_generate")],
+                [InlineKeyboardButton("« Назад в меню", callback_data="menu_back")]
+            ]
+        else:
+            text = f"""
+🔑 **Лицензионный ключ**
+
+У тебя пока нет лицензионного ключа.
+
+Сгенерируй ключ для активации SheetGPT:
+"""
+            keyboard = [
+                [InlineKeyboardButton("🔐 Сгенерировать ключ", callback_data="license_generate")],
+                [InlineKeyboardButton("« Назад в меню", callback_data="menu_back")]
+            ]
+
+        await query.edit_message_text(
+            text,
+            parse_mode='Markdown',
+            reply_markup=InlineKeyboardMarkup(keyboard)
+        )
+
+    async def generate_license(self, query, context):
+        """Генерация лицензионного ключа"""
+        user_id = query.from_user.id
+
+        # Генерируем ключ формата XXXX-XXXX-XXXX-XXXX
+        key_parts = [secrets.token_hex(2).upper() for _ in range(4)]
+        license_key = '-'.join(key_parts)
+
+        user_licenses[user_id] = {
+            'key': license_key,
+            'created_at': datetime.now(),
+            'is_active': True
+        }
+
+        text = f"""
+🔑 **Твой лицензионный ключ**
+
+```
+{license_key}
+```
+
+📋 Скопируй этот ключ и вставь в настройках расширения SheetGPT.
+
+⚠️ Не передавай ключ третьим лицам!
+"""
+        await query.edit_message_text(
+            text,
+            parse_mode='Markdown',
+            reply_markup=self.get_back_button()
+        )
+
+    async def show_my_license(self, query):
+        """Показать текущий ключ"""
+        user_id = query.from_user.id
+
+        if user_id not in user_licenses:
+            text = "❌ У тебя нет лицензионного ключа."
+        else:
+            license_data = user_licenses[user_id]
+            key = license_data['key']
+            created = license_data['created_at'].strftime('%d.%m.%Y %H:%M')
+
+            text = f"""
+🔑 **Твой лицензионный ключ**
+
+```
+{key}
+```
+
+📅 Создан: {created}
+✅ Статус: Активен
+"""
+        await query.edit_message_text(
+            text,
+            parse_mode='Markdown',
+            reply_markup=self.get_back_button()
+        )
+
+    async def show_subscription(self, query):
+        """Раздел Подписка"""
+        user_id = query.from_user.id
+        # TODO: проверить статус подписки из БД
+        has_subscription = False  # Заглушка
+
+        if has_subscription:
+            text = """
+💳 **Подписка**
+
+✅ У тебя активная подписка **Premium**
+
+📅 Действует до: 01.02.2025
+🔄 Автопродление: Включено
+
+Что включено:
+• Безлимитные запросы
+• Приоритетная поддержка
+• Все будущие обновления
+"""
+            keyboard = [
+                [InlineKeyboardButton("❌ Отменить подписку", callback_data="sub_cancel")],
+                [InlineKeyboardButton("« Назад в меню", callback_data="menu_back")]
+            ]
+        else:
+            text = """
+💳 **Подписка**
+
+У тебя сейчас **Бесплатный** план.
+
+Лимиты бесплатного плана:
+• 10 запросов в день
+• Базовые функции
+
+Хочешь больше возможностей? Выбери тариф:
+"""
+            keyboard = [
+                [InlineKeyboardButton("📋 Посмотреть тарифы", callback_data="sub_plans")],
+                [InlineKeyboardButton("« Назад в меню", callback_data="menu_back")]
+            ]
+
+        await query.edit_message_text(
+            text,
+            parse_mode='Markdown',
+            reply_markup=InlineKeyboardMarkup(keyboard)
+        )
+
+    async def show_subscription_plans(self, query):
+        """Показать тарифные планы"""
+        text = """
+💳 **Тарифные планы**
+
+**🆓 Free** - Бесплатно
+• 10 запросов в день
+• Базовые формулы
+• Email поддержка
+
+**⭐ Starter** - $9/месяц
+• 200 запросов в день
+• Все типы анализа
+• Приоритетная поддержка
+
+**🚀 Pro** - $29/месяц
+• Безлимитные запросы
+• API доступ
+• Персональный менеджер
+
+👇 Для оплаты напиши в поддержку:
+"""
+        keyboard = [
+            [InlineKeyboardButton("💬 Написать в поддержку", url=SUPPORT_CHAT_URL)],
+            [InlineKeyboardButton("« Назад", callback_data="menu_subscription")]
+        ]
+        await query.edit_message_text(
+            text,
+            parse_mode='Markdown',
+            reply_markup=InlineKeyboardMarkup(keyboard)
+        )
+
+    async def cancel_subscription(self, query):
+        """Отмена подписки"""
+        text = """
+❌ **Отмена подписки**
+
+Ты уверен, что хочешь отменить подписку?
+
+После отмены:
+• Подписка будет активна до конца оплаченного периода
+• Затем аккаунт перейдёт на бесплатный план
+
+Для отмены напиши в поддержку.
+"""
+        keyboard = [
+            [InlineKeyboardButton("💬 Написать в поддержку", url=SUPPORT_CHAT_URL)],
+            [InlineKeyboardButton("« Назад", callback_data="menu_subscription")]
+        ]
+        await query.edit_message_text(
+            text,
+            parse_mode='Markdown',
+            reply_markup=InlineKeyboardMarkup(keyboard)
+        )
+
+    async def show_support(self, query):
+        """Раздел Поддержка"""
+        text = f"""
+🆘 **Поддержка**
+
+Нужна помощь? Мы всегда на связи!
+
+**Способы связи:**
+
+💬 **Чат поддержки** - для быстрых вопросов
+📧 **Email:** support@sheetgpt.ai
+📚 **FAQ** - в инструкции по установке
+
+**Время ответа:**
+• Чат: до 2 часов
+• Email: до 24 часов
+
+👇 Выбери способ связи:
+"""
+        keyboard = [
+            [InlineKeyboardButton("💬 Открыть чат поддержки", url=SUPPORT_CHAT_URL)],
+            [InlineKeyboardButton("📖 Читать FAQ", url=INSTALLATION_GUIDE_URL)],
+            [InlineKeyboardButton("« Назад в меню", callback_data="menu_back")]
+        ]
+        await query.edit_message_text(
+            text,
+            parse_mode='Markdown',
+            reply_markup=InlineKeyboardMarkup(keyboard)
+        )
+
+    async def show_reviews(self, query):
+        """Раздел Отзывы"""
+        # Считаем среднюю оценку
+        if user_reviews:
+            avg_rating = sum(r['rating'] for r in user_reviews) / len(user_reviews)
+            rating_stars = '⭐' * round(avg_rating)
+            stats = f"Средняя оценка: {rating_stars} ({avg_rating:.1f}/5)\nВсего отзывов: {len(user_reviews)}"
+        else:
+            stats = "Пока нет отзывов. Будь первым!"
+
+        text = f"""
+⭐ **Отзывы**
+
+{stats}
+
+Поделись своим мнением о SheetGPT!
+"""
+        keyboard = [
+            [InlineKeyboardButton("✍️ Оставить отзыв", callback_data="reviews_add")],
+            [InlineKeyboardButton("👀 Посмотреть отзывы", callback_data="reviews_view")],
+            [InlineKeyboardButton("« Назад в меню", callback_data="menu_back")]
+        ]
+        await query.edit_message_text(
+            text,
+            parse_mode='Markdown',
+            reply_markup=InlineKeyboardMarkup(keyboard)
+        )
+
+    async def start_review(self, query, context):
+        """Начать оставление отзыва - выбор оценки"""
+        text = """
+✍️ **Оставить отзыв**
+
+Выбери оценку:
+"""
+        keyboard = [
+            [
+                InlineKeyboardButton("1 ⭐", callback_data="rating_1"),
+                InlineKeyboardButton("2 ⭐", callback_data="rating_2"),
+                InlineKeyboardButton("3 ⭐", callback_data="rating_3"),
+                InlineKeyboardButton("4 ⭐", callback_data="rating_4"),
+                InlineKeyboardButton("5 ⭐", callback_data="rating_5"),
+            ],
+            [InlineKeyboardButton("« Отмена", callback_data="menu_reviews")]
+        ]
+        await query.edit_message_text(
+            text,
+            parse_mode='Markdown',
+            reply_markup=InlineKeyboardMarkup(keyboard)
+        )
+
+    async def save_rating(self, query, context, data):
+        """Сохранить оценку и попросить текст отзыва"""
+        rating = int(data.split('_')[1])
+        context.user_data['pending_rating'] = rating
+
+        text = f"""
+✍️ **Оставить отзыв**
+
+Твоя оценка: {'⭐' * rating}
+
+Теперь напиши текст отзыва (или отправь /skip чтобы пропустить):
+"""
+        await query.edit_message_text(text, parse_mode='Markdown')
+        context.user_data['waiting_review_text'] = True
+
+    async def handle_review_text(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Обработка текста отзыва"""
+        if not context.user_data.get('waiting_review_text'):
+            return False
+
+        user = update.effective_user
+        rating = context.user_data.get('pending_rating', 5)
+        text = update.message.text
+
+        if text == '/skip':
+            text = ''
+
+        # Сохраняем отзыв
+        review = {
+            'user_id': user.id,
+            'username': user.username or user.first_name,
+            'rating': rating,
+            'text': text,
+            'date': datetime.now()
+        }
+        user_reviews.append(review)
+
+        # Очищаем состояние
+        context.user_data.pop('waiting_review_text', None)
+        context.user_data.pop('pending_rating', None)
+
+        await update.message.reply_text(
+            f"✅ Спасибо за отзыв!\n\nТвоя оценка: {'⭐' * rating}",
+            reply_markup=self.get_back_button()
+        )
+        return True
+
+    async def view_reviews(self, query):
+        """Посмотреть отзывы"""
+        if not user_reviews:
+            text = "📭 Пока нет отзывов."
+        else:
+            # Показываем последние 5 отзывов
+            text = "👀 **Последние отзывы:**\n\n"
+            for review in user_reviews[-5:]:
+                stars = '⭐' * review['rating']
+                username = review['username'][:15]
+                date = review['date'].strftime('%d.%m.%Y')
+                review_text = review['text'][:100] + '...' if len(review['text']) > 100 else review['text']
+
+                text += f"**{username}** {stars}\n"
+                if review_text:
+                    text += f"_{review_text}_\n"
+                text += f"📅 {date}\n\n"
+
+        keyboard = [
+            [InlineKeyboardButton("« Назад", callback_data="menu_reviews")]
+        ]
+        await query.edit_message_text(
+            text,
+            parse_mode='Markdown',
+            reply_markup=InlineKeyboardMarkup(keyboard)
+        )
+
+    async def handle_message(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Обработка текстовых сообщений"""
+        # Сначала проверяем, ждём ли мы текст отзыва
+        if context.user_data.get('waiting_review_text'):
+            await self.handle_review_text(update, context)
+            return
+
+        # Иначе показываем меню
+        await update.message.reply_text(
+            "Используй меню для навигации 👇",
+            reply_markup=self.get_main_menu_keyboard()
+        )
 
     async def help_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Команда /help"""
-        help_text = """
-**Справка по SheetGPT Bot**
-
-**Поддерживаемые форматы:**
-- Excel (.xlsx, .xls)
-- CSV (.csv)
-
-**Типы запросов:**
-
-**Формулы:**
-- "Формула для суммы колонки B"
-- "VLOOKUP для поиска цены"
-
-**Анализ:**
-- "Сколько всего продаж"
-- "Средняя цена по категориям"
-- "Топ 10 клиентов"
-
-**Действия:**
-- "Выдели строки где цена > 1000"
-- "Отфильтруй данные по региону"
-
-**Советы:**
-- Первая строка файла должна содержать заголовки
-- Указывайте точные названия колонок
-- Можно задавать вопросы на русском языке
-"""
-        await update.message.reply_text(help_text, parse_mode='Markdown')
-
-    async def status_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """Команда /status"""
-        user_id = update.effective_user.id
-
-        # Проверяем, есть ли загруженные данные
-        has_data = user_id in user_data_store and user_data_store[user_id].get('df') is not None
-
-        status_text = f"""
-**Статус SheetGPT Bot**
-
-**Пользователь:** {update.effective_user.first_name}
-**Telegram ID:** {user_id}
-
-**Загруженные данные:** {'Да' if has_data else 'Нет'}
-"""
-        if has_data:
-            df = user_data_store[user_id]['df']
-            filename = user_data_store[user_id].get('filename', 'unknown')
-            status_text += f"""
-**Файл:** {filename}
-**Размер:** {len(df)} строк x {len(df.columns)} колонок
-**Колонки:** {', '.join(df.columns[:5])}{'...' if len(df.columns) > 5 else ''}
-"""
-
-        status_text += f"""
-**Время:** {datetime.now().strftime('%Y-%m-%d %H:%M')}
-"""
-        await update.message.reply_text(status_text, parse_mode='Markdown')
-
-    async def clear_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """Команда /clear - очистить данные"""
-        user_id = update.effective_user.id
-
-        if user_id in user_data_store:
-            del user_data_store[user_id]
-            await update.message.reply_text("Данные очищены. Загрузите новый файл.")
-        else:
-            await update.message.reply_text("У вас нет загруженных данных.")
-
-    async def handle_document(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """Обработка загруженного файла"""
-        user_id = update.effective_user.id
-        document = update.message.document
-        filename = document.file_name.lower()
-
-        # Проверяем формат файла
-        if not any(filename.endswith(ext) for ext in ['.xlsx', '.xls', '.csv']):
-            await update.message.reply_text(
-                "Неподдерживаемый формат файла.\n"
-                "Поддерживаются: .xlsx, .xls, .csv"
-            )
-            return
-
-        await update.message.reply_text("Загружаю файл...")
-
-        try:
-            # Скачиваем файл
-            file = await context.bot.get_file(document.file_id)
-            file_bytes = await file.download_as_bytearray()
-
-            # Читаем данные
-            if filename.endswith('.csv'):
-                # Пробуем разные кодировки
-                for encoding in ['utf-8', 'cp1251', 'latin1']:
-                    try:
-                        df = pd.read_csv(io.BytesIO(file_bytes), encoding=encoding)
-                        break
-                    except UnicodeDecodeError:
-                        continue
-                else:
-                    raise ValueError("Не удалось определить кодировку CSV файла")
-            else:
-                df = pd.read_excel(io.BytesIO(file_bytes))
-
-            # Проверяем данные
-            if df.empty:
-                await update.message.reply_text("Файл пустой или не содержит данных.")
-                return
-
-            # Сохраняем данные пользователя
-            user_data_store[user_id] = {
-                'df': df,
-                'filename': document.file_name,
-                'uploaded_at': datetime.now()
-            }
-
-            # Формируем ответ
-            columns_preview = ', '.join(df.columns[:8])
-            if len(df.columns) > 8:
-                columns_preview += f' и ещё {len(df.columns) - 8}'
-
-            preview_rows = min(3, len(df))
-            data_preview = df.head(preview_rows).to_string(index=False, max_colwidth=20)
-
-            response = f"""
-**Файл загружен!**
-
-**Файл:** {document.file_name}
-**Размер:** {len(df)} строк x {len(df.columns)} колонок
-
-**Колонки:**
-{columns_preview}
-
-**Превью данных:**
-```
-{data_preview}
-```
-
-Теперь задай вопрос по данным!
-Например: "Сумма по колонке Продажи" или "Топ 5 по выручке"
-"""
-            await update.message.reply_text(response, parse_mode='Markdown')
-
-        except Exception as e:
-            logger.error(f"Error processing file: {e}")
-            await update.message.reply_text(
-                f"Ошибка обработки файла:\n{str(e)}\n\n"
-                "Попробуйте другой файл или формат."
-            )
-
-    async def handle_message(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """Обработка текстового сообщения (запроса)"""
-        user_id = update.effective_user.id
-        query = update.message.text
-
-        # Проверяем, есть ли данные
-        if user_id not in user_data_store or user_data_store[user_id].get('df') is None:
-            await update.message.reply_text(
-                "Сначала загрузите Excel или CSV файл.\n"
-                "Просто отправьте файл в этот чат."
-            )
-            return
-
-        df = user_data_store[user_id]['df']
-
-        await update.message.reply_text("Обрабатываю запрос...")
-
-        try:
-            # Подготавливаем данные для API
-            column_names = df.columns.tolist()
-            sheet_data = df.values.tolist()
-
-            # Вызываем API
-            async with httpx.AsyncClient(timeout=60.0) as client:
-                response = await client.post(
-                    f"{API_URL}/api/v1/formula",
-                    json={
-                        "query": query,
-                        "column_names": column_names,
-                        "sheet_data": sheet_data
-                    }
-                )
-
-                if response.status_code != 200:
-                    error_detail = response.json().get('detail', {})
-                    user_message = error_detail.get('user_message', 'Ошибка обработки')
-                    await update.message.reply_text(f"Ошибка: {user_message}")
-                    return
-
-                result = response.json()
-
-            # Формируем ответ
-            response_text = self.format_response(result)
-            await update.message.reply_text(response_text, parse_mode='Markdown')
-
-        except httpx.TimeoutException:
-            await update.message.reply_text(
-                "Превышено время ожидания.\n"
-                "Попробуйте упростить запрос или уменьшить объём данных."
-            )
-        except Exception as e:
-            logger.error(f"Error processing query: {e}")
-            await update.message.reply_text(
-                f"Ошибка обработки:\n{str(e)}"
-            )
-
-    def format_response(self, result: dict) -> str:
-        """Форматирование ответа API для Telegram"""
-        parts = []
-
-        # Summary (основной результат)
-        if result.get('summary'):
-            parts.append(f"**Результат:**\n{result['summary']}")
-
-        # Формула
-        if result.get('formula'):
-            parts.append(f"**Формула:**\n`{result['formula']}`")
-
-        # Explanation
-        if result.get('explanation'):
-            parts.append(f"**Пояснение:**\n{result['explanation']}")
-
-        # Key findings
-        if result.get('key_findings'):
-            findings = '\n'.join(f"- {f}" for f in result['key_findings'][:5])
-            parts.append(f"**Ключевые находки:**\n{findings}")
-
-        # Methodology
-        if result.get('methodology'):
-            parts.append(f"**Методология:**\n{result['methodology']}")
-
-        # Highlighting info
-        if result.get('highlight_rows'):
-            rows = result['highlight_rows']
-            color = result.get('highlight_color', 'yellow')
-            parts.append(f"**Подсветка:** {len(rows)} строк ({color})")
-
-        # Structured data (таблицы)
-        if result.get('structured_data'):
-            data = result['structured_data']
-            if data.get('rows') and len(data['rows']) <= 10:
-                table_preview = self.format_table(data)
-                parts.append(f"**Данные:**\n```\n{table_preview}\n```")
-
-        # Function used (для отладки)
-        if result.get('function_used'):
-            parts.append(f"_Функция: {result['function_used']}_")
-
-        return '\n\n'.join(parts) if parts else "Запрос обработан"
-
-    def format_table(self, structured_data: dict) -> str:
-        """Форматирование таблицы для Telegram"""
-        headers = structured_data.get('headers', [])
-        rows = structured_data.get('rows', [])
-
-        if not headers or not rows:
-            return "Нет данных"
-
-        # Ограничиваем ширину колонок
-        max_col_width = 15
-
-        # Форматируем заголовки
-        header_line = ' | '.join(str(h)[:max_col_width].ljust(max_col_width) for h in headers)
-        separator = '-' * len(header_line)
-
-        # Форматируем строки
-        row_lines = []
-        for row in rows[:10]:  # Максимум 10 строк
-            row_str = ' | '.join(str(cell)[:max_col_width].ljust(max_col_width) for cell in row)
-            row_lines.append(row_str)
-
-        return f"{header_line}\n{separator}\n" + '\n'.join(row_lines)
-
-    async def admin_broadcast(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """Команда /broadcast - рассылка (только для админа)"""
-        if update.effective_user.id != self.admin_id:
-            await update.message.reply_text("Эта команда доступна только администратору.")
-            return
-
-        if not context.args:
-            await update.message.reply_text("Использование: /broadcast <сообщение>")
-            return
-
-        message = ' '.join(context.args)
-        await update.message.reply_text(f"Рассылка (MVP - только лог):\n{message}")
+        await update.message.reply_text(
+            "Нажми /start для открытия главного меню",
+            reply_markup=self.get_main_menu_keyboard()
+        )
 
     async def admin_stats(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Команда /stats - статистика (только для админа)"""
@@ -373,18 +571,23 @@ class SheetGPTBot:
             await update.message.reply_text("Эта команда доступна только администратору.")
             return
 
-        active_users = len(user_data_store)
-        stats_text = f"""
-**Статистика бота**
+        total_licenses = len(user_licenses)
+        total_reviews = len(user_reviews)
+        avg_rating = sum(r['rating'] for r in user_reviews) / len(user_reviews) if user_reviews else 0
 
-Активных сессий: {active_users}
-Время: {datetime.now().strftime('%Y-%m-%d %H:%M')}
+        stats_text = f"""
+📊 **Статистика бота**
+
+🔑 Выдано лицензий: {total_licenses}
+⭐ Всего отзывов: {total_reviews}
+📈 Средняя оценка: {avg_rating:.1f}/5
+⏰ Время: {datetime.now().strftime('%Y-%m-%d %H:%M')}
 """
         await update.message.reply_text(stats_text, parse_mode='Markdown')
 
     def run(self):
         """Запуск бота"""
-        logger.info("Starting SheetGPT Telegram Bot...")
+        logger.info("Starting SheetGPT Telegram Bot v2.0...")
 
         # Создаем приложение
         self.application = Application.builder().token(self.token).build()
@@ -392,29 +595,26 @@ class SheetGPTBot:
         # Регистрируем обработчики
         self.application.add_handler(CommandHandler("start", self.start))
         self.application.add_handler(CommandHandler("help", self.help_command))
-        self.application.add_handler(CommandHandler("status", self.status_command))
-        self.application.add_handler(CommandHandler("clear", self.clear_command))
-        self.application.add_handler(CommandHandler("broadcast", self.admin_broadcast))
         self.application.add_handler(CommandHandler("stats", self.admin_stats))
 
-        # Обработчик файлов
-        self.application.add_handler(MessageHandler(filters.Document.ALL, self.handle_document))
+        # Обработчик callback-кнопок
+        self.application.add_handler(CallbackQueryHandler(self.menu_callback))
 
         # Обработчик текстовых сообщений
         self.application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, self.handle_message))
 
-        # Создаём event loop для потока (нужно при запуске из отдельного потока)
+        # Создаём event loop для потока
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
 
-        # Запускаем бота (stop_signals=None - отключаем signal handlers для работы в отдельном потоке)
+        # Запускаем бота
         logger.info("Bot is running...")
         self.application.run_polling(allowed_updates=Update.ALL_TYPES, stop_signals=None)
 
 
 def main():
     """Точка входа"""
-    from app.core.config import settings
+    from app.config import settings
 
     token = settings.TELEGRAM_BOT_TOKEN
     admin_id = settings.TELEGRAM_ADMIN_ID
