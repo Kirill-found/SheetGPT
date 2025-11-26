@@ -219,7 +219,25 @@ CRITICAL DECISION LOGIC:
 RULES FOR CODE GENERATION:
 10. For Russian names/surnames: use partial matching with .str.contains() to handle different word forms
 11. Example: "Капустина" should match "Капустин", "Шилова" matches "Шилов"
+12. CRITICAL FOR RUSSIAN GRAMMAR - Strip case endings from search terms:
+    - "Петрова" (genitive) → search for "Петров" (nominative)
+    - "Иванову" (dative) → search for "Иванов"
+    - "а Петрова?" means "what about Petrov?" - extract "Петров" not "Петрова"!
+    - Always remove trailing: 'а', 'у', 'ом', 'ой', 'е', 'ы', 'ов' before searching
+    - Use the ROOT of the name (first 5-6 chars) for flexible matching
 
+EXAMPLE for "а Петрова?":
+```python
+# Extract name root - remove Russian case endings
+search_name = "Петрова"  # from query
+# Strip common endings
+for ending in ['ова', 'ова', 'ева', 'ина', 'а', 'у', 'ом', 'ой', 'е', 'ы']:
+    if search_name.lower().endswith(ending) and len(search_name) > len(ending) + 2:
+        search_name = search_name[:-len(ending)]
+        break
+# search_name is now "Петр" or "Петров" - will match "Петров" in data
+result = df[df['Менеджер'].str.contains(search_name, case=False, na=False)]
+```
 
 1. Use pandas for all data operations
 2. Variable 'df' contains the data
@@ -1010,7 +1028,13 @@ Generate CORRECTED code that will work. Return ONLY the Python code."""
         if not name and query_lower.startswith('а '):
             parts = query.split()
             if len(parts) >= 2:
-                name = parts[1].rstrip('?').capitalize()
+                raw_name = parts[1].rstrip('?')
+                # Strip Russian case endings
+                for ending in ['ова', 'ева', 'ина', 'а', 'у', 'ом', 'ой', 'е', 'ы']:
+                    if raw_name.lower().endswith(ending) and len(raw_name) > len(ending) + 2:
+                        raw_name = raw_name[:-len(ending)]
+                        break
+                name = raw_name.capitalize()
 
         # Пытаемся посчитать сумму из result
         total_sum = None
