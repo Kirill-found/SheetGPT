@@ -16,6 +16,9 @@ from openai import AsyncOpenAI
 import ast
 import traceback
 import re
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class PandasCodeGenerator:
@@ -154,7 +157,7 @@ result = df.sort_values('Дата').assign(Накопительная_сумма
             except Exception as e:
                 last_error = f"{type(e).__name__}: {str(e)}"
                 if attempt < max_retries:
-                    print(f"[PANDAS_GENERATOR] Attempt {attempt + 1} failed: {last_error}")
+                    logger.warning(f"[PANDAS_GENERATOR] Attempt {attempt + 1} failed: {last_error}")
                     continue
 
         return {
@@ -185,6 +188,12 @@ result = df.sort_values('Дата').assign(Накопительная_сумма
 """
 
         try:
+            if not self.client:
+                logger.error("[PANDAS_GENERATOR] ❌ OpenAI client is None!")
+                return None
+
+            logger.info(f"[PANDAS_GENERATOR] Generating code for: {query[:50]}...")
+
             response = await self.client.chat.completions.create(
                 model="gpt-4o",
                 messages=[
@@ -196,20 +205,26 @@ result = df.sort_values('Дата').assign(Накопительная_сумма
             )
 
             content = response.choices[0].message.content
+            logger.info(f"[PANDAS_GENERATOR] GPT response length: {len(content)} chars")
 
             # Извлекаем код из markdown блока
             code_match = re.search(r'```python\s*(.*?)\s*```', content, re.DOTALL)
             if code_match:
-                return code_match.group(1).strip()
+                code = code_match.group(1).strip()
+                logger.info(f"[PANDAS_GENERATOR] ✅ Extracted code: {len(code)} chars")
+                return code
 
             # Если нет markdown блока, пробуем взять весь ответ
             if 'result' in content and '=' in content:
+                logger.info("[PANDAS_GENERATOR] ✅ Using raw content as code")
                 return content.strip()
 
+            logger.warning(f"[PANDAS_GENERATOR] ⚠️ No code found in response: {content[:200]}...")
             return None
 
         except Exception as e:
-            print(f"[PANDAS_GENERATOR] Code generation error: {e}")
+            logger.error(f"[PANDAS_GENERATOR] ❌ Code generation error: {type(e).__name__}: {e}")
+            logger.error(traceback.format_exc())
             return None
 
     def _validate_code_safety(self, code: str) -> tuple[bool, Optional[str]]:
