@@ -8,6 +8,7 @@ Telegram бот для работы с SheetGPT API.
 import logging
 import os
 import io
+import asyncio
 import pandas as pd
 from datetime import datetime
 
@@ -401,6 +402,10 @@ class SheetGPTBot:
 
         # Обработчик текстовых сообщений
         self.application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, self.handle_message))
+
+        # Создаём event loop для потока (нужно при запуске из отдельного потока)
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
 
         # Запускаем бота
         logger.info("Bot is running...")
