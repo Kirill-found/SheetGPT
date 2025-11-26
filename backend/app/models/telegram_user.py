@@ -23,6 +23,9 @@ class TelegramUser(Base):
     # API токен для аутентификации
     api_token = Column(String(64), unique=True, nullable=False, index=True)
 
+    # Лицензионный ключ для Chrome Extension (формат: XXXX-XXXX-XXXX-XXXX)
+    license_key = Column(String(19), unique=True, nullable=True, index=True)
+
     # Подписка и лимиты
     subscription_tier = Column(String(20), default="free")  # free, premium
     is_active = Column(Boolean, default=True)
@@ -44,6 +47,12 @@ class TelegramUser(Base):
     def generate_api_token():
         """Генерация уникального API токена"""
         return secrets.token_urlsafe(48)
+
+    @staticmethod
+    def generate_license_key():
+        """Генерация лицензионного ключа формата XXXX-XXXX-XXXX-XXXX"""
+        parts = [secrets.token_hex(2).upper() for _ in range(4)]
+        return '-'.join(parts)
 
     def can_make_query(self) -> bool:
         """Проверка возможности сделать запрос"""

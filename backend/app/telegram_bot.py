@@ -37,8 +37,7 @@ API_URL = os.getenv("SHEETGPT_API_URL", "http://localhost:8000")
 
 # Хранилище данных (в памяти для MVP)
 user_data_store = {}
-user_licenses = {}  # user_id -> license_key
-user_reviews = []   # [{user_id, username, rating, text, date}]
+user_reviews = []   # [{user_id, username, rating, text, date}] - TODO: переместить в БД
 
 # Состояния для ConversationHandler
 WAITING_REVIEW_RATING, WAITING_REVIEW_TEXT, WAITING_SUPPORT_MESSAGE = range(3)
@@ -194,9 +193,20 @@ SheetGPT работает как расширение для Google Chrome, ко
         )
 
     async def show_license(self, query, context):
-        """Раздел Лицензионный ключ"""
+        """Раздел Лицензионный ключ - проверяем через API"""
         user_id = query.from_user.id
-        has_license = user_id in user_licenses
+        has_license = False
+
+        try:
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                response = await client.get(
+                    f"{API_URL}/api/v1/telegram/license/user/{user_id}"
+                )
+                if response.status_code == 200:
+                    data = response.json()
+                    has_license = data.get('success', False) and data.get('license_key')
+        except Exception as e:
+            logger.error(f"Error checking license: {e}")
 
         if has_license:
             text = f"""
@@ -231,20 +241,27 @@ SheetGPT работает как расширение для Google Chrome, ко
         )
 
     async def generate_license(self, query, context):
-        """Генерация лицензионного ключа"""
-        user_id = query.from_user.id
+        """Генерация лицензионного ключа через API"""
+        user = query.from_user
+        user_id = user.id
 
-        # Генерируем ключ формата XXXX-XXXX-XXXX-XXXX
-        key_parts = [secrets.token_hex(2).upper() for _ in range(4)]
-        license_key = '-'.join(key_parts)
+        try:
+            # Вызываем API для генерации ключа
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                response = await client.post(
+                    f"{API_URL}/api/v1/telegram/license/generate",
+                    json={
+                        "telegram_user_id": user_id,
+                        "username": user.username,
+                        "first_name": user.first_name
+                    }
+                )
 
-        user_licenses[user_id] = {
-            'key': license_key,
-            'created_at': datetime.now(),
-            'is_active': True
-        }
+                if response.status_code == 200:
+                    data = response.json()
+                    license_key = data.get('license_key')
 
-        text = f"""
+                    text = f"""
 🔑 **Твой лицензионный ключ**
 
 ```
@@ -255,6 +272,13 @@ SheetGPT работает как расширение для Google Chrome, ко
 
 ⚠️ Не передавай ключ третьим лицам!
 """
+                else:
+                    text = "❌ Ошибка генерации ключа. Попробуйте позже."
+
+        except Exception as e:
+            logger.error(f"Error generating license: {e}")
+            text = f"❌ Ошибка: {str(e)}"
+
         await query.edit_message_text(
             text,
             parse_mode='Markdown',
@@ -262,26 +286,40 @@ SheetGPT работает как расширение для Google Chrome, ко
         )
 
     async def show_my_license(self, query):
-        """Показать текущий ключ"""
+        """Показать текущий ключ через API"""
         user_id = query.from_user.id
 
-        if user_id not in user_licenses:
-            text = "❌ У тебя нет лицензионного ключа."
-        else:
-            license_data = user_licenses[user_id]
-            key = license_data['key']
-            created = license_data['created_at'].strftime('%d.%m.%Y %H:%M')
+        try:
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                response = await client.get(
+                    f"{API_URL}/api/v1/telegram/license/user/{user_id}"
+                )
 
-            text = f"""
+                if response.status_code == 200:
+                    data = response.json()
+                    if data.get('success') and data.get('license_key'):
+                        license_key = data['license_key']
+                        tier = data.get('subscription_tier', 'free')
+
+                        text = f"""
 🔑 **Твой лицензионный ключ**
 
 ```
-{key}
+{license_key}
 ```
 
-📅 Создан: {created}
+📊 Тариф: {tier.capitalize()}
 ✅ Статус: Активен
 """
+                    else:
+                        text = "❌ У тебя нет лицензионного ключа. Нажми 'Сгенерировать ключ'."
+                else:
+                    text = "❌ Ошибка получения ключа."
+
+        except Exception as e:
+            logger.error(f"Error getting license: {e}")
+            text = f"❌ Ошибка: {str(e)}"
+
         await query.edit_message_text(
             text,
             parse_mode='Markdown',
@@ -571,17 +609,17 @@ SheetGPT работает как расширение для Google Chrome, ко
             await update.message.reply_text("Эта команда доступна только администратору.")
             return
 
-        total_licenses = len(user_licenses)
         total_reviews = len(user_reviews)
         avg_rating = sum(r['rating'] for r in user_reviews) / len(user_reviews) if user_reviews else 0
 
         stats_text = f"""
 📊 **Статистика бота**
 
-🔑 Выдано лицензий: {total_licenses}
 ⭐ Всего отзывов: {total_reviews}
 📈 Средняя оценка: {avg_rating:.1f}/5
 ⏰ Время: {datetime.now().strftime('%Y-%m-%d %H:%M')}
+
+💡 Лицензии теперь хранятся в БД - используй /api/v1/telegram для статистики
 """
         await update.message.reply_text(stats_text, parse_mode='Markdown')
 

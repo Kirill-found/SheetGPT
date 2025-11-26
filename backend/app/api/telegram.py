@@ -305,6 +305,147 @@ async def reset_daily_limits(
     }
 
 
+# ==================== LICENSE ENDPOINTS ====================
+
+class LicenseGenerateRequest(BaseModel):
+    telegram_user_id: int
+    username: Optional[str] = None
+    first_name: Optional[str] = None
+
+
+class LicenseResponse(BaseModel):
+    success: bool
+    license_key: Optional[str] = None
+    message: str
+    telegram_user_id: Optional[int] = None
+    subscription_tier: Optional[str] = None
+
+
+@router.post("/license/generate", response_model=LicenseResponse)
+async def generate_license_key(
+    request: LicenseGenerateRequest,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Генерация лицензионного ключа для пользователя.
+    Вызывается из Telegram бота при нажатии "Сгенерировать ключ".
+    """
+    logger.info(f"Generating license for user: {request.telegram_user_id}")
+
+    # Ищем или создаём пользователя
+    result = await db.execute(
+        select(TelegramUser).where(TelegramUser.telegram_user_id == request.telegram_user_id)
+    )
+    user = result.scalar_one_or_none()
+
+    if not user:
+        # Создаём нового пользователя
+        user = TelegramUser(
+            telegram_user_id=request.telegram_user_id,
+            username=request.username,
+            first_name=request.first_name,
+            api_token=TelegramUser.generate_api_token(),
+            license_key=TelegramUser.generate_license_key(),
+            subscription_tier="free",
+            queries_used_today=0,
+            queries_limit=10,
+            total_queries=0,
+            is_active=True
+        )
+        db.add(user)
+        await db.commit()
+        await db.refresh(user)
+        logger.info(f"Created new user with license: {user.license_key}")
+    else:
+        # Генерируем новый ключ для существующего пользователя
+        user.license_key = TelegramUser.generate_license_key()
+        user.updated_at = datetime.now(timezone.utc)
+        await db.commit()
+        await db.refresh(user)
+        logger.info(f"Updated license for user: {user.license_key}")
+
+    return LicenseResponse(
+        success=True,
+        license_key=user.license_key,
+        message="License key generated successfully",
+        telegram_user_id=user.telegram_user_id,
+        subscription_tier=user.subscription_tier
+    )
+
+
+@router.get("/license/validate/{license_key}", response_model=LicenseResponse)
+async def validate_license_key(
+    license_key: str,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Проверка лицензионного ключа.
+    Вызывается из Chrome Extension при активации.
+    """
+    logger.info(f"Validating license: {license_key}")
+
+    # Нормализуем ключ (убираем пробелы, приводим к верхнему регистру)
+    license_key = license_key.strip().upper()
+
+    result = await db.execute(
+        select(TelegramUser).where(TelegramUser.license_key == license_key)
+    )
+    user = result.scalar_one_or_none()
+
+    if not user:
+        logger.warning(f"License not found: {license_key}")
+        return LicenseResponse(
+            success=False,
+            license_key=license_key,
+            message="License key not found"
+        )
+
+    if not user.is_active:
+        logger.warning(f"License inactive: {license_key}")
+        return LicenseResponse(
+            success=False,
+            license_key=license_key,
+            message="License key is inactive"
+        )
+
+    logger.info(f"License valid: {license_key} for user {user.telegram_user_id}")
+    return LicenseResponse(
+        success=True,
+        license_key=license_key,
+        message="License key is valid",
+        telegram_user_id=user.telegram_user_id,
+        subscription_tier=user.subscription_tier
+    )
+
+
+@router.get("/license/user/{telegram_user_id}", response_model=LicenseResponse)
+async def get_user_license(
+    telegram_user_id: int,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Получить лицензионный ключ пользователя по telegram_user_id.
+    """
+    result = await db.execute(
+        select(TelegramUser).where(TelegramUser.telegram_user_id == telegram_user_id)
+    )
+    user = result.scalar_one_or_none()
+
+    if not user or not user.license_key:
+        return LicenseResponse(
+            success=False,
+            message="No license found for this user"
+        )
+
+    return LicenseResponse(
+        success=True,
+        license_key=user.license_key,
+        message="License found",
+        telegram_user_id=user.telegram_user_id,
+        subscription_tier=user.subscription_tier
+    )
+
+
 @router.get("/test-db")
 async def test_database_connection(db: AsyncSession = Depends(get_db)):
     """
