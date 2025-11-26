@@ -511,3 +511,51 @@ async def init_telegram_database(
             "error": str(e),
             "traceback": traceback.format_exc()
         }
+
+
+@router.post("/migrate-license-key")
+async def migrate_license_key_column(
+    admin_key: str = Header(...),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Добавить колонку license_key в таблицу telegram_users
+    (Миграция для существующей таблицы)
+    """
+    if admin_key != "sheetgpt_admin_2025":
+        raise HTTPException(status_code=403, detail="Invalid admin key")
+
+    try:
+        from sqlalchemy import text
+
+        # Добавляем колонку если её нет
+        await db.execute(text("""
+            ALTER TABLE telegram_users
+            ADD COLUMN IF NOT EXISTS license_key VARCHAR(19) UNIQUE
+        """))
+        await db.commit()
+
+        # Создаём индекс
+        try:
+            await db.execute(text("""
+                CREATE INDEX IF NOT EXISTS ix_telegram_users_license_key
+                ON telegram_users(license_key)
+            """))
+            await db.commit()
+        except Exception:
+            pass  # Индекс уже существует
+
+        logger.info("license_key column added successfully")
+
+        return {
+            "success": True,
+            "message": "license_key column added successfully"
+        }
+    except Exception as e:
+        logger.error(f"Failed to add license_key column: {e}")
+        import traceback
+        return {
+            "success": False,
+            "error": str(e),
+            "traceback": traceback.format_exc()
+        }
