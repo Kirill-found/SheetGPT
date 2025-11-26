@@ -132,10 +132,19 @@ async function handleActivation() {
     if (isValid) {
       input.classList.add('success');
       btn.textContent = 'Успешно!';
+      console.log('[Sidebar] License valid, hiding overlay in 500ms...');
 
       // Hide overlay after short delay
       setTimeout(() => {
-        hideLicenseOverlay();
+        console.log('[Sidebar] Hiding license overlay now');
+        const overlay = document.getElementById('licenseOverlay');
+        if (overlay) {
+          overlay.style.display = 'none';
+          overlay.classList.add('hidden');
+          console.log('[Sidebar] ✅ Overlay hidden');
+        } else {
+          console.error('[Sidebar] ❌ licenseOverlay element not found!');
+        }
       }, 500);
     } else {
       input.classList.add('error');
