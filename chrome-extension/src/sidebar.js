@@ -525,7 +525,9 @@ let isProcessing = false;
 
           // КРИТИЧНО: Проверяем operation_type и display_mode чтобы определить куда отправлять данные
           const isSplitOperation = result.structured_data.operation_type === 'split';
-          const displayMode = result.structured_data.display_mode || 'create_sheet'; // v7.8.14: default to create_sheet
+          // v9.0.0: По умолчанию показываем в sidebar, создаём лист только для больших таблиц (>50 строк)
+          const rowCount = result.structured_data.rows ? result.structured_data.rows.length : 0;
+          const displayMode = result.structured_data.display_mode || (rowCount > 50 ? 'create_sheet' : 'sidebar_only');
 
           if (isSplitOperation) {
             // SPLIT OPERATION: заменяем данные в ТЕКУЩЕМ листе
