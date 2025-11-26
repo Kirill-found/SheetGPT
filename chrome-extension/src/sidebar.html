@@ -1883,6 +1883,70 @@
         <li class="dropdown-empty">История пуста</li>
       </ul>
     </div>
+
+    <!-- Settings Dropdown -->
+    <div id="settingsDropdown" class="dropdown" style="width: 260px;">
+      <!-- User Info -->
+      <div style="padding: var(--space-4); border-bottom: 1px solid var(--border-subtle);">
+        <div style="display: flex; align-items: center; gap: var(--space-3); margin-bottom: var(--space-3);">
+          <div style="width: 36px; height: 36px; background: var(--surface-1); border-radius: var(--radius-full); display: flex; align-items: center; justify-content: center; font-weight: 600; color: var(--ink-secondary);">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 18px; height: 18px;">
+              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+              <circle cx="12" cy="7" r="4"/>
+            </svg>
+          </div>
+          <div style="flex: 1; min-width: 0;">
+            <div id="userEmail" style="font-size: 13px; font-weight: 500; color: var(--ink-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">user@example.com</div>
+            <span id="planBadge" style="display: inline-block; font-family: 'JetBrains Mono', monospace; font-size: 10px; font-weight: 600; padding: 2px 6px; background: var(--surface-2); border-radius: var(--radius-sm); color: var(--ink-tertiary);">FREE</span>
+          </div>
+        </div>
+
+        <!-- Usage Bar -->
+        <div style="margin-top: var(--space-2);">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-1);">
+            <span style="font-size: 11px; color: var(--ink-tertiary);">Запросов:</span>
+            <span id="usageCount" style="font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 600; color: var(--ink-primary);">0 / 10</span>
+          </div>
+          <div style="height: 4px; background: var(--surface-2); border-radius: var(--radius-full); overflow: hidden;">
+            <div id="usageBarFill" style="height: 100%; width: 0%; background: var(--accent-primary); border-radius: var(--radius-full); transition: width 0.3s ease;"></div>
+          </div>
+          <div id="usageReset" style="font-size: 10px; color: var(--ink-tertiary); margin-top: var(--space-1);">Обновление: завтра</div>
+        </div>
+      </div>
+
+      <!-- Menu Items -->
+      <ul class="dropdown-list" style="max-height: none;">
+        <li class="dropdown-item" id="personalizeBtn" style="display: flex; align-items: center; gap: var(--space-3);">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 18px; height: 18px; color: var(--ink-tertiary);">
+            <path d="M12 20h9"/>
+            <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/>
+          </svg>
+          <span style="font-size: 13px;">Персонализация</span>
+        </li>
+        <li class="dropdown-item" id="historyMenuBtn" style="display: flex; align-items: center; gap: var(--space-3);">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 18px; height: 18px; color: var(--ink-tertiary);">
+            <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
+            <path d="M3 3v5h5"/>
+            <path d="M12 7v5l4 2"/>
+          </svg>
+          <span style="font-size: 13px;">История</span>
+        </li>
+        <li class="dropdown-item" id="upgradeBtn" style="display: flex; align-items: center; gap: var(--space-3); color: var(--accent-primary);">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 18px; height: 18px;">
+            <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+          </svg>
+          <span style="font-size: 13px; font-weight: 600;">Unlimited</span>
+        </li>
+        <li class="dropdown-item" id="logoutBtn" style="display: flex; align-items: center; gap: var(--space-3); border-top: 1px solid var(--border-subtle); margin-top: var(--space-2); padding-top: var(--space-3);">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 18px; height: 18px; color: var(--data-error);">
+            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+            <polyline points="16 17 21 12 16 7"/>
+            <line x1="21" y1="12" x2="9" y2="12"/>
+          </svg>
+          <span style="font-size: 13px; color: var(--data-error);">Выйти</span>
+        </li>
+      </ul>
+    </div>
   </header>
 
   <!-- Chat Container -->
@@ -2004,6 +2068,99 @@
     </div>
   </footer>
 
+  <!-- Personalize Modal -->
+  <div id="personalizeModal" class="modal-overlay">
+    <div class="modal-content">
+      <div class="modal-header">
+        <div class="modal-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 20h9"/>
+            <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/>
+          </svg>
+        </div>
+        <h2 class="modal-title">Персонализация</h2>
+      </div>
+      <div class="modal-section">
+        <label class="modal-label">Контекст для AI</label>
+        <p class="modal-description">
+          Опишите вашу роль и предпочтения для более точных ответов.
+        </p>
+        <textarea
+          id="customContextInput"
+          class="modal-textarea"
+          placeholder="Например: Я финансовый аналитик, работаю с данными продаж..."
+          maxlength="500"
+        ></textarea>
+        <div class="char-counter">
+          <span id="charCount">0</span> / 500
+        </div>
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-secondary" id="cancelPersonalizeBtn">Отмена</button>
+        <button class="btn btn-primary" id="savePersonalizeBtn">Сохранить</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Upgrade Modal -->
+  <div id="upgradeModal" class="modal-overlay">
+    <div class="modal-content">
+      <div class="modal-header">
+        <div class="modal-icon" style="background: rgba(132, 204, 22, 0.15); color: var(--accent-primary);">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+          </svg>
+        </div>
+        <h2 class="modal-title">SheetGPT Unlimited</h2>
+      </div>
+
+      <div style="text-align: center; padding: var(--space-4) 0;">
+        <div style="font-size: 36px; font-weight: 800; color: var(--ink-primary);">
+          299 ₽<span style="font-size: 14px; font-weight: 500; color: var(--ink-tertiary);">/месяц</span>
+        </div>
+        <div style="font-size: 13px; color: var(--ink-secondary); margin-top: var(--space-2);">
+          Безлимитные запросы
+        </div>
+      </div>
+
+      <ul style="list-style: none; padding: 0; margin: var(--space-4) 0;">
+        <li style="display: flex; align-items: center; gap: var(--space-3); padding: var(--space-2) 0; font-size: 13px; color: var(--ink-primary);">
+          <svg viewBox="0 0 24 24" fill="none" stroke="var(--data-success)" stroke-width="2.5" style="width: 16px; height: 16px; flex-shrink: 0;">
+            <polyline points="20 6 9 17 4 12"/>
+          </svg>
+          Неограниченные запросы
+        </li>
+        <li style="display: flex; align-items: center; gap: var(--space-3); padding: var(--space-2) 0; font-size: 13px; color: var(--ink-primary);">
+          <svg viewBox="0 0 24 24" fill="none" stroke="var(--data-success)" stroke-width="2.5" style="width: 16px; height: 16px; flex-shrink: 0;">
+            <polyline points="20 6 9 17 4 12"/>
+          </svg>
+          Генерация таблиц из AI
+        </li>
+        <li style="display: flex; align-items: center; gap: var(--space-3); padding: var(--space-2) 0; font-size: 13px; color: var(--ink-primary);">
+          <svg viewBox="0 0 24 24" fill="none" stroke="var(--data-success)" stroke-width="2.5" style="width: 16px; height: 16px; flex-shrink: 0;">
+            <polyline points="20 6 9 17 4 12"/>
+          </svg>
+          Приоритетная поддержка
+        </li>
+        <li style="display: flex; align-items: center; gap: var(--space-3); padding: var(--space-2) 0; font-size: 13px; color: var(--ink-primary);">
+          <svg viewBox="0 0 24 24" fill="none" stroke="var(--data-success)" stroke-width="2.5" style="width: 16px; height: 16px; flex-shrink: 0;">
+            <polyline points="20 6 9 17 4 12"/>
+          </svg>
+          Сложные аналитические запросы
+        </li>
+      </ul>
+
+      <div class="modal-actions" style="flex-direction: column; gap: var(--space-3);">
+        <button class="btn btn-primary" id="purchaseBtn" style="width: 100%; justify-content: center;">
+          Оформить подписку
+        </button>
+        <button class="btn btn-secondary" id="closeUpgradeModal" style="width: 100%; justify-content: center;">
+          Позже
+        </button>
+      </div>
+    </div>
+  </div>
+
   <!-- Settings Modal -->
   <div id="settingsModal" class="modal-overlay">
     <div class="modal-content">
@@ -2046,6 +2203,7 @@
   </div>
 
   <script src="response-templates.js"></script>
+  <script src="settings-menu.js"></script>
   <script src="sidebar.js"></script>
 </body>
 </html>
