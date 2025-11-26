@@ -605,6 +605,12 @@ let isProcessing = false;
             // TABLE/CHART OPERATION: создаём НОВЫЙ лист
             console.log('[UI] TABLE/CHART OPERATION: Creating new sheet');
 
+            // v9.0.1: Debug logging before calling createTableAndChart
+            console.log('[UI] Calling createTableAndChart with:', result.structured_data);
+            console.log('[UI] structured_data keys:', result.structured_data ? Object.keys(result.structured_data) : 'null');
+            console.log('[UI] headers:', result.structured_data?.headers);
+            console.log('[UI] rows count:', result.structured_data?.rows?.length);
+
             google.script.run
               .withSuccessHandler(function(tableResult) {
                 console.log('[UI] Table success handler:', tableResult);

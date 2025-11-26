@@ -594,11 +594,24 @@ async function insertFormula(formula, targetCell) {
 }
 
 async function createTableAndChart(structuredData) {
-  console.log('[SheetGPT] Create table and chart:', structuredData);
+  console.log('[SheetGPT] Create table and chart called');
+  console.log('[SheetGPT] structuredData:', JSON.stringify(structuredData, null, 2));
 
   try {
+    // Validate input
+    if (!structuredData) {
+      throw new Error('structuredData is null or undefined');
+    }
+
+    console.log('[SheetGPT] structuredData keys:', Object.keys(structuredData));
+    console.log('[SheetGPT] headers:', structuredData.headers);
+    console.log('[SheetGPT] rows:', structuredData.rows);
+    console.log('[SheetGPT] rows count:', structuredData.rows?.length);
+
     // Convert structured data to 2D array
     const values = convertStructuredDataToValues(structuredData);
+    console.log('[SheetGPT] Converted values:', values);
+    console.log('[SheetGPT] Values length:', values.length);
 
     // Generate sheet title
     const timestamp = new Date().toLocaleString('ru-RU', {
