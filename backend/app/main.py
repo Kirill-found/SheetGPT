@@ -58,13 +58,14 @@ def start_telegram_bot():
 
         token = settings.TELEGRAM_BOT_TOKEN
         admin_id = settings.TELEGRAM_ADMIN_ID
+        database_url = settings.DATABASE_URL
 
         if not token:
             logger.warning("TELEGRAM_BOT_TOKEN not set - bot disabled")
             return
 
-        logger.info(f"Starting Telegram bot (admin_id: {admin_id})")
-        bot = SheetGPTBot(token=token, admin_id=admin_id)
+        logger.info(f"Starting Telegram bot (admin_id: {admin_id}, db: {'YES' if database_url else 'NO'})")
+        bot = SheetGPTBot(token=token, admin_id=admin_id, database_url=database_url)
         bot.run()
     except Exception as e:
         logger.error(f"Failed to start Telegram bot: {e}")

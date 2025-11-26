@@ -23,7 +23,9 @@ from telegram.ext import (
     filters,
     ConversationHandler,
 )
-import httpx
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
+from sqlalchemy.orm import sessionmaker
 
 # Configure logging
 logging.basicConfig(
@@ -31,9 +33,6 @@ logging.basicConfig(
     level=logging.INFO
 )
 logger = logging.getLogger(__name__)
-
-# API URL (внутренний вызов)
-API_URL = os.getenv("SHEETGPT_API_URL", "http://localhost:8000")
 
 # Хранилище данных (в памяти для MVP)
 user_data_store = {}
@@ -51,10 +50,29 @@ SUPPORT_CHAT_URL = "https://t.me/sheetgpt_support"  # TODO: создать ча�
 class SheetGPTBot:
     """Telegram бот для SheetGPT"""
 
-    def __init__(self, token: str, admin_id: int):
+    def __init__(self, token: str, admin_id: int, database_url: str = None):
         self.token = token
         self.admin_id = admin_id
         self.application = None
+        self.database_url = database_url
+        self.async_engine = None
+        self.async_session_factory = None
+
+    def _init_db(self):
+        """Инициализация подключения к БД"""
+        if self.database_url:
+            # Конвертируем postgres:// в postgresql+asyncpg://
+            db_url = self.database_url
+            if db_url.startswith("postgres://"):
+                db_url = db_url.replace("postgres://", "postgresql+asyncpg://", 1)
+            elif db_url.startswith("postgresql://") and "asyncpg" not in db_url:
+                db_url = db_url.replace("postgresql://", "postgresql+asyncpg://", 1)
+
+            self.async_engine = create_async_engine(db_url, echo=False)
+            self.async_session_factory = sessionmaker(
+                self.async_engine, class_=AsyncSession, expire_on_commit=False
+            )
+            logger.info("Database connection initialized for bot")
 
     def get_main_menu_keyboard(self):
         """Создание главного меню с кнопками"""
@@ -193,20 +211,21 @@ SheetGPT работает как расширение для Google Chrome, ко
         )
 
     async def show_license(self, query, context):
-        """Раздел Лицензионный ключ - проверяем через API"""
+        """Раздел Лицензионный ключ - проверяем напрямую в БД"""
         user_id = query.from_user.id
         has_license = False
 
-        try:
-            async with httpx.AsyncClient(timeout=10.0) as client:
-                response = await client.get(
-                    f"{API_URL}/api/v1/telegram/license/user/{user_id}"
-                )
-                if response.status_code == 200:
-                    data = response.json()
-                    has_license = data.get('success', False) and data.get('license_key')
-        except Exception as e:
-            logger.error(f"Error checking license: {e}")
+        if self.async_session_factory:
+            try:
+                from app.models.telegram_user import TelegramUser
+                async with self.async_session_factory() as session:
+                    result = await session.execute(
+                        select(TelegramUser).where(TelegramUser.telegram_user_id == user_id)
+                    )
+                    user = result.scalar_one_or_none()
+                    has_license = user and user.license_key
+            except Exception as e:
+                logger.error(f"Error checking license: {e}")
 
         if has_license:
             text = f"""
@@ -241,25 +260,37 @@ SheetGPT работает как расширение для Google Chrome, ко
         )
 
     async def generate_license(self, query, context):
-        """Генерация лицензионного ключа через API"""
+        """Генерация лицензионного ключа напрямую в БД"""
         user = query.from_user
         user_id = user.id
+        text = "❌ База данных не настроена"
 
-        try:
-            # Вызываем API для генерации ключа
-            async with httpx.AsyncClient(timeout=30.0) as client:
-                response = await client.post(
-                    f"{API_URL}/api/v1/telegram/license/generate",
-                    json={
-                        "telegram_user_id": user_id,
-                        "username": user.username,
-                        "first_name": user.first_name
-                    }
-                )
+        if self.async_session_factory:
+            try:
+                from app.models.telegram_user import TelegramUser
+                async with self.async_session_factory() as session:
+                    # Ищем пользователя
+                    result = await session.execute(
+                        select(TelegramUser).where(TelegramUser.telegram_user_id == user_id)
+                    )
+                    db_user = result.scalar_one_or_none()
 
-                if response.status_code == 200:
-                    data = response.json()
-                    license_key = data.get('license_key')
+                    if db_user:
+                        # Генерируем новый ключ
+                        license_key = TelegramUser.generate_license_key()
+                        db_user.license_key = license_key
+                    else:
+                        # Создаём нового пользователя с ключом
+                        license_key = TelegramUser.generate_license_key()
+                        db_user = TelegramUser(
+                            telegram_user_id=user_id,
+                            username=user.username,
+                            first_name=user.first_name,
+                            license_key=license_key
+                        )
+                        session.add(db_user)
+
+                    await session.commit()
 
                     text = f"""
 🔑 **Твой лицензионный ключ**
@@ -272,12 +303,9 @@ SheetGPT работает как расширение для Google Chrome, ко
 
 ⚠️ Не передавай ключ третьим лицам!
 """
-                else:
-                    text = "❌ Ошибка генерации ключа. Попробуйте позже."
-
-        except Exception as e:
-            logger.error(f"Error generating license: {e}")
-            text = f"❌ Ошибка: {str(e)}"
+            except Exception as e:
+                logger.error(f"Error generating license: {e}")
+                text = f"❌ Ошибка: {str(e)}"
 
         await query.edit_message_text(
             text,
@@ -286,20 +314,22 @@ SheetGPT работает как расширение для Google Chrome, ко
         )
 
     async def show_my_license(self, query):
-        """Показать текущий ключ через API"""
+        """Показать текущий ключ напрямую из БД"""
         user_id = query.from_user.id
+        text = "❌ База данных не настроена"
 
-        try:
-            async with httpx.AsyncClient(timeout=30.0) as client:
-                response = await client.get(
-                    f"{API_URL}/api/v1/telegram/license/user/{user_id}"
-                )
+        if self.async_session_factory:
+            try:
+                from app.models.telegram_user import TelegramUser
+                async with self.async_session_factory() as session:
+                    result = await session.execute(
+                        select(TelegramUser).where(TelegramUser.telegram_user_id == user_id)
+                    )
+                    db_user = result.scalar_one_or_none()
 
-                if response.status_code == 200:
-                    data = response.json()
-                    if data.get('success') and data.get('license_key'):
-                        license_key = data['license_key']
-                        tier = data.get('subscription_tier', 'free')
+                    if db_user and db_user.license_key:
+                        license_key = db_user.license_key
+                        tier = db_user.subscription_tier or 'free'
 
                         text = f"""
 🔑 **Твой лицензионный ключ**
@@ -313,12 +343,10 @@ SheetGPT работает как расширение для Google Chrome, ко
 """
                     else:
                         text = "❌ У тебя нет лицензионного ключа. Нажми 'Сгенерировать ключ'."
-                else:
-                    text = "❌ Ошибка получения ключа."
 
-        except Exception as e:
-            logger.error(f"Error getting license: {e}")
-            text = f"❌ Ошибка: {str(e)}"
+            except Exception as e:
+                logger.error(f"Error getting license: {e}")
+                text = f"❌ Ошибка: {str(e)}"
 
         await query.edit_message_text(
             text,
@@ -627,6 +655,9 @@ SheetGPT работает как расширение для Google Chrome, ко
         """Запуск бота"""
         logger.info("Starting SheetGPT Telegram Bot v2.0...")
 
+        # Инициализируем подключение к БД
+        self._init_db()
+
         # Создаем приложение
         self.application = Application.builder().token(self.token).build()
 
@@ -656,6 +687,7 @@ def main():
 
     token = settings.TELEGRAM_BOT_TOKEN
     admin_id = settings.TELEGRAM_ADMIN_ID
+    database_url = settings.DATABASE_URL
 
     if not token:
         logger.error("TELEGRAM_BOT_TOKEN not set!")
@@ -664,7 +696,7 @@ def main():
     if not admin_id:
         logger.warning("TELEGRAM_ADMIN_ID not set - admin commands will be disabled")
 
-    bot = SheetGPTBot(token=token, admin_id=admin_id)
+    bot = SheetGPTBot(token=token, admin_id=admin_id, database_url=database_url)
     bot.run()
 
 
