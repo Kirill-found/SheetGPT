@@ -27,21 +27,40 @@ let userState = {
 };
 
 // ===== ИНИЦИАЛИЗАЦИЯ =====
-document.addEventListener('DOMContentLoaded', () => {
+function init() {
+  console.log('[SettingsMenu] Initializing...');
   initSettingsMenu();
   initModals();
   loadUserState();
   updateUsageDisplay();
-});
+  console.log('[SettingsMenu] ✅ Initialized');
+}
+
+// Инициализация: либо сразу, либо на DOMContentLoaded
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', init);
+} else {
+  init();
+}
 
 function initSettingsMenu() {
   const settingsBtn = document.getElementById('settingsBtn');
   const settingsDropdown = document.getElementById('settingsDropdown');
 
+  console.log('[SettingsMenu] settingsBtn:', settingsBtn);
+  console.log('[SettingsMenu] settingsDropdown:', settingsDropdown);
+
+  if (!settingsBtn || !settingsDropdown) {
+    console.error('[SettingsMenu] ❌ Elements not found!');
+    return;
+  }
+
   // Toggle dropdown
-  settingsBtn?.addEventListener('click', (e) => {
+  settingsBtn.addEventListener('click', (e) => {
     e.stopPropagation();
+    console.log('[SettingsMenu] Button clicked!');
     settingsDropdown.classList.toggle('show');
+    console.log('[SettingsMenu] Dropdown classes:', settingsDropdown.className);
 
     // Закрыть другие dropdown
     document.getElementById('historyDropdown')?.classList.remove('show');
