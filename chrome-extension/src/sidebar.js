@@ -122,11 +122,18 @@ function formatLicenseInput(input) {
 
 // Handle license activation
 async function handleActivation() {
+  console.log('[Sidebar] 🔥 handleActivation() called!');
+
   const input = document.getElementById('licenseInput');
   const btn = document.getElementById('activateBtn');
   const errorDiv = document.getElementById('licenseError');
 
-  if (!input || !btn) return;
+  console.log('[Sidebar] Elements found:', { input: !!input, btn: !!btn, errorDiv: !!errorDiv });
+
+  if (!input || !btn) {
+    console.error('[Sidebar] ❌ Required elements not found!');
+    return;
+  }
 
   const licenseKey = input.value.trim();
 
@@ -194,17 +201,20 @@ async function handleActivation() {
 
 // Initialize license system when DOM is ready
 document.addEventListener('DOMContentLoaded', () => {
-  console.log('[Sidebar] DOM loaded, initializing license system');
+  console.log('[Sidebar] ✅ DOM loaded, initializing license system');
 
   // Check license on load
   checkLicense();
 
   // Setup license input formatting
   const licenseInput = document.getElementById('licenseInput');
+  console.log('[Sidebar] licenseInput element:', licenseInput);
+
   if (licenseInput) {
     licenseInput.addEventListener('input', (e) => formatLicenseInput(e.target));
     licenseInput.addEventListener('keydown', (e) => {
       if (e.key === 'Enter') {
+        console.log('[Sidebar] Enter pressed in license input');
         handleActivation();
       }
     });
@@ -212,10 +222,20 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Setup activate button
   const activateBtn = document.getElementById('activateBtn');
+  console.log('[Sidebar] activateBtn element:', activateBtn);
+
   if (activateBtn) {
-    activateBtn.addEventListener('click', handleActivation);
+    activateBtn.addEventListener('click', () => {
+      console.log('[Sidebar] 🖱️ Activate button clicked!');
+      handleActivation();
+    });
+    console.log('[Sidebar] ✅ Click handler attached to activateBtn');
+  } else {
+    console.error('[Sidebar] ❌ activateBtn not found!');
   }
 });
+
+console.log('[Sidebar] 📜 sidebar.js loaded');
 
 // ===== POSTMESSAGE BRIDGE FOR CHROME EXTENSION =====
 console.log('[Sidebar] Initializing event listeners...');

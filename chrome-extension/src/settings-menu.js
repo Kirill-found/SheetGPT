@@ -3,6 +3,8 @@
  * Управление меню настроек, тарифами, usage bar
  */
 
+console.log('[SettingsMenu] 📜 settings-menu.js loading...');
+
 // ===== КОНФИГУРАЦИЯ ТАРИФОВ =====
 const PLANS = {
   free: {
@@ -42,10 +44,15 @@ function init() {
 }
 
 // Инициализация: либо сразу, либо на DOMContentLoaded
-if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', init);
-} else {
-  init();
+try {
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', init);
+  } else {
+    init();
+  }
+  console.log('[SettingsMenu] 📜 settings-menu.js loaded successfully');
+} catch (e) {
+  console.error('[SettingsMenu] ❌ Error during init:', e);
 }
 
 function initSettingsMenu() {

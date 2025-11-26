@@ -3,6 +3,8 @@
  * Используй эти функции в sidebar.js для рендеринга ответов
  */
 
+console.log('[ResponseTemplates] 📜 response-templates.js loading...');
+
 // ===== ШАБЛОН: Анимация загрузки =====
 function createLoadingMessage() {
   return `
