@@ -237,6 +237,21 @@ document.addEventListener('DOMContentLoaded', () => {
 
 console.log('[Sidebar] 📜 sidebar.js loaded');
 
+// ===== DEBUG MESSAGE HANDLER =====
+window.addEventListener('message', (event) => {
+  if (event.data && event.data.type === 'DEBUG_ACTIVATE') {
+    console.log('[Sidebar] 🔧 DEBUG_ACTIVATE received, key:', event.data.key);
+    const input = document.getElementById('licenseInput');
+    if (input) {
+      input.value = event.data.key || 'TEST-TEST-TEST-TEST';
+      console.log('[Sidebar] 🔧 Input value set, calling handleActivation...');
+      handleActivation();
+    } else {
+      console.error('[Sidebar] 🔧 licenseInput not found!');
+    }
+  }
+});
+
 // ===== POSTMESSAGE BRIDGE FOR CHROME EXTENSION =====
 console.log('[Sidebar] Initializing event listeners...');
 

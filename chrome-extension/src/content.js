@@ -7,6 +7,28 @@
 
 console.log('[SheetGPT] Content script loaded');
 
+// Debug: expose function to test activation from console
+window.testSheetGPTActivation = function(key) {
+  const iframe = document.getElementById('sheetgpt-sidebar-iframe');
+  if (iframe && iframe.contentWindow) {
+    console.log('[SheetGPT] Sending test activation to sidebar...');
+    iframe.contentWindow.postMessage({ type: 'DEBUG_ACTIVATE', key: key || 'TEST-TEST-TEST-TEST' }, '*');
+  } else {
+    console.error('[SheetGPT] Sidebar iframe not found!');
+  }
+};
+
+window.checkSheetGPTSidebar = function() {
+  const iframe = document.getElementById('sheetgpt-sidebar-iframe');
+  const container = document.getElementById('sheetgpt-sidebar-container');
+  console.log('[SheetGPT] Debug info:', {
+    containerExists: !!container,
+    iframeExists: !!iframe,
+    iframeSrc: iframe?.src,
+    containerTransform: container?.style.transform
+  });
+};
+
 // v7.9.4: Check if extension context is valid
 function isExtensionContextValid() {
   try {
@@ -167,6 +189,15 @@ function injectSidebar() {
     border-left: 1px solid #e5e7eb;
     box-shadow: -2px 0 10px rgba(0, 0, 0, 0.1);
   `;
+
+  // Log iframe loading
+  iframe.addEventListener('load', () => {
+    console.log('[SheetGPT] ✅ Sidebar iframe loaded successfully');
+  });
+
+  iframe.addEventListener('error', (e) => {
+    console.error('[SheetGPT] ❌ Sidebar iframe failed to load:', e);
+  });
 
   container.appendChild(iframe);
 
