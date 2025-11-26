@@ -1,3 +1,193 @@
+// ===== LICENSE VALIDATION =====
+const LICENSE_API_URL = 'https://sheetgpt-production.up.railway.app/api/v1/telegram/license/validate';
+const LICENSE_STORAGE_KEY = 'sheetgpt_license_key';
+
+// Check if license is valid on startup
+async function checkLicense() {
+  const savedLicense = localStorage.getItem(LICENSE_STORAGE_KEY);
+  console.log('[Sidebar] Checking license:', savedLicense ? 'found' : 'not found');
+
+  if (savedLicense) {
+    // Validate saved license
+    const isValid = await validateLicense(savedLicense, true);
+    if (isValid) {
+      console.log('[Sidebar] License valid, hiding activation screen');
+      hideLicenseOverlay();
+      return true;
+    } else {
+      console.log('[Sidebar] Saved license invalid, clearing');
+      localStorage.removeItem(LICENSE_STORAGE_KEY);
+    }
+  }
+
+  console.log('[Sidebar] No valid license, showing activation screen');
+  showLicenseOverlay();
+  return false;
+}
+
+// Validate license key via API
+async function validateLicense(licenseKey, silent = false) {
+  try {
+    const cleanKey = licenseKey.trim().toUpperCase();
+    console.log('[Sidebar] Validating license:', cleanKey);
+
+    const response = await fetch(`${LICENSE_API_URL}/${encodeURIComponent(cleanKey)}`, {
+      method: 'GET',
+      headers: {
+        'Accept': 'application/json'
+      }
+    });
+
+    console.log('[Sidebar] License API response status:', response.status);
+
+    if (!response.ok) {
+      if (response.status === 404) {
+        console.log('[Sidebar] License not found');
+        return false;
+      }
+      throw new Error(`HTTP ${response.status}`);
+    }
+
+    const data = await response.json();
+    console.log('[Sidebar] License API response:', data);
+
+    if (data.success && data.license_key) {
+      // Save valid license
+      localStorage.setItem(LICENSE_STORAGE_KEY, data.license_key);
+      return true;
+    }
+
+    return false;
+  } catch (error) {
+    console.error('[Sidebar] License validation error:', error);
+    if (!silent) {
+      throw error;
+    }
+    return false;
+  }
+}
+
+// Show license activation overlay
+function showLicenseOverlay() {
+  const overlay = document.getElementById('licenseOverlay');
+  if (overlay) {
+    overlay.classList.remove('hidden');
+  }
+}
+
+// Hide license activation overlay
+function hideLicenseOverlay() {
+  const overlay = document.getElementById('licenseOverlay');
+  if (overlay) {
+    overlay.classList.add('hidden');
+  }
+}
+
+// Format license key input (add dashes)
+function formatLicenseInput(input) {
+  // Remove non-alphanumeric characters
+  let value = input.value.replace(/[^A-Za-z0-9]/g, '').toUpperCase();
+
+  // Add dashes every 4 characters
+  let formatted = '';
+  for (let i = 0; i < value.length && i < 16; i++) {
+    if (i > 0 && i % 4 === 0) {
+      formatted += '-';
+    }
+    formatted += value[i];
+  }
+
+  input.value = formatted;
+}
+
+// Handle license activation
+async function handleActivation() {
+  const input = document.getElementById('licenseInput');
+  const btn = document.getElementById('activateBtn');
+  const errorDiv = document.getElementById('licenseError');
+
+  if (!input || !btn) return;
+
+  const licenseKey = input.value.trim();
+
+  // Validate format
+  if (!/^[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}$/i.test(licenseKey)) {
+    input.classList.add('error');
+    errorDiv.textContent = 'Неверный формат ключа';
+    errorDiv.classList.add('show');
+    setTimeout(() => {
+      input.classList.remove('error');
+    }, 300);
+    return;
+  }
+
+  // Disable button during validation
+  btn.disabled = true;
+  btn.textContent = 'Проверка...';
+  errorDiv.classList.remove('show');
+  input.classList.remove('error', 'success');
+
+  try {
+    const isValid = await validateLicense(licenseKey, false);
+
+    if (isValid) {
+      input.classList.add('success');
+      btn.textContent = 'Успешно!';
+
+      // Hide overlay after short delay
+      setTimeout(() => {
+        hideLicenseOverlay();
+      }, 500);
+    } else {
+      input.classList.add('error');
+      errorDiv.textContent = 'Лицензионный ключ не найден';
+      errorDiv.classList.add('show');
+      btn.textContent = 'Активировать';
+      btn.disabled = false;
+
+      setTimeout(() => {
+        input.classList.remove('error');
+      }, 300);
+    }
+  } catch (error) {
+    console.error('[Sidebar] Activation error:', error);
+    input.classList.add('error');
+    errorDiv.textContent = 'Ошибка проверки: ' + error.message;
+    errorDiv.classList.add('show');
+    btn.textContent = 'Активировать';
+    btn.disabled = false;
+
+    setTimeout(() => {
+      input.classList.remove('error');
+    }, 300);
+  }
+}
+
+// Initialize license system when DOM is ready
+document.addEventListener('DOMContentLoaded', () => {
+  console.log('[Sidebar] DOM loaded, initializing license system');
+
+  // Check license on load
+  checkLicense();
+
+  // Setup license input formatting
+  const licenseInput = document.getElementById('licenseInput');
+  if (licenseInput) {
+    licenseInput.addEventListener('input', (e) => formatLicenseInput(e.target));
+    licenseInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        handleActivation();
+      }
+    });
+  }
+
+  // Setup activate button
+  const activateBtn = document.getElementById('activateBtn');
+  if (activateBtn) {
+    activateBtn.addEventListener('click', handleActivation);
+  }
+});
+
 // ===== POSTMESSAGE BRIDGE FOR CHROME EXTENSION =====
 console.log('[Sidebar] Initializing event listeners...');
 
