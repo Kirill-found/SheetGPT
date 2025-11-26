@@ -137,6 +137,9 @@ function createFilterResponse(result) {
 
 // ===== ШАБЛОН: Ответ с созданием таблицы (с подтверждением!) =====
 function createTableResponse(result) {
+  // Получаем реальное количество строк
+  const actualRowCount = result.rows_count || result.structured_data?.rows?.length || result.rows?.length || 0;
+
   // Если таблица ещё НЕ создана - показываем превью и кнопку подтверждения
   if (!result.created && result.preview) {
     return `
@@ -156,7 +159,7 @@ function createTableResponse(result) {
               <span class="response-type-label">Новая таблица</span>
             </div>
             <div class="response-body">
-              <div class="response-result">Готова таблица: ${result.rows_count || 0} строк</div>
+              <div class="response-result">Готова таблица: ${actualRowCount} строк</div>
               <div class="response-explanation">${result.description || ''}</div>
 
               <div class="response-actions">
@@ -198,7 +201,7 @@ function createTableResponse(result) {
                 <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
                 <polyline points="22 4 12 14.01 9 11.01"/>
               </svg>
-              <span>Лист "${result.sheet_name || 'SheetGPT'}" (${result.rows_count || 0} строк)</span>
+              <span>Лист "${result.sheet_name || 'SheetGPT'}" (${actualRowCount} строк)</span>
             </div>
           </div>
         </div>
