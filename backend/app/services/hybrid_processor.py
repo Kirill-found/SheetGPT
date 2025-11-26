@@ -67,11 +67,11 @@ class HybridProcessor:
     - Self-correction loop для retry при ошибках
     """
 
-    # Конфигурация моделей (all using gpt-4o-mini for cost efficiency)
+    # Конфигурация моделей
     MODELS = {
         "simple": None,           # Pattern matching - no LLM
         "medium": "gpt-4o-mini",  # Function Calling
-        "complex": "gpt-4o-mini"  # Code Generation (was gpt-4o, switched for cost)
+        "complex": "gpt-4o"       # Code Generation (best quality)
     }
 
     MAX_RETRIES = 2  # Количество retry при ошибке

@@ -195,7 +195,7 @@ result = df.sort_values('Дата').assign(Накопительная_сумма
             logger.info(f"[PANDAS_GENERATOR] Generating code for: {query[:50]}...")
 
             response = await self.client.chat.completions.create(
-                model="gpt-4o-mini",  # Cheaper than gpt-4o, sufficient for code generation
+                model="gpt-4o",  # Best quality for complex code generation
                 messages=[
                     {"role": "system", "content": self.SYSTEM_PROMPT},
                     {"role": "user", "content": user_prompt}
