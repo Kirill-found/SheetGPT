@@ -418,6 +418,53 @@ async def validate_license_key(
     )
 
 
+class ActivateLicenseRequest(BaseModel):
+    license_key: str
+
+
+@router.post("/activate-license", response_model=LicenseResponse)
+async def activate_license(
+    request: ActivateLicenseRequest,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Активация лицензионного ключа (POST версия для Chrome Extension).
+    Принимает JSON: {"license_key": "XXXX-XXXX-XXXX-XXXX"}
+    """
+    license_key = request.license_key.strip().upper()
+    logger.info(f"Activating license (POST): {license_key}")
+
+    result = await db.execute(
+        select(TelegramUser).where(TelegramUser.license_key == license_key)
+    )
+    user = result.scalar_one_or_none()
+
+    if not user:
+        logger.warning(f"License not found: {license_key}")
+        return LicenseResponse(
+            success=False,
+            license_key=license_key,
+            message="License key not found"
+        )
+
+    if not user.is_active:
+        logger.warning(f"License inactive: {license_key}")
+        return LicenseResponse(
+            success=False,
+            license_key=license_key,
+            message="License key is inactive"
+        )
+
+    logger.info(f"License activated: {license_key} for user {user.telegram_user_id}")
+    return LicenseResponse(
+        success=True,
+        license_key=license_key,
+        message="License activated successfully",
+        telegram_user_id=user.telegram_user_id,
+        subscription_tier=user.subscription_tier
+    )
+
+
 @router.get("/license/user/{telegram_user_id}", response_model=LicenseResponse)
 async def get_user_license(
     telegram_user_id: int,
