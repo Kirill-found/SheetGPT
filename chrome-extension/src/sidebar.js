@@ -487,181 +487,35 @@ let isProcessing = false;
     function addAIResponse(result) {
       try {
         const container = document.getElementById('chatContainer');
-        const messageDiv = document.createElement('div');
-        messageDiv.className = 'message ai';
 
-        const bubble = document.createElement('div');
-        bubble.className = 'message-bubble';
-
-        // Response type badge
-        const responseType = result.response_type || 'formula';
-        const badge = document.createElement('div');
-        badge.className = 'response-badge ' + responseType;
-        if (responseType === 'analysis') {
-          badge.textContent = 'Анализ';
-        } else if (responseType === 'action') {
-          badge.textContent = 'Действие';
+        // Use new templates from response-templates.js if available
+        if (typeof renderAIResponse === 'function') {
+          renderAIResponse(result);
         } else {
-          badge.textContent = 'Формула';
-        }
-        bubble.appendChild(badge);
-
-        // Main content
-        const content = document.createElement('div');
-
-        if (responseType === 'formula' && result.formula) {
-          // Formula
-          const formulaDiv = document.createElement('div');
-          formulaDiv.className = 'formula-code';
-          formulaDiv.textContent = result.formula;
-          content.appendChild(formulaDiv);
-
-          // Explanation
-          if (result.explanation) {
-            const explanation = document.createElement('p');
-            explanation.style.marginTop = '12px';
-            explanation.textContent = result.explanation;
-            content.appendChild(explanation);
-          }
-
-          // Action buttons
-          const actions = document.createElement('div');
-          actions.className = 'action-buttons';
-
-          const insertBtn = document.createElement('button');
-          insertBtn.className = 'action-btn';
-          insertBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 4v16m8-8H4"></path></svg> Вставить';
-          insertBtn.onclick = () => insertFormula(result.formula, result.target_cell);
-          actions.appendChild(insertBtn);
-
-          const copyBtn = document.createElement('button');
-          copyBtn.className = 'action-btn secondary';
-          copyBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg> Копировать';
-          copyBtn.onclick = () => copyToClipboard(result.formula);
-          actions.appendChild(copyBtn);
-
-          content.appendChild(actions);
-        } else {
-          // Analysis response
-
-          // Summary
-          if (result.summary) {
-            const summaryBox = document.createElement('div');
-
-            // Проверяем на сообщения об отсутствии данных
-            if (result.summary.includes('Данные отсутствуют') || result.summary.includes('невозможно создать')) {
-              summaryBox.className = 'content-box error';
-              summaryBox.innerHTML = `
-                <div style="margin-bottom: 8px;">❌ ${result.summary}</div>
-                <div style="font-size: 13px; color: #666; margin-top: 12px; padding-top: 12px; border-top: 1px solid #eee;">
-                  <strong>💡 Что попробовать:</strong><br/>
-                  <ul style="margin: 8px 0; padding-left: 20px;">
-                    <li>Переформулируйте запрос более конкретно</li>
-                    <li>Укажите конкретные примеры данных</li>
-                    <li>Попробуйте более простую тему с базовыми данными</li>
-                  </ul>
-                  <strong>✅ Примеры успешных запросов:</strong><br/>
-                  <ul style="margin: 8px 0; padding-left: 20px;">
-                    <li>"Создай таблицу с топ-10 стран Европы"</li>
-                    <li>"Создай таблицу планет солнечной системы"</li>
-                    <li>"Создай таблицу химических элементов"</li>
-                  </ul>
+          // Fallback to simple display
+          const messageDiv = document.createElement('div');
+          messageDiv.className = 'message ai';
+          const bubble = document.createElement('div');
+          bubble.className = 'message-bubble';
+          bubble.innerHTML = `
+            <div class="ai-response">
+              <div class="response-header">
+                <div class="response-type-icon analysis">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M3 3v18h18"/><path d="M7 12l4-4 4 4 5-5"/>
+                  </svg>
                 </div>
-              `;
-            } else {
-              summaryBox.className = 'content-box info';
-              const sentences = result.summary.split('. ');
-              summaryBox.innerHTML = sentences.map(s => s.trim() ? `<p style="margin: 8px 0;">${s.trim()}${s.endsWith('.') ? '' : '.'}</p>` : '').join('');
-            }
-
-            content.appendChild(summaryBox);
-          } else if (result.explanation) {
-            const explanation = document.createElement('p');
-            explanation.textContent = result.explanation;
-            content.appendChild(explanation);
-          }
-
-          // Methodology
-          if (result.methodology) {
-            const sectionTitle = document.createElement('div');
-            sectionTitle.className = 'section-title';
-            sectionTitle.textContent = 'Методология';
-            content.appendChild(sectionTitle);
-
-            const methodBox = document.createElement('div');
-            methodBox.className = 'content-box';
-            methodBox.innerHTML = result.methodology;
-            content.appendChild(methodBox);
-          }
-
-          // Key findings
-          if (result.key_findings && result.key_findings.length > 0) {
-            const sectionTitle = document.createElement('div');
-            sectionTitle.className = 'section-title';
-            sectionTitle.textContent = 'Ключевые находки';
-            content.appendChild(sectionTitle);
-
-            const findingsList = document.createElement('ul');
-            findingsList.className = 'list-items';
-            result.key_findings.forEach(finding => {
-              const li = document.createElement('li');
-              li.textContent = finding;
-              findingsList.appendChild(li);
-            });
-            content.appendChild(findingsList);
-          }
-
-          // Professional Insights
-          if (result.professional_insights) {
-            const sectionTitle = document.createElement('div');
-            sectionTitle.className = 'section-title';
-            sectionTitle.textContent = 'Профессиональный анализ';
-            content.appendChild(sectionTitle);
-
-            const insightsBox = document.createElement('div');
-            insightsBox.className = 'content-box warning';
-            insightsBox.textContent = result.professional_insights;
-            content.appendChild(insightsBox);
-          }
-
-          // Recommendations
-          if (result.recommendations && result.recommendations.length > 0) {
-            const sectionTitle = document.createElement('div');
-            sectionTitle.className = 'section-title';
-            sectionTitle.textContent = 'Рекомендации';
-            content.appendChild(sectionTitle);
-
-            const recsList = document.createElement('ul');
-            recsList.className = 'list-items';
-            result.recommendations.forEach(rec => {
-              const li = document.createElement('li');
-              li.textContent = rec;
-              recsList.appendChild(li);
-            });
-            content.appendChild(recsList);
-          }
-
-          // Warnings
-          if (result.warnings && result.warnings.length > 0) {
-            const sectionTitle = document.createElement('div');
-            sectionTitle.className = 'section-title';
-            sectionTitle.textContent = 'Предупреждения';
-            content.appendChild(sectionTitle);
-
-            const warnsList = document.createElement('ul');
-            warnsList.className = 'list-items';
-            result.warnings.forEach(warn => {
-              const li = document.createElement('li');
-              li.textContent = warn;
-              warnsList.appendChild(li);
-            });
-            content.appendChild(warnsList);
-          }
+                <span class="response-type-label">Анализ</span>
+              </div>
+              <div class="response-body">
+                <div class="response-result">${result.summary || result.explanation || 'Результат'}</div>
+                ${result.methodology ? `<div class="response-explanation">${result.methodology}</div>` : ''}
+              </div>
+            </div>
+          `;
+          messageDiv.appendChild(bubble);
+          container.appendChild(messageDiv);
         }
-
-        bubble.appendChild(content);
-        messageDiv.appendChild(bubble);
-        container.appendChild(messageDiv);
 
         // Handle structured data (tables, charts, and split operations)
         if (result.structured_data) {
@@ -798,22 +652,25 @@ let isProcessing = false;
 
     function addLoadingIndicator() {
       const container = document.getElementById('chatContainer');
-      const loadingDiv = document.createElement('div');
-      loadingDiv.className = 'message ai';
-      loadingDiv.id = 'loading';
-
-      const loading = document.createElement('div');
-      loading.className = 'loading-indicator';
-      loading.innerHTML = '<div class="loading-dots"><span></span><span></span><span></span></div><span class="loading-text">Думаю...</span>';
-
-      loadingDiv.appendChild(loading);
-      container.appendChild(loadingDiv);
-
+      // Use new template from response-templates.js
+      if (typeof createLoadingMessage === 'function') {
+        container.insertAdjacentHTML('beforeend', createLoadingMessage());
+      } else {
+        // Fallback to old loading
+        const loadingDiv = document.createElement('div');
+        loadingDiv.className = 'message ai';
+        loadingDiv.id = 'loadingMessage';
+        const loading = document.createElement('div');
+        loading.className = 'loading-indicator';
+        loading.innerHTML = '<div class="loading-dots"><span></span><span></span><span></span></div><span class="loading-text">Думаю...</span>';
+        loadingDiv.appendChild(loading);
+        container.appendChild(loadingDiv);
+      }
       scrollToBottom();
     }
 
     function removeLoadingIndicator() {
-      const loading = document.getElementById('loading');
+      const loading = document.getElementById('loadingMessage') || document.getElementById('loading');
       if (loading) loading.remove();
     }
 
