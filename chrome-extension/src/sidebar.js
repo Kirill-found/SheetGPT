@@ -605,12 +605,15 @@ let isProcessing = false;
           const isSplitOperation = result.structured_data.operation_type === 'split';
           const rowCount = result.structured_data.rows ? result.structured_data.rows.length : 0;
 
-          // v9.0.1: Проверяем, просил ли пользователь явно создать отдельный лист
+          // v9.0.3: Проверяем, просил ли пользователь явно создать отдельный лист
           const userQuery = (window.lastUserQuery || '').toLowerCase();
+          console.log('[UI] 🔍 User query for sheet detection:', userQuery);
+
           const wantsNewSheet = userQuery.includes('отдельн') || userQuery.includes('новом листе') ||
                                userQuery.includes('новый лист') || userQuery.includes('создай лист') ||
                                userQuery.includes('создай таблицу') || userQuery.includes('в листе') ||
                                userQuery.includes('на листе') || userQuery.includes('в таблиц');
+          console.log('[UI] 🔍 wantsNewSheet:', wantsNewSheet);
 
           // Логика выбора display_mode:
           // 1. Если пользователь ЯВНО просит создать лист - ВСЕГДА create_sheet (приоритет!)
@@ -686,8 +689,19 @@ let isProcessing = false;
             console.log('[UI] rows:', result.structured_data?.rows);
             console.log('[UI] rows count:', result.structured_data?.rows?.length);
 
-            // v9.0.2: Pre-call validation
-            if (!result.structured_data?.headers || !result.structured_data?.rows) {
+            // v9.0.2: Pre-call validation with auto-extract headers
+            let structuredData = result.structured_data;
+
+            // Auto-extract headers from first row if missing
+            if (!structuredData.headers && structuredData.rows && structuredData.rows.length > 0) {
+              const firstRow = structuredData.rows[0];
+              if (typeof firstRow === 'object' && !Array.isArray(firstRow)) {
+                structuredData.headers = Object.keys(firstRow);
+                console.log('[UI] Auto-extracted headers from row keys:', structuredData.headers);
+              }
+            }
+
+            if (!structuredData?.headers || !structuredData?.rows) {
               console.error('[UI] ❌ ERROR: structured_data missing headers or rows!');
               console.error('[UI] Full result object:', JSON.stringify(result, null, 2));
               const errorDiv = document.createElement('div');
@@ -741,7 +755,7 @@ let isProcessing = false;
                 container.appendChild(errorDiv);
                 scrollToBottom();
               })
-              .createTableAndChart(result.structured_data);
+              .createTableAndChart(structuredData);
           }
         }
 
