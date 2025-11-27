@@ -1043,11 +1043,19 @@ let isProcessing = false;
       table.style.fontSize = '13px';
       table.style.marginTop = '8px';
 
-      // Headers
-      if (structuredData.headers && structuredData.headers.length > 0) {
+      // Headers - extract from first row if not provided
+      let headers = structuredData.headers;
+      if ((!headers || headers.length === 0) && structuredData.rows && structuredData.rows.length > 0) {
+        const firstRow = structuredData.rows[0];
+        if (!Array.isArray(firstRow) && typeof firstRow === 'object') {
+          headers = Object.keys(firstRow);
+        }
+      }
+
+      if (headers && headers.length > 0) {
         const thead = document.createElement('thead');
         const headerRow = document.createElement('tr');
-        structuredData.headers.forEach(header => {
+        headers.forEach(header => {
           const th = document.createElement('th');
           th.textContent = header;
           th.style.padding = '6px 8px';
@@ -1067,7 +1075,9 @@ let isProcessing = false;
           const tr = document.createElement('tr');
           tr.style.backgroundColor = index % 2 === 0 ? '#ffffff' : '#f9f9f9';
 
-          row.forEach(cell => {
+          // Handle both array rows and object rows
+          const cells = Array.isArray(row) ? row : Object.values(row);
+          cells.forEach(cell => {
             const td = document.createElement('td');
             td.textContent = cell !== null && cell !== undefined ? cell : '';
             td.style.padding = '6px 8px';
