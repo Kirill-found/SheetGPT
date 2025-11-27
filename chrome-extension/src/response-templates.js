@@ -287,7 +287,11 @@ function renderAIResponse(result) {
       summary: result.summary || `Создаю таблицу (${rowCount} строк)...`
     });
   } else if (result.structured_data) {
-    html = createTableResponse({...result, ...result.structured_data});
+    // sidebar_only - просто показываем данные как analysis, таблица уже рендерится в displayTableInSidebar
+    html = createAnalysisResponse({
+      ...result,
+      summary: result.summary || `Найдено ${rowCount} записей`
+    });
   } else {
     switch (responseType) {
       case 'formula':

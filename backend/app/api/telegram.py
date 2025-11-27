@@ -276,6 +276,51 @@ async def upgrade_to_premium(
     }
 
 
+@router.post("/admin/set-premium")
+async def admin_set_premium(
+    telegram_user_id: int,
+    admin_key: str = Header(...),
+    duration_days: int = 365,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Админский endpoint для установки Premium подписки по telegram_user_id
+    """
+    if admin_key != "sheetgpt_admin_2025":
+        raise HTTPException(status_code=403, detail="Invalid admin key")
+
+    result = await db.execute(
+        select(TelegramUser).where(TelegramUser.telegram_user_id == telegram_user_id)
+    )
+    user = result.scalar_one_or_none()
+
+    if not user:
+        raise HTTPException(status_code=404, detail=f"User {telegram_user_id} not found")
+
+    from datetime import timedelta
+
+    user.subscription_tier = "premium"
+    user.queries_limit = -1  # Unlimited
+    user.queries_used_today = 0  # Reset usage
+    user.premium_until = datetime.now(timezone.utc) + timedelta(days=duration_days)
+
+    await db.commit()
+    await db.refresh(user)
+
+    logger.info(f"[ADMIN] User {telegram_user_id} set to premium until {user.premium_until}")
+
+    return {
+        "success": True,
+        "message": f"User {telegram_user_id} upgraded to Premium for {duration_days} days",
+        "user": {
+            "telegram_user_id": user.telegram_user_id,
+            "username": user.username,
+            "subscription_tier": user.subscription_tier,
+            "premium_until": user.premium_until
+        }
+    }
+
+
 @router.post("/reset-daily-limits")
 async def reset_daily_limits(
     admin_key: str = Header(...),
