@@ -2070,7 +2070,7 @@
 
   <!-- Personalize Modal -->
   <div id="personalizeModal" class="modal-overlay">
-    <div class="modal-content">
+    <div class="modal-content" style="max-width: 480px;">
       <div class="modal-header">
         <div class="modal-icon">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -2080,22 +2080,47 @@
         </div>
         <h2 class="modal-title">Персонализация</h2>
       </div>
+
+      <!-- Role Templates -->
       <div class="modal-section">
-        <label class="modal-label">Контекст для AI</label>
-        <p class="modal-description">
-          Опишите вашу роль и предпочтения для более точных ответов.
-        </p>
+        <label class="modal-label">Выберите роль</label>
+        <p class="modal-description">AI будет анализировать данные как эксперт</p>
+        <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin-top: 8px;">
+          <button class="role-template-btn" data-role="business" style="display: flex; align-items: center; gap: 8px; padding: 10px 12px; border: 1px solid var(--border-secondary); border-radius: 8px; background: var(--surface-primary); cursor: pointer; transition: all 0.15s;">
+            <span style="font-size: 20px;">🏪</span>
+            <span style="font-size: 13px; font-weight: 500; color: var(--ink-primary);">Малый бизнес</span>
+          </button>
+          <button class="role-template-btn" data-role="sales" style="display: flex; align-items: center; gap: 8px; padding: 10px 12px; border: 1px solid var(--border-secondary); border-radius: 8px; background: var(--surface-primary); cursor: pointer; transition: all 0.15s;">
+            <span style="font-size: 20px;">💼</span>
+            <span style="font-size: 13px; font-weight: 500; color: var(--ink-primary);">Продажи</span>
+          </button>
+          <button class="role-template-btn" data-role="finance" style="display: flex; align-items: center; gap: 8px; padding: 10px 12px; border: 1px solid var(--border-secondary); border-radius: 8px; background: var(--surface-primary); cursor: pointer; transition: all 0.15s;">
+            <span style="font-size: 20px;">📊</span>
+            <span style="font-size: 13px; font-weight: 500; color: var(--ink-primary);">Финансы</span>
+          </button>
+          <button class="role-template-btn" data-role="analyst" style="display: flex; align-items: center; gap: 8px; padding: 10px 12px; border: 1px solid var(--border-secondary); border-radius: 8px; background: var(--surface-primary); cursor: pointer; transition: all 0.15s;">
+            <span style="font-size: 20px;">📈</span>
+            <span style="font-size: 13px; font-weight: 500; color: var(--ink-primary);">Аналитик</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="modal-section">
+        <label class="modal-label">Промпт</label>
+        <p class="modal-description">Можете отредактировать или написать свой</p>
         <textarea
           id="customContextInput"
           class="modal-textarea"
-          placeholder="Например: Я финансовый аналитик, работаю с данными продаж..."
-          maxlength="500"
+          style="min-height: 180px; font-size: 12px; line-height: 1.5;"
+          placeholder="Выберите роль выше или опишите контекст вручную..."
+          maxlength="2000"
         ></textarea>
         <div class="char-counter">
-          <span id="charCount">0</span> / 500
+          <span id="charCount">0</span> / 2000
         </div>
       </div>
       <div class="modal-actions">
+        <button class="btn btn-secondary" id="clearContextBtn" style="margin-right: auto;">Очистить</button>
         <button class="btn btn-secondary" id="cancelPersonalizeBtn">Отмена</button>
         <button class="btn btn-primary" id="savePersonalizeBtn">Сохранить</button>
       </div>
