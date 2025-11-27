@@ -455,6 +455,18 @@ window.addEventListener('message', async (event) => {
     return;
   }
 
+  // Handle SAVE_CONTEXT message from sidebar
+  if (event.data && event.data.type === 'SHEETGPT_SAVE_CONTEXT') {
+    console.log('[SheetGPT] 💾 Saving context to chrome.storage:', event.data.context);
+    try {
+      await chrome.storage.local.set({ customContext: event.data.context });
+      console.log('[SheetGPT] ✅ Context saved to chrome.storage');
+    } catch (e) {
+      console.error('[SheetGPT] Failed to save context:', e);
+    }
+    return;
+  }
+
   // Verify it's a message from our sidebar (has our message structure)
   if (!event.data || typeof event.data !== 'object' || !event.data.action || !event.data.messageId) {
     console.log('[SheetGPT] Ignoring message - not from sidebar (missing action or messageId)');

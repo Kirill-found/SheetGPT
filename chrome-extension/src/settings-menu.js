@@ -321,6 +321,13 @@ function getRemainingRequests() {
 // ===== ACTIONS =====
 function savePersonalization(context) {
   localStorage.setItem('sheetgpt_context', context);
+
+  // Также сохраняем в chrome.storage через postMessage к content script
+  window.parent.postMessage({
+    type: 'SHEETGPT_SAVE_CONTEXT',
+    context: context
+  }, '*');
+
   showToast('Контекст сохранён', 'success');
 }
 
