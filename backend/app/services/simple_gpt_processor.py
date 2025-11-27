@@ -189,16 +189,33 @@ result = df[df['Город'] == 'Москва']
 
             # 4. Format response
             elapsed = time.time() - start_time
+            formatted_result = self._format_result(result["result"])
+            result_type = self._get_result_type(result["result"])
 
-            return {
+            # Generate human-readable summary
+            summary = self._generate_summary(result["result"], result_type, query)
+
+            response = {
                 "success": True,
-                "result": self._format_result(result["result"]),
-                "result_type": self._get_result_type(result["result"]),
+                "result": formatted_result,
+                "result_type": result_type,
+                "summary": summary,
                 "code": result.get("code"),
                 "processing_time": f"{elapsed:.2f}s",
                 "processor": "SimpleGPT v1.0",
                 "validation": validation
             }
+
+            # Add structured_data for tables/lists
+            if result_type == "table" and isinstance(formatted_result, list):
+                response["structured_data"] = {
+                    "rows": formatted_result,
+                    "display_mode": "sidebar_only" if len(formatted_result) <= 20 else "create_sheet"
+                }
+            elif result_type == "list" and isinstance(formatted_result, list):
+                response["key_findings"] = formatted_result
+
+            return response
 
         except Exception as e:
             elapsed = time.time() - start_time
@@ -405,6 +422,38 @@ result = df[df['Город'] == 'Москва']
             return "number"
         else:
             return "text"
+
+    def _generate_summary(self, result: Any, result_type: str, query: str) -> str:
+        """Генерирует человеко-читаемое описание результата."""
+
+        if result_type == "number":
+            # Для чисел - просто значение
+            if isinstance(result, float):
+                return f"{result:,.2f}".replace(",", " ")
+            return str(result)
+
+        elif result_type == "list":
+            # Для списков - перечисление элементов
+            items = list(result) if isinstance(result, pd.Series) else result
+            if len(items) == 0:
+                return "Ничего не найдено"
+            elif len(items) <= 5:
+                return ", ".join(str(item) for item in items)
+            else:
+                first_items = ", ".join(str(item) for item in items[:5])
+                return f"{first_items} (и ещё {len(items) - 5})"
+
+        elif result_type == "table":
+            # Для таблиц - количество строк
+            if isinstance(result, pd.DataFrame):
+                return f"Найдено {len(result)} записей"
+            elif isinstance(result, list):
+                return f"Найдено {len(result)} записей"
+            return "Таблица данных"
+
+        else:
+            # Текст
+            return str(result)[:200] if result else "Результат обработан"
 
     def _create_error_response(self, error: str, elapsed: float) -> Dict[str, Any]:
         """Создаёт ответ об ошибке."""
