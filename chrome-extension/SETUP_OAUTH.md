@@ -1,119 +1,61 @@
-# Настройка OAuth для SheetGPT Chrome Extension
+# OAuth Setup for SheetGPT Chrome Extension
 
-Для работы с Google Sheets API расширению необходим OAuth 2.0 Client ID. Следуйте инструкциям ниже:
+## Step 1: Create Google Cloud Project
 
-## Шаг 1: Создайте проект в Google Cloud Console
+1. Go to [Google Cloud Console](https://console.cloud.google.com/)
+2. Create a new project or select existing
+3. Name it: **SheetGPT Extension**
 
-1. Перейдите на [Google Cloud Console](https://console.cloud.google.com/)
-2. Создайте новый проект или выберите существующий
-3. Назовите проект, например: **SheetGPT Extension**
+## Step 2: Enable Google Sheets API
 
-## Шаг 2: Включите Google Sheets API
+1. Go to **APIs & Services** → **Library**
+2. Search for **Google Sheets API**
+3. Click **Enable**
 
-1. В меню слева выберите **APIs & Services** → **Library**
-2. Найдите **Google Sheets API**
-3. Нажмите **Enable**
+## Step 3: Configure OAuth Consent Screen
 
-## Шаг 3: Настройте OAuth Consent Screen
+1. Go to **APIs & Services** → **OAuth consent screen**
+2. Select **External**
+3. Fill in:
+   - App name: SheetGPT AI Assistant
+   - User support email: your email
+   - Developer contact: your email
+4. Add scope: `https://www.googleapis.com/auth/spreadsheets`
+5. Add your email to **Test users**
 
-1. Перейдите в **APIs & Services** → **OAuth consent screen**
-2. Выберите **External** (если вы не используете Google Workspace)
-3. Нажмите **Create**
+## Step 4: Create OAuth Client ID
 
-### Заполните форму:
+1. Go to **APIs & Services** → **Credentials**
+2. Click **Create Credentials** → **OAuth client ID**
+3. Select **Chrome Extension**
+4. Get your Extension ID:
+   - Open `chrome://extensions/`
+   - Find SheetGPT and copy the ID
+5. Paste Extension ID in **Item ID** field
+6. Copy the generated **Client ID**
 
-- **App name**: SheetGPT AI Assistant
-- **User support email**: ваш email
-- **Developer contact email**: ваш email
-- **App domain** (опционально): можно пропустить для тестирования
-- **Scopes**: Нажмите **Add or Remove Scopes**, найдите и добавьте:
-  - `https://www.googleapis.com/auth/spreadsheets`
+## Step 5: Update manifest.json
 
-4. Нажмите **Save and Continue**
-5. На странице **Test users** добавьте ваш email для тестирования
-6. Нажмите **Save and Continue**
+Replace `YOUR_CLIENT_ID` in manifest.json:
 
-## Шаг 4: Создайте OAuth 2.0 Client ID
+```json
+"oauth2": {
+  "client_id": "YOUR_CLIENT_ID.apps.googleusercontent.com",
+  "scopes": ["https://www.googleapis.com/auth/spreadsheets"]
+}
+```
 
-1. Перейдите в **APIs & Services** → **Credentials**
-2. Нажмите **Create Credentials** → **OAuth client ID**
-3. Выберите **Chrome Extension** как тип приложения
+## Step 6: Reload Extension
 
-### ВАЖНО: Получите Extension ID
+1. Open `chrome://extensions/`
+2. Find SheetGPT
+3. Click **Reload**
 
-Прежде чем продолжить, вам нужен Extension ID:
+## Step 7: Test
 
-1. Загрузите расширение в Chrome:
-   - Откройте `chrome://extensions/`
-   - Включите **Developer mode**
-   - Нажмите **Load unpacked**
-   - Выберите папку `chrome-extension`
-2. Скопируйте **Extension ID** (например: `abcdefghijklmnopqrstuvwxyzabcdef`)
+1. Open any Google Sheets document
+2. Open SheetGPT sidebar
+3. Chrome will ask for Google Sheets permission
+4. Click **Allow**
 
-### Продолжите создание OAuth Client:
-
-4. В поле **Item ID** вставьте ваш Extension ID
-5. Нажмите **Create**
-6. Скопируйте **Client ID** (вида: `123456789012-abc...xyz.apps.googleusercontent.com`)
-
-## Шаг 5: Обновите manifest.json
-
-1. Откройте файл `chrome-extension/manifest.json`
-2. Найдите строку:
-   ```json
-   "client_id": "YOUR_CLIENT_ID.apps.googleusercontent.com"
-   ```
-3. Замените `YOUR_CLIENT_ID.apps.googleusercontent.com` на ваш реальный Client ID
-4. Сохраните файл
-
-## Шаг 6: Перезагрузите расширение
-
-1. Откройте `chrome://extensions/`
-2. Найдите **SheetGPT AI Assistant**
-3. Нажмите кнопку **↻ Reload**
-
-## Шаг 7: Протестируйте
-
-1. Откройте любую Google Sheets таблицу
-2. Откройте SheetGPT sidebar (кнопка справа)
-3. При первом запросе Chrome попросит разрешение на доступ к Google Sheets
-4. Нажмите **Allow**
-
-## Готово! 🎉
-
-Расширение теперь может:
-- ✅ Читать данные из активного листа
-- ✅ Создавать новые листы с таблицами
-- ✅ Записывать и обновлять данные
-- ✅ Выделять строки цветом
-- ✅ Работать с AI для генерации таблиц
-
----
-
-## Troubleshooting
-
-### Ошибка "Access denied"
-- Убедитесь, что вы добавили свой email в **Test users** в OAuth consent screen
-- Проверьте, что scope `https://www.googleapis.com/auth/spreadsheets` добавлен
-
-### Ошибка "Invalid client"
-- Проверьте, что Client ID в manifest.json совпадает с Client ID из Google Cloud Console
-- Убедитесь, что Extension ID правильный
-
-### Расширение не запрашивает разрешения
-- Очистите токены: откройте DevTools → Application → Clear storage
-- Перезагрузите расширение
-
----
-
-## Публикация в Chrome Web Store
-
-После тестирования для публикации:
-
-1. Смените **OAuth consent screen** с Internal на External
-2. Пройдите **OAuth verification** от Google (может занять несколько дней)
-3. Подготовьте скриншоты и описание
-4. Опубликуйте в [Chrome Web Store Developer Dashboard](https://chrome.google.com/webstore/devconsole/)
-
-**Стоимость**: $5 разовый платеж за регистрацию developer account
-**Время модерации**: 1-3 дня (обычно быстрее, чем Google Workspace Marketplace!)
+Done! 🎉

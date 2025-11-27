@@ -92,7 +92,6 @@ async function validateLicense(licenseKey, silent = false) {
 
 // Show license activation screen
 function showLicenseOverlay() {
-  // Support both old (licenseOverlay) and new (licenseScreen) element IDs
   const overlay = document.getElementById('licenseScreen') || document.getElementById('licenseOverlay');
   if (overlay) {
     overlay.classList.remove('hidden');
@@ -102,7 +101,6 @@ function showLicenseOverlay() {
 
 // Hide license activation screen
 function hideLicenseOverlay() {
-  // Support both old (licenseOverlay) and new (licenseScreen) element IDs
   const overlay = document.getElementById('licenseScreen') || document.getElementById('licenseOverlay');
   if (overlay) {
     overlay.classList.add('hidden');
@@ -485,7 +483,7 @@ let chatHistory = [];
 let isProcessing = false;
 
     // Initialize
-    document.getElementById('messageInput').addEventListener('input', function() {
+    document.getElementById('inputField').addEventListener('input', function() {
       this.style.height = 'auto';
       this.style.height = (this.scrollHeight) + 'px';
 
@@ -509,13 +507,13 @@ let isProcessing = false;
     }
 
     function useExample(query) {
-      document.getElementById('messageInput').value = query;
+      document.getElementById('inputField').value = query;
       document.getElementById('sendBtn').disabled = false;
       sendMessage();
     }
 
     function sendMessage() {
-      const input = document.getElementById('messageInput');
+      const input = document.getElementById('inputField');
       const message = input.value.trim();
 
       if (!message || isProcessing) return;
@@ -1388,7 +1386,7 @@ if (sendBtn) {
 }
 
 // Message input - Enter to send
-const messageInput = document.getElementById('messageInput');
+const messageInput = document.getElementById('inputField');
 if (messageInput) {
   messageInput.addEventListener('keydown', handleKeyPress);
   console.log('[Sidebar] ✅ Message input keydown listener attached');

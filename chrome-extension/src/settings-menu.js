@@ -215,51 +215,35 @@ try {
 }
 
 function initSettingsMenu() {
-  const settingsBtn = document.getElementById('settingsBtn');
-  const settingsDropdown = document.getElementById('settingsDropdown');
+  // Support both old (settingsBtn/settingsDropdown) and new (menuBtn/menuDropdown) element IDs
+  const settingsBtn = document.getElementById('menuBtn') || document.getElementById('settingsBtn');
+  const settingsDropdown = document.getElementById('menuDropdown') || document.getElementById('settingsDropdown');
 
   console.log('[SettingsMenu] settingsBtn:', settingsBtn);
   console.log('[SettingsMenu] settingsDropdown:', settingsDropdown);
 
-  if (!settingsBtn || !settingsDropdown) {
-    console.error('[SettingsMenu] ❌ Elements not found!');
-    return;
-  }
+  // Note: If using new design, dropdown toggle is handled in inline scripts
+  // So we skip setting up the toggle handler to avoid conflicts
 
-  // Toggle dropdown
-  settingsBtn.addEventListener('click', (e) => {
-    e.stopPropagation();
-    console.log('[SettingsMenu] Button clicked!');
-    settingsDropdown.classList.toggle('show');
-    console.log('[SettingsMenu] Dropdown classes:', settingsDropdown.className);
-
-    // Закрыть другие dropdown
-    document.getElementById('historyDropdown')?.classList.remove('show');
-  });
-
-  // Закрыть при клике вне
-  document.addEventListener('click', (e) => {
-    if (!settingsDropdown?.contains(e.target) && e.target !== settingsBtn) {
-      settingsDropdown?.classList.remove('show');
-    }
-  });
-
-  // Menu item handlers
+  // Menu item handlers - personalize button handled by inline scripts in new design
+  // This adds additional functionality (loading saved context)
   document.getElementById('personalizeBtn')?.addEventListener('click', () => {
-    settingsDropdown.classList.remove('show');
+    if (settingsDropdown) settingsDropdown.classList.remove('show');
 
-    // Reset and reload state when opening modal
-    const contextInput = document.getElementById('customContextInput');
+    // Reset and reload state when opening modal - support both old and new IDs
+    const contextInput = document.getElementById('promptField') || document.getElementById('customContextInput');
     const promptIndicator = document.getElementById('promptIndicator');
-    const charCount = document.getElementById('charCount');
+    const charCount = document.getElementById('promptCounter') || document.getElementById('charCount');
 
     if (contextInput) {
       const savedContext = localStorage.getItem('sheetgpt_context') || '';
       contextInput.value = savedContext;
-      if (charCount) charCount.textContent = savedContext.length;
+      const maxLen = contextInput.getAttribute('maxlength') || 2000;
+      if (charCount) charCount.textContent = `${savedContext.length}/${maxLen}`;
 
-      // Reset all role cards
+      // Reset all role cards and preset buttons
       document.querySelectorAll('.role-card').forEach(c => c.classList.remove('selected'));
+      document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
       if (promptIndicator) promptIndicator.style.background = 'var(--accent-primary)';
 
       // Detect if saved context matches a role template
@@ -279,12 +263,12 @@ function initSettingsMenu() {
   });
 
   document.getElementById('historyMenuBtn')?.addEventListener('click', () => {
-    settingsDropdown.classList.remove('show');
+    if (settingsDropdown) settingsDropdown.classList.remove('show');
     document.getElementById('historyDropdown')?.classList.toggle('show');
   });
 
   document.getElementById('upgradeBtn')?.addEventListener('click', () => {
-    settingsDropdown.classList.remove('show');
+    if (settingsDropdown) settingsDropdown.classList.remove('show');
     openModal('upgradeModal');
   });
 
@@ -294,12 +278,12 @@ function initSettingsMenu() {
 }
 
 function initModals() {
-  // Personalize modal
+  // Personalize modal - support both old and new element IDs
   const personalizeModal = document.getElementById('personalizeModal');
-  const cancelPersonalizeBtn = document.getElementById('cancelPersonalizeBtn');
-  const savePersonalizeBtn = document.getElementById('savePersonalizeBtn');
-  const contextInput = document.getElementById('customContextInput');
-  const charCount = document.getElementById('charCount');
+  const cancelPersonalizeBtn = document.getElementById('closePersonalize') || document.getElementById('cancelPersonalizeBtn');
+  const savePersonalizeBtn = document.getElementById('savePrompt') || document.getElementById('savePersonalizeBtn');
+  const contextInput = document.getElementById('promptField') || document.getElementById('customContextInput');
+  const charCount = document.getElementById('promptCounter') || document.getElementById('charCount');
 
   // Note: Context loading and role selection happens in personalizeBtn click handler
 
@@ -315,7 +299,10 @@ function initModals() {
   });
 
   contextInput?.addEventListener('input', () => {
-    if (charCount) charCount.textContent = contextInput.value.length;
+    if (charCount) {
+      const maxLen = contextInput.getAttribute('maxlength') || 2000;
+      charCount.textContent = `${contextInput.value.length}/${maxLen}`;
+    }
   });
 
   // Role card buttons (new design)
@@ -347,15 +334,21 @@ function initModals() {
     });
   });
 
-  // Clear context button
-  document.getElementById('clearContextBtn')?.addEventListener('click', () => {
+  // Clear context button - support both old and new element IDs
+  const clearBtn = document.getElementById('clearPrompt') || document.getElementById('clearContextBtn');
+  clearBtn?.addEventListener('click', () => {
     if (contextInput) {
       contextInput.value = '';
-      if (charCount) charCount.textContent = '0';
+      const maxLen = contextInput.getAttribute('maxlength') || 2000;
+      if (charCount) charCount.textContent = `0/${maxLen}`;
 
       // Reset all role cards selection
       document.querySelectorAll('.role-card').forEach(c => {
         c.classList.remove('selected');
+      });
+      // Also reset preset buttons if present
+      document.querySelectorAll('.preset-btn').forEach(b => {
+        b.classList.remove('active');
       });
 
       // Reset prompt indicator to default
@@ -608,7 +601,8 @@ function handleLogout() {
   showToast('Выход выполнен', 'info');
 
   // Закрыть dropdown
-  document.getElementById('settingsDropdown')?.classList.remove('show');
+  const dropdown = document.getElementById('menuDropdown') || document.getElementById('settingsDropdown');
+  if (dropdown) dropdown.classList.remove('show');
 
   // Показать экран активации (не перезагружать страницу)
   setTimeout(() => {

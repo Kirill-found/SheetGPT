@@ -3,275 +3,213 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>SheetGPT AI</title>
+  <title>SheetGPT</title>
   
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@500;600;700&family=Outfit:wght@500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
   
   <style>
+    :root, [data-theme="dark"] {
+      --bg-primary: #0C0C0F;
+      --bg-secondary: #16161A;
+      --bg-tertiary: #1E1E24;
+      --text-primary: #FFFFFF;
+      --text-secondary: #A0A0AB;
+      --text-muted: #5C5C66;
+      --accent: #A1FF62;
+      --accent-hover: #8FE856;
+      --accent-subtle: rgba(161, 255, 98, 0.12);
+      --border: rgba(255, 255, 255, 0.08);
+      --border-strong: rgba(255, 255, 255, 0.15);
+      --grid-color: rgba(255, 255, 255, 0.03);
+      --shadow: rgba(0, 0, 0, 0.5);
+    }
+
+    [data-theme="light"] {
+      --bg-primary: #FAFAFA;
+      --bg-secondary: #FFFFFF;
+      --bg-tertiary: #F0F0F2;
+      --text-primary: #0C0C0F;
+      --text-secondary: #5C5C66;
+      --text-muted: #9C9CA6;
+      --accent: #6840FF;
+      --accent-hover: #5835DB;
+      --accent-subtle: rgba(104, 64, 255, 0.1);
+      --border: rgba(0, 0, 0, 0.06);
+      --border-strong: rgba(0, 0, 0, 0.12);
+      --grid-color: rgba(0, 0, 0, 0.03);
+      --shadow: rgba(0, 0, 0, 0.08);
+    }
+
     :root {
-      --surface-0: #FAFAF9;
-      --surface-1: #F5F5F4;
-      --surface-2: #E7E5E4;
-      --surface-elevated: #FFFFFF;
-      
-      --accent-primary: #84CC16;
-      --accent-primary-hover: #65A30D;
-      --accent-glow: rgba(132, 204, 22, 0.3);
-      
-      --ink-primary: #1C1917;
-      --ink-secondary: #57534E;
-      --ink-tertiary: #A8A29E;
-      --ink-inverse: #FAFAF9;
-      
-      --data-success: #22C55E;
-      --data-error: #EF4444;
-      
-      --border-default: rgba(28, 25, 23, 0.15);
-      --border-strong: rgba(28, 25, 23, 0.25);
-      
-      --shadow-md: 4px 4px 0 rgba(28, 25, 23, 0.1);
-      --shadow-lg: 6px 6px 0 rgba(28, 25, 23, 0.12);
-      
-      --radius-sm: 4px;
-      --radius-md: 8px;
-      --radius-lg: 12px;
-      
-      --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
-      --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+      --success: #22C55E;
+      --error: #EF4444;
+      --font-mono: 'JetBrains Mono', monospace;
+      --font-sans: 'Inter', sans-serif;
+      --radius-sm: 6px;
+      --radius-md: 10px;
+      --radius-lg: 14px;
+      --radius-full: 9999px;
+      --ease: cubic-bezier(0.16, 1, 0.3, 1);
+      --spring: cubic-bezier(0.34, 1.56, 0.64, 1);
     }
 
-    /* Dark Mode */
-    [data-theme="dark"] {
-      --surface-0: #0C0A09;
-      --surface-1: #1C1917;
-      --surface-2: #292524;
-      --surface-elevated: #171412;
-      
-      --ink-primary: #FAFAF9;
-      --ink-secondary: #A8A29E;
-      --ink-tertiary: #78716C;
-      --ink-inverse: #0C0A09;
-      
-      --border-default: rgba(250, 250, 249, 0.1);
-      --border-strong: rgba(250, 250, 249, 0.18);
-      
-      --shadow-md: 4px 4px 0 rgba(0, 0, 0, 0.5);
-      --shadow-lg: 6px 6px 0 rgba(0, 0, 0, 0.6);
-    }
-
-    * {
-      box-sizing: border-box;
-      margin: 0;
-      padding: 0;
-    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
 
     body {
-      width: 320px;
-      font-family: 'Outfit', -apple-system, sans-serif;
-      background: var(--surface-0);
-      color: var(--ink-primary);
+      width: 300px;
+      font-family: var(--font-sans);
+      background: var(--bg-primary);
+      color: var(--text-primary);
       padding: 20px;
-      position: relative;
-      overflow: hidden;
+      transition: background 0.3s var(--ease);
+      -webkit-font-smoothing: antialiased;
     }
 
-    /* Grid background */
     body::before {
       content: '';
-      position: absolute;
+      position: fixed;
       inset: 0;
       background-image: 
-        linear-gradient(rgba(28, 25, 23, 0.03) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(28, 25, 23, 0.03) 1px, transparent 1px);
+        linear-gradient(var(--grid-color) 1px, transparent 1px),
+        linear-gradient(90deg, var(--grid-color) 1px, transparent 1px);
       background-size: 20px 20px;
       pointer-events: none;
     }
 
-    [data-theme="dark"] body::before {
-      background-image: 
-        linear-gradient(rgba(250, 250, 249, 0.02) 1px, transparent 1px),
-        linear-gradient(90deg, rgba(250, 250, 249, 0.02) 1px, transparent 1px);
-    }
-
-    /* Header */
     .header {
       display: flex;
       align-items: center;
       justify-content: space-between;
       margin-bottom: 20px;
       position: relative;
+      z-index: 1;
     }
 
-    .header-left {
+    .logo {
       display: flex;
       align-items: center;
-      gap: 12px;
+      gap: 10px;
     }
 
-    .logo-mark {
-      width: 48px;
-      height: 48px;
-      background: var(--ink-primary);
+    .logo-icon {
+      width: 36px;
+      height: 36px;
+      background: var(--accent);
       border-radius: var(--radius-sm);
       display: flex;
       align-items: center;
       justify-content: center;
-      position: relative;
-      box-shadow: var(--shadow-md);
-      flex-shrink: 0;
     }
 
-    .logo-mark::before {
-      content: '';
-      position: absolute;
-      inset: 3px;
-      border: 2px solid var(--accent-primary);
-      border-radius: 2px;
+    .logo-icon svg {
+      width: 20px;
+      height: 20px;
+      color: var(--bg-primary);
     }
 
-    .logo-mark svg {
-      width: 24px;
-      height: 24px;
-      color: var(--accent-primary);
+    .logo-text {
+      font-family: var(--font-mono);
+      font-size: 16px;
+      font-weight: 600;
     }
 
-    .header-text h1 {
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 20px;
-      font-weight: 700;
-      letter-spacing: -0.02em;
-      margin-bottom: 2px;
-    }
-
-    .header-text h1 span {
-      color: var(--accent-primary);
-    }
-
-    .header-text p {
-      font-size: 12px;
-      color: var(--ink-tertiary);
-      font-family: 'JetBrains Mono', monospace;
-    }
-
-    /* Theme Toggle Button */
     .theme-btn {
-      width: 36px;
-      height: 36px;
-      background: transparent;
-      border: 2px solid var(--border-default);
+      width: 32px;
+      height: 32px;
+      background: var(--bg-secondary);
+      border: 1px solid var(--border);
       border-radius: var(--radius-sm);
       cursor: pointer;
       display: flex;
       align-items: center;
       justify-content: center;
-      color: var(--ink-secondary);
-      transition: all 0.2s var(--ease-out);
+      color: var(--text-muted);
+      transition: all 0.15s;
       position: relative;
       overflow: hidden;
     }
 
     .theme-btn:hover {
-      background: var(--surface-1);
-      border-color: var(--ink-primary);
-      color: var(--ink-primary);
+      color: var(--text-primary);
+      border-color: var(--border-strong);
     }
 
     .theme-btn svg {
-      width: 18px;
-      height: 18px;
+      width: 16px;
+      height: 16px;
       position: absolute;
-      transition: all 0.3s var(--ease-spring);
+      transition: all 0.25s var(--spring);
     }
 
-    .theme-btn .sun-icon {
-      opacity: 1;
-      transform: rotate(0deg) scale(1);
-    }
-
-    .theme-btn .moon-icon {
-      opacity: 0;
-      transform: rotate(90deg) scale(0.5);
-    }
-
-    [data-theme="dark"] .theme-btn .sun-icon {
+    .theme-btn .icon-sun {
       opacity: 0;
       transform: rotate(-90deg) scale(0.5);
     }
 
-    [data-theme="dark"] .theme-btn .moon-icon {
+    .theme-btn .icon-moon {
       opacity: 1;
       transform: rotate(0deg) scale(1);
     }
 
-    /* Status Banner */
+    [data-theme="light"] .theme-btn .icon-sun {
+      opacity: 1;
+      transform: rotate(0deg) scale(1);
+    }
+
+    [data-theme="light"] .theme-btn .icon-moon {
+      opacity: 0;
+      transform: rotate(90deg) scale(0.5);
+    }
+
     .status {
       display: none;
       align-items: center;
-      gap: 10px;
-      padding: 12px 16px;
-      background: var(--surface-1);
-      border: 2px solid var(--border-default);
+      gap: 8px;
+      padding: 10px 14px;
+      background: var(--bg-secondary);
+      border: 1px solid var(--border);
       border-radius: var(--radius-md);
       margin-bottom: 16px;
-      font-family: 'JetBrains Mono', monospace;
+      font-family: var(--font-mono);
       font-size: 12px;
-      animation: slideIn 0.3s var(--ease-out);
+      position: relative;
+      z-index: 1;
+      animation: slideIn 0.2s var(--ease);
     }
 
     @keyframes slideIn {
-      from {
-        opacity: 0;
-        transform: translateY(-8px);
-      }
-      to {
-        opacity: 1;
-        transform: translateY(0);
-      }
+      from { opacity: 0; transform: translateY(-6px); }
+      to { opacity: 1; transform: translateY(0); }
     }
 
-    .status.show {
-      display: flex;
-    }
-
-    .status.success {
-      background: rgba(34, 197, 94, 0.1);
-      border-color: var(--data-success);
-      color: var(--data-success);
-    }
-
-    .status.error {
-      background: rgba(239, 68, 68, 0.1);
-      border-color: var(--data-error);
-      color: var(--data-error);
-    }
+    .status.show { display: flex; }
+    .status.success { background: rgba(34, 197, 94, 0.12); border-color: var(--success); color: var(--success); }
+    .status.error { background: rgba(239, 68, 68, 0.12); border-color: var(--error); color: var(--error); }
 
     .status-dot {
-      width: 8px;
-      height: 8px;
+      width: 6px;
+      height: 6px;
       border-radius: 50%;
       background: currentColor;
-      flex-shrink: 0;
       animation: pulse 2s ease-in-out infinite;
     }
 
     @keyframes pulse {
       0%, 100% { opacity: 1; }
-      50% { opacity: 0.5; }
+      50% { opacity: 0.4; }
     }
 
-    /* Description */
     .description {
-      font-size: 14px;
+      font-size: 13px;
       line-height: 1.6;
-      color: var(--ink-secondary);
+      color: var(--text-secondary);
       margin-bottom: 20px;
-      padding-bottom: 20px;
-      border-bottom: 1px dashed var(--border-default);
+      position: relative;
+      z-index: 1;
     }
 
-    /* Buttons */
     .btn {
       display: flex;
       align-items: center;
@@ -279,207 +217,167 @@
       gap: 10px;
       width: 100%;
       padding: 14px 20px;
-      font-family: 'JetBrains Mono', monospace;
+      font-family: var(--font-mono);
       font-size: 13px;
-      font-weight: 600;
-      border-radius: var(--radius-md);
-      border: 2px solid transparent;
+      font-weight: 500;
+      border-radius: var(--radius-full);
+      border: none;
       cursor: pointer;
       text-decoration: none;
-      transition: all 0.2s var(--ease-spring);
+      transition: all 0.15s var(--spring);
       margin-bottom: 10px;
       position: relative;
-      overflow: hidden;
+      z-index: 1;
     }
 
     .btn svg {
       width: 18px;
       height: 18px;
-      flex-shrink: 0;
     }
 
     .btn-primary {
-      background: var(--ink-primary);
-      color: var(--accent-primary);
-      border-color: var(--ink-primary);
-      box-shadow: var(--shadow-md);
+      background: var(--accent);
+      color: var(--bg-primary);
     }
 
     .btn-primary:hover {
-      transform: translateY(-3px);
-      box-shadow: var(--shadow-lg);
-    }
-
-    .btn-primary:active {
-      transform: translateY(0);
-      box-shadow: none;
+      background: var(--accent-hover);
+      transform: translateY(-2px);
+      box-shadow: 0 8px 20px var(--shadow);
     }
 
     .btn-secondary {
-      background: var(--surface-elevated);
-      color: var(--ink-primary);
-      border-color: var(--border-strong);
+      background: var(--bg-secondary);
+      color: var(--text-secondary);
+      border: 1px solid var(--border);
     }
 
     .btn-secondary:hover {
-      background: var(--surface-1);
-      border-color: var(--ink-primary);
-      transform: translateY(-2px);
-      box-shadow: var(--shadow-md);
+      border-color: var(--border-strong);
+      color: var(--text-primary);
     }
 
-    .btn-secondary:active {
-      transform: translateY(0);
-      box-shadow: none;
+    .hidden { display: none !important; }
+
+    .divider {
+      height: 1px;
+      background: var(--border);
+      margin: 16px 0;
+      position: relative;
+      z-index: 1;
     }
 
-    /* Hidden utility */
-    .hidden {
-      display: none !important;
-    }
-
-    /* Footer */
     .footer {
-      margin-top: 16px;
-      padding-top: 16px;
-      border-top: 1px dashed var(--border-default);
       display: flex;
       align-items: center;
       justify-content: space-between;
+      position: relative;
+      z-index: 1;
     }
 
     .version {
-      font-family: 'JetBrains Mono', monospace;
+      font-family: var(--font-mono);
       font-size: 10px;
-      color: var(--ink-tertiary);
+      color: var(--text-muted);
       text-transform: uppercase;
-      letter-spacing: 0.1em;
+      letter-spacing: 0.08em;
     }
 
     .footer-link {
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 11px;
-      color: var(--ink-tertiary);
+      font-size: 12px;
+      color: var(--text-muted);
       text-decoration: none;
-      transition: color 0.2s;
+      transition: color 0.15s;
     }
 
     .footer-link:hover {
-      color: var(--accent-primary);
+      color: var(--accent);
     }
 
-    /* Keyboard shortcuts hint */
     .kbd-hint {
       display: flex;
       align-items: center;
-      gap: 8px;
-      margin-top: 12px;
       justify-content: center;
+      gap: 6px;
+      margin-top: 12px;
+      position: relative;
+      z-index: 1;
     }
 
     .kbd {
-      font-family: 'JetBrains Mono', monospace;
+      font-family: var(--font-mono);
       font-size: 10px;
-      background: var(--surface-2);
-      border: 1px solid var(--border-default);
-      border-radius: 3px;
+      background: var(--bg-secondary);
+      border: 1px solid var(--border);
+      border-radius: 4px;
       padding: 3px 6px;
-      color: var(--ink-tertiary);
+      color: var(--text-muted);
     }
 
     .kbd-hint span {
       font-size: 11px;
-      color: var(--ink-tertiary);
+      color: var(--text-muted);
     }
   </style>
 </head>
-<body>
-  <!-- Header -->
+<body data-theme="dark">
   <div class="header">
-    <div class="header-left">
-      <div class="logo-mark">
-        <!-- Custom Grid/Table Icon -->
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+    <div class="logo">
+      <div class="logo-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
           <rect x="3" y="3" width="18" height="18" rx="2"/>
           <line x1="3" y1="9" x2="21" y2="9"/>
           <line x1="9" y1="3" x2="9" y2="21"/>
         </svg>
       </div>
-      <div class="header-text">
-        <h1>Sheet<span>GPT</span></h1>
-        <p>AI для таблиц</p>
-      </div>
+      <span class="logo-text">SheetGPT</span>
     </div>
     
-    <!-- Theme Toggle -->
-    <button class="theme-btn" id="themeToggle" aria-label="Переключить тему">
-      <svg class="sun-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-        <circle cx="12" cy="12" r="4"/>
-        <path d="M12 2v2"/>
-        <path d="M12 20v2"/>
-        <path d="M4.93 4.93l1.41 1.41"/>
-        <path d="M17.66 17.66l1.41 1.41"/>
-        <path d="M2 12h2"/>
-        <path d="M20 12h2"/>
-        <path d="M6.34 17.66l-1.41 1.41"/>
-        <path d="M19.07 4.93l-1.41 1.41"/>
+    <button class="theme-btn" id="themeToggle">
+      <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M4.93 4.93l1.41 1.41m11.32 11.32l1.41 1.41M2 12h2m16 0h2M6.34 17.66l-1.41 1.41m12.73-12.73l1.41-1.41"/>
       </svg>
-      <svg class="moon-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+      <svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
         <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
       </svg>
     </button>
   </div>
 
-  <!-- Status Banner -->
   <div id="status" class="status">
     <span class="status-dot"></span>
     <span id="statusText"></span>
   </div>
 
-  <!-- Description -->
   <p class="description">
-    Анализируй данные, создавай формулы и генерируй отчёты с помощью AI прямо в Google Sheets.
+    AI-ассистент для Google Sheets. Формулы, анализ данных, автоматизация — просто опиши задачу.
   </p>
 
-  <!-- Open Sidebar Button (shown when on Sheets) -->
   <button id="open-sidebar-btn" class="btn btn-primary hidden">
-    <!-- Lightning Icon -->
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-      <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
-    </svg>
-    Запустить SheetGPT
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+    Запустить
   </button>
 
-  <!-- Open Sheets Button (shown when not on Sheets) -->
   <a id="open-sheets-btn" href="https://docs.google.com/spreadsheets" target="_blank" class="btn btn-primary">
-    <!-- Table Icon -->
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
       <rect x="3" y="3" width="18" height="18" rx="2"/>
       <line x1="3" y1="9" x2="21" y2="9"/>
-      <line x1="3" y1="15" x2="21" y2="15"/>
       <line x1="9" y1="3" x2="9" y2="21"/>
-      <line x1="15" y1="3" x2="15" y2="21"/>
     </svg>
-    Открыть Google Sheets
+    Открыть Sheets
   </a>
 
-  <!-- Test Connection Button -->
   <button id="test-btn" class="btn btn-secondary">
-    <!-- Shield Check Icon -->
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-      <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
-      <path d="M9 12l2 2 4-4"/>
-    </svg>
-    Проверить подключение
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="M9 12l2 2 4-4"/></svg>
+    Проверить
   </button>
 
-  <!-- Keyboard Shortcut Hint -->
   <div class="kbd-hint">
-    <kbd>Alt</kbd> + <kbd>S</kbd>
-    <span>быстрый запуск</span>
+    <kbd>Alt</kbd><span>+</span><kbd>S</kbd>
+    <span>— быстрый запуск</span>
   </div>
 
-  <!-- Footer -->
+  <div class="divider"></div>
+
   <div class="footer">
     <span class="version">v7.5.6</span>
     <a href="https://sheetgpt.app" target="_blank" class="footer-link">sheetgpt.app</a>
@@ -487,26 +385,20 @@
 
   <script src="popup.js"></script>
   <script>
-    // Theme management for popup
-    function initTheme() {
-      const savedTheme = localStorage.getItem('sheetgpt_theme');
-      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-      const theme = savedTheme || (prefersDark ? 'dark' : 'light');
-      document.documentElement.setAttribute('data-theme', theme);
+    function setTheme(theme) {
+      document.body.setAttribute('data-theme', theme);
+      localStorage.setItem('sheetgpt_theme', theme);
     }
 
     function toggleTheme() {
-      const currentTheme = document.documentElement.getAttribute('data-theme');
-      const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
-      document.documentElement.setAttribute('data-theme', newTheme);
-      localStorage.setItem('sheetgpt_theme', newTheme);
+      const current = document.body.getAttribute('data-theme');
+      setTheme(current === 'dark' ? 'light' : 'dark');
     }
 
-    // Initialize
-    initTheme();
-    
-    // Theme toggle listener
-    document.getElementById('themeToggle')?.addEventListener('click', toggleTheme);
+    const savedTheme = localStorage.getItem('sheetgpt_theme') || 'dark';
+    setTheme(savedTheme);
+
+    document.getElementById('themeToggle').addEventListener('click', toggleTheme);
   </script>
 </body>
 </html>
