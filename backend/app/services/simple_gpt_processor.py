@@ -208,7 +208,10 @@ result = df[df['Город'] == 'Москва']
 
             # Add structured_data for tables/lists
             if result_type == "table" and isinstance(formatted_result, list):
+                # Extract headers from first row keys (rows are dicts from DataFrame)
+                headers = list(formatted_result[0].keys()) if formatted_result else []
                 response["structured_data"] = {
+                    "headers": headers,
                     "rows": formatted_result,
                     "display_mode": "sidebar_only" if len(formatted_result) <= 20 else "create_sheet"
                 }

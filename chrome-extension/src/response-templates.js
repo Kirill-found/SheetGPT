@@ -306,23 +306,22 @@ function renderAIResponse(result) {
 
   let html = '';
 
-  // v9.0.2: Проверяем display_mode - сначала от бэкенда, потом локально
+  // v9.0.3: Проверяем display_mode - приоритет у явного запроса пользователя
   const userQuery = (window.lastUserQuery || '').toLowerCase();
   const wantsNewSheet = userQuery.includes('отдельн') || userQuery.includes('новом листе') ||
                        userQuery.includes('новый лист') || userQuery.includes('создай лист') ||
-                       userQuery.includes('в листе') || userQuery.includes('на листе');
+                       userQuery.includes('создай таблицу') || userQuery.includes('в листе') ||
+                       userQuery.includes('на листе') || userQuery.includes('в таблиц');
   const rowCount = result.structured_data?.rows?.length || 0;
 
-  // v9.0.2: Используем ту же логику что и в sidebar.js
-  let displayMode = result.structured_data?.display_mode;
-  if (!displayMode) {
-    if (wantsNewSheet) {
-      displayMode = 'create_sheet';
-    } else if (rowCount > 50) {
-      displayMode = 'create_sheet';
-    } else {
-      displayMode = 'sidebar_only';
-    }
+  // v9.0.3: Приоритет - запрос пользователя > размер данных > ответ бэкенда
+  let displayMode;
+  if (wantsNewSheet) {
+    displayMode = 'create_sheet';
+  } else if (rowCount > 50) {
+    displayMode = 'create_sheet';
+  } else {
+    displayMode = result.structured_data?.display_mode || 'sidebar_only';
   }
   const shouldCreateSheet = displayMode === 'create_sheet';
 

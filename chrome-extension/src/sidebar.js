@@ -609,23 +609,23 @@ let isProcessing = false;
           const userQuery = (window.lastUserQuery || '').toLowerCase();
           const wantsNewSheet = userQuery.includes('отдельн') || userQuery.includes('новом листе') ||
                                userQuery.includes('новый лист') || userQuery.includes('создай лист') ||
-                               userQuery.includes('в листе') || userQuery.includes('на листе');
+                               userQuery.includes('создай таблицу') || userQuery.includes('в листе') ||
+                               userQuery.includes('на листе') || userQuery.includes('в таблиц');
 
           // Логика выбора display_mode:
-          // 1. Если явно указан в ответе - используем его
-          // 2. Если пользователь просит отдельный лист - create_sheet
-          // 3. Если > 50 строк - create_sheet
+          // 1. Если пользователь ЯВНО просит создать лист - ВСЕГДА create_sheet (приоритет!)
+          // 2. Если > 50 строк - create_sheet
+          // 3. Если указано в ответе backend - используем его
           // 4. Иначе - sidebar_only
-          let displayMode = result.structured_data.display_mode;
-          if (!displayMode) {
-            if (wantsNewSheet) {
-              displayMode = 'create_sheet';
-              console.log('[UI] User requested new sheet explicitly');
-            } else if (rowCount > 50) {
-              displayMode = 'create_sheet';
-            } else {
-              displayMode = 'sidebar_only';
-            }
+          let displayMode;
+          if (wantsNewSheet) {
+            displayMode = 'create_sheet';
+            console.log('[UI] User requested new sheet explicitly, overriding backend');
+          } else if (rowCount > 50) {
+            displayMode = 'create_sheet';
+            console.log('[UI] Large dataset (>50 rows), creating sheet');
+          } else {
+            displayMode = result.structured_data.display_mode || 'sidebar_only';
           }
           console.log('[UI] Display mode:', displayMode);
 
