@@ -59,17 +59,37 @@ class TelegramUser(Base):
         if not self.is_active:
             return False
 
+        # queries_limit = -1 означает безлимит (независимо от tier)
+        if self.queries_limit == -1:
+            return True
+
         # Premium пользователи имеют безлимит
         if self.subscription_tier == "premium":
             # Проверяем, не истекла ли подписка
             if self.premium_until:
                 from datetime import datetime, timezone
                 if datetime.now(timezone.utc) > self.premium_until:
-                    return False
+                    # Подписка истекла - понижаем до free
+                    return self.queries_used_today < 10  # default free limit
             return True
 
         # Free пользователи ограничены дневным лимитом
         return self.queries_used_today < self.queries_limit
+
+    def upgrade_to_premium(self, duration_days: int = 365):
+        """Обновление до Premium подписки"""
+        from datetime import datetime, timezone, timedelta
+        self.subscription_tier = "premium"
+        self.queries_limit = -1  # Unlimited
+        self.queries_used_today = 0  # Reset usage
+        self.premium_until = datetime.now(timezone.utc) + timedelta(days=duration_days)
+
+    def downgrade_to_free(self):
+        """Понижение до Free плана"""
+        self.subscription_tier = "free"
+        self.queries_limit = 10
+        self.queries_used_today = 0
+        self.premium_until = None
 
     def increment_usage(self):
         """Увеличение счетчика использования"""

@@ -297,12 +297,8 @@ async def admin_set_premium(
     if not user:
         raise HTTPException(status_code=404, detail=f"User {telegram_user_id} not found")
 
-    from datetime import timedelta
-
-    user.subscription_tier = "premium"
-    user.queries_limit = -1  # Unlimited
-    user.queries_used_today = 0  # Reset usage
-    user.premium_until = datetime.now(timezone.utc) + timedelta(days=duration_days)
+    # Используем метод модели для корректного обновления всех полей
+    user.upgrade_to_premium(duration_days=duration_days)
 
     await db.commit()
     await db.refresh(user)
@@ -558,9 +554,15 @@ async def increment_usage_by_license(
     if not user.is_active:
         raise HTTPException(status_code=403, detail="License inactive")
 
+    # Определяем, является ли пользователь premium/unlimited
+    is_unlimited = (
+        user.subscription_tier == "premium" or
+        user.queries_limit == -1
+    )
+
     # Проверяем лимит перед инкрементом
     if not user.can_make_query():
-        queries_remaining = max(0, user.queries_limit - user.queries_used_today)
+        queries_remaining = -1 if is_unlimited else max(0, user.queries_limit - user.queries_used_today)
         return UsageIncrementResponse(
             success=False,
             queries_used_today=user.queries_used_today,
@@ -575,7 +577,7 @@ async def increment_usage_by_license(
     await db.commit()
     await db.refresh(user)
 
-    queries_remaining = -1 if user.subscription_tier == "premium" else max(0, user.queries_limit - user.queries_used_today)
+    queries_remaining = -1 if is_unlimited else max(0, user.queries_limit - user.queries_used_today)
 
     logger.info(f"Usage incremented for {license_key}: {user.queries_used_today}/{user.queries_limit}")
 

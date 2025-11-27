@@ -843,13 +843,16 @@ let isProcessing = false;
             window.SheetGPTSettings.setUserData(userData);
           }
 
-          // Show warning if limit almost reached
-          if (!data.can_make_query) {
+          // Проверяем, является ли пользователь premium/unlimited
+          const isUnlimited = data.queries_remaining === -1 || data.queries_limit === -1;
+
+          // Show warning if limit almost reached (только для free пользователей)
+          if (!data.can_make_query && !isUnlimited) {
             if (window.SheetGPTSettings) {
               window.SheetGPTSettings.showToast('Лимит запросов исчерпан', 'error');
               window.SheetGPTSettings.openUpgradeModal();
             }
-          } else if (data.queries_remaining <= 3 && data.queries_remaining > 0) {
+          } else if (!isUnlimited && data.queries_remaining <= 3 && data.queries_remaining > 0) {
             if (window.SheetGPTSettings) {
               window.SheetGPTSettings.showToast(`Осталось ${data.queries_remaining} запросов`, 'warning');
             }
