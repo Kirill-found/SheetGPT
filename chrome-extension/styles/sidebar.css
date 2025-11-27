@@ -257,3 +257,145 @@
 .sheetgpt-chat::-webkit-scrollbar-thumb:hover {
   background: #bdc1c6;
 }
+
+/* ============================================
+   PERSONALIZATION MODAL STYLES
+   ============================================ */
+
+.personalize-modal {
+  max-width: 440px !important;
+}
+
+.modal-header-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.modal-subtitle {
+  font-size: 11px;
+  color: var(--ink-tertiary);
+  font-weight: 400;
+}
+
+/* Roles Grid */
+.roles-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  margin-top: 10px;
+}
+
+/* Role Card */
+.role-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 8px;
+  border-radius: 10px;
+  border: 2px solid var(--border-secondary);
+  background: var(--surface-primary);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  outline: none;
+  font-family: inherit;
+}
+
+.role-card:hover {
+  border-color: var(--border-primary);
+  background: var(--surface-secondary);
+}
+
+.role-card.selected {
+  border-color: var(--role-color, var(--accent-primary));
+  background: color-mix(in srgb, var(--role-color, var(--accent-primary)) 10%, transparent);
+}
+
+/* Role Icon */
+.role-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 8px;
+  background: var(--surface-secondary);
+  border: 1.5px solid var(--border-secondary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+
+.role-icon svg {
+  width: 18px;
+  height: 18px;
+  stroke: var(--ink-tertiary);
+  transition: stroke 0.2s ease;
+}
+
+.role-card.selected .role-icon {
+  border-color: var(--role-color, var(--accent-primary));
+  background: color-mix(in srgb, var(--role-color, var(--accent-primary)) 15%, transparent);
+}
+
+.role-card.selected .role-icon svg {
+  stroke: var(--role-color, var(--accent-primary));
+}
+
+/* Role Label */
+.role-label {
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--ink-secondary);
+  text-align: center;
+  line-height: 1.2;
+  transition: color 0.2s ease;
+}
+
+.role-card.selected .role-label {
+  color: var(--ink-primary);
+}
+
+/* Prompt Section */
+.prompt-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+
+.prompt-container {
+  position: relative;
+  border-radius: 10px;
+  border: 2px solid var(--border-secondary);
+  background: var(--surface-primary);
+  overflow: hidden;
+  transition: all 0.2s ease;
+}
+
+.prompt-container:focus-within {
+  border-color: var(--border-primary);
+}
+
+.prompt-indicator {
+  height: 3px;
+  background: var(--accent-primary);
+  transition: background 0.3s ease;
+}
+
+.prompt-textarea {
+  width: 100%;
+  min-height: 180px;
+  padding: 12px 14px;
+  font-size: 11px;
+  line-height: 1.6;
+  color: var(--ink-primary);
+  background: transparent;
+  border: none;
+  outline: none;
+  resize: vertical;
+  font-family: inherit;
+}
+
+.prompt-textarea::placeholder {
+  color: var(--ink-tertiary);
+}
