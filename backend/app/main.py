@@ -157,7 +157,7 @@ async def health_check():
         "timestamp": datetime.now().isoformat(),
         "checks": {
             "ai_service": "operational",
-            "hybrid_processor": "enabled",
+            "simple_gpt_processor": "enabled (v10.0 - no patterns, full GPT)",
             "schema_extractor": "enabled",
             "smart_classifier": "enabled",
             "self_correction": "enabled",
@@ -184,10 +184,10 @@ async def process_formula(
         logger.info(f"[REQUEST v9.0.0] Query: {request.query}")
         logger.info(f"[DATA] Shape: {len(request.sheet_data)} rows x {len(request.column_names)} columns")
 
-        from app.services.hybrid_processor import get_hybrid_processor
+        from app.services.simple_gpt_processor import get_simple_gpt_processor
         import pandas as pd
 
-        logger.info("[ENGINE v9.0.0] Using Hybrid Intelligence Processor")
+        logger.info("[ENGINE v10.0.0] Using SimpleGPT Processor (no patterns, full GPT)")
 
         # Создаем DataFrame из данных
         df = pd.DataFrame(request.sheet_data, columns=request.column_names)
@@ -219,8 +219,8 @@ async def process_formula(
                 df[col] = converted
                 logger.info(f"[AUTO-CONVERT] ✅ '{col}' → numeric")
 
-        # v9.0.0: Use Hybrid Processor
-        processor = get_hybrid_processor()
+        # v10.0.0: Use SimpleGPT Processor (no patterns, full GPT)
+        processor = get_simple_gpt_processor()
         result = await processor.process(
             query=request.query,
             df=df,
@@ -228,8 +228,8 @@ async def process_formula(
             custom_context=request.custom_context
         )
 
-        logger.info(f"[SUCCESS] Hybrid processing completed")
-        logger.info(f"[STRATEGY] {result.get('strategy', 'N/A')}")
+        logger.info(f"[SUCCESS] SimpleGPT processing completed")
+        logger.info(f"[PROCESSOR] {result.get('processor', 'N/A')}")
         logger.info(f"[TIME] {result.get('processing_time', 'N/A')}")
 
         # Log result summary
