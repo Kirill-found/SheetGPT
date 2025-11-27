@@ -793,10 +793,28 @@ function convertStructuredDataToValues(structuredData) {
     throw new Error('Invalid structured data format: data is null or undefined');
   }
 
-  // Backend returns format: { headers: [...], rows: [[...], [...]], ... }
+  // Backend returns format: { headers: [...], rows: [...], ... }
   if (structuredData.headers && structuredData.rows) {
     console.log('[SheetGPT] Using headers/rows format');
-    return [structuredData.headers, ...structuredData.rows];
+    const headers = structuredData.headers;
+
+    // Check if rows are objects (from DataFrame.to_dict('records')) or arrays
+    const firstRow = structuredData.rows[0];
+    if (firstRow && typeof firstRow === 'object' && !Array.isArray(firstRow)) {
+      // Rows are objects - convert to arrays using headers as keys
+      console.log('[SheetGPT] Converting object rows to arrays');
+      const convertedRows = structuredData.rows.map(row => {
+        return headers.map(header => {
+          const value = row[header];
+          return value !== undefined && value !== null ? value : '';
+        });
+      });
+      return [headers, ...convertedRows];
+    } else {
+      // Rows are already arrays
+      console.log('[SheetGPT] Rows are already arrays');
+      return [headers, ...structuredData.rows];
+    }
   }
 
   // Alternative format: { columns: [...], data: [...] }
