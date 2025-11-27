@@ -63,6 +63,56 @@ function createFormulaResponse(result) {
   `;
 }
 
+// ===== ШАБЛОН: Ответ с предложением создать лист (> 20 строк) =====
+function createAnalysisWithSheetOffer(result) {
+  const findings = result.key_findings || result.findings || [];
+  const findingsList = findings.length > 0
+    ? `<ul class="findings-list">${findings.map(f => `<li>${f}</li>`).join('')}</ul>`
+    : '';
+
+  // Сохраняем structured_data для создания листа
+  const structuredDataJson = JSON.stringify(result.structured_data || {}).replace(/'/g, "\\'");
+
+  return `
+    <div class="message ai">
+      <div class="message-bubble">
+        <div class="ai-response">
+          <div class="response-header">
+            <div class="response-type-icon analysis">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M3 3v18h18"/>
+                <path d="M7 12l4-4 4 4 5-5"/>
+              </svg>
+            </div>
+            <span class="response-type-label">Анализ</span>
+          </div>
+          <div class="response-body">
+            <div class="response-result">${result.summary || 'Результат анализа'}</div>
+            ${findingsList}
+            ${result.explanation ? `<div class="response-explanation">${result.explanation}</div>` : ''}
+
+            <div class="sheet-offer" style="margin-top: 12px; padding: 10px; background: #f0f9ff; border-radius: 8px; border: 1px solid #bae6fd;">
+              <div style="font-size: 13px; color: #0369a1; margin-bottom: 8px;">
+                📊 ${result.rowCount || 0} строк — создать отдельный лист в Google Sheets?
+              </div>
+              <div style="display: flex; gap: 8px;">
+                <button onclick="createSheetFromOffer('${structuredDataJson}')"
+                        style="padding: 6px 12px; background: #0ea5e9; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 12px;">
+                  ✓ Создать лист
+                </button>
+                <button onclick="this.closest('.sheet-offer').style.display='none'"
+                        style="padding: 6px 12px; background: #e2e8f0; color: #475569; border: none; border-radius: 6px; cursor: pointer; font-size: 12px;">
+                  ✗ Не нужно
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
 // ===== ШАБЛОН: Ответ с анализом (calculate_count и т.д.) =====
 function createAnalysisResponse(result) {
   const findings = result.key_findings || result.findings || [];
@@ -279,19 +329,28 @@ function renderAIResponse(result) {
   // Проверяем есть ли highlight_rows
   if (result.highlight_rows && result.highlight_rows.length > 0) {
     html = createHighlightResponse(result);
-  } else if (result.structured_data && shouldCreateSheet) {
-    // v9.0.1: Если нужен отдельный лист - не рисуем таблицу в sidebar, только уведомление
+  } else if (result.structured_data && wantsNewSheet) {
+    // Пользователь явно попросил создать лист - показываем уведомление
     // Таблица будет создана через createTableAndChart в sidebar.js
     html = createAnalysisResponse({
       ...result,
       summary: result.summary || `Создаю таблицу (${rowCount} строк)...`
     });
   } else if (result.structured_data) {
-    // sidebar_only - просто показываем данные как analysis, таблица уже рендерится в displayTableInSidebar
-    html = createAnalysisResponse({
-      ...result,
-      summary: result.summary || `Найдено ${rowCount} записей`
-    });
+    // Показываем результат в sidebar
+    // Если > 20 строк - предлагаем создать лист (пользователь решает)
+    if (rowCount > 20) {
+      html = createAnalysisWithSheetOffer({
+        ...result,
+        summary: result.summary || `Найдено ${rowCount} записей`,
+        rowCount: rowCount
+      });
+    } else {
+      html = createAnalysisResponse({
+        ...result,
+        summary: result.summary || `Найдено ${rowCount} записей`
+      });
+    }
   } else {
     switch (responseType) {
       case 'formula':

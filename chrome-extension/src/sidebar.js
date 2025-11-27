@@ -1109,6 +1109,51 @@ let isProcessing = false;
       scrollToBottom();
     }
 
+    // Глобальная функция для создания листа из предложения
+    window.createSheetFromOffer = function(structuredDataJson) {
+      try {
+        const structuredData = JSON.parse(structuredDataJson);
+        console.log('[UI] Creating sheet from offer:', structuredData);
+
+        // Добавляем headers если их нет
+        if (!structuredData.headers && structuredData.rows && structuredData.rows.length > 0) {
+          const firstRow = structuredData.rows[0];
+          if (!Array.isArray(firstRow) && typeof firstRow === 'object') {
+            structuredData.headers = Object.keys(firstRow);
+          }
+        }
+
+        google.script.run
+          .withSuccessHandler(function(result) {
+            console.log('[UI] Sheet created:', result);
+            const container = document.getElementById('chatContainer');
+            const successDiv = document.createElement('div');
+            successDiv.className = 'message ai';
+            successDiv.innerHTML = `
+              <div class="message-bubble">
+                <div class="content-box success">
+                  ✅ Лист "${result.sheet_name || 'SheetGPT'}" создан (${result.rows_count || structuredData.rows?.length || 0} строк)
+                </div>
+              </div>
+            `;
+            container.appendChild(successDiv);
+            scrollToBottom();
+          })
+          .withFailureHandler(function(error) {
+            console.error('[UI] Sheet creation failed:', error);
+            alert('Ошибка при создании листа: ' + error.message);
+          })
+          .createTableAndChart(structuredData);
+
+        // Скрываем блок с предложением
+        document.querySelectorAll('.sheet-offer').forEach(el => el.style.display = 'none');
+
+      } catch (e) {
+        console.error('[UI] Error parsing structured data:', e);
+        alert('Ошибка: ' + e.message);
+      }
+    };
+
     function scrollToBottom() {
       const container = document.getElementById('chatContainer');
       setTimeout(() => {
