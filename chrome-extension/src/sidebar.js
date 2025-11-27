@@ -482,14 +482,19 @@ console.log('[Sidebar] ✅ READY message sent to parent');
 let chatHistory = [];
 let isProcessing = false;
 
-    // Initialize
-    document.getElementById('messageInput').addEventListener('input', function() {
-      this.style.height = 'auto';
-      this.style.height = (this.scrollHeight) + 'px';
+    // Initialize - support both old and new element IDs
+    const inputElement = document.getElementById('inputField') || document.getElementById('messageInput');
+    if (inputElement) {
+      inputElement.addEventListener('input', function() {
+        this.style.height = 'auto';
+        this.style.height = (this.scrollHeight) + 'px';
 
-      const sendBtn = document.getElementById('sendBtn');
-      sendBtn.disabled = !this.value.trim() || isProcessing;
-    });
+        const sendBtn = document.getElementById('sendBtn');
+        if (sendBtn) {
+          sendBtn.disabled = !this.value.trim() || isProcessing;
+        }
+      });
+    }
 
     // Character counter
     const customContextInput = document.getElementById('customContextInput');
@@ -507,14 +512,20 @@ let isProcessing = false;
     }
 
     function useExample(query) {
-      document.getElementById('messageInput').value = query;
-      document.getElementById('sendBtn').disabled = false;
+      const input = document.getElementById('inputField') || document.getElementById('messageInput');
+      if (input) {
+        input.value = query;
+      }
+      const sendBtn = document.getElementById('sendBtn');
+      if (sendBtn) {
+        sendBtn.disabled = false;
+      }
       sendMessage();
     }
 
     function sendMessage() {
-      const input = document.getElementById('messageInput');
-      const message = input.value.trim();
+      const input = document.getElementById('inputField') || document.getElementById('messageInput');
+      const message = input ? input.value.trim() : '';
 
       if (!message || isProcessing) return;
 
@@ -529,7 +540,10 @@ let isProcessing = false;
       window.lastUserQuery = message;
 
       // Hide empty state
-      document.getElementById('emptyState').style.display = 'none';
+      const emptyState = document.getElementById('emptyState');
+      if (emptyState) {
+        emptyState.style.display = 'none';
+      }
 
       // Add user message
       addMessage(message, 'user');
@@ -1385,8 +1399,8 @@ if (sendBtn) {
   console.log('[Sidebar] ✅ Send button listener attached');
 }
 
-// Message input - Enter to send
-const messageInput = document.getElementById('messageInput');
+// Message input - Enter to send (support both old and new element IDs)
+const messageInput = document.getElementById('inputField') || document.getElementById('messageInput');
 if (messageInput) {
   messageInput.addEventListener('keydown', handleKeyPress);
   console.log('[Sidebar] ✅ Message input keydown listener attached');
@@ -1409,5 +1423,10 @@ if (historyBtn) {
 }
 
 // Settings button - handled by settings-menu.js
+
+// Expose critical functions globally for inline event handlers
+window.sendMessage = sendMessage;
+window.handleKeyPress = handleKeyPress;
+window.useExample = useExample;
 
 console.log('[Sidebar] Event listeners initialized');

@@ -1865,6 +1865,25 @@
       inputField.style.height = 'auto';
       inputField.style.height = Math.min(inputField.scrollHeight, 120) + 'px';
     });
+
+    // Send button click handler (fallback - sidebar.js also adds this)
+    sendBtn.addEventListener('click', () => {
+      if (window.sendMessage) {
+        window.sendMessage();
+      } else {
+        console.error('[Inline] sendMessage not available');
+      }
+    });
+
+    // Enter key to send (fallback)
+    inputField.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        if (window.sendMessage) {
+          window.sendMessage();
+        }
+      }
+    });
   </script>
   <script src="response-templates.js"></script>
   <script src="settings-menu.js"></script>
