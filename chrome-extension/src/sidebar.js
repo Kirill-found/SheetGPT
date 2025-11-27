@@ -202,6 +202,9 @@ async function handleActivation() {
   }
 }
 
+// Expose handleActivation globally for inline onclick
+window.handleActivation = handleActivation;
+
 // Initialize license system when DOM is ready
 document.addEventListener('DOMContentLoaded', () => {
   console.log('[Sidebar] ✅ DOM loaded, initializing license system');
