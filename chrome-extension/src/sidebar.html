@@ -5,105 +5,82 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <!-- Distinctive Typography -->
+  <!-- JetBrains Mono как основной + Inter для body text -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
 
   <style>
+    /* ============================================
+       TWO THEMES: DARK (default) & LIGHT
+       ============================================ */
+    
+    :root, [data-theme="dark"] {
+      --bg-primary: #0C0C0F;
+      --bg-secondary: #16161A;
+      --bg-tertiary: #1E1E24;
+      --bg-elevated: #242429;
+      
+      --text-primary: #FFFFFF;
+      --text-secondary: #A0A0AB;
+      --text-muted: #5C5C66;
+      
+      --accent: #A1FF62;
+      --accent-hover: #8FE856;
+      --accent-subtle: rgba(161, 255, 98, 0.12);
+      --accent-glow: rgba(161, 255, 98, 0.25);
+      
+      --border: rgba(255, 255, 255, 0.08);
+      --border-strong: rgba(255, 255, 255, 0.15);
+      
+      --shadow: rgba(0, 0, 0, 0.5);
+      --grid-color: rgba(255, 255, 255, 0.03);
+    }
+
+    [data-theme="light"] {
+      --bg-primary: #FAFAFA;
+      --bg-secondary: #FFFFFF;
+      --bg-tertiary: #F0F0F2;
+      --bg-elevated: #FFFFFF;
+      
+      --text-primary: #0C0C0F;
+      --text-secondary: #5C5C66;
+      --text-muted: #9C9CA6;
+      
+      --accent: #6840FF;
+      --accent-hover: #5835DB;
+      --accent-subtle: rgba(104, 64, 255, 0.1);
+      --accent-glow: rgba(104, 64, 255, 0.2);
+      
+      --border: rgba(0, 0, 0, 0.06);
+      --border-strong: rgba(0, 0, 0, 0.12);
+      
+      --shadow: rgba(0, 0, 0, 0.08);
+      --grid-color: rgba(0, 0, 0, 0.03);
+    }
+
+    /* Static */
     :root {
-      /* Neo-Brutalist Palette - Light */
-      --surface-0: #FAFAF9;
-      --surface-1: #F5F5F4;
-      --surface-2: #E7E5E4;
-      --surface-elevated: #FFFFFF;
+      --success: #22C55E;
+      --error: #EF4444;
+      --warning: #F59E0B;
       
-      /* Accent: Electric Lime meets Deep Ink */
-      --accent-primary: #84CC16;
-      --accent-primary-hover: #65A30D;
-      --accent-secondary: #FACC15;
-      --accent-glow: rgba(132, 204, 22, 0.25);
+      --font-mono: 'JetBrains Mono', monospace;
+      --font-sans: 'Inter', -apple-system, sans-serif;
       
-      /* Ink Colors */
-      --ink-primary: #1C1917;
-      --ink-secondary: #57534E;
-      --ink-tertiary: #A8A29E;
-      --ink-inverse: #FAFAF9;
-      
-      /* Data Visualization Colors */
-      --data-success: #22C55E;
-      --data-warning: #F59E0B;
-      --data-error: #EF4444;
-      --data-info: #3B82F6;
-      --data-purple: #A855F7;
-      
-      /* Grid accent */
-      --grid-color: rgba(28, 25, 23, 0.04);
-      --grid-accent: rgba(132, 204, 22, 0.1);
-      
-      /* Borders */
-      --border-subtle: rgba(28, 25, 23, 0.08);
-      --border-default: rgba(28, 25, 23, 0.15);
-      --border-strong: rgba(28, 25, 23, 0.25);
-      --border-focus: var(--accent-primary);
-      
-      /* Shadows - Brutalist style (hard edges) */
-      --shadow-sm: 2px 2px 0 rgba(28, 25, 23, 0.08);
-      --shadow-md: 4px 4px 0 rgba(28, 25, 23, 0.1);
-      --shadow-lg: 6px 6px 0 rgba(28, 25, 23, 0.12);
-      --shadow-glow: 0 0 20px var(--accent-glow);
-      
-      /* Spacing */
-      --space-1: 4px;
-      --space-2: 8px;
-      --space-3: 12px;
-      --space-4: 16px;
-      --space-5: 20px;
-      --space-6: 24px;
-      --space-8: 32px;
-      --space-10: 40px;
-      --space-12: 48px;
-      
-      /* Radius - Brutalist: mostly sharp with occasional softness */
-      --radius-sm: 4px;
-      --radius-md: 8px;
-      --radius-lg: 12px;
-      --radius-xl: 16px;
+      --radius-sm: 6px;
+      --radius-md: 10px;
+      --radius-lg: 14px;
+      --radius-xl: 20px;
       --radius-full: 9999px;
       
-      /* Timing */
-      --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
-      --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
-      --duration-fast: 150ms;
-      --duration-normal: 250ms;
-      --duration-slow: 400ms;
+      --ease: cubic-bezier(0.16, 1, 0.3, 1);
+      --spring: cubic-bezier(0.34, 1.56, 0.64, 1);
     }
 
-    /* ===== DARK MODE ===== */
-    [data-theme="dark"] {
-      --surface-0: #0C0A09;
-      --surface-1: #1C1917;
-      --surface-2: #292524;
-      --surface-elevated: #171412;
-      
-      --ink-primary: #FAFAF9;
-      --ink-secondary: #A8A29E;
-      --ink-tertiary: #78716C;
-      --ink-inverse: #0C0A09;
-      
-      --grid-color: rgba(250, 250, 249, 0.025);
-      --grid-accent: rgba(132, 204, 22, 0.08);
-      
-      --border-subtle: rgba(250, 250, 249, 0.06);
-      --border-default: rgba(250, 250, 249, 0.1);
-      --border-strong: rgba(250, 250, 249, 0.18);
-      
-      --shadow-sm: 2px 2px 0 rgba(0, 0, 0, 0.4);
-      --shadow-md: 4px 4px 0 rgba(0, 0, 0, 0.5);
-      --shadow-lg: 6px 6px 0 rgba(0, 0, 0, 0.6);
-    }
-
-    /* ===== RESET & BASE ===== */
+    /* ============================================
+       RESET
+       ============================================ */
     *, *::before, *::after {
       box-sizing: border-box;
       margin: 0;
@@ -112,22 +89,21 @@
 
     html {
       font-size: 14px;
+      -webkit-font-smoothing: antialiased;
     }
 
     body {
-      font-family: 'Outfit', -apple-system, BlinkMacSystemFont, sans-serif;
-      background: var(--surface-0);
-      color: var(--ink-primary);
-      line-height: 1.5;
+      font-family: var(--font-sans);
+      background: var(--bg-primary);
+      color: var(--text-primary);
       height: 100vh;
       display: flex;
       flex-direction: column;
       overflow: hidden;
-      -webkit-font-smoothing: antialiased;
-      position: relative;
+      transition: background 0.3s var(--ease), color 0.3s var(--ease);
     }
 
-    /* Grid Background Pattern */
+    /* Grid background */
     body::before {
       content: '';
       position: fixed;
@@ -135,20 +111,30 @@
       background-image: 
         linear-gradient(var(--grid-color) 1px, transparent 1px),
         linear-gradient(90deg, var(--grid-color) 1px, transparent 1px);
-      background-size: 24px 24px;
+      background-size: 20px 20px;
       pointer-events: none;
       z-index: 0;
     }
 
-    /* ===== HEADER ===== */
+    /* Custom scrollbar */
+    ::-webkit-scrollbar { width: 5px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { 
+      background: var(--border-strong); 
+      border-radius: var(--radius-full);
+    }
+
+    /* ============================================
+       HEADER — минималистичный
+       ============================================ */
     .header {
-      height: 64px;
-      padding: 0 var(--space-5);
-      background: var(--surface-elevated);
-      border-bottom: 2px solid var(--border-default);
+      height: 52px;
+      padding: 0 16px;
       display: flex;
       align-items: center;
       justify-content: space-between;
+      border-bottom: 1px solid var(--border);
+      background: var(--bg-secondary);
       position: relative;
       z-index: 100;
       flex-shrink: 0;
@@ -157,1027 +143,703 @@
     .logo {
       display: flex;
       align-items: center;
-      gap: var(--space-3);
+      gap: 10px;
     }
 
-    .logo-mark {
-      width: 40px;
-      height: 40px;
-      background: var(--ink-primary);
+    .logo-icon {
+      width: 28px;
+      height: 28px;
+      background: var(--accent);
       border-radius: var(--radius-sm);
       display: flex;
       align-items: center;
       justify-content: center;
-      position: relative;
-      overflow: hidden;
-      box-shadow: var(--shadow-md);
-      transition: transform var(--duration-normal) var(--ease-spring);
     }
 
-    .logo-mark:hover {
-      transform: rotate(-3deg) scale(1.05);
-    }
-
-    .logo-mark::before {
-      content: '';
-      position: absolute;
-      inset: 2px;
-      border: 2px solid var(--accent-primary);
-      border-radius: 2px;
-    }
-
-    .logo-mark svg {
-      width: 22px;
-      height: 22px;
-      color: var(--accent-primary);
-      position: relative;
-      z-index: 1;
+    .logo-icon svg {
+      width: 16px;
+      height: 16px;
+      color: var(--bg-primary);
     }
 
     .logo-text {
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 18px;
-      font-weight: 700;
+      font-family: var(--font-mono);
+      font-size: 15px;
+      font-weight: 600;
+      color: var(--text-primary);
       letter-spacing: -0.02em;
-      color: var(--ink-primary);
-    }
-
-    .logo-text span {
-      color: var(--accent-primary);
     }
 
     .header-actions {
       display: flex;
-      gap: var(--space-2);
+      align-items: center;
+      gap: 4px;
     }
 
     .icon-btn {
-      width: 40px;
-      height: 40px;
+      width: 32px;
+      height: 32px;
       background: transparent;
-      border: 2px solid transparent;
+      border: none;
       border-radius: var(--radius-sm);
       cursor: pointer;
       display: flex;
       align-items: center;
       justify-content: center;
-      color: var(--ink-secondary);
-      transition: all var(--duration-fast) var(--ease-out-expo);
-      position: relative;
+      color: var(--text-muted);
+      transition: all 0.15s var(--ease);
     }
 
     .icon-btn:hover {
-      background: var(--surface-1);
-      border-color: var(--border-default);
-      color: var(--ink-primary);
-      transform: translateY(-2px);
-      box-shadow: var(--shadow-sm);
-    }
-
-    .icon-btn:active {
-      transform: translateY(0);
-      box-shadow: none;
+      background: var(--bg-tertiary);
+      color: var(--text-primary);
     }
 
     .icon-btn svg {
-      width: 20px;
-      height: 20px;
+      width: 18px;
+      height: 18px;
     }
 
-    /* Theme toggle animation */
+    /* Theme toggle */
     .theme-toggle {
       position: relative;
       overflow: hidden;
     }
 
-    .theme-toggle .sun-icon,
-    .theme-toggle .moon-icon {
+    .theme-toggle .icon-sun,
+    .theme-toggle .icon-moon {
       position: absolute;
-      transition: all var(--duration-normal) var(--ease-spring);
+      transition: all 0.25s var(--spring);
     }
 
-    .theme-toggle .sun-icon {
-      opacity: 1;
-      transform: rotate(0deg) scale(1);
-    }
-
-    .theme-toggle .moon-icon {
-      opacity: 0;
-      transform: rotate(90deg) scale(0.5);
-    }
-
-    [data-theme="dark"] .theme-toggle .sun-icon {
+    .theme-toggle .icon-sun {
       opacity: 0;
       transform: rotate(-90deg) scale(0.5);
     }
 
-    [data-theme="dark"] .theme-toggle .moon-icon {
+    .theme-toggle .icon-moon {
       opacity: 1;
       transform: rotate(0deg) scale(1);
     }
 
-    /* ===== MAIN CHAT CONTAINER ===== */
+    [data-theme="light"] .theme-toggle .icon-sun {
+      opacity: 1;
+      transform: rotate(0deg) scale(1);
+    }
+
+    [data-theme="light"] .theme-toggle .icon-moon {
+      opacity: 0;
+      transform: rotate(90deg) scale(0.5);
+    }
+
+    /* ============================================
+       CHAT CONTAINER
+       ============================================ */
     .chat-container {
       flex: 1;
       overflow-y: auto;
-      overflow-x: hidden;
-      padding: var(--space-6);
+      padding: 20px 16px;
       position: relative;
       z-index: 1;
-      scroll-behavior: smooth;
     }
 
-    .chat-container::-webkit-scrollbar {
-      width: 6px;
-    }
-
-    .chat-container::-webkit-scrollbar-track {
-      background: transparent;
-    }
-
-    .chat-container::-webkit-scrollbar-thumb {
-      background: var(--border-default);
-      border-radius: var(--radius-full);
-    }
-
-    .chat-container::-webkit-scrollbar-thumb:hover {
-      background: var(--border-strong);
-    }
-
-    /* ===== EMPTY STATE ===== */
+    /* ============================================
+       EMPTY STATE — Онбординг
+       ============================================ */
     .empty-state {
       display: flex;
       flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      min-height: 100%;
-      text-align: center;
-      padding: var(--space-8) var(--space-4);
-      animation: fadeIn var(--duration-slow) var(--ease-out-expo);
-    }
-
-    @keyframes fadeIn {
-      from {
-        opacity: 0;
-        transform: translateY(10px);
-      }
-      to {
-        opacity: 1;
-        transform: translateY(0);
-      }
-    }
-
-    .empty-icon {
-      width: 80px;
-      height: 80px;
-      background: var(--surface-1);
-      border: 3px solid var(--ink-primary);
-      border-radius: var(--radius-md);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      margin-bottom: var(--space-6);
-      box-shadow: var(--shadow-lg);
-      position: relative;
-      animation: float 4s ease-in-out infinite;
-    }
-
-    @keyframes float {
-      0%, 100% { transform: translateY(0) rotate(0deg); }
-      50% { transform: translateY(-8px) rotate(2deg); }
-    }
-
-    .empty-icon::after {
-      content: '';
-      position: absolute;
-      inset: 6px;
-      border: 2px dashed var(--accent-primary);
-      border-radius: 4px;
-      animation: spin 20s linear infinite;
-    }
-
-    @keyframes spin {
-      from { transform: rotate(0deg); }
-      to { transform: rotate(360deg); }
-    }
-
-    .empty-icon svg {
-      width: 36px;
-      height: 36px;
-      color: var(--accent-primary);
-    }
-
-    .empty-title {
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 24px;
-      font-weight: 700;
-      margin-bottom: var(--space-3);
-      color: var(--ink-primary);
-    }
-
-    .empty-description {
-      font-size: 15px;
-      color: var(--ink-secondary);
-      max-width: 280px;
-      line-height: 1.6;
-      margin-bottom: var(--space-8);
-    }
-
-    /* ===== QUICK ACTIONS GRID ===== */
-    .actions-label {
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 11px;
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: 0.1em;
-      color: var(--ink-tertiary);
-      margin-bottom: var(--space-4);
-      display: flex;
-      align-items: center;
-      gap: var(--space-2);
-    }
-
-    .actions-label::before,
-    .actions-label::after {
-      content: '';
-      flex: 1;
-      height: 1px;
-      background: var(--border-subtle);
-    }
-
-    .actions-grid {
-      display: grid;
-      grid-template-columns: repeat(2, 1fr);
-      gap: var(--space-3);
-      width: 100%;
-      max-width: 340px;
-    }
-
-    .action-card {
-      background: var(--surface-elevated);
-      border: 2px solid var(--border-default);
-      border-radius: var(--radius-md);
-      padding: var(--space-4);
-      cursor: pointer;
-      text-align: left;
-      transition: all var(--duration-fast) var(--ease-out-expo);
-      position: relative;
-      overflow: hidden;
-    }
-
-    .action-card::before {
-      content: '';
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: 4px;
       height: 100%;
-      background: var(--accent-primary);
-      transform: scaleY(0);
-      transform-origin: bottom;
-      transition: transform var(--duration-normal) var(--ease-spring);
+      animation: fadeUp 0.4s var(--ease);
     }
 
-    .action-card:hover {
-      border-color: var(--ink-primary);
-      transform: translateY(-3px);
-      box-shadow: var(--shadow-md);
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(20px); }
+      to { opacity: 1; transform: translateY(0); }
     }
 
-    .action-card:hover::before {
-      transform: scaleY(1);
+    /* Welcome */
+    .welcome {
+      text-align: center;
+      padding: 32px 0 24px;
     }
 
-    .action-card:active {
-      transform: translateY(0);
-      box-shadow: none;
+    .welcome-emoji {
+      font-size: 40px;
+      margin-bottom: 12px;
+      animation: wave 2s ease-in-out infinite;
     }
 
-    /* Custom SVG Icons for actions */
-    .action-icon {
-      width: 32px;
-      height: 32px;
-      margin-bottom: var(--space-2);
+    @keyframes wave {
+      0%, 100% { transform: rotate(0deg); }
+      25% { transform: rotate(15deg); }
+      75% { transform: rotate(-10deg); }
+    }
+
+    .welcome-title {
+      font-family: var(--font-mono);
+      font-size: 22px;
+      font-weight: 700;
+      color: var(--text-primary);
+      margin-bottom: 6px;
+      letter-spacing: -0.02em;
+    }
+
+    .welcome-subtitle {
+      font-size: 14px;
+      color: var(--text-secondary);
+      max-width: 260px;
+      margin: 0 auto;
+      line-height: 1.5;
+    }
+
+    /* Steps */
+    .steps {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      padding: 0 8px;
+      margin-bottom: 24px;
+    }
+
+    .step {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      padding: 12px;
+      background: var(--bg-secondary);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      transition: all 0.2s var(--ease);
+    }
+
+    .step:hover {
+      border-color: var(--border-strong);
+      background: var(--bg-tertiary);
+    }
+
+    .step-num {
+      width: 24px;
+      height: 24px;
+      background: var(--accent-subtle);
+      border-radius: var(--radius-full);
       display: flex;
       align-items: center;
       justify-content: center;
-      border-radius: var(--radius-sm);
-      transition: transform var(--duration-normal) var(--ease-spring);
-    }
-
-    .action-icon svg {
-      width: 20px;
-      height: 20px;
-    }
-
-    .action-card:hover .action-icon {
-      transform: scale(1.1) rotate(-5deg);
-    }
-
-    /* Icon color variants */
-    .action-icon.chart {
-      background: rgba(59, 130, 246, 0.15);
-      color: #3B82F6;
-    }
-
-    .action-icon.calc {
-      background: rgba(168, 85, 247, 0.15);
-      color: #A855F7;
-    }
-
-    .action-icon.paint {
-      background: rgba(245, 158, 11, 0.15);
-      color: #F59E0B;
-    }
-
-    .action-icon.layers {
-      background: rgba(34, 197, 94, 0.15);
-      color: #22C55E;
-    }
-
-    .action-icon.sparkle {
-      background: rgba(132, 204, 22, 0.2);
-      color: var(--accent-primary);
-    }
-
-    .action-title {
-      font-family: 'JetBrains Mono', monospace;
+      font-family: var(--font-mono);
       font-size: 12px;
       font-weight: 600;
-      color: var(--ink-primary);
-      margin-bottom: var(--space-1);
+      color: var(--accent);
+      flex-shrink: 0;
     }
 
-    .action-desc {
-      font-size: 11px;
-      color: var(--ink-tertiary);
+    .step-content {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .step-title {
+      font-family: var(--font-mono);
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text-primary);
+      margin-bottom: 2px;
+    }
+
+    .step-desc {
+      font-size: 12px;
+      color: var(--text-muted);
       line-height: 1.4;
     }
 
-    /* Featured action - spans full width - FIXED HOVER STATE */
-    .action-card.featured {
-      grid-column: span 2;
-      background: var(--ink-primary);
-      border-color: var(--ink-primary);
+    /* Suggestions — chips */
+    .suggestions {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
     }
 
-    .action-card.featured .action-icon {
-      background: rgba(132, 204, 22, 0.25);
-      color: var(--accent-primary);
+    .suggestions-label {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--text-muted);
+      padding: 0 8px;
+      margin-bottom: 10px;
     }
 
-    .action-card.featured .action-title {
-      color: var(--accent-primary);
+    .suggestions-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      padding: 0 8px;
     }
 
-    .action-card.featured .action-desc {
-      color: var(--ink-inverse);
-      opacity: 0.8;
+    .suggestion-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 14px;
+      background: var(--bg-secondary);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-full);
+      font-family: var(--font-mono);
+      font-size: 12px;
+      color: var(--text-secondary);
+      cursor: pointer;
+      transition: all 0.15s var(--ease);
+      white-space: nowrap;
     }
 
-    /* FIXED: Featured hover - keep dark background, just lift */
-    .action-card.featured:hover {
-      background: var(--ink-primary);
-      border-color: var(--accent-primary);
-      box-shadow: var(--shadow-lg), 0 0 20px rgba(132, 204, 22, 0.2);
+    .suggestion-chip:hover {
+      background: var(--accent-subtle);
+      border-color: var(--accent);
+      color: var(--accent);
+      transform: translateY(-2px);
     }
 
-    .action-card.featured::before {
-      background: var(--accent-primary);
+    .suggestion-chip svg {
+      width: 14px;
+      height: 14px;
+      opacity: 0.6;
     }
 
-    /* Dark mode featured card adjustments */
-    [data-theme="dark"] .action-card.featured {
-      background: var(--accent-primary);
-      border-color: var(--accent-primary);
+    .suggestion-chip:hover svg {
+      opacity: 1;
     }
 
-    [data-theme="dark"] .action-card.featured .action-icon {
-      background: rgba(0, 0, 0, 0.2);
-      color: var(--ink-inverse);
+    /* ============================================
+       MESSAGES
+       ============================================ */
+    .messages-list {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
     }
 
-    [data-theme="dark"] .action-card.featured .action-title {
-      color: var(--ink-inverse);
-    }
-
-    [data-theme="dark"] .action-card.featured .action-desc {
-      color: var(--ink-inverse);
-      opacity: 0.85;
-    }
-
-    [data-theme="dark"] .action-card.featured:hover {
-      background: var(--accent-primary-hover);
-      border-color: var(--accent-primary-hover);
-      box-shadow: var(--shadow-lg), 0 0 30px rgba(132, 204, 22, 0.3);
-    }
-
-    [data-theme="dark"] .action-card.featured::before {
-      background: var(--ink-inverse);
-    }
-
-    /* ===== MESSAGES ===== */
     .message {
-      margin-bottom: var(--space-5);
-      animation: messageSlide var(--duration-normal) var(--ease-out-expo);
+      animation: msgIn 0.25s var(--ease);
     }
 
-    @keyframes messageSlide {
-      from {
-        opacity: 0;
-        transform: translateY(16px);
-      }
-      to {
-        opacity: 1;
-        transform: translateY(0);
-      }
+    @keyframes msgIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
     }
 
-    .message.user {
+    /* User message */
+    .message-user {
       display: flex;
       justify-content: flex-end;
     }
 
-    .message.ai {
-      display: flex;
-      justify-content: flex-start;
-    }
-
-    .message-bubble {
+    .message-user .bubble {
       max-width: 85%;
-      padding: var(--space-4);
-      border-radius: var(--radius-md);
-      position: relative;
-    }
-
-    .message.user .message-bubble {
-      background: var(--ink-primary);
-      color: var(--ink-inverse);
-      border-bottom-right-radius: var(--radius-sm);
-      box-shadow: var(--shadow-md);
-    }
-
-    .message.ai .message-bubble {
-      background: var(--surface-elevated);
-      border: 2px solid var(--border-default);
-      border-bottom-left-radius: var(--radius-sm);
-      max-width: 92%;
-      width: 100%;
-      padding: 0;
-    }
-
-    /* AI Response Card */
-    .ai-response {
-      background: var(--surface-elevated);
+      padding: 12px 16px;
+      background: var(--accent);
+      color: var(--bg-primary);
       border-radius: var(--radius-lg);
+      border-bottom-right-radius: var(--radius-sm);
+      font-size: 14px;
+      line-height: 1.5;
+      font-weight: 500;
+    }
+
+    /* AI message */
+    .message-ai {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .message-ai .bubble {
+      background: var(--bg-secondary);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      border-bottom-left-radius: var(--radius-sm);
       overflow: hidden;
     }
 
-    /* Response Header with Type Icon */
-    .response-header {
+    /* Response type header */
+    .response-type {
       display: flex;
       align-items: center;
-      gap: var(--space-3);
-      padding: var(--space-3) var(--space-4);
-      background: var(--surface-1);
-      border-bottom: 1px solid var(--border-subtle);
+      gap: 8px;
+      padding: 10px 14px;
+      background: var(--bg-tertiary);
+      border-bottom: 1px solid var(--border);
     }
 
     .response-type-icon {
-      width: 32px;
-      height: 32px;
+      width: 24px;
+      height: 24px;
+      background: var(--accent-subtle);
       border-radius: var(--radius-sm);
       display: flex;
       align-items: center;
       justify-content: center;
-      flex-shrink: 0;
+      color: var(--accent);
     }
 
     .response-type-icon svg {
-      width: 18px;
-      height: 18px;
+      width: 14px;
+      height: 14px;
     }
 
-    .response-type-icon.analysis {
-      background: rgba(59, 130, 246, 0.15);
-      color: var(--data-info);
-    }
-
-    .response-type-icon.formula {
-      background: rgba(132, 204, 22, 0.15);
-      color: var(--accent-primary);
-    }
-
-    .response-type-icon.action {
-      background: rgba(168, 85, 247, 0.15);
-      color: var(--data-purple);
-    }
-
-    .response-type-icon.filter {
-      background: rgba(245, 158, 11, 0.15);
-      color: var(--data-warning);
-    }
-
-    .response-type-icon.table {
-      background: rgba(34, 197, 94, 0.15);
-      color: var(--data-success);
-    }
-
-    .response-type-label {
-      font-family: 'JetBrains Mono', monospace;
+    .response-type-text {
+      font-family: var(--font-mono);
       font-size: 11px;
-      font-weight: 600;
+      font-weight: 500;
       text-transform: uppercase;
       letter-spacing: 0.05em;
-      color: var(--ink-secondary);
+      color: var(--text-muted);
     }
 
-    /* Response Body */
-    .response-body {
-      padding: var(--space-4);
+    /* Response content */
+    .response-content {
+      padding: 14px;
     }
 
-    /* Main result text */
+    /* Result — главное выделено */
     .response-result {
-      font-size: 16px;
-      font-weight: 600;
-      color: var(--ink-primary);
-      margin-bottom: var(--space-3);
-      line-height: 1.4;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 12px 14px;
+      background: var(--accent-subtle);
+      border-radius: var(--radius-md);
+      margin-bottom: 12px;
     }
 
-    /* Result value highlight */
+    .result-label {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
     .result-value {
-      display: inline-flex;
-      align-items: center;
-      gap: var(--space-2);
-      background: var(--surface-1);
-      padding: var(--space-2) var(--space-3);
-      border-radius: var(--radius-sm);
-      font-family: 'JetBrains Mono', monospace;
+      font-family: var(--font-mono);
       font-size: 18px;
       font-weight: 700;
-      color: var(--accent-primary);
-      margin: var(--space-2) 0;
+      color: var(--accent);
     }
 
-    /* Explanation text */
-    .response-explanation {
-      font-size: 14px;
-      color: var(--ink-secondary);
-      line-height: 1.6;
-      margin-top: var(--space-3);
-    }
-
-    /* Formula code block - improved */
+    /* Formula block */
     .formula-block {
-      background: var(--ink-primary);
+      background: var(--bg-primary);
+      border: 1px solid var(--border);
       border-radius: var(--radius-md);
-      padding: var(--space-4);
-      margin: var(--space-3) 0;
-      position: relative;
-      overflow-x: auto;
-    }
-
-    .formula-block code {
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 14px;
-      color: var(--accent-primary);
-      word-break: break-all;
-    }
-
-    .formula-block .copy-btn {
-      position: absolute;
-      top: var(--space-2);
-      right: var(--space-2);
-      width: 28px;
-      height: 28px;
-      background: rgba(255,255,255,0.1);
-      border: none;
-      border-radius: var(--radius-sm);
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      color: var(--ink-inverse);
-      opacity: 0.6;
-      transition: all var(--duration-fast);
-    }
-
-    .formula-block .copy-btn:hover {
-      opacity: 1;
-      background: rgba(255,255,255,0.2);
-    }
-
-    .formula-block .copy-btn svg {
-      width: 14px;
-      height: 14px;
-    }
-
-    /* Key findings list */
-    .findings-list {
-      list-style: none;
-      margin: var(--space-3) 0;
-    }
-
-    .findings-list li {
-      display: flex;
-      align-items: flex-start;
-      gap: var(--space-2);
-      padding: var(--space-2) 0;
-      font-size: 14px;
-      color: var(--ink-primary);
-      border-bottom: 1px solid var(--border-subtle);
-    }
-
-    .findings-list li:last-child {
-      border-bottom: none;
-    }
-
-    .findings-list li::before {
-      content: '';
-      width: 6px;
-      height: 6px;
-      background: var(--accent-primary);
-      border-radius: 50%;
-      margin-top: 8px;
-      flex-shrink: 0;
-    }
-
-    /* Action buttons in response */
-    .response-actions {
-      display: flex;
-      gap: var(--space-2);
-      margin-top: var(--space-4);
-      padding-top: var(--space-3);
-      border-top: 1px solid var(--border-subtle);
-      flex-wrap: wrap;
-    }
-
-    .response-btn {
-      display: inline-flex;
-      align-items: center;
-      gap: var(--space-2);
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 12px;
-      font-weight: 600;
-      padding: var(--space-2) var(--space-3);
-      border-radius: var(--radius-sm);
-      border: none;
-      cursor: pointer;
-      transition: all var(--duration-fast) var(--ease-spring);
-    }
-
-    .response-btn svg {
-      width: 14px;
-      height: 14px;
-    }
-
-    .response-btn.primary {
-      background: var(--accent-primary);
-      color: var(--ink-inverse);
-    }
-
-    .response-btn.primary:hover {
-      background: var(--accent-primary-hover);
-      transform: translateY(-1px);
-    }
-
-    .response-btn.secondary {
-      background: var(--surface-1);
-      color: var(--ink-primary);
-      border: 1px solid var(--border-default);
-    }
-
-    .response-btn.secondary:hover {
-      background: var(--surface-2);
-      border-color: var(--ink-primary);
-    }
-
-    /* Success/Created message */
-    .response-success {
-      display: flex;
-      align-items: center;
-      gap: var(--space-3);
-      background: rgba(34, 197, 94, 0.1);
-      border: 1px solid rgba(34, 197, 94, 0.3);
-      border-radius: var(--radius-md);
-      padding: var(--space-3) var(--space-4);
-      margin-top: var(--space-3);
-    }
-
-    .response-success svg {
-      width: 20px;
-      height: 20px;
-      color: var(--data-success);
-      flex-shrink: 0;
-    }
-
-    .response-success span {
-      font-size: 13px;
-      color: var(--data-success);
-    }
-
-    /* Loading Animation - Improved */
-    .loading-message {
-      display: flex;
-      justify-content: flex-start;
-      margin-bottom: var(--space-4);
-      animation: messageSlide var(--duration-normal) var(--ease-out-expo);
-    }
-
-    .loading-bubble {
-      background: var(--surface-elevated);
-      border: 2px solid var(--border-default);
-      border-radius: var(--radius-lg);
-      padding: var(--space-4) var(--space-5);
-      display: flex;
-      align-items: center;
-      gap: var(--space-4);
-    }
-
-    .loading-icon {
-      width: 36px;
-      height: 36px;
-      background: var(--surface-1);
-      border-radius: var(--radius-sm);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      position: relative;
-    }
-
-    .loading-icon svg {
-      width: 20px;
-      height: 20px;
-      color: var(--accent-primary);
-      animation: pulse 1.5s ease-in-out infinite;
-    }
-
-    @keyframes pulse {
-      0%, 100% { opacity: 0.5; transform: scale(0.95); }
-      50% { opacity: 1; transform: scale(1); }
-    }
-
-    .loading-icon::after {
-      content: '';
-      position: absolute;
-      inset: -4px;
-      border: 2px solid var(--accent-primary);
-      border-radius: var(--radius-md);
-      opacity: 0.3;
-      animation: ping 1.5s ease-out infinite;
-    }
-
-    @keyframes ping {
-      0% { transform: scale(1); opacity: 0.3; }
-      100% { transform: scale(1.3); opacity: 0; }
-    }
-
-    .loading-content {
-      display: flex;
-      flex-direction: column;
-      gap: var(--space-1);
-    }
-
-    .loading-title {
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 13px;
-      font-weight: 600;
-      color: var(--ink-primary);
-    }
-
-    .loading-status {
-      font-size: 12px;
-      color: var(--ink-tertiary);
-      display: flex;
-      align-items: center;
-      gap: var(--space-2);
-    }
-
-    .loading-progress {
-      width: 80px;
-      height: 3px;
-      background: var(--border-default);
-      border-radius: var(--radius-full);
+      margin-bottom: 12px;
       overflow: hidden;
     }
 
-    .loading-progress-bar {
-      height: 100%;
-      width: 30%;
-      background: var(--accent-primary);
-      border-radius: var(--radius-full);
-      animation: progress 1.5s ease-in-out infinite;
-    }
-
-    @keyframes progress {
-      0% { width: 0%; margin-left: 0%; }
-      50% { width: 50%; margin-left: 25%; }
-      100% { width: 0%; margin-left: 100%; }
-    }
-
-    /* Response type badges */
-    .response-badge {
-      display: inline-flex;
-      align-items: center;
-      gap: var(--space-1);
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 10px;
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-      padding: var(--space-1) var(--space-2);
-      border-radius: var(--radius-sm);
-      margin-bottom: var(--space-3);
-    }
-
-    .response-badge.formula {
-      background: rgba(132, 204, 22, 0.15);
-      color: var(--accent-primary-hover);
-      border: 1px solid rgba(132, 204, 22, 0.3);
-    }
-
-    .response-badge.analysis {
-      background: rgba(59, 130, 246, 0.15);
-      color: var(--data-info);
-      border: 1px solid rgba(59, 130, 246, 0.3);
-    }
-
-    .response-badge.action {
-      background: rgba(168, 85, 247, 0.15);
-      color: var(--data-purple);
-      border: 1px solid rgba(168, 85, 247, 0.3);
-    }
-
-    /* Formula code block */
-    .formula-code {
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 13px;
-      background: var(--surface-1);
-      border: 1px solid var(--border-default);
-      border-left: 4px solid var(--accent-primary);
-      padding: var(--space-3) var(--space-4);
-      border-radius: var(--radius-sm);
-      overflow-x: auto;
-      margin: var(--space-3) 0;
-      position: relative;
-    }
-
-    .formula-code::before {
-      content: 'FORMULA';
-      position: absolute;
-      top: -8px;
-      left: var(--space-3);
-      font-size: 9px;
-      font-weight: 700;
-      letter-spacing: 0.1em;
-      background: var(--surface-1);
-      padding: 0 var(--space-2);
-      color: var(--ink-tertiary);
-    }
-
-    /* AI Thinking / Loading */
-    .loading-indicator {
+    .formula-header {
       display: flex;
       align-items: center;
-      gap: var(--space-3);
-      padding: var(--space-4);
-      background: var(--surface-elevated);
-      border: 2px solid var(--border-default);
+      justify-content: space-between;
+      padding: 8px 12px;
+      background: var(--bg-tertiary);
+      border-bottom: 1px solid var(--border);
+    }
+
+    .formula-label {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--text-muted);
+    }
+
+    .formula-copy {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      padding: 4px 10px;
+      background: var(--accent);
+      border: none;
+      border-radius: var(--radius-full);
+      font-family: var(--font-mono);
+      font-size: 10px;
+      font-weight: 600;
+      color: var(--bg-primary);
+      cursor: pointer;
+      transition: all 0.15s var(--spring);
+    }
+
+    .formula-copy:hover {
+      transform: scale(1.05);
+    }
+
+    .formula-copy svg {
+      width: 12px;
+      height: 12px;
+    }
+
+    .formula-code {
+      padding: 12px;
+      font-family: var(--font-mono);
+      font-size: 13px;
+      color: var(--accent);
+      line-height: 1.5;
+      word-break: break-all;
+    }
+
+    /* Explanation — collapsible */
+    .explanation {
+      border-top: 1px solid var(--border);
+    }
+
+    .explanation-toggle {
+      width: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 14px;
+      background: transparent;
+      border: none;
+      cursor: pointer;
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--text-muted);
+      transition: all 0.15s;
+    }
+
+    .explanation-toggle:hover {
+      color: var(--text-secondary);
+      background: var(--bg-tertiary);
+    }
+
+    .explanation-toggle svg {
+      width: 14px;
+      height: 14px;
+      transition: transform 0.2s var(--ease);
+    }
+
+    .explanation.open .explanation-toggle svg {
+      transform: rotate(180deg);
+    }
+
+    .explanation-content {
+      display: none;
+      padding: 0 14px 14px;
+      font-size: 13px;
+      color: var(--text-secondary);
+      line-height: 1.6;
+    }
+
+    .explanation.open .explanation-content {
+      display: block;
+    }
+
+    /* Response actions */
+    .response-actions {
+      display: flex;
+      gap: 8px;
+      padding: 12px 14px;
+      border-top: 1px solid var(--border);
+      background: var(--bg-tertiary);
+    }
+
+    .action-btn {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 14px;
+      border-radius: var(--radius-full);
+      font-family: var(--font-mono);
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.15s var(--spring);
+      border: none;
+    }
+
+    .action-btn svg {
+      width: 14px;
+      height: 14px;
+    }
+
+    .action-btn.primary {
+      background: var(--accent);
+      color: var(--bg-primary);
+    }
+
+    .action-btn.primary:hover {
+      background: var(--accent-hover);
+      transform: translateY(-1px);
+    }
+
+    .action-btn.secondary {
+      background: var(--bg-secondary);
+      color: var(--text-secondary);
+      border: 1px solid var(--border);
+    }
+
+    .action-btn.secondary:hover {
+      border-color: var(--border-strong);
+      color: var(--text-primary);
+    }
+
+    /* Success notification */
+    .success-toast {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 10px 14px;
+      background: rgba(34, 197, 94, 0.15);
+      border: 1px solid var(--success);
       border-radius: var(--radius-md);
-      max-width: 200px;
+      margin-top: 8px;
+    }
+
+    .success-toast svg {
+      width: 16px;
+      height: 16px;
+      color: var(--success);
+    }
+
+    .success-toast span {
+      font-family: var(--font-mono);
+      font-size: 12px;
+      color: var(--success);
+    }
+
+    /* ============================================
+       LOADING
+       ============================================ */
+    .message-loading .bubble {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 14px 16px;
     }
 
     .loading-dots {
       display: flex;
-      gap: var(--space-1);
+      gap: 4px;
     }
 
     .loading-dots span {
-      width: 8px;
-      height: 8px;
-      background: var(--accent-primary);
+      width: 6px;
+      height: 6px;
+      background: var(--accent);
       border-radius: var(--radius-full);
-      animation: loadingPulse 1.4s ease-in-out infinite;
+      animation: bounce 1.4s infinite;
     }
 
     .loading-dots span:nth-child(2) { animation-delay: 0.2s; }
     .loading-dots span:nth-child(3) { animation-delay: 0.4s; }
 
-    @keyframes loadingPulse {
-      0%, 100% { transform: scale(0.8); opacity: 0.5; }
-      50% { transform: scale(1); opacity: 1; }
+    @keyframes bounce {
+      0%, 80%, 100% { transform: translateY(0); opacity: 0.4; }
+      40% { transform: translateY(-6px); opacity: 1; }
     }
 
     .loading-text {
-      font-family: 'JetBrains Mono', monospace;
+      font-family: var(--font-mono);
       font-size: 12px;
-      color: var(--ink-secondary);
+      color: var(--text-muted);
     }
 
-    /* ===== INPUT AREA ===== */
+    /* ============================================
+       INPUT AREA — главный герой
+       ============================================ */
     .input-area {
-      padding: var(--space-4) var(--space-5);
-      background: var(--surface-elevated);
-      border-top: 2px solid var(--border-default);
+      padding: 12px 16px 16px;
+      background: var(--bg-secondary);
+      border-top: 1px solid var(--border);
       position: relative;
-      z-index: 100;
+      z-index: 10;
     }
 
     .input-wrapper {
       display: flex;
       align-items: flex-end;
-      gap: var(--space-3);
-      background: var(--surface-1);
-      border: 2px solid var(--border-default);
-      border-radius: var(--radius-md);
-      padding: var(--space-3);
-      transition: all var(--duration-fast) var(--ease-out-expo);
+      gap: 10px;
+      background: var(--bg-primary);
+      border: 2px solid var(--border);
+      border-radius: var(--radius-lg);
+      padding: 10px 12px;
+      transition: all 0.2s var(--ease);
     }
 
     .input-wrapper:focus-within {
-      border-color: var(--ink-primary);
-      box-shadow: var(--shadow-md);
+      border-color: var(--accent);
+      box-shadow: 0 0 0 4px var(--accent-glow);
     }
 
-    .prompt-input {
+    .input-field {
       flex: 1;
       border: none;
       background: transparent;
-      font-family: 'Outfit', sans-serif;
+      font-family: var(--font-sans);
       font-size: 15px;
-      color: var(--ink-primary);
+      color: var(--text-primary);
       resize: none;
       min-height: 24px;
-      max-height: 120px;
+      max-height: 150px;
       line-height: 1.5;
-      padding: var(--space-1) 0;
+      padding: 4px 0;
     }
 
-    .prompt-input::placeholder {
-      color: var(--ink-tertiary);
+    .input-field::placeholder {
+      color: var(--text-muted);
     }
 
-    .prompt-input:focus {
+    .input-field:focus {
       outline: none;
     }
 
     .send-btn {
-      width: 44px;
-      height: 44px;
-      background: var(--ink-primary);
+      width: 38px;
+      height: 38px;
+      background: var(--accent);
       border: none;
-      border-radius: var(--radius-sm);
+      border-radius: var(--radius-md);
       cursor: pointer;
       display: flex;
       align-items: center;
       justify-content: center;
-      color: var(--accent-primary);
+      color: var(--bg-primary);
       flex-shrink: 0;
-      transition: all var(--duration-fast) var(--ease-spring);
-      box-shadow: var(--shadow-sm);
+      transition: all 0.15s var(--spring);
     }
 
     .send-btn:hover:not(:disabled) {
-      transform: translateY(-2px) rotate(-3deg);
-      box-shadow: var(--shadow-md);
-    }
-
-    .send-btn:active:not(:disabled) {
-      transform: translateY(0) rotate(0deg);
-      box-shadow: none;
+      background: var(--accent-hover);
+      transform: scale(1.05);
     }
 
     .send-btn:disabled {
-      opacity: 0.4;
+      opacity: 0.3;
       cursor: not-allowed;
     }
 
     .send-btn svg {
-      width: 22px;
-      height: 22px;
-      transition: transform var(--duration-fast) var(--ease-spring);
+      width: 18px;
+      height: 18px;
     }
 
-    .send-btn:hover:not(:disabled) svg {
-      transform: translateX(2px);
-    }
-
-    /* ===== DROPDOWN MENU ===== */
+    /* ============================================
+       DROPDOWNS
+       ============================================ */
     .dropdown {
       position: absolute;
-      top: calc(100% + var(--space-2));
-      right: var(--space-5);
-      width: 280px;
-      background: var(--surface-elevated);
-      border: 2px solid var(--border-default);
-      border-radius: var(--radius-md);
-      box-shadow: var(--shadow-lg);
+      top: calc(100% + 6px);
+      right: 16px;
+      width: 260px;
+      background: var(--bg-elevated);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-lg);
+      box-shadow: 0 12px 40px var(--shadow);
       opacity: 0;
       visibility: hidden;
-      transform: translateY(-8px);
-      transition: all var(--duration-normal) var(--ease-out-expo);
+      transform: translateY(-8px) scale(0.98);
+      transition: all 0.2s var(--ease);
       z-index: 200;
       overflow: hidden;
     }
@@ -1185,77 +847,173 @@
     .dropdown.show {
       opacity: 1;
       visibility: visible;
-      transform: translateY(0);
+      transform: translateY(0) scale(1);
     }
 
-    .dropdown-header {
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 11px;
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: 0.08em;
-      color: var(--ink-tertiary);
-      padding: var(--space-4);
-      border-bottom: 1px solid var(--border-subtle);
+    .dropdown-section {
+      padding: 12px;
+      border-bottom: 1px solid var(--border);
     }
 
-    .dropdown-list {
-      list-style: none;
-      max-height: 300px;
-      overflow-y: auto;
-    }
-
-    .dropdown-item {
-      padding: var(--space-3) var(--space-4);
-      cursor: pointer;
-      border-bottom: 1px solid var(--border-subtle);
-      transition: background var(--duration-fast);
-    }
-
-    .dropdown-item:hover {
-      background: var(--surface-1);
-    }
-
-    .dropdown-item:last-child {
+    .dropdown-section:last-child {
       border-bottom: none;
     }
 
-    .dropdown-item-title {
+    .dropdown-title {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--text-muted);
+      margin-bottom: 8px;
+    }
+
+    /* User info */
+    .user-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .user-avatar {
+      width: 36px;
+      height: 36px;
+      background: var(--accent-subtle);
+      border-radius: var(--radius-full);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--accent);
+    }
+
+    .user-avatar svg {
+      width: 18px;
+      height: 18px;
+    }
+
+    .user-info {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .user-email {
       font-size: 13px;
       font-weight: 500;
-      color: var(--ink-primary);
-      margin-bottom: var(--space-1);
+      color: var(--text-primary);
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
     }
 
-    .dropdown-item-meta {
-      font-family: 'JetBrains Mono', monospace;
+    .user-plan {
+      font-family: var(--font-mono);
+      font-size: 10px;
+      font-weight: 600;
+      color: var(--accent);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    /* Usage bar */
+    .usage-bar-wrap {
+      margin-top: 10px;
+    }
+
+    .usage-labels {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 4px;
+    }
+
+    .usage-label {
       font-size: 11px;
-      color: var(--ink-tertiary);
+      color: var(--text-muted);
     }
 
-    .dropdown-empty {
-      padding: var(--space-6);
-      text-align: center;
-      color: var(--ink-tertiary);
+    .usage-count {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+
+    .usage-bar {
+      height: 4px;
+      background: var(--border);
+      border-radius: var(--radius-full);
+      overflow: hidden;
+    }
+
+    .usage-fill {
+      height: 100%;
+      background: var(--accent);
+      border-radius: var(--radius-full);
+      transition: width 0.3s var(--ease);
+    }
+
+    /* Menu items */
+    .menu-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 10px 12px;
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      transition: all 0.15s;
       font-size: 13px;
+      color: var(--text-secondary);
     }
 
-    /* ===== MODAL ===== */
+    .menu-item:hover {
+      background: var(--bg-tertiary);
+      color: var(--text-primary);
+    }
+
+    .menu-item svg {
+      width: 16px;
+      height: 16px;
+      opacity: 0.6;
+    }
+
+    .menu-item:hover svg {
+      opacity: 1;
+    }
+
+    .menu-item.danger {
+      color: var(--error);
+    }
+
+    .menu-item.danger:hover {
+      background: rgba(239, 68, 68, 0.1);
+    }
+
+    .menu-item.upgrade {
+      background: var(--accent-subtle);
+      color: var(--accent);
+      font-weight: 600;
+    }
+
+    .menu-item.upgrade:hover {
+      background: var(--accent);
+      color: var(--bg-primary);
+    }
+
+    /* ============================================
+       MODALS — упрощённые
+       ============================================ */
     .modal-overlay {
       position: fixed;
       inset: 0;
-      background: rgba(0, 0, 0, 0.6);
+      background: rgba(0, 0, 0, 0.7);
       backdrop-filter: blur(4px);
       display: flex;
       align-items: center;
       justify-content: center;
-      padding: var(--space-4);
+      padding: 16px;
       opacity: 0;
       visibility: hidden;
-      transition: all var(--duration-normal) var(--ease-out-expo);
+      transition: all 0.25s var(--ease);
       z-index: 1000;
     }
 
@@ -1264,466 +1022,316 @@
       visibility: visible;
     }
 
-    .modal-content {
+    .modal {
       width: 100%;
-      max-width: 400px;
-      background: var(--surface-elevated);
-      border: 2px solid var(--border-default);
-      border-radius: var(--radius-lg);
-      padding: var(--space-6);
-      transform: scale(0.95) translateY(10px);
-      transition: transform var(--duration-normal) var(--ease-spring);
-      box-shadow: var(--shadow-lg);
+      max-width: 360px;
+      background: var(--bg-secondary);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-xl);
+      overflow: hidden;
+      transform: scale(0.95) translateY(20px);
+      transition: transform 0.25s var(--spring);
     }
 
-    .modal-overlay.show .modal-content {
+    .modal-overlay.show .modal {
       transform: scale(1) translateY(0);
     }
 
     .modal-header {
       display: flex;
       align-items: center;
-      gap: var(--space-3);
-      margin-bottom: var(--space-5);
-    }
-
-    .modal-icon {
-      width: 48px;
-      height: 48px;
-      background: var(--surface-1);
-      border: 2px solid var(--border-default);
-      border-radius: var(--radius-md);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      color: var(--ink-secondary);
-    }
-
-    .modal-icon svg {
-      width: 24px;
-      height: 24px;
+      justify-content: space-between;
+      padding: 16px 20px;
+      border-bottom: 1px solid var(--border);
     }
 
     .modal-title {
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 18px;
-      font-weight: 700;
-      color: var(--ink-primary);
-    }
-
-    .modal-section {
-      margin-bottom: var(--space-5);
-    }
-
-    .modal-label {
-      display: block;
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 12px;
+      font-family: var(--font-mono);
+      font-size: 16px;
       font-weight: 600;
-      color: var(--ink-primary);
-      margin-bottom: var(--space-2);
+      color: var(--text-primary);
     }
 
-    .modal-description {
-      font-size: 13px;
-      color: var(--ink-secondary);
-      line-height: 1.6;
-      margin-bottom: var(--space-3);
-    }
-
-    .modal-textarea {
-      width: 100%;
-      min-height: 100px;
-      padding: var(--space-3);
-      border: 2px solid var(--border-default);
-      border-radius: var(--radius-md);
-      font-family: 'Outfit', sans-serif;
-      font-size: 14px;
-      background: var(--surface-1);
-      color: var(--ink-primary);
-      resize: vertical;
-      transition: all var(--duration-fast);
-    }
-
-    .modal-textarea:focus {
-      outline: none;
-      border-color: var(--ink-primary);
-    }
-
-    .modal-textarea::placeholder {
-      color: var(--ink-tertiary);
-    }
-
-    .char-counter {
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 11px;
-      color: var(--ink-tertiary);
-      text-align: right;
-      margin-top: var(--space-2);
-    }
-
-    .modal-actions {
-      display: flex;
-      gap: var(--space-3);
-      justify-content: flex-end;
-      margin-top: var(--space-6);
-    }
-
-    /* ===== BUTTONS ===== */
-    .btn {
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 13px;
-      font-weight: 600;
-      padding: var(--space-3) var(--space-5);
-      border-radius: var(--radius-sm);
-      border: 2px solid transparent;
-      cursor: pointer;
-      transition: all var(--duration-fast) var(--ease-out-expo);
-    }
-
-    .btn-primary {
-      background: var(--ink-primary);
-      color: var(--accent-primary);
-      border-color: var(--ink-primary);
-      box-shadow: var(--shadow-sm);
-    }
-
-    .btn-primary:hover {
-      transform: translateY(-2px);
-      box-shadow: var(--shadow-md);
-    }
-
-    .btn-primary:active {
-      transform: translateY(0);
-      box-shadow: none;
-    }
-
-    .btn-secondary {
+    .modal-close {
+      width: 28px;
+      height: 28px;
       background: transparent;
-      color: var(--ink-primary);
-      border-color: var(--border-default);
-    }
-
-    .btn-secondary:hover {
-      background: var(--surface-1);
-      border-color: var(--ink-primary);
-    }
-
-    /* ===== COPY BUTTON FOR FORMULAS ===== */
-    .copy-btn {
-      display: inline-flex;
-      align-items: center;
-      gap: var(--space-2);
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 11px;
-      font-weight: 600;
-      padding: var(--space-2) var(--space-3);
-      background: var(--surface-1);
-      border: 1px solid var(--border-default);
-      border-radius: var(--radius-sm);
-      cursor: pointer;
-      color: var(--ink-secondary);
-      margin-top: var(--space-3);
-      transition: all var(--duration-fast);
-    }
-
-    .copy-btn:hover {
-      background: var(--ink-primary);
-      border-color: var(--ink-primary);
-      color: var(--accent-primary);
-    }
-
-    .copy-btn svg {
-      width: 14px;
-      height: 14px;
-    }
-
-    .copy-btn.copied {
-      background: var(--data-success);
-      border-color: var(--data-success);
-      color: white;
-    }
-
-    /* ===== ACTION BUTTONS IN MESSAGES ===== */
-    .action-buttons {
-      display: flex;
-      gap: var(--space-2);
-      margin-top: var(--space-3);
-      flex-wrap: wrap;
-    }
-
-    .action-btn {
-      display: inline-flex;
-      align-items: center;
-      gap: var(--space-2);
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 11px;
-      font-weight: 600;
-      padding: var(--space-2) var(--space-3);
-      background: var(--accent-primary);
       border: none;
       border-radius: var(--radius-sm);
       cursor: pointer;
-      color: var(--ink-inverse);
-      transition: all var(--duration-fast) var(--ease-spring);
-    }
-
-    .action-btn:hover {
-      background: var(--accent-primary-hover);
-      transform: translateY(-1px);
-    }
-
-    .action-btn.secondary {
-      background: var(--surface-1);
-      color: var(--ink-primary);
-      border: 1px solid var(--border-default);
-    }
-
-    .action-btn.secondary:hover {
-      background: var(--surface-2);
-      border-color: var(--ink-primary);
-    }
-
-    /* ===== STATUS INDICATORS ===== */
-    .status-pill {
-      display: inline-flex;
+      display: flex;
       align-items: center;
-      gap: var(--space-1);
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 10px;
-      font-weight: 600;
-      padding: var(--space-1) var(--space-2);
+      justify-content: center;
+      color: var(--text-muted);
+      transition: all 0.15s;
+    }
+
+    .modal-close:hover {
+      background: var(--bg-tertiary);
+      color: var(--text-primary);
+    }
+
+    .modal-close svg {
+      width: 16px;
+      height: 16px;
+    }
+
+    .modal-body {
+      padding: 20px;
+    }
+
+    /* Presets — одна строка */
+    .presets {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-bottom: 16px;
+    }
+
+    .preset-btn {
+      padding: 6px 12px;
+      background: var(--bg-tertiary);
+      border: 1px solid var(--border);
       border-radius: var(--radius-full);
-    }
-
-    .status-pill.success {
-      background: rgba(34, 197, 94, 0.15);
-      color: var(--data-success);
-    }
-
-    .status-pill.error {
-      background: rgba(239, 68, 68, 0.15);
-      color: var(--data-error);
-    }
-
-    .status-pill.warning {
-      background: rgba(245, 158, 11, 0.15);
-      color: var(--data-warning);
-    }
-
-    .status-dot {
-      width: 6px;
-      height: 6px;
-      border-radius: var(--radius-full);
-      background: currentColor;
-    }
-
-    /* ===== UTILITIES ===== */
-    .sr-only {
-      position: absolute;
-      width: 1px;
-      height: 1px;
-      padding: 0;
-      margin: -1px;
-      overflow: hidden;
-      clip: rect(0, 0, 0, 0);
-      border: 0;
-    }
-
-    .hidden {
-      display: none !important;
-    }
-
-    /* ===== SCROLLBAR CUSTOM ===== */
-    ::-webkit-scrollbar {
-      width: 6px;
-    }
-
-    ::-webkit-scrollbar-track {
-      background: transparent;
-    }
-
-    ::-webkit-scrollbar-thumb {
-      background: var(--border-default);
-      border-radius: var(--radius-full);
-    }
-
-    ::-webkit-scrollbar-thumb:hover {
-      background: var(--border-strong);
-    }
-
-    /* ===== KEYBOARD SHORTCUT HINT ===== */
-    .kbd {
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 10px;
-      background: var(--surface-2);
-      border: 1px solid var(--border-default);
-      border-radius: 3px;
-      padding: 2px 4px;
-      color: var(--ink-tertiary);
-    }
-
-    .input-hint {
+      font-family: var(--font-mono);
       font-size: 11px;
-      color: var(--ink-tertiary);
-      margin-top: var(--space-2);
-      display: flex;
-      align-items: center;
-      gap: var(--space-2);
-      justify-content: center;
+      color: var(--text-secondary);
+      cursor: pointer;
+      transition: all 0.15s;
     }
 
-    /* ===== LICENSE ACTIVATION SCREEN ===== */
-    .license-overlay {
-      position: fixed;
-      inset: 0;
-      background: var(--surface-0);
-      z-index: 10000;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      padding: var(--space-6);
+    .preset-btn:hover {
+      border-color: var(--accent);
+      color: var(--accent);
     }
 
-    .license-overlay.hidden {
-      display: none;
+    .preset-btn.active {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: var(--bg-primary);
     }
 
-    .license-container {
-      width: 100%;
-      max-width: 360px;
-      text-align: center;
-    }
-
-    .license-logo {
-      width: 80px;
-      height: 80px;
-      background: var(--ink-primary);
-      border-radius: var(--radius-md);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      margin: 0 auto var(--space-6);
-      box-shadow: var(--shadow-lg);
+    /* Prompt textarea */
+    .prompt-wrap {
       position: relative;
     }
 
-    .license-logo::before {
+    .prompt-label {
+      font-family: var(--font-mono);
+      font-size: 11px;
+      color: var(--text-muted);
+      margin-bottom: 6px;
+      display: block;
+    }
+
+    .prompt-field {
+      width: 100%;
+      min-height: 100px;
+      padding: 12px;
+      background: var(--bg-primary);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-md);
+      font-family: var(--font-sans);
+      font-size: 13px;
+      color: var(--text-primary);
+      resize: vertical;
+      transition: all 0.15s;
+    }
+
+    .prompt-field:focus {
+      outline: none;
+      border-color: var(--accent);
+    }
+
+    .prompt-field::placeholder {
+      color: var(--text-muted);
+    }
+
+    .prompt-counter {
+      position: absolute;
+      bottom: 8px;
+      right: 10px;
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: var(--text-muted);
+    }
+
+    .modal-footer {
+      display: flex;
+      gap: 10px;
+      padding: 16px 20px;
+      border-top: 1px solid var(--border);
+      background: var(--bg-tertiary);
+    }
+
+    .modal-btn {
+      flex: 1;
+      padding: 10px 16px;
+      border-radius: var(--radius-full);
+      font-family: var(--font-mono);
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.15s var(--spring);
+      border: none;
+    }
+
+    .modal-btn.secondary {
+      background: var(--bg-secondary);
+      color: var(--text-secondary);
+      border: 1px solid var(--border);
+    }
+
+    .modal-btn.secondary:hover {
+      border-color: var(--border-strong);
+      color: var(--text-primary);
+    }
+
+    .modal-btn.primary {
+      background: var(--accent);
+      color: var(--bg-primary);
+    }
+
+    .modal-btn.primary:hover {
+      background: var(--accent-hover);
+    }
+
+    /* ============================================
+       LICENSE SCREEN
+       ============================================ */
+    .license-screen {
+      position: fixed;
+      inset: 0;
+      background: var(--bg-primary);
+      z-index: 10000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+
+    .license-screen.hidden {
+      display: none;
+    }
+
+    .license-screen::before {
       content: '';
       position: absolute;
-      inset: 4px;
-      border: 3px solid var(--accent-primary);
-      border-radius: 6px;
+      inset: 0;
+      background-image: 
+        linear-gradient(var(--grid-color) 1px, transparent 1px),
+        linear-gradient(90deg, var(--grid-color) 1px, transparent 1px);
+      background-size: 20px 20px;
+      pointer-events: none;
+    }
+
+    .license-card {
+      width: 100%;
+      max-width: 320px;
+      text-align: center;
+      position: relative;
+      z-index: 1;
+    }
+
+    .license-logo {
+      width: 56px;
+      height: 56px;
+      background: var(--accent);
+      border-radius: var(--radius-lg);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto 20px;
     }
 
     .license-logo svg {
-      width: 40px;
-      height: 40px;
-      color: var(--accent-primary);
+      width: 28px;
+      height: 28px;
+      color: var(--bg-primary);
     }
 
     .license-title {
-      font-family: 'JetBrains Mono', monospace;
+      font-family: var(--font-mono);
       font-size: 24px;
       font-weight: 700;
-      margin-bottom: var(--space-2);
-      color: var(--ink-primary);
-    }
-
-    .license-title span {
-      color: var(--accent-primary);
+      color: var(--text-primary);
+      margin-bottom: 6px;
     }
 
     .license-subtitle {
       font-size: 14px;
-      color: var(--ink-secondary);
-      margin-bottom: var(--space-6);
-    }
-
-    .license-input-group {
-      margin-bottom: var(--space-4);
+      color: var(--text-secondary);
+      margin-bottom: 24px;
     }
 
     .license-input {
       width: 100%;
-      padding: var(--space-4);
-      font-family: 'JetBrains Mono', monospace;
-      font-size: 16px;
+      padding: 14px 16px;
+      background: var(--bg-secondary);
+      border: 2px solid var(--border);
+      border-radius: var(--radius-lg);
+      font-family: var(--font-mono);
+      font-size: 15px;
       text-align: center;
       letter-spacing: 0.1em;
       text-transform: uppercase;
-      background: var(--surface-1);
-      border: 2px solid var(--border-default);
-      border-radius: var(--radius-md);
-      color: var(--ink-primary);
-      transition: all var(--duration-fast);
-    }
-
-    .license-input::placeholder {
-      color: var(--ink-tertiary);
-      letter-spacing: 0.05em;
+      color: var(--text-primary);
+      margin-bottom: 12px;
+      transition: all 0.15s;
     }
 
     .license-input:focus {
       outline: none;
-      border-color: var(--ink-primary);
-      box-shadow: var(--shadow-md);
+      border-color: var(--accent);
+    }
+
+    .license-input::placeholder {
+      color: var(--text-muted);
+      letter-spacing: 0.05em;
     }
 
     .license-input.error {
-      border-color: var(--data-error);
-      animation: shake 0.3s ease;
-    }
-
-    .license-input.success {
-      border-color: var(--data-success);
+      border-color: var(--error);
+      animation: shake 0.3s;
     }
 
     @keyframes shake {
       0%, 100% { transform: translateX(0); }
-      25% { transform: translateX(-8px); }
-      75% { transform: translateX(8px); }
+      25% { transform: translateX(-6px); }
+      75% { transform: translateX(6px); }
     }
 
     .license-btn {
       width: 100%;
-      padding: var(--space-4);
-      font-family: 'JetBrains Mono', monospace;
+      padding: 14px;
+      background: var(--accent);
+      border: none;
+      border-radius: var(--radius-full);
+      font-family: var(--font-mono);
       font-size: 14px;
       font-weight: 600;
-      background: var(--ink-primary);
-      color: var(--accent-primary);
-      border: 2px solid var(--ink-primary);
-      border-radius: var(--radius-md);
+      color: var(--bg-primary);
       cursor: pointer;
-      box-shadow: var(--shadow-md);
-      transition: all var(--duration-fast) var(--ease-spring);
+      transition: all 0.15s var(--spring);
     }
 
     .license-btn:hover:not(:disabled) {
-      transform: translateY(-3px);
-      box-shadow: var(--shadow-lg);
-    }
-
-    .license-btn:active:not(:disabled) {
-      transform: translateY(0);
-      box-shadow: none;
+      background: var(--accent-hover);
+      transform: translateY(-2px);
     }
 
     .license-btn:disabled {
-      opacity: 0.6;
+      opacity: 0.5;
       cursor: not-allowed;
     }
 
     .license-error {
-      margin-top: var(--space-4);
-      padding: var(--space-3);
-      background: rgba(239, 68, 68, 0.1);
-      border: 1px solid var(--data-error);
-      border-radius: var(--radius-sm);
-      color: var(--data-error);
+      margin-top: 12px;
+      padding: 10px 14px;
+      background: rgba(239, 68, 68, 0.15);
+      border-radius: var(--radius-md);
       font-size: 13px;
+      color: var(--error);
       display: none;
     }
 
@@ -1731,91 +1339,66 @@
       display: block;
     }
 
-    .license-hint {
-      margin-top: var(--space-6);
-      padding-top: var(--space-6);
-      border-top: 1px dashed var(--border-default);
+    .license-help {
+      margin-top: 24px;
+      padding-top: 20px;
+      border-top: 1px solid var(--border);
       font-size: 13px;
-      color: var(--ink-tertiary);
+      color: var(--text-muted);
     }
 
-    .license-hint a {
-      color: var(--accent-primary);
-      text-decoration: none;
-      font-weight: 600;
-    }
-
-    .license-hint a:hover {
-      text-decoration: underline;
-    }
-
-    .telegram-link {
+    .license-help a {
       display: inline-flex;
       align-items: center;
-      gap: var(--space-2);
-      margin-top: var(--space-3);
-      padding: var(--space-2) var(--space-4);
-      background: var(--surface-1);
-      border: 1px solid var(--border-default);
+      gap: 6px;
+      margin-top: 8px;
+      padding: 8px 16px;
+      background: var(--bg-secondary);
+      border: 1px solid var(--border);
       border-radius: var(--radius-full);
-      color: var(--ink-secondary);
-      font-size: 12px;
+      color: var(--text-secondary);
       text-decoration: none;
-      transition: all var(--duration-fast);
+      font-weight: 500;
+      transition: all 0.15s;
     }
 
-    .telegram-link:hover {
-      background: var(--surface-2);
-      color: var(--ink-primary);
-      border-color: var(--ink-primary);
+    .license-help a:hover {
+      border-color: var(--accent);
+      color: var(--accent);
     }
 
-    .telegram-link svg {
+    .license-help a svg {
       width: 16px;
       height: 16px;
     }
+
+    /* Utilities */
+    .hidden { display: none !important; }
   </style>
 </head>
-<body>
-  <!-- License Activation Overlay -->
-  <div id="licenseOverlay" class="license-overlay">
-    <div class="license-container">
+<body data-theme="dark">
+  <!-- License Screen -->
+  <div id="licenseScreen" class="license-screen">
+    <div class="license-card">
       <div class="license-logo">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
           <rect x="3" y="3" width="18" height="18" rx="2"/>
           <line x1="3" y1="9" x2="21" y2="9"/>
           <line x1="9" y1="3" x2="9" y2="21"/>
         </svg>
       </div>
-
-      <h1 class="license-title">Активация <span>SheetGPT</span></h1>
-      <p class="license-subtitle">Введите лицензионный ключ для доступа</p>
-
-      <div class="license-input-group">
-        <input
-          type="text"
-          id="licenseInput"
-          class="license-input"
-          placeholder="XXXX-XXXX-XXXX-XXXX"
-          maxlength="19"
-          autocomplete="off"
-        />
-      </div>
-
-      <button id="activateBtn" class="license-btn" onclick="console.log('INLINE CLICK!'); if(typeof handleActivation === 'function') handleActivation(); else alert('handleActivation not defined!');">
-        Активировать
-      </button>
-
-      <div id="licenseError" class="license-error">
-        Неверный лицензионный ключ
-      </div>
-
-      <div class="license-hint">
-        <p>Получите ключ в нашем Telegram-боте:</p>
-        <a href="https://t.me/sheetgptBot" target="_blank" class="telegram-link">
-          <svg viewBox="0 0 24 24" fill="currentColor">
-            <path d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z"/>
-          </svg>
+      <h1 class="license-title">SheetGPT</h1>
+      <p class="license-subtitle">Введите лицензионный ключ</p>
+      
+      <input type="text" id="licenseInput" class="license-input" placeholder="XXXX-XXXX-XXXX" maxlength="14" autocomplete="off">
+      <button id="activateBtn" class="license-btn">Активировать</button>
+      
+      <div id="licenseError" class="license-error">Неверный ключ</div>
+      
+      <div class="license-help">
+        <p>Нет ключа?</p>
+        <a href="https://t.me/sheetgptBot" target="_blank">
+          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z"/></svg>
           @sheetgptBot
         </a>
       </div>
@@ -1825,451 +1408,256 @@
   <!-- Header -->
   <header class="header">
     <div class="logo">
-      <div class="logo-mark">
-        <!-- Custom Grid/Table Icon -->
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+      <div class="logo-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
           <rect x="3" y="3" width="18" height="18" rx="2"/>
           <line x1="3" y1="9" x2="21" y2="9"/>
           <line x1="9" y1="3" x2="9" y2="21"/>
         </svg>
       </div>
-      <span class="logo-text">Sheet<span>GPT</span></span>
+      <span class="logo-text">SheetGPT</span>
     </div>
 
     <div class="header-actions">
-      <button class="icon-btn theme-toggle" id="themeToggle" aria-label="Переключить тему">
-        <!-- Custom Sun Icon -->
-        <svg class="sun-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-          <circle cx="12" cy="12" r="4"/>
-          <path d="M12 2v2"/>
-          <path d="M12 20v2"/>
-          <path d="M4.93 4.93l1.41 1.41"/>
-          <path d="M17.66 17.66l1.41 1.41"/>
-          <path d="M2 12h2"/>
-          <path d="M20 12h2"/>
-          <path d="M6.34 17.66l-1.41 1.41"/>
-          <path d="M19.07 4.93l-1.41 1.41"/>
+      <button class="icon-btn theme-toggle" id="themeToggle" aria-label="Сменить тему">
+        <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M4.93 4.93l1.41 1.41m11.32 11.32l1.41 1.41M2 12h2m16 0h2M6.34 17.66l-1.41 1.41m12.73-12.73l1.41-1.41"/>
         </svg>
-        <!-- Custom Moon Icon -->
-        <svg class="moon-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
+        <svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
         </svg>
       </button>
       <button class="icon-btn" id="historyBtn" aria-label="История">
-        <!-- Custom History/Clock Icon -->
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-          <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
-          <path d="M3 3v5h5"/>
-          <path d="M12 7v5l4 2"/>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
         </svg>
       </button>
-      <button class="icon-btn" id="settingsBtn" aria-label="Настройки">
-        <!-- Custom Sliders Icon -->
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-          <line x1="4" y1="6" x2="20" y2="6"/>
-          <line x1="4" y1="12" x2="20" y2="12"/>
-          <line x1="4" y1="18" x2="20" y2="18"/>
-          <circle cx="8" cy="6" r="2" fill="currentColor"/>
-          <circle cx="16" cy="12" r="2" fill="currentColor"/>
-          <circle cx="10" cy="18" r="2" fill="currentColor"/>
+      <button class="icon-btn" id="menuBtn" aria-label="Меню">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/>
         </svg>
       </button>
     </div>
 
-    <!-- History Dropdown -->
-    <div id="historyDropdown" class="dropdown">
-      <div class="dropdown-header">История запросов</div>
-      <ul class="dropdown-list" id="historyList">
-        <li class="dropdown-empty">История пуста</li>
-      </ul>
-    </div>
-
-    <!-- Settings Dropdown -->
-    <div id="settingsDropdown" class="dropdown" style="width: 260px;">
-      <!-- User Info -->
-      <div style="padding: var(--space-4); border-bottom: 1px solid var(--border-subtle);">
-        <div style="display: flex; align-items: center; gap: var(--space-3); margin-bottom: var(--space-3);">
-          <div style="width: 36px; height: 36px; background: var(--surface-1); border-radius: var(--radius-full); display: flex; align-items: center; justify-content: center; font-weight: 600; color: var(--ink-secondary);">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 18px; height: 18px;">
-              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
-              <circle cx="12" cy="7" r="4"/>
-            </svg>
+    <!-- Menu Dropdown -->
+    <div id="menuDropdown" class="dropdown">
+      <div class="dropdown-section">
+        <div class="user-row">
+          <div class="user-avatar">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
           </div>
-          <div style="flex: 1; min-width: 0;">
-            <div id="userEmail" style="font-size: 13px; font-weight: 500; color: var(--ink-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">user@example.com</div>
-            <span id="planBadge" style="display: inline-block; font-family: 'JetBrains Mono', monospace; font-size: 10px; font-weight: 600; padding: 2px 6px; background: var(--surface-2); border-radius: var(--radius-sm); color: var(--ink-tertiary);">FREE</span>
+          <div class="user-info">
+            <div id="userEmail" class="user-email">user@mail.com</div>
+            <div id="userPlan" class="user-plan">Free</div>
           </div>
         </div>
-
-        <!-- Usage Bar -->
-        <div style="margin-top: var(--space-2);">
-          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: var(--space-1);">
-            <span style="font-size: 11px; color: var(--ink-tertiary);">Запросов:</span>
-            <span id="usageCount" style="font-family: 'JetBrains Mono', monospace; font-size: 11px; font-weight: 600; color: var(--ink-primary);">0 / 10</span>
+        <div class="usage-bar-wrap">
+          <div class="usage-labels">
+            <span class="usage-label">Запросов</span>
+            <span id="usageCount" class="usage-count">0/10</span>
           </div>
-          <div style="height: 4px; background: var(--surface-2); border-radius: var(--radius-full); overflow: hidden;">
-            <div id="usageBarFill" style="height: 100%; width: 0%; background: var(--accent-primary); border-radius: var(--radius-full); transition: width 0.3s ease;"></div>
+          <div class="usage-bar">
+            <div id="usageFill" class="usage-fill" style="width: 0%;"></div>
           </div>
-          <div id="usageReset" style="font-size: 10px; color: var(--ink-tertiary); margin-top: var(--space-1);">Обновление: завтра</div>
         </div>
       </div>
-
-      <!-- Menu Items -->
-      <ul class="dropdown-list" style="max-height: none;">
-        <li class="dropdown-item" id="personalizeBtn" style="display: flex; align-items: center; gap: var(--space-3);">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 18px; height: 18px; color: var(--ink-tertiary);">
-            <path d="M12 20h9"/>
-            <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/>
-          </svg>
-          <span style="font-size: 13px;">Персонализация</span>
-        </li>
-        <li class="dropdown-item" id="historyMenuBtn" style="display: flex; align-items: center; gap: var(--space-3);">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 18px; height: 18px; color: var(--ink-tertiary);">
-            <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
-            <path d="M3 3v5h5"/>
-            <path d="M12 7v5l4 2"/>
-          </svg>
-          <span style="font-size: 13px;">История</span>
-        </li>
-        <li class="dropdown-item" id="upgradeBtn" style="display: flex; align-items: center; gap: var(--space-3); color: var(--accent-primary);">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 18px; height: 18px;">
-            <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
-          </svg>
-          <span style="font-size: 13px; font-weight: 600;">Unlimited</span>
-        </li>
-        <li class="dropdown-item" id="logoutBtn" style="display: flex; align-items: center; gap: var(--space-3); border-top: 1px solid var(--border-subtle); margin-top: var(--space-2); padding-top: var(--space-3);">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 18px; height: 18px; color: var(--data-error);">
-            <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
-            <polyline points="16 17 21 12 16 7"/>
-            <line x1="21" y1="12" x2="9" y2="12"/>
-          </svg>
-          <span style="font-size: 13px; color: var(--data-error);">Выйти</span>
-        </li>
-      </ul>
+      
+      <div class="dropdown-section">
+        <div class="menu-item" id="personalizeBtn">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+          Настроить AI
+        </div>
+        <div class="menu-item upgrade" id="upgradeBtn">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+          Unlimited
+        </div>
+      </div>
+      
+      <div class="dropdown-section">
+        <div class="menu-item danger" id="logoutBtn">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+          Выйти
+        </div>
+      </div>
     </div>
   </header>
 
-  <!-- Chat Container -->
+  <!-- Chat -->
   <main class="chat-container" id="chatContainer">
     <!-- Empty State -->
     <div class="empty-state" id="emptyState">
-      <div class="empty-icon">
-        <!-- Custom Spreadsheet Brain Icon -->
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round">
-          <rect x="3" y="3" width="18" height="18" rx="2"/>
-          <line x1="3" y1="9" x2="21" y2="9"/>
-          <line x1="3" y1="15" x2="21" y2="15"/>
-          <line x1="9" y1="3" x2="9" y2="21"/>
-          <line x1="15" y1="3" x2="15" y2="21"/>
-          <circle cx="12" cy="12" r="2" fill="currentColor"/>
-        </svg>
+      <div class="welcome">
+        <div class="welcome-emoji">👋</div>
+        <h1 class="welcome-title">Привет!</h1>
+        <p class="welcome-subtitle">Я помогу работать с таблицей. Спроси что угодно — от формул до анализа данных.</p>
       </div>
-      <h2 class="empty-title">SheetGPT</h2>
-      <p class="empty-description">AI-ассистент для работы с таблицами. Анализируй данные, создавай формулы, генерируй отчёты.</p>
 
-      <div class="actions-label">Быстрые действия</div>
-      <div class="actions-grid">
-        <!-- Chart/Analytics Action -->
-        <button class="action-card" data-query="Топ 5 товаров по продажам">
-          <div class="action-icon chart">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-              <path d="M3 3v18h18"/>
-              <path d="M7 16l4-8 4 5 5-9"/>
-            </svg>
+      <div class="steps">
+        <div class="step">
+          <div class="step-num">1</div>
+          <div class="step-content">
+            <div class="step-title">Выдели данные</div>
+            <div class="step-desc">Выбери ячейки с которыми работаем</div>
           </div>
-          <span class="action-title">Топ товары</span>
-          <span class="action-desc">Анализ лидеров</span>
-        </button>
-        
-        <!-- Calculator/SUMIF Action -->
-        <button class="action-card" data-query="Сумма где значение > 500000">
-          <div class="action-icon calc">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-              <rect x="4" y="2" width="16" height="20" rx="2"/>
-              <line x1="8" y1="6" x2="16" y2="6"/>
-              <line x1="8" y1="10" x2="10" y2="10"/>
-              <line x1="14" y1="10" x2="16" y2="10"/>
-              <line x1="8" y1="14" x2="10" y2="14"/>
-              <line x1="14" y1="14" x2="16" y2="14"/>
-              <line x1="8" y1="18" x2="16" y2="18"/>
-            </svg>
+        </div>
+        <div class="step">
+          <div class="step-num">2</div>
+          <div class="step-content">
+            <div class="step-title">Опиши задачу</div>
+            <div class="step-desc">Напиши что нужно сделать простым языком</div>
           </div>
-          <span class="action-title">SUMIF</span>
-          <span class="action-desc">Условная сумма</span>
-        </button>
-        
-        <!-- Paint/Highlight Action -->
-        <button class="action-card" data-query="Подсветить строки где сумма > 100000">
-          <div class="action-icon paint">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-              <path d="M19 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2Z"/>
-              <path d="M3 9h18"/>
-              <path d="M3 15h18"/>
-              <rect x="3" y="9" width="18" height="6" fill="currentColor" opacity="0.3"/>
-            </svg>
+        </div>
+        <div class="step">
+          <div class="step-num">3</div>
+          <div class="step-content">
+            <div class="step-title">Получи результат</div>
+            <div class="step-desc">Формула или действие применится автоматически</div>
           </div>
-          <span class="action-title">Выделение</span>
-          <span class="action-desc">Подсветка строк</span>
-        </button>
-        
-        <!-- Layers/Aggregation Action -->
-        <button class="action-card" data-query="Средняя цена по категориям">
-          <div class="action-icon layers">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-              <path d="M12 2L2 7l10 5 10-5-10-5Z"/>
-              <path d="M2 17l10 5 10-5"/>
-              <path d="M2 12l10 5 10-5"/>
-            </svg>
-          </div>
-          <span class="action-title">Агрегация</span>
-          <span class="action-desc">Группировка</span>
-        </button>
-        
-        <!-- Featured: Generate Table -->
-        <button class="action-card featured" data-query="Создай таблицу с топ-10 стран Европы по ВВП">
-          <div class="action-icon sparkle">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-              <path d="M12 3v1m0 16v1m-9-9h1m16 0h1"/>
-              <path d="M5.6 5.6l.7.7m12.1-.7-.7.7m0 11.4.7.7m-12.1-.7-.7.7"/>
-              <circle cx="12" cy="12" r="4"/>
-              <path d="M12 8v8"/>
-              <path d="M8 12h8"/>
-            </svg>
-          </div>
-          <span class="action-title">Генерация таблицы</span>
-          <span class="action-desc">Создать данные из AI-знаний</span>
-        </button>
+        </div>
+      </div>
+
+      <div class="suggestions">
+        <div class="suggestions-label">Попробуй спросить</div>
+        <div class="suggestions-list">
+          <button class="suggestion-chip" data-query="Посчитай сумму выделенных ячеек">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            Сумма ячеек
+          </button>
+          <button class="suggestion-chip" data-query="Найди топ 5 по продажам">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><path d="m7 16 4-8 4 5 5-9"/></svg>
+            Топ 5
+          </button>
+          <button class="suggestion-chip" data-query="Подсветить где больше 100000">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/></svg>
+            Подсветить
+          </button>
+          <button class="suggestion-chip" data-query="Среднее по категориям">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5Z"/><path d="M2 17l10 5 10-5"/></svg>
+            Среднее
+          </button>
+          <button class="suggestion-chip" data-query="Создай таблицу ТОП-10 стран по ВВП">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v1m0 16v1m-9-9h1m16 0h1"/><circle cx="12" cy="12" r="4"/></svg>
+            Сгенерировать
+          </button>
+        </div>
       </div>
     </div>
 
-    <!-- Messages will be added here dynamically -->
+    <!-- Messages will be inserted here -->
+    <div class="messages-list hidden" id="messagesList"></div>
   </main>
 
-  <!-- Input Area -->
+  <!-- Input -->
   <footer class="input-area">
     <div class="input-wrapper">
-      <textarea
-        id="messageInput"
-        class="prompt-input"
-        placeholder="Опишите задачу..."
-        rows="1"
-        aria-label="Введите запрос"
-      ></textarea>
-      <button id="sendBtn" class="send-btn" disabled aria-label="Отправить">
-        <!-- Custom Arrow Icon -->
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
-          <line x1="5" y1="12" x2="19" y2="12"/>
-          <polyline points="12 5 19 12 12 19"/>
-        </svg>
+      <textarea id="inputField" class="input-field" placeholder="Что нужно сделать?" rows="1"></textarea>
+      <button id="sendBtn" class="send-btn" disabled>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
       </button>
-    </div>
-    <div class="input-hint">
-      <kbd>Enter</kbd> отправить · <kbd>Shift+Enter</kbd> новая строка
     </div>
   </footer>
 
   <!-- Personalize Modal -->
   <div id="personalizeModal" class="modal-overlay">
-    <div class="modal-content personalize-modal">
+    <div class="modal">
       <div class="modal-header">
-        <div class="modal-icon" style="border-color: var(--accent-primary);">
-          <svg viewBox="0 0 24 24" fill="none" stroke="var(--accent-primary)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M17 3a2.85 2.85 0 114 4L7.5 20.5 2 22l1.5-5.5L17 3z"/>
-          </svg>
-        </div>
-        <div class="modal-header-text">
-          <h2 class="modal-title">Персонализация</h2>
-          <p class="modal-subtitle">Настройте AI под ваши задачи</p>
-        </div>
-      </div>
-
-      <!-- Role Templates -->
-      <div class="modal-section">
-        <label class="modal-label">Выберите роль</label>
-        <div class="roles-grid">
-          <!-- Малый бизнес -->
-          <button class="role-card" data-role="small-business" style="--role-color: #84CC16;">
-            <div class="role-icon">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/>
-                <polyline points="9,22 9,12 15,12 15,22"/>
-              </svg>
-            </div>
-            <span class="role-label">Малый бизнес</span>
-          </button>
-
-          <!-- Продажи -->
-          <button class="role-card" data-role="sales" style="--role-color: #F59E0B;">
-            <div class="role-icon">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M3 3v18h18"/>
-                <path d="M18 9l-5 5-4-4-6 6"/>
-              </svg>
-            </div>
-            <span class="role-label">Продажи</span>
-          </button>
-
-          <!-- Финансы -->
-          <button class="role-card" data-role="finance" style="--role-color: #3B82F6;">
-            <div class="role-icon">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <rect x="2" y="6" width="20" height="14" rx="2"/>
-                <path d="M2 10h20"/>
-                <circle cx="16" cy="14" r="2"/>
-              </svg>
-            </div>
-            <span class="role-label">Финансы</span>
-          </button>
-
-          <!-- Аналитик -->
-          <button class="role-card" data-role="analyst" style="--role-color: #8B5CF6;">
-            <div class="role-icon">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <circle cx="12" cy="12" r="10"/>
-                <path d="M12 6v6l4 2"/>
-              </svg>
-            </div>
-            <span class="role-label">Аналитик</span>
-          </button>
-
-          <!-- Маркетинг -->
-          <button class="role-card" data-role="marketing" style="--role-color: #EC4899;">
-            <div class="role-icon">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M3 11l18-5v12L3 13v-2z"/>
-                <path d="M11.6 16.8a3 3 0 11-5.8-1.6"/>
-              </svg>
-            </div>
-            <span class="role-label">Маркетинг</span>
-          </button>
-        </div>
-      </div>
-
-      <div class="modal-section">
-        <div class="prompt-header">
-          <label class="modal-label">Промпт</label>
-          <span class="char-counter"><span id="charCount">0</span> / 2000</span>
-        </div>
-        <p class="modal-description">Можете отредактировать или написать свой</p>
-        <div class="prompt-container">
-          <div class="prompt-indicator" id="promptIndicator"></div>
-          <textarea
-            id="customContextInput"
-            class="modal-textarea prompt-textarea"
-            placeholder="Выберите роль выше или опишите контекст вручную..."
-            maxlength="2000"
-          ></textarea>
-        </div>
-      </div>
-
-      <div class="modal-actions">
-        <button class="btn btn-secondary" id="clearContextBtn">Очистить</button>
-        <button class="btn btn-secondary" id="cancelPersonalizeBtn">Отмена</button>
-        <button class="btn btn-primary" id="savePersonalizeBtn">Сохранить</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- Upgrade Modal -->
-  <div id="upgradeModal" class="modal-overlay">
-    <div class="modal-content">
-      <div class="modal-header">
-        <div class="modal-icon" style="background: rgba(132, 204, 22, 0.15); color: var(--accent-primary);">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
-          </svg>
-        </div>
-        <h2 class="modal-title">SheetGPT Unlimited</h2>
-      </div>
-
-      <div style="text-align: center; padding: var(--space-4) 0;">
-        <div style="font-size: 36px; font-weight: 800; color: var(--ink-primary);">
-          299 ₽<span style="font-size: 14px; font-weight: 500; color: var(--ink-tertiary);">/месяц</span>
-        </div>
-        <div style="font-size: 13px; color: var(--ink-secondary); margin-top: var(--space-2);">
-          Безлимитные запросы
-        </div>
-      </div>
-
-      <ul style="list-style: none; padding: 0; margin: var(--space-4) 0;">
-        <li style="display: flex; align-items: center; gap: var(--space-3); padding: var(--space-2) 0; font-size: 13px; color: var(--ink-primary);">
-          <svg viewBox="0 0 24 24" fill="none" stroke="var(--data-success)" stroke-width="2.5" style="width: 16px; height: 16px; flex-shrink: 0;">
-            <polyline points="20 6 9 17 4 12"/>
-          </svg>
-          Неограниченные запросы
-        </li>
-        <li style="display: flex; align-items: center; gap: var(--space-3); padding: var(--space-2) 0; font-size: 13px; color: var(--ink-primary);">
-          <svg viewBox="0 0 24 24" fill="none" stroke="var(--data-success)" stroke-width="2.5" style="width: 16px; height: 16px; flex-shrink: 0;">
-            <polyline points="20 6 9 17 4 12"/>
-          </svg>
-          Генерация таблиц из AI
-        </li>
-        <li style="display: flex; align-items: center; gap: var(--space-3); padding: var(--space-2) 0; font-size: 13px; color: var(--ink-primary);">
-          <svg viewBox="0 0 24 24" fill="none" stroke="var(--data-success)" stroke-width="2.5" style="width: 16px; height: 16px; flex-shrink: 0;">
-            <polyline points="20 6 9 17 4 12"/>
-          </svg>
-          Приоритетная поддержка
-        </li>
-        <li style="display: flex; align-items: center; gap: var(--space-3); padding: var(--space-2) 0; font-size: 13px; color: var(--ink-primary);">
-          <svg viewBox="0 0 24 24" fill="none" stroke="var(--data-success)" stroke-width="2.5" style="width: 16px; height: 16px; flex-shrink: 0;">
-            <polyline points="20 6 9 17 4 12"/>
-          </svg>
-          Сложные аналитические запросы
-        </li>
-      </ul>
-
-      <div class="modal-actions" style="flex-direction: column; gap: var(--space-3);">
-        <button class="btn btn-primary" id="purchaseBtn" style="width: 100%; justify-content: center;">
-          Оформить подписку
-        </button>
-        <button class="btn btn-secondary" id="closeUpgradeModal" style="width: 100%; justify-content: center;">
-          Позже
+        <h2 class="modal-title">Настроить AI</h2>
+        <button class="modal-close" id="closePersonalize">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
         </button>
       </div>
-    </div>
-  </div>
-
-  <!-- Settings Modal -->
-  <div id="settingsModal" class="modal-overlay">
-    <div class="modal-content">
-      <div class="modal-header">
-        <div class="modal-icon">
-          <!-- Custom Sliders Icon -->
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round">
-            <line x1="4" y1="6" x2="20" y2="6"/>
-            <line x1="4" y1="12" x2="20" y2="12"/>
-            <line x1="4" y1="18" x2="20" y2="18"/>
-            <circle cx="8" cy="6" r="2" fill="currentColor"/>
-            <circle cx="16" cy="12" r="2" fill="currentColor"/>
-            <circle cx="10" cy="18" r="2" fill="currentColor"/>
-          </svg>
+      <div class="modal-body">
+        <div class="presets">
+          <button class="preset-btn" data-preset="sales">Продажи</button>
+          <button class="preset-btn" data-preset="finance">Финансы</button>
+          <button class="preset-btn" data-preset="marketing">Маркетинг</button>
+          <button class="preset-btn" data-preset="analyst">Аналитика</button>
         </div>
-        <h2 class="modal-title">Настройки</h2>
-      </div>
-
-      <div class="modal-section">
-        <label class="modal-label">Персонализация AI</label>
-        <p class="modal-description">
-          Задайте контекст для более точных ответов. Например: «Ты финансовый аналитик, фокусируйся на ROI».
-        </p>
-        <textarea
-          id="customContextInput"
-          class="modal-textarea"
-          placeholder="Оставьте пустым для стандартного режима..."
-          maxlength="2000"
-        ></textarea>
-        <div class="char-counter">
-          <span id="charCount">0</span> / 2000
+        <div class="prompt-wrap">
+          <label class="prompt-label">Или опиши контекст</label>
+          <textarea id="promptField" class="prompt-field" placeholder="Например: Я работаю с отчётами по продажам, фокусируйся на метриках ROI и конверсии..." maxlength="500"></textarea>
+          <span id="promptCounter" class="prompt-counter">0/500</span>
         </div>
       </div>
-
-      <div class="modal-actions">
-        <button class="btn btn-secondary" id="cancelSettingsBtn">Отмена</button>
-        <button class="btn btn-primary" id="saveSettingsBtn">Сохранить</button>
+      <div class="modal-footer">
+        <button class="modal-btn secondary" id="clearPrompt">Сбросить</button>
+        <button class="modal-btn primary" id="savePrompt">Сохранить</button>
       </div>
     </div>
   </div>
 
+  <script>
+    // Theme
+    function setTheme(theme) {
+      document.body.setAttribute('data-theme', theme);
+      localStorage.setItem('sheetgpt_theme', theme);
+    }
+
+    function toggleTheme() {
+      const current = document.body.getAttribute('data-theme');
+      setTheme(current === 'dark' ? 'light' : 'dark');
+    }
+
+    // Init
+    const savedTheme = localStorage.getItem('sheetgpt_theme') || 'dark';
+    setTheme(savedTheme);
+
+    document.getElementById('themeToggle').addEventListener('click', toggleTheme);
+
+    // Dropdowns
+    document.getElementById('menuBtn').addEventListener('click', (e) => {
+      e.stopPropagation();
+      document.getElementById('menuDropdown').classList.toggle('show');
+    });
+
+    document.addEventListener('click', () => {
+      document.getElementById('menuDropdown').classList.remove('show');
+    });
+
+    // Modal
+    document.getElementById('personalizeBtn').addEventListener('click', () => {
+      document.getElementById('menuDropdown').classList.remove('show');
+      document.getElementById('personalizeModal').classList.add('show');
+    });
+
+    document.getElementById('closePersonalize').addEventListener('click', () => {
+      document.getElementById('personalizeModal').classList.remove('show');
+    });
+
+    // Presets
+    document.querySelectorAll('.preset-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+      });
+    });
+
+    // Prompt counter
+    const promptField = document.getElementById('promptField');
+    const promptCounter = document.getElementById('promptCounter');
+    promptField.addEventListener('input', () => {
+      promptCounter.textContent = `${promptField.value.length}/500`;
+    });
+
+    // Suggestions
+    document.querySelectorAll('.suggestion-chip').forEach(chip => {
+      chip.addEventListener('click', () => {
+        const query = chip.dataset.query;
+        document.getElementById('inputField').value = query;
+        document.getElementById('sendBtn').disabled = false;
+      });
+    });
+
+    // Input
+    const inputField = document.getElementById('inputField');
+    const sendBtn = document.getElementById('sendBtn');
+
+    inputField.addEventListener('input', () => {
+      sendBtn.disabled = !inputField.value.trim();
+      inputField.style.height = 'auto';
+      inputField.style.height = Math.min(inputField.scrollHeight, 150) + 'px';
+    });
+  </script>
   <script src="response-templates.js"></script>
   <script src="settings-menu.js"></script>
   <script src="sidebar.js"></script>

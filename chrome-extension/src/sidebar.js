@@ -90,19 +90,23 @@ async function validateLicense(licenseKey, silent = false) {
   }
 }
 
-// Show license activation overlay
+// Show license activation screen
 function showLicenseOverlay() {
-  const overlay = document.getElementById('licenseOverlay');
+  // Support both old (licenseOverlay) and new (licenseScreen) element IDs
+  const overlay = document.getElementById('licenseScreen') || document.getElementById('licenseOverlay');
   if (overlay) {
     overlay.classList.remove('hidden');
+    overlay.style.display = '';
   }
 }
 
-// Hide license activation overlay
+// Hide license activation screen
 function hideLicenseOverlay() {
-  const overlay = document.getElementById('licenseOverlay');
+  // Support both old (licenseOverlay) and new (licenseScreen) element IDs
+  const overlay = document.getElementById('licenseScreen') || document.getElementById('licenseOverlay');
   if (overlay) {
     overlay.classList.add('hidden');
+    overlay.style.display = 'none';
   }
 }
 
@@ -140,11 +144,16 @@ async function handleActivation() {
 
   const licenseKey = input.value.trim();
 
-  // Validate format
-  if (!/^[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}$/i.test(licenseKey)) {
+  // Validate format - support both 3-group (XXXX-XXXX-XXXX) and 4-group (XXXX-XXXX-XXXX-XXXX) formats
+  const isValid3Group = /^[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}$/i.test(licenseKey);
+  const isValid4Group = /^[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}$/i.test(licenseKey);
+
+  if (!isValid3Group && !isValid4Group) {
     input.classList.add('error');
-    errorDiv.textContent = 'Неверный формат ключа';
-    errorDiv.classList.add('show');
+    if (errorDiv) {
+      errorDiv.textContent = 'Неверный формат ключа';
+      errorDiv.classList.add('show');
+    }
     setTimeout(() => {
       input.classList.remove('error');
     }, 300);
@@ -167,14 +176,14 @@ async function handleActivation() {
 
       // Hide overlay after short delay
       setTimeout(() => {
-        console.log('[Sidebar] Hiding license overlay now');
-        const overlay = document.getElementById('licenseOverlay');
+        console.log('[Sidebar] Hiding license screen now');
+        const overlay = document.getElementById('licenseScreen') || document.getElementById('licenseOverlay');
         if (overlay) {
           overlay.style.display = 'none';
           overlay.classList.add('hidden');
-          console.log('[Sidebar] ✅ Overlay hidden');
+          console.log('[Sidebar] ✅ License screen hidden');
         } else {
-          console.error('[Sidebar] ❌ licenseOverlay element not found!');
+          console.error('[Sidebar] ❌ License screen element not found!');
         }
       }, 500);
     } else {

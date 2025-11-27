@@ -612,10 +612,11 @@ function handleLogout() {
 
   // Показать экран активации (не перезагружать страницу)
   setTimeout(() => {
-    const overlay = document.getElementById('licenseOverlay');
+    const overlay = document.getElementById('licenseScreen') || document.getElementById('licenseOverlay');
     if (overlay) {
       overlay.classList.remove('hidden');
-      console.log('[SettingsMenu] License overlay shown');
+      overlay.style.display = '';
+      console.log('[SettingsMenu] License screen shown');
     } else {
       // Fallback: перезагрузить страницу
       location.reload();
