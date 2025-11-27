@@ -288,12 +288,16 @@ function updateUsageDisplay() {
 
 // ===== REQUEST TRACKING =====
 function canMakeRequest() {
-  if (userState.plan === 'unlimited') return true;
+  // premium или unlimited = безлимит
+  if (userState.plan === 'unlimited' || userState.plan === 'premium') return true;
+  // queries_limit = -1 также означает безлимит
+  if (userState.requestsLimit === -1) return true;
   return userState.requestsUsed < userState.requestsLimit;
 }
 
 function incrementRequestCount() {
-  if (userState.plan === 'unlimited') return;
+  if (userState.plan === 'unlimited' || userState.plan === 'premium') return;
+  if (userState.requestsLimit === -1) return;
 
   userState.requestsUsed++;
   saveUserState();
@@ -309,7 +313,8 @@ function incrementRequestCount() {
 }
 
 function getRemainingRequests() {
-  if (userState.plan === 'unlimited') return Infinity;
+  if (userState.plan === 'unlimited' || userState.plan === 'premium') return Infinity;
+  if (userState.requestsLimit === -1) return Infinity;
   return Math.max(0, userState.requestsLimit - userState.requestsUsed);
 }
 
