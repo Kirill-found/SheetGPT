@@ -793,6 +793,15 @@ function convertStructuredDataToValues(structuredData) {
     throw new Error('Invalid structured data format: data is null or undefined');
   }
 
+  // If we have rows but no headers, extract headers from first row keys
+  if (structuredData.rows && structuredData.rows.length > 0 && !structuredData.headers) {
+    const firstRow = structuredData.rows[0];
+    if (firstRow && typeof firstRow === 'object' && !Array.isArray(firstRow)) {
+      structuredData.headers = Object.keys(firstRow);
+      console.log('[SheetGPT] Auto-extracted headers:', structuredData.headers);
+    }
+  }
+
   // Backend returns format: { headers: [...], rows: [...], ... }
   if (structuredData.headers && structuredData.rows) {
     console.log('[SheetGPT] Using headers/rows format');
@@ -802,13 +811,16 @@ function convertStructuredDataToValues(structuredData) {
     const firstRow = structuredData.rows[0];
     if (firstRow && typeof firstRow === 'object' && !Array.isArray(firstRow)) {
       // Rows are objects - convert to arrays using headers as keys
-      console.log('[SheetGPT] Converting object rows to arrays');
-      const convertedRows = structuredData.rows.map(row => {
-        return headers.map(header => {
+      console.log('[SheetGPT] 🔄 Converting object rows to arrays using headers:', headers);
+      const convertedRows = structuredData.rows.map((row, idx) => {
+        const convertedRow = headers.map(header => {
           const value = row[header];
-          return value !== undefined && value !== null ? value : '';
+          return value !== undefined && value !== null ? String(value) : '';
         });
+        if (idx === 0) console.log('[SheetGPT] First converted row:', convertedRow);
+        return convertedRow;
       });
+      console.log('[SheetGPT] ✅ Converted', convertedRows.length, 'rows');
       return [headers, ...convertedRows];
     } else {
       // Rows are already arrays
