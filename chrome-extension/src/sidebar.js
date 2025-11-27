@@ -483,7 +483,7 @@ let chatHistory = [];
 let isProcessing = false;
 
     // Initialize
-    document.getElementById('inputField').addEventListener('input', function() {
+    document.getElementById('messageInput').addEventListener('input', function() {
       this.style.height = 'auto';
       this.style.height = (this.scrollHeight) + 'px';
 
@@ -507,13 +507,13 @@ let isProcessing = false;
     }
 
     function useExample(query) {
-      document.getElementById('inputField').value = query;
+      document.getElementById('messageInput').value = query;
       document.getElementById('sendBtn').disabled = false;
       sendMessage();
     }
 
     function sendMessage() {
-      const input = document.getElementById('inputField');
+      const input = document.getElementById('messageInput');
       const message = input.value.trim();
 
       if (!message || isProcessing) return;
@@ -1386,7 +1386,7 @@ if (sendBtn) {
 }
 
 // Message input - Enter to send
-const messageInput = document.getElementById('inputField');
+const messageInput = document.getElementById('messageInput');
 if (messageInput) {
   messageInput.addEventListener('keydown', handleKeyPress);
   console.log('[Sidebar] ✅ Message input keydown listener attached');

@@ -222,11 +222,10 @@ function initSettingsMenu() {
   console.log('[SettingsMenu] settingsBtn:', settingsBtn);
   console.log('[SettingsMenu] settingsDropdown:', settingsDropdown);
 
-  // Note: If using new design, dropdown toggle is handled in inline scripts
-  // So we skip setting up the toggle handler to avoid conflicts
+  // Note: In new v3/v4 design, dropdown toggle is handled by inline scripts in sidebar.html
+  // We only set up menu item handlers here
 
-  // Menu item handlers - personalize button handled by inline scripts in new design
-  // This adds additional functionality (loading saved context)
+  // Menu item handlers - personalize button
   document.getElementById('personalizeBtn')?.addEventListener('click', () => {
     if (settingsDropdown) settingsDropdown.classList.remove('show');
 
@@ -342,11 +341,10 @@ function initModals() {
       const maxLen = contextInput.getAttribute('maxlength') || 2000;
       if (charCount) charCount.textContent = `0/${maxLen}`;
 
-      // Reset all role cards selection
+      // Reset all role cards and preset buttons
       document.querySelectorAll('.role-card').forEach(c => {
         c.classList.remove('selected');
       });
-      // Also reset preset buttons if present
       document.querySelectorAll('.preset-btn').forEach(b => {
         b.classList.remove('active');
       });
