@@ -181,16 +181,30 @@ async def process_formula(
     try:
         # Log incoming request
         logger.info("="*60)
-        logger.info(f"[REQUEST v9.0.0] Query: {request.query}")
+        logger.info(f"[REQUEST v10.0.0] Query: {request.query}")
         logger.info(f"[DATA] Shape: {len(request.sheet_data)} rows x {len(request.column_names)} columns")
+        logger.info(f"[DATA] Headers: {request.column_names}")
+        if request.sheet_data:
+            logger.info(f"[DATA] First row: {request.sheet_data[0] if request.sheet_data else 'empty'}")
+            # Check for row length mismatches
+            for i, row in enumerate(request.sheet_data[:3]):
+                if len(row) != len(request.column_names):
+                    logger.warning(f"[DATA] ⚠️ Row {i} has {len(row)} cols, expected {len(request.column_names)}")
 
         from app.services.simple_gpt_processor import get_simple_gpt_processor
         import pandas as pd
 
         logger.info("[ENGINE v10.0.0] Using SimpleGPT Processor (no patterns, full GPT)")
 
-        # Создаем DataFrame из данных
-        df = pd.DataFrame(request.sheet_data, columns=request.column_names)
+        # Создаем DataFrame из данных (pad rows to match header length)
+        padded_data = []
+        num_cols = len(request.column_names)
+        for row in request.sheet_data:
+            if len(row) < num_cols:
+                row = list(row) + [None] * (num_cols - len(row))
+            padded_data.append(row[:num_cols])
+
+        df = pd.DataFrame(padded_data, columns=request.column_names)
 
         # v7.9.1: Count query usage if API token provided
         if x_api_token:
