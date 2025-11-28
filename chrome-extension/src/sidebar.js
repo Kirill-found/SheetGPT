@@ -1308,16 +1308,22 @@ async function formatRowInSheet(rowIndex, bold, backgroundColor) {
 async function createChartInSheet(chartSpec) {
   if (!chartSpec) {
     console.error('[Sidebar] Chart error: chartSpec is required');
+    addAIMessage({ type: 'error', text: 'Ошибка: спецификация диаграммы не найдена' });
     return;
   }
 
   try {
+    console.log('[Sidebar] Creating chart with spec:', chartSpec);
     await sendToContentScript('CREATE_CHART', {
       chartSpec: chartSpec
     });
-    console.log(`[Sidebar] Chart "${chartSpec.title}" created`);
+    console.log(`[Sidebar] Chart "${chartSpec.title}" created successfully`);
   } catch (error) {
     console.error('[Sidebar] Error creating chart:', error);
+    addAIMessage({
+      type: 'error',
+      text: `Ошибка создания диаграммы: ${error.message || error}. Попробуйте обновить страницу.`
+    });
   }
 }
 

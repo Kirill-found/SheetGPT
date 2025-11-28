@@ -939,8 +939,8 @@ async function createChartInSheet(chartSpec) {
       }
     });
 
-    if (!response.success) {
-      throw new Error(response.error);
+    if (!response || !response.success) {
+      throw new Error(response?.error || 'Неизвестная ошибка при создании диаграммы');
     }
 
     console.log('[SheetGPT] ✅ Chart created via API:', response.result);
@@ -950,10 +950,8 @@ async function createChartInSheet(chartSpec) {
     };
   } catch (error) {
     console.error('[SheetGPT] Error creating chart:', error);
-    return {
-      success: false,
-      message: `Ошибка создания диаграммы: ${error.message}`
-    };
+    // Re-throw error so it's properly handled by the message handler
+    throw new Error(`Ошибка создания диаграммы: ${error.message}`);
   }
 }
 
@@ -968,8 +966,8 @@ async function applyConditionalFormat(rule) {
       }
     });
 
-    if (!response.success) {
-      throw new Error(response.error);
+    if (!response || !response.success) {
+      throw new Error(response?.error || 'Неизвестная ошибка');
     }
 
     console.log('[SheetGPT] ✅ Conditional format applied via API:', response.result);
@@ -979,10 +977,7 @@ async function applyConditionalFormat(rule) {
     };
   } catch (error) {
     console.error('[SheetGPT] Error applying conditional format:', error);
-    return {
-      success: false,
-      message: `Ошибка условного форматирования: ${error.message}`
-    };
+    throw new Error(`Ошибка условного форматирования: ${error.message}`);
   }
 }
 
@@ -1007,8 +1002,8 @@ async function overwriteSheetData(cleanedData) {
       }
     });
 
-    if (!response.success) {
-      throw new Error(response.error);
+    if (!response || !response.success) {
+      throw new Error(response?.error || 'Неизвестная ошибка');
     }
 
     console.log('[SheetGPT] ✅ Data overwritten via API:', response.result);
@@ -1018,10 +1013,7 @@ async function overwriteSheetData(cleanedData) {
     };
   } catch (error) {
     console.error('[SheetGPT] Error overwriting data:', error);
-    return {
-      success: false,
-      message: `Ошибка замены данных: ${error.message}`
-    };
+    throw new Error(`Ошибка замены данных: ${error.message}`);
   }
 }
 
@@ -1040,8 +1032,8 @@ async function setDataValidationInSheet(rule) {
       }
     });
 
-    if (!response.success) {
-      throw new Error(response.error);
+    if (!response || !response.success) {
+      throw new Error(response?.error || 'Неизвестная ошибка');
     }
 
     console.log('[SheetGPT] ✅ Data validation set via API:', response.result);
@@ -1051,10 +1043,7 @@ async function setDataValidationInSheet(rule) {
     };
   } catch (error) {
     console.error('[SheetGPT] Error setting data validation:', error);
-    return {
-      success: false,
-      message: `Ошибка создания валидации: ${error.message}`
-    };
+    throw new Error(`Ошибка создания валидации: ${error.message}`);
   }
 }
 
