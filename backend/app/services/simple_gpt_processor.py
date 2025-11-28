@@ -197,8 +197,28 @@ result = df[df['Город'] == 'Москва']
 
     # Data validation keywords
     VALIDATION_KEYWORDS = ['валидац', 'validation', 'выпадающ', 'dropdown', 'список',
-                           'ограничь', 'restrict', 'только', 'only', 'допустим',
+                           'ограничь', 'restrict', 'допустим',
                            'разрешённ', 'allowed', 'выбор из', 'select from']
+
+    # Filter keywords
+    FILTER_KEYWORDS = ['фильтр', 'filter', 'отфильтр', 'покажи только', 'show only',
+                       'где ', 'where ', 'выбери где', 'select where', 'строки где',
+                       'rows where', 'отбери', 'выбери строки']
+
+    # Filter operators
+    FILTER_OPERATORS = {
+        '>=': ['>=', '≥', 'больше или равно', 'не меньше'],
+        '<=': ['<=', '≤', 'меньше или равно', 'не больше'],
+        '!=': ['!=', '≠', '<>', 'не равно', 'не равен', 'кроме'],
+        '>': ['>', 'больше', 'выше', 'more than', 'greater'],
+        '<': ['<', 'меньше', 'ниже', 'less than', 'lower'],
+        '==': ['=', '==', 'равно', 'равен', 'equals', 'is'],
+        'contains': ['содержит', 'contains', 'включает', 'includes'],
+        'startswith': ['начинается', 'starts with', 'начинает'],
+        'endswith': ['заканчивается', 'ends with', 'оканчивается'],
+        'empty': ['пуст', 'empty', 'null', 'nan', 'нет значения'],
+        'not_empty': ['не пуст', 'not empty', 'заполнен', 'есть значение'],
+    }
 
     # Color keywords for conditional formatting
     CONDITION_COLORS = {
@@ -1128,6 +1148,185 @@ result = df[df['Город'] == 'Москва']
             "message": message
         }
 
+    def _detect_filter_action(self, query: str, column_names: List[str], df: pd.DataFrame) -> Optional[Dict[str, Any]]:
+        """
+        Определяет, является ли запрос командой фильтрации данных.
+        Примеры:
+        - "покажи только строки где Статус = Активный"
+        - "отфильтруй по Цена > 1000"
+        - "найди строки где Дата пустая"
+        """
+        query_lower = query.lower()
+
+        # Check for filter keywords
+        is_filter = any(kw in query_lower for kw in self.FILTER_KEYWORDS)
+        if not is_filter:
+            return None
+
+        logger.info(f"[SimpleGPT] Filter action detected: {query}")
+
+        # Find target column
+        target_column = None
+        target_column_index = None
+
+        for idx, col_name in enumerate(column_names):
+            col_lower = col_name.lower()
+            if col_lower in query_lower or col_name in query:
+                target_column = col_name
+                target_column_index = idx
+                break
+            # Partial match
+            for word in col_lower.split():
+                if len(word) > 2 and word in query_lower:
+                    target_column = col_name
+                    target_column_index = idx
+                    break
+            if target_column:
+                break
+
+        if not target_column:
+            logger.warning(f"[SimpleGPT] No target column found for filter")
+            return None
+
+        # Detect operator and value
+        import re
+        operator = '=='
+        filter_value = None
+
+        # Check operators in order of specificity (longer patterns first)
+        for op, patterns in self.FILTER_OPERATORS.items():
+            for pattern in patterns:
+                if pattern in query_lower:
+                    operator = op
+                    break
+            if operator != '==':
+                break
+
+        # Extract value based on operator
+        if operator in ['empty', 'not_empty']:
+            filter_value = None
+        else:
+            # Try to extract numeric value
+            number_match = re.search(r'(\d+(?:[.,]\d+)?)', query_lower)
+            if number_match:
+                filter_value = float(number_match.group(1).replace(',', '.'))
+            else:
+                # Try to extract text value after operator patterns
+                value_patterns = [
+                    r'(?:равно|=|равен|is)\s+["\']?([^"\'.,!?]+)["\']?',
+                    r'(?:содержит|contains)\s+["\']?([^"\'.,!?]+)["\']?',
+                    r'(?:начинается|starts)\s+(?:с|with)?\s*["\']?([^"\'.,!?]+)["\']?',
+                ]
+                for vp in value_patterns:
+                    value_match = re.search(vp, query_lower)
+                    if value_match:
+                        filter_value = value_match.group(1).strip()
+                        break
+
+                # If still no value, try to find value after column name
+                if filter_value is None:
+                    col_pattern = re.escape(target_column.lower())
+                    after_col_match = re.search(
+                        rf'{col_pattern}\s*(?:[=<>!]+|равно|больше|меньше|содержит)\s*["\']?([^\s"\'.,!?]+)',
+                        query_lower
+                    )
+                    if after_col_match:
+                        filter_value = after_col_match.group(1).strip()
+
+        # Execute filter and get preview
+        try:
+            filtered_df = df.copy()
+            original_rows = len(filtered_df)
+            col = filtered_df.columns[target_column_index]
+
+            if operator == 'empty':
+                filtered_df = filtered_df[filtered_df[col].isna() | (filtered_df[col] == '')]
+            elif operator == 'not_empty':
+                filtered_df = filtered_df[filtered_df[col].notna() & (filtered_df[col] != '')]
+            elif operator == 'contains' and filter_value:
+                filtered_df = filtered_df[
+                    filtered_df[col].astype(str).str.lower().str.contains(str(filter_value).lower(), na=False)
+                ]
+            elif operator == 'startswith' and filter_value:
+                filtered_df = filtered_df[
+                    filtered_df[col].astype(str).str.lower().str.startswith(str(filter_value).lower())
+                ]
+            elif operator == 'endswith' and filter_value:
+                filtered_df = filtered_df[
+                    filtered_df[col].astype(str).str.lower().str.endswith(str(filter_value).lower())
+                ]
+            elif filter_value is not None:
+                # Numeric or exact match
+                try:
+                    numeric_val = float(filter_value) if isinstance(filter_value, (int, float, str)) and str(filter_value).replace('.', '').replace('-', '').isdigit() else None
+                    if numeric_val is not None:
+                        col_numeric = pd.to_numeric(filtered_df[col], errors='coerce')
+                        if operator == '>':
+                            filtered_df = filtered_df[col_numeric > numeric_val]
+                        elif operator == '<':
+                            filtered_df = filtered_df[col_numeric < numeric_val]
+                        elif operator == '>=':
+                            filtered_df = filtered_df[col_numeric >= numeric_val]
+                        elif operator == '<=':
+                            filtered_df = filtered_df[col_numeric <= numeric_val]
+                        elif operator == '!=':
+                            filtered_df = filtered_df[col_numeric != numeric_val]
+                        else:  # ==
+                            filtered_df = filtered_df[col_numeric == numeric_val]
+                    else:
+                        # String comparison
+                        str_col = filtered_df[col].astype(str).str.lower()
+                        str_val = str(filter_value).lower()
+                        if operator == '!=':
+                            filtered_df = filtered_df[str_col != str_val]
+                        else:
+                            filtered_df = filtered_df[str_col == str_val]
+                except Exception as e:
+                    logger.warning(f"[SimpleGPT] Filter comparison error: {e}")
+                    # Fallback to string comparison
+                    str_col = filtered_df[col].astype(str).str.lower()
+                    str_val = str(filter_value).lower()
+                    filtered_df = filtered_df[str_col == str_val]
+
+            filtered_rows = len(filtered_df)
+
+            # Prepare result data
+            filtered_data = {
+                "headers": list(filtered_df.columns),
+                "rows": filtered_df.to_dict(orient='records')
+            }
+
+            # Build operator display
+            op_display = {
+                '==': '=', '!=': '≠', '>': '>', '<': '<', '>=': '≥', '<=': '≤',
+                'contains': 'содержит', 'startswith': 'начинается с', 'endswith': 'заканчивается на',
+                'empty': 'пусто', 'not_empty': 'не пусто'
+            }
+
+            if operator in ['empty', 'not_empty']:
+                condition_str = f"{target_column} {op_display.get(operator, operator)}"
+            else:
+                condition_str = f"{target_column} {op_display.get(operator, operator)} {filter_value}"
+
+            message = f"Фильтр: {condition_str} → {filtered_rows} из {original_rows} строк"
+
+            return {
+                "action_type": "filter_data",
+                "column_name": target_column,
+                "column_index": target_column_index,
+                "operator": operator,
+                "filter_value": filter_value,
+                "original_rows": original_rows,
+                "filtered_rows": filtered_rows,
+                "filtered_data": filtered_data,
+                "condition_str": condition_str,
+                "message": message
+            }
+
+        except Exception as e:
+            logger.error(f"[SimpleGPT] Error filtering data: {e}")
+            return None
+
     async def process(
         self,
         query: str,
@@ -1272,6 +1471,28 @@ result = df[df['Город'] == 'Москва']
                     "result_type": "action",
                     "rule": validation_action["rule"],
                     "summary": validation_action["message"],
+                    "processing_time": f"{elapsed:.2f}s",
+                    "processor": "SimpleGPT v1.0 (direct action)"
+                }
+
+            # Check for filter action
+            filter_action = self._detect_filter_action(query, column_names, df)
+            if filter_action:
+                elapsed = time.time() - start_time
+                logger.info(f"[SimpleGPT] Returning filter action: {filter_action}")
+                return {
+                    "success": True,
+                    "action_type": "filter_data",
+                    "result_type": "action",
+                    "column_name": filter_action["column_name"],
+                    "column_index": filter_action["column_index"],
+                    "operator": filter_action["operator"],
+                    "filter_value": filter_action["filter_value"],
+                    "original_rows": filter_action["original_rows"],
+                    "filtered_rows": filter_action["filtered_rows"],
+                    "filtered_data": filter_action["filtered_data"],
+                    "condition_str": filter_action["condition_str"],
+                    "summary": filter_action["message"],
                     "processing_time": f"{elapsed:.2f}s",
                     "processor": "SimpleGPT v1.0 (direct action)"
                 }

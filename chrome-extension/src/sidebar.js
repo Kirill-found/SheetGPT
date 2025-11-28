@@ -819,6 +819,24 @@ function addAIMessage(response) {
       <p class="text-secondary">${valuesCount} вариантов: ${escapeHtml(valuesPreview)}${valuesCount > 5 ? '...' : ''}</p>
       <div class="content-box success">Выпадающий список применён к колонке</div>
     `;
+  } else if (response.type === 'filter_data') {
+    const originalRows = response.originalRows || 0;
+    const filteredRows = response.filteredRows || 0;
+    content = `
+      <div class="response-badge analysis">
+        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polygon points="22,3 2,3 10,12.46 10,19 14,21 14,12.46"/>
+        </svg>
+        Фильтр
+      </div>
+      <p>${escapeHtml(response.text || 'Данные отфильтрованы')}</p>
+      <p class="text-secondary">${escapeHtml(response.conditionStr || '')}</p>
+      <p class="text-secondary">${filteredRows} из ${originalRows} строк</p>
+      <div class="action-buttons">
+        <button class="action-btn" onclick="insertFilteredData()">Создать новый лист</button>
+        <button class="action-btn secondary" onclick="highlightFilteredRows()">Выделить строки</button>
+      </div>
+    `;
   } else {
     content = `<p>${escapeHtml(response.text || 'Готово')}</p>`;
   }
@@ -1125,6 +1143,21 @@ function transformAPIResponse(apiResponse) {
       type: 'data_validation',
       text: apiResponse.summary || 'Валидация данных создана',
       rule: apiResponse.rule
+    };
+  }
+
+  // If response is a filter action
+  if (apiResponse.action_type === 'filter_data' && apiResponse.filtered_data) {
+    console.log('[Sidebar] ✅ Filter condition met!');
+    // Store filtered data for later use
+    window.lastFilteredData = apiResponse.filtered_data;
+    return {
+      type: 'filter_data',
+      text: apiResponse.summary || 'Данные отфильтрованы',
+      filteredData: apiResponse.filtered_data,
+      originalRows: apiResponse.original_rows,
+      filteredRows: apiResponse.filtered_rows,
+      conditionStr: apiResponse.condition_str
     };
   }
 
@@ -1479,6 +1512,85 @@ window.overwriteWithCleanedData = async function() {
     addAIMessage({
       type: 'error',
       text: 'Ошибка при замене данных: ' + error.message
+    });
+  }
+};
+
+window.insertFilteredData = async function() {
+  const filteredData = window.lastFilteredData;
+  if (!filteredData) {
+    addAIMessage({
+      type: 'error',
+      text: 'Нет данных для вставки. Сначала выполните фильтрацию.'
+    });
+    return;
+  }
+
+  try {
+    // Create a new sheet with filtered data
+    const result = await sendToContentScript('CREATE_TABLE_AND_CHART', {
+      structuredData: filteredData,
+      sheetTitle: 'Отфильтрованные данные'
+    });
+    console.log('[Sidebar] Filtered data inserted:', result);
+
+    if (result.success) {
+      addAIMessage({
+        type: 'analysis',
+        text: result.message || 'Новый лист с отфильтрованными данными создан'
+      });
+    } else {
+      addAIMessage({
+        type: 'error',
+        text: result.message || 'Не удалось создать лист с данными'
+      });
+    }
+  } catch (error) {
+    console.error('[Sidebar] Error inserting filtered data:', error);
+    addAIMessage({
+      type: 'error',
+      text: 'Ошибка при создании листа: ' + error.message
+    });
+  }
+};
+
+window.highlightFilteredRows = async function() {
+  const filteredData = window.lastFilteredData;
+  if (!filteredData || !filteredData.rows) {
+    addAIMessage({
+      type: 'error',
+      text: 'Нет данных для выделения. Сначала выполните фильтрацию.'
+    });
+    return;
+  }
+
+  try {
+    // Get row indices from filtered data
+    // Note: rows are 1-indexed in sheets, and we skip header
+    const rowIndices = filteredData.rows.map((_, idx) => idx + 2); // +2 because 1-indexed and skip header
+
+    const result = await sendToContentScript('HIGHLIGHT_ROWS', {
+      rows: rowIndices.slice(0, 100), // Limit to 100 rows for performance
+      color: 'yellow'
+    });
+    console.log('[Sidebar] Rows highlighted:', result);
+
+    if (result.success) {
+      addAIMessage({
+        type: 'analysis',
+        text: result.message || `Выделено ${Math.min(rowIndices.length, 100)} строк`
+      });
+    } else {
+      addAIMessage({
+        type: 'error',
+        text: result.message || 'Не удалось выделить строки'
+      });
+    }
+  } catch (error) {
+    console.error('[Sidebar] Error highlighting rows:', error);
+    addAIMessage({
+      type: 'error',
+      text: 'Ошибка при выделении строк: ' + error.message
     });
   }
 };
