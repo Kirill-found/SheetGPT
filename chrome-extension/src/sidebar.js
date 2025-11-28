@@ -648,6 +648,16 @@ function addAIMessage(response) {
       </div>
       <div class="content-box success">${escapeHtml(response.text || 'Строки успешно выделены')}</div>
     `;
+  } else if (response.type === 'chart') {
+    content = `
+      <div class="response-badge formula">
+        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M18 20V10"/><path d="M12 20V4"/><path d="M6 20v-6"/>
+        </svg>
+        Диаграмма
+      </div>
+      <div class="content-box success">${escapeHtml(response.text || 'Диаграмма создана')}</div>
+    `;
   } else {
     content = `<p>${escapeHtml(response.text || 'Готово')}</p>`;
   }
@@ -880,6 +890,17 @@ function transformAPIResponse(apiResponse) {
     };
   }
 
+  // If response is a chart action
+  if (apiResponse.action_type === 'chart' && apiResponse.chart_spec) {
+    // Trigger chart creation
+    createChartInSheet(apiResponse.chart_spec);
+    return {
+      type: 'chart',
+      text: apiResponse.summary || `Диаграмма "${apiResponse.chart_spec.title || 'Диаграмма'}" создана`,
+      chartSpec: apiResponse.chart_spec
+    };
+  }
+
   // If response has highlight_rows
   if (apiResponse.highlight_rows && apiResponse.highlight_rows.length > 0) {
     // Trigger highlight action
@@ -1021,6 +1042,22 @@ async function formatRowInSheet(rowIndex, bold, backgroundColor) {
     console.log(`[Sidebar] Row ${rowIndex} formatted`);
   } catch (error) {
     console.error('[Sidebar] Error formatting row:', error);
+  }
+}
+
+async function createChartInSheet(chartSpec) {
+  if (!chartSpec) {
+    console.error('[Sidebar] Chart error: chartSpec is required');
+    return;
+  }
+
+  try {
+    await sendToContentScript('CREATE_CHART', {
+      chartSpec: chartSpec
+    });
+    console.log(`[Sidebar] Chart "${chartSpec.title}" created`);
+  } catch (error) {
+    console.error('[Sidebar] Error creating chart:', error);
   }
 }
 

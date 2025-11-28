@@ -315,6 +315,10 @@ async def process_formula(
         if "background_color" in result:
             response_dict["background_color"] = result["background_color"]
 
+        # Add chart data
+        if "chart_spec" in result:
+            response_dict["chart_spec"] = result["chart_spec"]
+
         # v9.0.0: Add hybrid processor metadata
         response_dict["processor_version"] = result.get("processor_version", "9.0.0")
         response_dict["complexity"] = result.get("complexity")

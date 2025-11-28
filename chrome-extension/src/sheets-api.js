@@ -573,6 +573,169 @@ async function formatRow(spreadsheetId, sheetId, rowIndex = 0, bold = true, back
 }
 
 /**
+ * Create a chart in Google Sheets
+ * @param {string} spreadsheetId - The spreadsheet ID
+ * @param {number} sheetId - The sheet ID
+ * @param {object} chartSpec - Chart specification from backend
+ */
+async function createChart(spreadsheetId, sheetId, chartSpec) {
+  try {
+    const token = await getAuthToken();
+
+    const { chart_type, title, x_column_index, y_column_indices, row_count, col_count } = chartSpec;
+
+    console.log(`[SheetsAPI] Creating ${chart_type} chart: "${title}"`);
+    console.log(`[SheetsAPI] X column: ${x_column_index}, Y columns: ${y_column_indices}, rows: ${row_count}`);
+
+    // Build series for each Y column
+    const series = y_column_indices.map((yColIndex, idx) => ({
+      series: {
+        sourceRange: {
+          sources: [{
+            sheetId: sheetId,
+            startRowIndex: 0,
+            endRowIndex: row_count + 1, // Include header
+            startColumnIndex: yColIndex,
+            endColumnIndex: yColIndex + 1
+          }]
+        }
+      },
+      targetAxis: 'LEFT_AXIS'
+    }));
+
+    // Build domain (X axis)
+    const domain = {
+      domain: {
+        sourceRange: {
+          sources: [{
+            sheetId: sheetId,
+            startRowIndex: 0,
+            endRowIndex: row_count + 1, // Include header
+            startColumnIndex: x_column_index,
+            endColumnIndex: x_column_index + 1
+          }]
+        }
+      }
+    };
+
+    // Map chart type to Google Sheets API type
+    const chartTypeMap = {
+      'LINE': 'LINE',
+      'BAR': 'BAR',
+      'COLUMN': 'COLUMN',
+      'PIE': 'PIE',
+      'AREA': 'AREA',
+      'SCATTER': 'SCATTER',
+      'COMBO': 'COMBO'
+    };
+
+    const googleChartType = chartTypeMap[chart_type] || 'COLUMN';
+
+    // Build chart spec based on type
+    let spec;
+
+    if (googleChartType === 'PIE') {
+      // Pie charts have different structure
+      spec = {
+        pieChart: {
+          legendPosition: 'RIGHT_LEGEND',
+          domain: domain.domain,
+          series: series[0]?.series || series[0],
+          threeDimensional: false
+        }
+      };
+    } else {
+      // Line, Bar, Column, Area, Scatter, Combo
+      spec = {
+        basicChart: {
+          chartType: googleChartType,
+          legendPosition: 'BOTTOM_LEGEND',
+          axis: [
+            {
+              position: 'BOTTOM_AXIS',
+              title: chartSpec.x_column_name || ''
+            },
+            {
+              position: 'LEFT_AXIS',
+              title: chartSpec.y_column_names?.join(', ') || ''
+            }
+          ],
+          domains: [domain],
+          series: series,
+          headerCount: 1,
+          interpolateNulls: true,
+          stackedType: 'NOT_STACKED'
+        }
+      };
+
+      // For scatter, add specific settings
+      if (googleChartType === 'SCATTER') {
+        spec.basicChart.lineSmoothing = false;
+      }
+
+      // For area chart, stack if multiple series
+      if (googleChartType === 'AREA' && series.length > 1) {
+        spec.basicChart.stackedType = 'STACKED';
+      }
+    }
+
+    // Build the full chart request
+    const chartRequest = {
+      addChart: {
+        chart: {
+          spec: {
+            title: title,
+            ...spec
+          },
+          position: {
+            overlayPosition: {
+              anchorCell: {
+                sheetId: sheetId,
+                rowIndex: 1,
+                columnIndex: col_count + 1 // Place chart next to data
+              },
+              offsetXPixels: 20,
+              offsetYPixels: 20,
+              widthPixels: 600,
+              heightPixels: 400
+            }
+          }
+        }
+      }
+    };
+
+    console.log('[SheetsAPI] Chart request:', JSON.stringify(chartRequest, null, 2));
+
+    const response = await fetch(
+      `${SHEETS_API_BASE}/${spreadsheetId}:batchUpdate`,
+      {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          requests: [chartRequest]
+        })
+      }
+    );
+
+    if (!response.ok) {
+      const error = await response.json();
+      console.error('[SheetsAPI] Chart error:', error);
+      throw new Error(`Sheets API error: ${error.error?.message || response.statusText}`);
+    }
+
+    const result = await response.json();
+    console.log('[SheetsAPI] ✅ Chart created:', result);
+    return result;
+  } catch (error) {
+    console.error('[SheetsAPI] Error creating chart:', error);
+    throw error;
+  }
+}
+
+/**
  * Get sheet ID by name
  */
 async function getSheetIdByName(spreadsheetId, sheetName) {
@@ -622,6 +785,7 @@ if (typeof module !== 'undefined' && module.exports) {
     sortRange,
     freezeRowsColumns,
     formatRow,
+    createChart,
     getSheetIdByName
   };
 }

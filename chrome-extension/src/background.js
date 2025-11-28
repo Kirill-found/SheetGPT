@@ -58,6 +58,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           result = await handleFormatRow(sender.tab.id, sender.tab.url, data);
           break;
 
+        case 'CREATE_CHART':
+          result = await handleCreateChart(sender.tab.id, sender.tab.url, data);
+          break;
+
         case 'CHECK_AUTH':
           result = await checkAuth();
           break;
@@ -330,6 +334,40 @@ async function handleFormatRow(tabId, tabUrl, data) {
   const result = await formatRow(spreadsheetId, sheetId, rowIndex || 0, bold, backgroundColor);
 
   console.log('[Background] ✅ Row formatted:', result);
+  return result;
+}
+
+/**
+ * Create a chart in Google Sheet
+ */
+async function handleCreateChart(tabId, tabUrl, data) {
+  console.log('[Background] Creating chart:', data);
+
+  const spreadsheetId = getSpreadsheetIdFromUrl(tabUrl);
+  if (!spreadsheetId) {
+    throw new Error('Not a valid Google Sheets URL');
+  }
+
+  const { chartSpec } = data;
+
+  if (!chartSpec) {
+    throw new Error('Chart specification is required');
+  }
+
+  // Get saved sheet name from storage
+  const storageKey = `sheetName_${spreadsheetId}`;
+  const storageData = await chrome.storage.local.get(storageKey);
+  const sheetName = storageData[storageKey] || 'Лист1';
+
+  console.log(`[Background] Using sheet name "${sheetName}" for chart`);
+
+  // Get sheet ID
+  const sheetId = await getSheetIdByName(spreadsheetId, sheetName);
+
+  // Create chart
+  const result = await createChart(spreadsheetId, sheetId, chartSpec);
+
+  console.log('[Background] ✅ Chart created:', result);
   return result;
 }
 

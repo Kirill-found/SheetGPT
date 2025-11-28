@@ -520,6 +520,10 @@ window.addEventListener('message', async (event) => {
         result = await formatRowInSheet(data.rowIndex, data.bold, data.backgroundColor);
         break;
 
+      case 'CREATE_CHART':
+        result = await createChartInSheet(data.chartSpec);
+        break;
+
       default:
         throw new Error(`Unknown action: ${action}`);
     }
@@ -908,6 +912,35 @@ async function formatRowInSheet(rowIndex, bold, backgroundColor) {
     return {
       success: false,
       message: `Ошибка форматирования: ${error.message}`
+    };
+  }
+}
+
+async function createChartInSheet(chartSpec) {
+  console.log('[SheetGPT] Create chart:', chartSpec);
+
+  try {
+    const response = await safeSendMessage({
+      action: 'CREATE_CHART',
+      data: {
+        chartSpec: chartSpec
+      }
+    });
+
+    if (!response.success) {
+      throw new Error(response.error);
+    }
+
+    console.log('[SheetGPT] ✅ Chart created via API:', response.result);
+    return {
+      success: true,
+      message: `Диаграмма "${chartSpec.title || 'Диаграмма'}" создана`
+    };
+  } catch (error) {
+    console.error('[SheetGPT] Error creating chart:', error);
+    return {
+      success: false,
+      message: `Ошибка создания диаграммы: ${error.message}`
     };
   }
 }
