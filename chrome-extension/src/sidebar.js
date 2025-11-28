@@ -895,7 +895,14 @@ function transformAPIResponse(apiResponse) {
   }
 
   // If response is a chart action
+  console.log('[Sidebar] Checking chart condition:', {
+    action_type: apiResponse.action_type,
+    has_chart_spec: !!apiResponse.chart_spec,
+    condition_met: apiResponse.action_type === 'chart' && apiResponse.chart_spec
+  });
+
   if (apiResponse.action_type === 'chart' && apiResponse.chart_spec) {
+    console.log('[Sidebar] ✅ Chart condition met! Creating chart...');
     // Trigger chart creation
     createChartInSheet(apiResponse.chart_spec);
     return {

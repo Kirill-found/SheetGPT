@@ -420,17 +420,23 @@ result = df[df['Город'] == 'Москва']
         x_column = None
         y_columns = []
 
-        # Priority for X axis: date > categorical mentioned > first categorical
-        if date_cols:
+        # Priority for X axis: mentioned categorical > date > first categorical
+        # If user explicitly mentions a categorical column, use it
+        for cat in categorical_cols:
+            if cat in mentioned_cols:
+                x_column = cat
+                logger.info(f"[SimpleGPT] Using mentioned categorical column for X axis: {cat['name']}")
+                break
+
+        # If no mentioned categorical, use date column for time series
+        if not x_column and date_cols:
             x_column = date_cols[0]
-        elif categorical_cols:
-            # Prefer mentioned categorical column
-            for cat in categorical_cols:
-                if cat in mentioned_cols:
-                    x_column = cat
-                    break
-            if not x_column:
-                x_column = categorical_cols[0]
+            logger.info(f"[SimpleGPT] Using date column for X axis: {x_column['name']}")
+
+        # Fallback to first categorical
+        if not x_column and categorical_cols:
+            x_column = categorical_cols[0]
+            logger.info(f"[SimpleGPT] Using first categorical column for X axis: {x_column['name']}")
 
         # Y axis: mentioned numeric columns, or all numeric if none mentioned
         for num in numeric_cols:
