@@ -5,105 +5,103 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   
-  <!-- JetBrains Mono как основной + Inter для body text -->
+  <!-- Fonts that support Cyrillic well -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 
   <style>
-    /* ============================================
-       TWO THEMES: DARK (default) & LIGHT
-       ============================================ */
-    
-    :root, [data-theme="dark"] {
-      --bg-primary: #0C0C0F;
-      --bg-secondary: #16161A;
-      --bg-tertiary: #1E1E24;
-      --bg-elevated: #242429;
+    :root {
+      /* Core Colors */
+      --lime: #a1ff62;
+      --lime-hover: #8ce854;
+      --lime-subtle: rgba(161, 255, 98, 0.12);
       
-      --text-primary: #FFFFFF;
-      --text-secondary: #A0A0AB;
-      --text-muted: #5C5C66;
+      --violet: #6840ff;
+      --violet-bright: #7c5aff;
+      --violet-subtle: rgba(104, 64, 255, 0.15);
       
-      --accent: #A1FF62;
-      --accent-hover: #8FE856;
-      --accent-subtle: rgba(161, 255, 98, 0.12);
-      --accent-glow: rgba(161, 255, 98, 0.25);
+      /* Dark Theme */
+      --bg-primary: #0d0d12;
+      --bg-secondary: #141419;
+      --bg-card: #1a1a21;
+      --bg-input: #1e1e26;
+      --bg-hover: #242430;
       
-      --border: rgba(255, 255, 255, 0.08);
-      --border-strong: rgba(255, 255, 255, 0.15);
+      --text-primary: #f5f5f7;
+      --text-secondary: #a0a0a8;
+      --text-muted: #606068;
+      --text-inverse: #0d0d12;
       
-      --shadow: rgba(0, 0, 0, 0.5);
-      --grid-color: rgba(255, 255, 255, 0.03);
+      /* Status */
+      --success: #34d399;
+      --warning: #fbbf24;
+      --error: #f87171;
+      
+      /* Borders */
+      --border-subtle: rgba(255, 255, 255, 0.06);
+      --border-default: rgba(255, 255, 255, 0.1);
+      --border-strong: rgba(255, 255, 255, 0.16);
+      
+      /* Grid */
+      --grid-color: rgba(161, 255, 98, 0.04);
+      
+      /* Spacing */
+      --space-xs: 4px;
+      --space-sm: 8px;
+      --space-md: 12px;
+      --space-lg: 16px;
+      --space-xl: 20px;
+      --space-2xl: 24px;
+      
+      /* Radius */
+      --radius-sm: 4px;
+      --radius-md: 6px;
+      --radius-lg: 8px;
     }
 
+    /* Light Theme */
     [data-theme="light"] {
-      --bg-primary: #FAFAFA;
-      --bg-secondary: #FFFFFF;
-      --bg-tertiary: #F0F0F2;
-      --bg-elevated: #FFFFFF;
+      --bg-primary: #f8f8fa;
+      --bg-secondary: #ffffff;
+      --bg-card: #ffffff;
+      --bg-input: #f0f0f4;
+      --bg-hover: #e8e8ec;
       
-      --text-primary: #0C0C0F;
-      --text-secondary: #5C5C66;
-      --text-muted: #9C9CA6;
+      --text-primary: #1a1a1f;
+      --text-secondary: #5a5a64;
+      --text-muted: #8a8a94;
+      --text-inverse: #f5f5f7;
       
-      --accent: #6840FF;
-      --accent-hover: #5835DB;
-      --accent-subtle: rgba(104, 64, 255, 0.1);
-      --accent-glow: rgba(104, 64, 255, 0.2);
-      
-      --border: rgba(0, 0, 0, 0.06);
+      --border-subtle: rgba(0, 0, 0, 0.04);
+      --border-default: rgba(0, 0, 0, 0.08);
       --border-strong: rgba(0, 0, 0, 0.12);
       
-      --shadow: rgba(0, 0, 0, 0.08);
-      --grid-color: rgba(0, 0, 0, 0.03);
+      --grid-color: rgba(104, 64, 255, 0.03);
+      
+      --violet-subtle: rgba(104, 64, 255, 0.12);
     }
 
-    /* Static */
-    :root {
-      --success: #22C55E;
-      --error: #EF4444;
-      --warning: #F59E0B;
-      
-      --font-mono: 'JetBrains Mono', monospace;
-      --font-sans: 'Inter', -apple-system, sans-serif;
-      
-      --radius-sm: 6px;
-      --radius-md: 10px;
-      --radius-lg: 14px;
-      --radius-xl: 20px;
-      --radius-full: 9999px;
-      
-      --ease: cubic-bezier(0.16, 1, 0.3, 1);
-      --spring: cubic-bezier(0.34, 1.56, 0.64, 1);
-    }
-
-    /* ============================================
-       RESET
-       ============================================ */
-    *, *::before, *::after {
+    * {
       box-sizing: border-box;
       margin: 0;
       padding: 0;
     }
 
-    html {
-      font-size: 14px;
-      -webkit-font-smoothing: antialiased;
-    }
-
     body {
-      font-family: var(--font-sans);
+      font-family: 'Manrope', -apple-system, BlinkMacSystemFont, sans-serif;
       background: var(--bg-primary);
       color: var(--text-primary);
+      font-size: 14px;
+      line-height: 1.5;
       height: 100vh;
       display: flex;
       flex-direction: column;
       overflow: hidden;
-      transition: background 0.3s var(--ease), color 0.3s var(--ease);
+      -webkit-font-smoothing: antialiased;
     }
 
-    /* Grid background */
+    /* Subtle Grid Background */
     body::before {
       content: '';
       position: fixed;
@@ -116,25 +114,15 @@
       z-index: 0;
     }
 
-    /* Custom scrollbar */
-    ::-webkit-scrollbar { width: 5px; }
-    ::-webkit-scrollbar-track { background: transparent; }
-    ::-webkit-scrollbar-thumb { 
-      background: var(--border-strong); 
-      border-radius: var(--radius-full);
-    }
-
-    /* ============================================
-       HEADER — минималистичный
-       ============================================ */
+    /* ===== HEADER ===== */
     .header {
-      height: 52px;
-      padding: 0 16px;
+      height: 48px;
+      padding: 0 var(--space-md);
+      background: var(--bg-secondary);
+      border-bottom: 1px solid var(--border-default);
       display: flex;
       align-items: center;
       justify-content: space-between;
-      border-bottom: 1px solid var(--border);
-      background: var(--bg-secondary);
       position: relative;
       z-index: 100;
       flex-shrink: 0;
@@ -143,31 +131,35 @@
     .logo {
       display: flex;
       align-items: center;
-      gap: 10px;
+      gap: var(--space-sm);
     }
 
-    .logo-icon {
+    .logo-mark {
       width: 28px;
       height: 28px;
-      background: var(--accent);
+      background: var(--violet);
+      border: 2px solid var(--lime);
       border-radius: var(--radius-sm);
       display: flex;
       align-items: center;
       justify-content: center;
+      flex-shrink: 0;
     }
 
-    .logo-icon svg {
-      width: 16px;
-      height: 16px;
-      color: var(--bg-primary);
+    .logo-mark svg {
+      width: 14px;
+      height: 14px;
+      color: var(--lime);
     }
 
     .logo-text {
-      font-family: var(--font-mono);
-      font-size: 15px;
-      font-weight: 600;
-      color: var(--text-primary);
+      font-size: 14px;
+      font-weight: 800;
       letter-spacing: -0.02em;
+    }
+
+    .logo-text span {
+      color: var(--lime);
     }
 
     .header-actions {
@@ -177,710 +169,897 @@
     }
 
     .icon-btn {
+      width: 28px;
+      height: 28px;
+      background: transparent;
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--text-secondary);
+      transition: all 0.15s ease;
+      position: relative;
+    }
+
+    .icon-btn:hover {
+      background: var(--bg-hover);
+      border-color: var(--border-default);
+      color: var(--text-primary);
+    }
+
+    .icon-btn:active {
+      transform: scale(0.95);
+    }
+
+    .icon-btn svg {
+      width: 14px;
+      height: 14px;
+    }
+
+    /* Theme Toggle */
+    .theme-toggle .sun-icon,
+    .theme-toggle .moon-icon {
+      position: absolute;
+      transition: all 0.2s ease;
+    }
+
+    .theme-toggle .sun-icon {
+      opacity: 0;
+      transform: rotate(90deg) scale(0.5);
+    }
+
+    .theme-toggle .moon-icon {
+      opacity: 1;
+      transform: rotate(0deg) scale(1);
+    }
+
+    [data-theme="light"] .theme-toggle .sun-icon {
+      opacity: 1;
+      transform: rotate(0deg) scale(1);
+    }
+
+    [data-theme="light"] .theme-toggle .moon-icon {
+      opacity: 0;
+      transform: rotate(-90deg) scale(0.5);
+    }
+
+    /* ===== LOGIN SCREEN ===== */
+    .login-screen {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: var(--space-2xl);
+      position: relative;
+      z-index: 1;
+    }
+
+    .login-screen.hidden {
+      display: none;
+    }
+
+    .login-logo {
+      width: 56px;
+      height: 56px;
+      background: var(--violet);
+      border: 3px solid var(--lime);
+      border-radius: var(--radius-lg);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: var(--space-xl);
+    }
+
+    .login-logo svg {
+      width: 28px;
+      height: 28px;
+      color: var(--lime);
+    }
+
+    .login-title {
+      font-size: 18px;
+      font-weight: 700;
+      margin-bottom: var(--space-sm);
+      text-align: center;
+    }
+
+    .login-title span {
+      color: var(--lime);
+    }
+
+    .login-description {
+      font-size: 13px;
+      color: var(--text-secondary);
+      text-align: center;
+      margin-bottom: var(--space-xl);
+      max-width: 260px;
+      line-height: 1.6;
+    }
+
+    .license-input-group {
+      width: 100%;
+      max-width: 260px;
+      margin-bottom: var(--space-lg);
+    }
+
+    .license-label {
+      display: block;
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--text-secondary);
+      margin-bottom: var(--space-sm);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .license-input {
+      width: 100%;
+      padding: var(--space-md) var(--space-lg);
+      background: var(--bg-input);
+      border: 2px solid var(--border-default);
+      border-radius: var(--radius-md);
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 13px;
+      color: var(--text-primary);
+      text-align: center;
+      letter-spacing: 0.1em;
+      transition: all 0.15s ease;
+    }
+
+    .license-input::placeholder {
+      color: var(--text-muted);
+      letter-spacing: 0.05em;
+    }
+
+    .license-input:focus {
+      outline: none;
+      border-color: var(--lime);
+      background: var(--bg-card);
+    }
+
+    .login-btn {
+      width: 100%;
+      max-width: 260px;
+      padding: var(--space-md) var(--space-lg);
+      background: var(--violet);
+      border: 2px solid var(--lime);
+      border-radius: var(--radius-md);
+      font-family: 'Manrope', sans-serif;
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--lime);
+      cursor: pointer;
+      transition: all 0.15s ease;
+    }
+
+    .login-btn:hover {
+      background: var(--lime);
+      color: var(--text-inverse);
+    }
+
+    .login-btn:active {
+      transform: scale(0.98);
+    }
+
+    .login-btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .telegram-link {
+      margin-top: var(--space-xl);
+      display: flex;
+      align-items: center;
+      gap: var(--space-sm);
+      font-size: 12px;
+      color: var(--text-secondary);
+      text-decoration: none;
+      padding: var(--space-sm) var(--space-md);
+      border-radius: var(--radius-md);
+      transition: all 0.15s ease;
+    }
+
+    .telegram-link:hover {
+      background: var(--bg-hover);
+      color: var(--lime);
+    }
+
+    .telegram-link svg {
+      width: 16px;
+      height: 16px;
+    }
+
+    .login-error {
+      margin-top: var(--space-md);
+      padding: var(--space-sm) var(--space-md);
+      background: rgba(248, 113, 113, 0.1);
+      border: 1px solid var(--error);
+      border-radius: var(--radius-md);
+      font-size: 11px;
+      color: var(--error);
+      text-align: center;
+      display: none;
+    }
+
+    .login-error.show {
+      display: block;
+    }
+
+    /* ===== MAIN APP ===== */
+    .main-app {
+      flex: 1;
+      display: none;
+      flex-direction: column;
+      position: relative;
+      z-index: 1;
+      overflow: hidden;
+    }
+
+    .main-app.active {
+      display: flex;
+    }
+
+    /* ===== USER BAR ===== */
+    .user-bar {
+      padding: var(--space-sm) var(--space-md);
+      background: var(--bg-secondary);
+      border-bottom: 1px solid var(--border-subtle);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .user-info {
+      display: flex;
+      align-items: center;
+      gap: var(--space-sm);
+    }
+
+    .user-avatar {
+      width: 24px;
+      height: 24px;
+      background: var(--violet-subtle);
+      border: 1px solid var(--violet);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 10px;
+      font-weight: 700;
+      color: var(--violet-bright);
+    }
+
+    [data-theme="light"] .user-avatar {
+      color: var(--violet);
+    }
+
+    .user-name {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+
+    .user-plan {
+      display: flex;
+      align-items: center;
+      gap: var(--space-sm);
+    }
+
+    .plan-badge {
+      padding: 2px 6px;
+      background: var(--lime-subtle);
+      border: 1px solid var(--lime);
+      border-radius: var(--radius-sm);
+      font-size: 9px;
+      font-weight: 700;
+      color: var(--lime);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .plan-badge.pro {
+      background: var(--violet-subtle);
+      border-color: var(--violet);
+      color: var(--violet-bright);
+    }
+
+    [data-theme="light"] .plan-badge.pro {
+      color: var(--violet);
+    }
+
+    /* Usage Bar */
+    .usage-bar-container {
+      padding: var(--space-xs) var(--space-md) var(--space-sm);
+      background: var(--bg-secondary);
+    }
+
+    .usage-info {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 3px;
+    }
+
+    .usage-label {
+      font-size: 10px;
+      color: var(--text-muted);
+    }
+
+    .usage-count {
+      font-size: 10px;
+      font-weight: 600;
+      color: var(--text-secondary);
+    }
+
+    .usage-bar {
+      height: 3px;
+      background: var(--bg-hover);
+      border-radius: 2px;
+      overflow: hidden;
+    }
+
+    .usage-bar-fill {
+      height: 100%;
+      background: linear-gradient(90deg, var(--lime), var(--violet));
+      border-radius: 2px;
+      transition: width 0.3s ease;
+    }
+
+    .usage-bar-fill.warning {
+      background: linear-gradient(90deg, var(--warning), var(--error));
+    }
+
+    /* ===== CHAT CONTAINER ===== */
+    .chat-container {
+      flex: 1;
+      overflow-y: auto;
+      padding: var(--space-md);
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-md);
+    }
+
+    .chat-container::-webkit-scrollbar {
+      width: 4px;
+    }
+
+    .chat-container::-webkit-scrollbar-track {
+      background: transparent;
+    }
+
+    .chat-container::-webkit-scrollbar-thumb {
+      background: var(--border-default);
+      border-radius: 2px;
+    }
+
+    /* Empty State */
+    .empty-state {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: var(--space-md);
+    }
+
+    .empty-icon {
+      width: 48px;
+      height: 48px;
+      background: var(--bg-card);
+      border: 2px solid var(--border-default);
+      border-radius: var(--radius-lg);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: var(--space-md);
+    }
+
+    .empty-icon svg {
+      width: 22px;
+      height: 22px;
+      color: var(--lime);
+    }
+
+    .empty-title {
+      font-size: 15px;
+      font-weight: 700;
+      margin-bottom: var(--space-xs);
+    }
+
+    .empty-description {
+      font-size: 12px;
+      color: var(--text-secondary);
+      max-width: 240px;
+      line-height: 1.5;
+      margin-bottom: var(--space-lg);
+    }
+
+    /* Quick Actions */
+    .actions-label {
+      font-size: 9px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--text-muted);
+      margin-bottom: var(--space-sm);
+    }
+
+    .actions-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: var(--space-sm);
+      width: 100%;
+      max-width: 280px;
+    }
+
+    .action-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-default);
+      border-radius: var(--radius-md);
+      padding: var(--space-sm) var(--space-md);
+      cursor: pointer;
+      text-align: left;
+      transition: all 0.15s ease;
+    }
+
+    .action-card:hover {
+      border-color: var(--lime);
+      background: var(--bg-hover);
+    }
+
+    .action-card:active {
+      transform: scale(0.98);
+    }
+
+    .action-icon {
+      width: 20px;
+      height: 20px;
+      margin-bottom: 2px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .action-icon svg {
+      width: 14px;
+      height: 14px;
+    }
+
+    .action-icon.chart { color: #60a5fa; }
+    .action-icon.calc { color: var(--violet-bright); }
+    .action-icon.paint { color: var(--warning); }
+    .action-icon.layers { color: var(--success); }
+    .action-icon.sparkle { color: var(--lime); }
+
+    .action-title {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--text-primary);
+      margin-bottom: 1px;
+    }
+
+    .action-desc {
+      font-size: 9px;
+      color: var(--text-muted);
+    }
+
+    /* Featured Action */
+    .action-card.featured {
+      grid-column: span 2;
+      background: var(--violet);
+      border-color: var(--lime);
+      border-width: 2px;
+    }
+
+    .action-card.featured .action-icon { color: var(--lime); }
+    .action-card.featured .action-title { color: var(--lime); }
+    .action-card.featured .action-desc { color: rgba(255,255,255,0.7); }
+
+    .action-card.featured:hover {
+      background: var(--violet-bright);
+    }
+
+    /* ===== MESSAGES ===== */
+    .message {
+      display: flex;
+      animation: fadeIn 0.2s ease;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(8px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .message.user {
+      justify-content: flex-end;
+    }
+
+    .message.ai {
+      justify-content: flex-start;
+    }
+
+    .message-bubble {
+      max-width: 85%;
+      padding: var(--space-sm) var(--space-md);
+      border-radius: var(--radius-lg);
+      font-size: 13px;
+      line-height: 1.6;
+    }
+
+    .message.user .message-bubble {
+      background: var(--violet);
+      color: #ffffff;
+      border-bottom-right-radius: var(--radius-sm);
+    }
+
+    .message.ai .message-bubble {
+      background: var(--bg-card);
+      border: 1px solid var(--border-default);
+      color: var(--text-primary);
+      border-bottom-left-radius: var(--radius-sm);
+    }
+
+    /* Response Badge */
+    .response-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: var(--space-xs);
+      font-size: 9px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      padding: 2px 6px;
+      border-radius: var(--radius-sm);
+      margin-bottom: var(--space-sm);
+    }
+
+    .response-badge.formula {
+      background: var(--lime-subtle);
+      color: var(--lime);
+    }
+
+    .response-badge.analysis {
+      background: var(--violet-subtle);
+      color: var(--violet-bright);
+    }
+
+    [data-theme="light"] .response-badge.analysis {
+      color: var(--violet);
+    }
+
+    /* Formula Code */
+    .formula-code {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px;
+      background: var(--bg-input);
+      border-left: 3px solid var(--lime);
+      padding: var(--space-sm) var(--space-md);
+      border-radius: var(--radius-sm);
+      margin: var(--space-sm) 0;
+      overflow-x: auto;
+    }
+
+    /* Content Boxes */
+    .content-box {
+      padding: var(--space-sm) var(--space-md);
+      border-radius: var(--radius-md);
+      font-size: 12px;
+      line-height: 1.5;
+      margin: var(--space-sm) 0;
+    }
+
+    .content-box.success {
+      background: rgba(52, 211, 153, 0.1);
+      border: 1px solid var(--success);
+      color: var(--success);
+    }
+
+    .content-box.error {
+      background: rgba(248, 113, 113, 0.1);
+      border: 1px solid var(--error);
+      color: var(--error);
+    }
+
+    .content-box.info {
+      background: var(--violet-subtle);
+      border: 1px solid var(--violet);
+      color: var(--text-primary);
+    }
+
+    /* Section Title */
+    .section-title {
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--lime);
+      margin: var(--space-sm) 0 var(--space-xs);
+      padding-bottom: 2px;
+      border-bottom: 1px solid var(--lime);
+      display: inline-block;
+    }
+
+    /* List Items */
+    .list-items {
+      list-style: none;
+      margin: var(--space-xs) 0;
+    }
+
+    .list-items li {
+      padding: 2px 0;
+      padding-left: var(--space-md);
+      position: relative;
+      font-size: 12px;
+    }
+
+    .list-items li::before {
+      content: '→';
+      position: absolute;
+      left: 0;
+      color: var(--lime);
+    }
+
+    /* Action Buttons */
+    .action-buttons {
+      display: flex;
+      gap: var(--space-sm);
+      margin-top: var(--space-sm);
+      flex-wrap: wrap;
+    }
+
+    .action-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: var(--space-xs);
+      font-family: 'Manrope', sans-serif;
+      font-size: 10px;
+      font-weight: 600;
+      padding: var(--space-xs) var(--space-sm);
+      background: var(--lime);
+      border: none;
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      color: var(--text-inverse);
+      transition: all 0.15s ease;
+    }
+
+    .action-btn:hover {
+      background: var(--lime-hover);
+    }
+
+    .action-btn.secondary {
+      background: var(--bg-input);
+      color: var(--text-primary);
+      border: 1px solid var(--border-default);
+    }
+
+    .action-btn.secondary:hover {
+      background: var(--bg-hover);
+      border-color: var(--lime);
+    }
+
+    /* Loading */
+    .loading-indicator {
+      display: flex;
+      align-items: center;
+      gap: var(--space-sm);
+      padding: var(--space-sm) var(--space-md);
+      background: var(--bg-card);
+      border: 1px solid var(--border-default);
+      border-radius: var(--radius-lg);
+    }
+
+    .loading-dots {
+      display: flex;
+      gap: 3px;
+    }
+
+    .loading-dots span {
+      width: 5px;
+      height: 5px;
+      background: var(--violet);
+      border-radius: 50%;
+      animation: loadingPulse 1.2s ease-in-out infinite;
+    }
+
+    .loading-dots span:nth-child(2) { animation-delay: 0.15s; }
+    .loading-dots span:nth-child(3) { animation-delay: 0.3s; }
+
+    @keyframes loadingPulse {
+      0%, 100% { transform: scale(0.8); opacity: 0.4; }
+      50% { transform: scale(1); opacity: 1; background: var(--lime); }
+    }
+
+    .loading-text {
+      font-size: 12px;
+      color: var(--text-secondary);
+    }
+
+    /* ===== INPUT AREA ===== */
+    .input-area {
+      padding: var(--space-sm) var(--space-md);
+      background: var(--bg-secondary);
+      border-top: 1px solid var(--border-default);
+    }
+
+    .input-wrapper {
+      display: flex;
+      align-items: center;
+      gap: var(--space-sm);
+      background: var(--bg-input);
+      border: 1px solid var(--border-default);
+      border-radius: var(--radius-md);
+      padding: var(--space-xs);
+      transition: all 0.15s ease;
+    }
+
+    .input-wrapper:focus-within {
+      border-color: var(--lime);
+    }
+
+    .prompt-input {
+      flex: 1;
+      border: none;
+      background: transparent;
+      font-family: 'Manrope', sans-serif;
+      font-size: 13px;
+      color: var(--text-primary);
+      padding: var(--space-sm) var(--space-sm);
+      resize: none;
+      min-height: 18px;
+      max-height: 80px;
+      line-height: 1.4;
+    }
+
+    .prompt-input::placeholder {
+      color: var(--text-muted);
+    }
+
+    .prompt-input:focus {
+      outline: none;
+    }
+
+    .send-btn {
       width: 32px;
       height: 32px;
-      background: transparent;
+      background: var(--violet);
       border: none;
       border-radius: var(--radius-sm);
       cursor: pointer;
       display: flex;
       align-items: center;
       justify-content: center;
-      color: var(--text-muted);
-      transition: all 0.15s var(--ease);
-    }
-
-    .icon-btn:hover {
-      background: var(--bg-tertiary);
-      color: var(--text-primary);
-    }
-
-    .icon-btn svg {
-      width: 18px;
-      height: 18px;
-    }
-
-    /* Theme toggle */
-    .theme-toggle {
-      position: relative;
-      overflow: hidden;
-    }
-
-    .theme-toggle .icon-sun,
-    .theme-toggle .icon-moon {
-      position: absolute;
-      transition: all 0.25s var(--spring);
-    }
-
-    .theme-toggle .icon-sun {
-      opacity: 0;
-      transform: rotate(-90deg) scale(0.5);
-    }
-
-    .theme-toggle .icon-moon {
-      opacity: 1;
-      transform: rotate(0deg) scale(1);
-    }
-
-    [data-theme="light"] .theme-toggle .icon-sun {
-      opacity: 1;
-      transform: rotate(0deg) scale(1);
-    }
-
-    [data-theme="light"] .theme-toggle .icon-moon {
-      opacity: 0;
-      transform: rotate(90deg) scale(0.5);
-    }
-
-    /* ============================================
-       CHAT CONTAINER
-       ============================================ */
-    .chat-container {
-      flex: 1;
-      overflow-y: auto;
-      padding: 20px 16px;
-      position: relative;
-      z-index: 1;
-    }
-
-    /* ============================================
-       EMPTY STATE — Онбординг
-       ============================================ */
-    .empty-state {
-      display: flex;
-      flex-direction: column;
-      height: 100%;
-      animation: fadeUp 0.4s var(--ease);
-    }
-
-    @keyframes fadeUp {
-      from { opacity: 0; transform: translateY(20px); }
-      to { opacity: 1; transform: translateY(0); }
-    }
-
-    /* Welcome */
-    .welcome {
-      text-align: center;
-      padding: 32px 0 24px;
-    }
-
-    .welcome-emoji {
-      font-size: 40px;
-      margin-bottom: 12px;
-      animation: wave 2s ease-in-out infinite;
-    }
-
-    @keyframes wave {
-      0%, 100% { transform: rotate(0deg); }
-      25% { transform: rotate(15deg); }
-      75% { transform: rotate(-10deg); }
-    }
-
-    .welcome-title {
-      font-family: var(--font-mono);
-      font-size: 22px;
-      font-weight: 700;
-      color: var(--text-primary);
-      margin-bottom: 6px;
-      letter-spacing: -0.02em;
-    }
-
-    .welcome-subtitle {
-      font-size: 14px;
-      color: var(--text-secondary);
-      max-width: 260px;
-      margin: 0 auto;
-      line-height: 1.5;
-    }
-
-    /* Steps */
-    .steps {
-      display: flex;
-      flex-direction: column;
-      gap: 8px;
-      padding: 0 8px;
-      margin-bottom: 24px;
-    }
-
-    .step {
-      display: flex;
-      align-items: flex-start;
-      gap: 12px;
-      padding: 12px;
-      background: var(--bg-secondary);
-      border: 1px solid var(--border);
-      border-radius: var(--radius-md);
-      transition: all 0.2s var(--ease);
-    }
-
-    .step:hover {
-      border-color: var(--border-strong);
-      background: var(--bg-tertiary);
-    }
-
-    .step-num {
-      width: 24px;
-      height: 24px;
-      background: var(--accent-subtle);
-      border-radius: var(--radius-full);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-family: var(--font-mono);
-      font-size: 12px;
-      font-weight: 600;
-      color: var(--accent);
+      color: var(--lime);
       flex-shrink: 0;
-    }
-
-    .step-content {
-      flex: 1;
-      min-width: 0;
-    }
-
-    .step-title {
-      font-family: var(--font-mono);
-      font-size: 13px;
-      font-weight: 600;
-      color: var(--text-primary);
-      margin-bottom: 2px;
-    }
-
-    .step-desc {
-      font-size: 12px;
-      color: var(--text-muted);
-      line-height: 1.4;
-    }
-
-    /* Suggestions — chips */
-    .suggestions {
-      flex: 1;
-      display: flex;
-      flex-direction: column;
-    }
-
-    .suggestions-label {
-      font-family: var(--font-mono);
-      font-size: 10px;
-      font-weight: 500;
-      text-transform: uppercase;
-      letter-spacing: 0.1em;
-      color: var(--text-muted);
-      padding: 0 8px;
-      margin-bottom: 10px;
-    }
-
-    .suggestions-list {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 8px;
-      padding: 0 8px;
-    }
-
-    .suggestion-chip {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      padding: 8px 14px;
-      background: var(--bg-secondary);
-      border: 1px solid var(--border);
-      border-radius: var(--radius-full);
-      font-family: var(--font-mono);
-      font-size: 12px;
-      color: var(--text-secondary);
-      cursor: pointer;
-      transition: all 0.15s var(--ease);
-      white-space: nowrap;
-    }
-
-    .suggestion-chip:hover {
-      background: var(--accent-subtle);
-      border-color: var(--accent);
-      color: var(--accent);
-      transform: translateY(-2px);
-    }
-
-    .suggestion-chip svg {
-      width: 14px;
-      height: 14px;
-      opacity: 0.6;
-    }
-
-    .suggestion-chip:hover svg {
-      opacity: 1;
-    }
-
-    /* ============================================
-       MESSAGES
-       ============================================ */
-    /* ============================================
-       CHAT MESSAGES — Clean & Minimal
-       ============================================ */
-    
-    .messages-list {
-      display: flex;
-      flex-direction: column;
-      gap: 20px;
-    }
-
-    .message {
-      animation: msgIn 0.2s ease-out;
-    }
-
-    @keyframes msgIn {
-      from { opacity: 0; transform: translateY(8px); }
-      to { opacity: 1; transform: translateY(0); }
-    }
-
-    /* User message — справа, акцентный */
-    .message-user {
-      display: flex;
-      justify-content: flex-end;
-    }
-
-    .user-bubble {
-      max-width: 80%;
-      padding: 12px 16px;
-      background: var(--accent);
-      color: #0a0a0a;
-      border-radius: 18px 18px 4px 18px;
-      font-size: 14px;
-      line-height: 1.5;
-      font-weight: 500;
-    }
-
-    /* AI message — слева, простой */
-    .message-ai {
-      display: flex;
-      justify-content: flex-start;
-    }
-
-    .ai-bubble {
-      max-width: 90%;
-      padding: 14px 18px;
-      background: var(--bg-secondary);
-      border: 1px solid var(--border);
-      border-radius: 18px 18px 18px 4px;
-      font-size: 14px;
-      line-height: 1.6;
-      color: var(--text-primary);
-    }
-
-    .ai-bubble p {
-      margin: 0;
-    }
-
-    .ai-bubble p + p {
-      margin-top: 12px;
-    }
-
-    /* Result highlight — крупное значение */
-    .result-highlight {
-      font-family: var(--font-mono);
-      font-size: 28px;
-      font-weight: 700;
-      color: var(--accent);
-      margin-bottom: 8px;
-      letter-spacing: -0.02em;
-    }
-
-    /* Formula box */
-    .formula-box {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      padding: 12px 14px;
-      background: var(--bg-tertiary);
-      border-radius: 10px;
-      margin-bottom: 12px;
-    }
-
-    .formula-box code {
-      flex: 1;
-      font-family: var(--font-mono);
-      font-size: 13px;
-      color: var(--accent);
-      word-break: break-all;
-    }
-
-    .copy-btn {
-      width: 32px;
-      height: 32px;
-      background: rgba(255,255,255,0.08);
-      border: none;
-      border-radius: 8px;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      color: var(--text-muted);
       transition: all 0.15s ease;
-      flex-shrink: 0;
-    }
-
-    .copy-btn:hover {
-      background: var(--accent);
-      color: #0a0a0a;
-    }
-
-    .copy-btn.copied {
-      background: var(--success);
-      color: white;
-    }
-
-    /* Explanation text */
-    .ai-bubble .explanation {
-      font-size: 13px;
-      color: var(--text-secondary);
-      margin-top: 10px;
-      padding-top: 10px;
-      border-top: 1px solid var(--border);
-    }
-
-    /* Findings list */
-    .findings {
-      list-style: none;
-      margin: 12px 0 0;
-      padding: 0;
-    }
-
-    .findings li {
-      position: relative;
-      padding-left: 16px;
-      margin-bottom: 8px;
-      font-size: 13px;
-      color: var(--text-secondary);
-    }
-
-    .findings li:last-child {
-      margin-bottom: 0;
-    }
-
-    .findings li::before {
-      content: '';
-      position: absolute;
-      left: 0;
-      top: 8px;
-      width: 5px;
-      height: 5px;
-      background: var(--accent);
-      border-radius: 50%;
-    }
-
-    /* Success message */
-    .success-msg {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      color: var(--success);
-      font-size: 14px;
-    }
-
-    .success-msg svg {
-      flex-shrink: 0;
-    }
-
-    /* ============================================
-       LOADING — typing indicator
-       ============================================ */
-    .typing {
-      display: flex;
-      align-items: center;
-      gap: 5px;
-      padding: 4px 0;
-    }
-
-    .typing span {
-      width: 8px;
-      height: 8px;
-      background: var(--text-muted);
-      border-radius: 50%;
-      animation: typing 1.4s infinite;
-    }
-
-    .typing span:nth-child(2) { animation-delay: 0.2s; }
-    .typing span:nth-child(3) { animation-delay: 0.4s; }
-
-    @keyframes typing {
-      0%, 60%, 100% { 
-        transform: translateY(0);
-        opacity: 0.4;
-      }
-      30% { 
-        transform: translateY(-8px);
-        opacity: 1;
-      }
-    }
-
-    /* ============================================
-       INPUT AREA — главный герой
-       ============================================ */
-    .input-area {
-      padding: 12px 16px 16px;
-      background: var(--bg-secondary);
-      border-top: 1px solid var(--border);
-      position: relative;
-      z-index: 10;
-    }
-
-    .input-wrapper {
-      display: flex;
-      align-items: flex-end;
-      gap: 10px;
-      background: var(--bg-primary);
-      border: 2px solid var(--border);
-      border-radius: var(--radius-lg);
-      padding: 10px 12px;
-      transition: all 0.2s var(--ease);
-    }
-
-    .input-wrapper:focus-within {
-      border-color: var(--accent);
-      box-shadow: 0 0 0 4px var(--accent-glow);
-    }
-
-    .input-field {
-      flex: 1;
-      border: none;
-      background: transparent;
-      font-family: var(--font-sans);
-      font-size: 15px;
-      color: var(--text-primary);
-      resize: none;
-      min-height: 24px;
-      max-height: 150px;
-      line-height: 1.5;
-      padding: 4px 0;
-    }
-
-    .input-field::placeholder {
-      color: var(--text-muted);
-    }
-
-    .input-field:focus {
-      outline: none;
-    }
-
-    .send-btn {
-      width: 38px;
-      height: 38px;
-      background: var(--accent);
-      border: none;
-      border-radius: var(--radius-md);
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      color: var(--bg-primary);
-      flex-shrink: 0;
-      transition: all 0.15s var(--spring);
     }
 
     .send-btn:hover:not(:disabled) {
-      background: var(--accent-hover);
-      transform: scale(1.05);
+      background: var(--violet-bright);
+    }
+
+    .send-btn:active:not(:disabled) {
+      transform: scale(0.95);
     }
 
     .send-btn:disabled {
-      opacity: 0.3;
+      opacity: 0.4;
       cursor: not-allowed;
     }
 
     .send-btn svg {
-      width: 18px;
-      height: 18px;
+      width: 14px;
+      height: 14px;
     }
 
-    /* ============================================
-       DROPDOWNS
-       ============================================ */
+    .input-hint {
+      font-size: 9px;
+      color: var(--text-muted);
+      margin-top: var(--space-xs);
+      text-align: center;
+    }
+
+    .kbd {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 8px;
+      background: var(--bg-hover);
+      padding: 1px 3px;
+      border-radius: 2px;
+      margin: 0 2px;
+    }
+
+    /* ===== DROPDOWN ===== */
     .dropdown {
       position: absolute;
-      top: calc(100% + 6px);
-      right: 16px;
-      width: 260px;
-      background: var(--bg-elevated);
-      border: 1px solid var(--border);
-      border-radius: var(--radius-lg);
-      box-shadow: 0 12px 40px var(--shadow);
+      top: calc(100% + 4px);
+      right: var(--space-md);
+      width: 220px;
+      background: var(--bg-card);
+      border: 1px solid var(--border-default);
+      border-radius: var(--radius-md);
+      box-shadow: 0 8px 24px rgba(0,0,0,0.2);
       opacity: 0;
       visibility: hidden;
-      transform: translateY(-8px) scale(0.98);
-      transition: all 0.2s var(--ease);
+      transform: translateY(-8px);
+      transition: all 0.2s ease;
       z-index: 200;
-      overflow: hidden;
     }
 
     .dropdown.show {
       opacity: 1;
       visibility: visible;
-      transform: translateY(0) scale(1);
+      transform: translateY(0);
     }
 
-    .dropdown-section {
-      padding: 12px;
-      border-bottom: 1px solid var(--border);
-    }
-
-    .dropdown-section:last-child {
-      border-bottom: none;
-    }
-
-    .dropdown-title {
-      font-family: var(--font-mono);
-      font-size: 10px;
-      font-weight: 500;
+    .dropdown-header {
+      font-size: 9px;
+      font-weight: 600;
       text-transform: uppercase;
       letter-spacing: 0.08em;
       color: var(--text-muted);
-      margin-bottom: 8px;
+      padding: var(--space-sm) var(--space-md);
+      border-bottom: 1px solid var(--border-subtle);
     }
 
-    /* User info */
-    .user-row {
-      display: flex;
-      align-items: center;
-      gap: 10px;
+    .dropdown-list {
+      list-style: none;
+      max-height: 200px;
+      overflow-y: auto;
     }
 
-    .user-avatar {
-      width: 36px;
-      height: 36px;
-      background: var(--accent-subtle);
-      border-radius: var(--radius-full);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      color: var(--accent);
+    .dropdown-item {
+      padding: var(--space-sm) var(--space-md);
+      cursor: pointer;
+      border-bottom: 1px solid var(--border-subtle);
+      transition: background 0.1s;
     }
 
-    .user-avatar svg {
-      width: 18px;
-      height: 18px;
+    .dropdown-item:hover {
+      background: var(--bg-hover);
     }
 
-    .user-info {
-      flex: 1;
-      min-width: 0;
+    .dropdown-item:last-child {
+      border-bottom: none;
     }
 
-    .user-email {
-      font-size: 13px;
+    .dropdown-item-title {
+      font-size: 12px;
       font-weight: 500;
       color: var(--text-primary);
+      margin-bottom: 1px;
       white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
     }
 
-    .user-plan {
-      font-family: var(--font-mono);
+    .dropdown-item-meta {
       font-size: 10px;
-      font-weight: 600;
-      color: var(--accent);
-      text-transform: uppercase;
-      letter-spacing: 0.05em;
-    }
-
-    /* Usage bar */
-    .usage-bar-wrap {
-      margin-top: 10px;
-    }
-
-    .usage-labels {
-      display: flex;
-      justify-content: space-between;
-      margin-bottom: 4px;
-    }
-
-    .usage-label {
-      font-size: 11px;
       color: var(--text-muted);
     }
 
-    .usage-count {
-      font-family: var(--font-mono);
-      font-size: 11px;
-      font-weight: 600;
-      color: var(--text-primary);
+    .dropdown-empty {
+      padding: var(--space-lg);
+      text-align: center;
+      color: var(--text-muted);
+      font-size: 12px;
     }
 
-    .usage-bar {
-      height: 4px;
-      background: var(--border);
-      border-radius: var(--radius-full);
-      overflow: hidden;
-    }
-
-    .usage-fill {
-      height: 100%;
-      background: var(--accent);
-      border-radius: var(--radius-full);
-      transition: width 0.3s var(--ease);
-    }
-
-    /* Menu items */
-    .menu-item {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      padding: 10px 12px;
-      border-radius: var(--radius-sm);
-      cursor: pointer;
-      transition: all 0.15s;
-      font-size: 13px;
-      color: var(--text-secondary);
-    }
-
-    .menu-item:hover {
-      background: var(--bg-tertiary);
-      color: var(--text-primary);
-    }
-
-    .menu-item svg {
-      width: 16px;
-      height: 16px;
-      opacity: 0.6;
-    }
-
-    .menu-item:hover svg {
-      opacity: 1;
-    }
-
-    .menu-item.danger {
-      color: var(--error);
-    }
-
-    .menu-item.danger:hover {
-      background: rgba(239, 68, 68, 0.1);
-    }
-
-    .menu-item.upgrade {
-      background: var(--accent-subtle);
-      color: var(--accent);
-      font-weight: 600;
-    }
-
-    .menu-item.upgrade:hover {
-      background: var(--accent);
-      color: var(--bg-primary);
-    }
-
-    /* ============================================
-       MODALS — упрощённые
-       ============================================ */
+    /* ===== SETTINGS MODAL ===== */
     .modal-overlay {
       position: fixed;
       inset: 0;
       background: rgba(0, 0, 0, 0.7);
-      backdrop-filter: blur(4px);
       display: flex;
       align-items: center;
       justify-content: center;
-      padding: 16px;
+      padding: var(--space-md);
       opacity: 0;
       visibility: hidden;
-      transition: all 0.25s var(--ease);
+      transition: all 0.2s ease;
       z-index: 1000;
     }
 
@@ -889,663 +1068,474 @@
       visibility: visible;
     }
 
-    .modal {
+    .modal-content {
       width: 100%;
-      max-width: 360px;
-      background: var(--bg-secondary);
-      border: 1px solid var(--border);
-      border-radius: var(--radius-xl);
-      overflow: hidden;
-      transform: scale(0.95) translateY(20px);
-      transition: transform 0.25s var(--spring);
+      max-width: 320px;
+      max-height: 85vh;
+      overflow-y: auto;
+      background: var(--bg-card);
+      border: 1px solid var(--border-default);
+      border-radius: var(--radius-lg);
+      transform: scale(0.95);
+      transition: transform 0.2s ease;
     }
 
-    .modal-overlay.show .modal {
-      transform: scale(1) translateY(0);
+    .modal-overlay.show .modal-content {
+      transform: scale(1);
     }
 
     .modal-header {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: 16px 20px;
-      border-bottom: 1px solid var(--border);
+      padding: var(--space-md);
+      border-bottom: 1px solid var(--border-subtle);
     }
 
     .modal-title {
-      font-family: var(--font-mono);
-      font-size: 16px;
-      font-weight: 600;
-      color: var(--text-primary);
+      font-size: 14px;
+      font-weight: 700;
     }
 
     .modal-close {
-      width: 28px;
-      height: 28px;
+      width: 24px;
+      height: 24px;
       background: transparent;
       border: none;
-      border-radius: var(--radius-sm);
       cursor: pointer;
       display: flex;
       align-items: center;
       justify-content: center;
       color: var(--text-muted);
-      transition: all 0.15s;
+      border-radius: var(--radius-sm);
+      transition: all 0.15s ease;
     }
 
     .modal-close:hover {
-      background: var(--bg-tertiary);
+      background: var(--bg-hover);
       color: var(--text-primary);
     }
 
     .modal-close svg {
-      width: 16px;
-      height: 16px;
+      width: 14px;
+      height: 14px;
     }
 
     .modal-body {
-      padding: 20px;
+      padding: var(--space-md);
     }
 
-    /* Presets — одна строка */
-    .presets {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 6px;
-      margin-bottom: 16px;
+    .modal-section {
+      margin-bottom: var(--space-lg);
     }
 
-    .preset-btn {
-      padding: 6px 12px;
-      background: var(--bg-tertiary);
-      border: 1px solid var(--border);
-      border-radius: var(--radius-full);
-      font-family: var(--font-mono);
-      font-size: 11px;
-      color: var(--text-secondary);
-      cursor: pointer;
-      transition: all 0.15s;
+    .modal-section:last-child {
+      margin-bottom: 0;
     }
 
-    .preset-btn:hover {
-      border-color: var(--accent);
-      color: var(--accent);
-    }
-
-    .preset-btn.active {
-      background: var(--accent);
-      border-color: var(--accent);
-      color: var(--bg-primary);
-    }
-
-    /* Prompt textarea */
-    .prompt-wrap {
-      position: relative;
-    }
-
-    .prompt-label {
-      font-family: var(--font-mono);
-      font-size: 11px;
-      color: var(--text-muted);
-      margin-bottom: 6px;
+    .modal-label {
       display: block;
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--text-secondary);
+      margin-bottom: var(--space-xs);
     }
 
-    .prompt-field {
-      width: 100%;
-      min-height: 100px;
-      padding: 12px;
-      background: var(--bg-primary);
-      border: 1px solid var(--border);
-      border-radius: var(--radius-md);
-      font-family: var(--font-sans);
-      font-size: 13px;
-      color: var(--text-primary);
-      resize: vertical;
-      transition: all 0.15s;
-    }
-
-    .prompt-field:focus {
-      outline: none;
-      border-color: var(--accent);
-    }
-
-    .prompt-field::placeholder {
+    .modal-description {
+      font-size: 11px;
       color: var(--text-muted);
+      line-height: 1.5;
+      margin-bottom: var(--space-sm);
     }
 
-    .prompt-counter {
-      position: absolute;
-      bottom: 8px;
-      right: 10px;
-      font-family: var(--font-mono);
+    .modal-input {
+      width: 100%;
+      padding: var(--space-sm) var(--space-md);
+      background: var(--bg-input);
+      border: 1px solid var(--border-default);
+      border-radius: var(--radius-md);
+      font-family: 'Manrope', sans-serif;
+      font-size: 12px;
+      color: var(--text-primary);
+      transition: all 0.15s ease;
+    }
+
+    .modal-input:focus {
+      outline: none;
+      border-color: var(--lime);
+    }
+
+    .modal-textarea {
+      min-height: 70px;
+      resize: vertical;
+      line-height: 1.5;
+    }
+
+    .char-counter {
+      font-size: 9px;
+      color: var(--text-muted);
+      text-align: right;
+      margin-top: 2px;
+    }
+
+    /* User Profile in Settings */
+    .profile-section {
+      display: flex;
+      align-items: center;
+      gap: var(--space-sm);
+      padding: var(--space-sm) var(--space-md);
+      background: var(--bg-input);
+      border-radius: var(--radius-md);
+      margin-bottom: var(--space-md);
+    }
+
+    .profile-avatar {
+      width: 32px;
+      height: 32px;
+      background: var(--violet-subtle);
+      border: 2px solid var(--violet);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--violet-bright);
+    }
+
+    [data-theme="light"] .profile-avatar {
+      color: var(--violet);
+    }
+
+    .profile-info {
+      flex: 1;
+    }
+
+    .profile-name {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text-primary);
+    }
+
+    .profile-plan {
       font-size: 10px;
       color: var(--text-muted);
     }
 
-    .modal-footer {
-      display: flex;
-      gap: 10px;
-      padding: 16px 20px;
-      border-top: 1px solid var(--border);
-      background: var(--bg-tertiary);
-    }
-
-    .modal-btn {
-      flex: 1;
-      padding: 10px 16px;
-      border-radius: var(--radius-full);
-      font-family: var(--font-mono);
-      font-size: 13px;
-      font-weight: 500;
-      cursor: pointer;
-      transition: all 0.15s var(--spring);
-      border: none;
-    }
-
-    .modal-btn.secondary {
-      background: var(--bg-secondary);
-      color: var(--text-secondary);
-      border: 1px solid var(--border);
-    }
-
-    .modal-btn.secondary:hover {
-      border-color: var(--border-strong);
-      color: var(--text-primary);
-    }
-
-    .modal-btn.primary {
-      background: var(--accent);
-      color: var(--bg-primary);
-    }
-
-    .modal-btn.primary:hover {
-      background: var(--accent-hover);
-    }
-
-    /* ============================================
-       LICENSE SCREEN
-       ============================================ */
-    .license-screen {
-      position: fixed;
-      inset: 0;
-      background: var(--bg-primary);
-      z-index: 10000;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      padding: 24px;
-    }
-
-    .license-screen.hidden {
-      display: none;
-    }
-
-    .license-screen::before {
-      content: '';
-      position: absolute;
-      inset: 0;
-      background-image: 
-        linear-gradient(var(--grid-color) 1px, transparent 1px),
-        linear-gradient(90deg, var(--grid-color) 1px, transparent 1px);
-      background-size: 20px 20px;
-      pointer-events: none;
-    }
-
-    .license-card {
-      width: 100%;
-      max-width: 320px;
-      text-align: center;
-      position: relative;
-      z-index: 1;
-    }
-
-    .license-logo {
-      width: 56px;
-      height: 56px;
-      background: var(--accent);
-      border-radius: var(--radius-lg);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      margin: 0 auto 20px;
-    }
-
-    .license-logo svg {
-      width: 28px;
-      height: 28px;
-      color: var(--bg-primary);
-    }
-
-    .license-title {
-      font-family: var(--font-mono);
-      font-size: 24px;
-      font-weight: 700;
-      color: var(--text-primary);
-      margin-bottom: 6px;
-    }
-
-    .license-subtitle {
-      font-size: 14px;
-      color: var(--text-secondary);
-      margin-bottom: 24px;
-    }
-
-    .license-input {
-      width: 100%;
-      padding: 14px 16px;
-      background: var(--bg-secondary);
-      border: 2px solid var(--border);
-      border-radius: var(--radius-lg);
-      font-family: var(--font-mono);
-      font-size: 15px;
-      text-align: center;
-      letter-spacing: 0.1em;
-      text-transform: uppercase;
-      color: var(--text-primary);
-      margin-bottom: 12px;
-      transition: all 0.15s;
-    }
-
-    .license-input:focus {
-      outline: none;
-      border-color: var(--accent);
-    }
-
-    .license-input::placeholder {
-      color: var(--text-muted);
-      letter-spacing: 0.05em;
-    }
-
-    .license-input.error {
-      border-color: var(--error);
-      animation: shake 0.3s;
-    }
-
-    @keyframes shake {
-      0%, 100% { transform: translateX(0); }
-      25% { transform: translateX(-6px); }
-      75% { transform: translateX(6px); }
-    }
-
-    .license-btn {
-      width: 100%;
-      padding: 14px;
-      background: var(--accent);
-      border: none;
-      border-radius: var(--radius-full);
-      font-family: var(--font-mono);
-      font-size: 14px;
+    .logout-btn {
+      padding: var(--space-xs) var(--space-sm);
+      background: transparent;
+      border: 1px solid var(--error);
+      border-radius: var(--radius-sm);
+      font-size: 10px;
       font-weight: 600;
-      color: var(--bg-primary);
-      cursor: pointer;
-      transition: all 0.15s var(--spring);
-    }
-
-    .license-btn:hover:not(:disabled) {
-      background: var(--accent-hover);
-      transform: translateY(-2px);
-    }
-
-    .license-btn:disabled {
-      opacity: 0.5;
-      cursor: not-allowed;
-    }
-
-    .license-error {
-      margin-top: 12px;
-      padding: 10px 14px;
-      background: rgba(239, 68, 68, 0.15);
-      border-radius: var(--radius-md);
-      font-size: 13px;
       color: var(--error);
-      display: none;
+      cursor: pointer;
+      transition: all 0.15s ease;
     }
 
-    .license-error.show {
-      display: block;
+    .logout-btn:hover {
+      background: rgba(248, 113, 113, 0.1);
     }
 
-    .license-help {
-      margin-top: 24px;
-      padding-top: 20px;
-      border-top: 1px solid var(--border);
-      font-size: 13px;
-      color: var(--text-muted);
+    .modal-footer {
+      padding: var(--space-md);
+      border-top: 1px solid var(--border-subtle);
+      display: flex;
+      gap: var(--space-sm);
+      justify-content: flex-end;
     }
 
-    .license-help a {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      margin-top: 8px;
-      padding: 8px 16px;
-      background: var(--bg-secondary);
-      border: 1px solid var(--border);
-      border-radius: var(--radius-full);
-      color: var(--text-secondary);
-      text-decoration: none;
-      font-weight: 500;
-      transition: all 0.15s;
+    .btn {
+      padding: var(--space-xs) var(--space-md);
+      border-radius: var(--radius-md);
+      font-family: 'Manrope', sans-serif;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s ease;
     }
 
-    .license-help a:hover {
-      border-color: var(--accent);
-      color: var(--accent);
+    .btn-primary {
+      background: var(--lime);
+      border: none;
+      color: var(--text-inverse);
     }
 
-    .license-help a svg {
-      width: 16px;
-      height: 16px;
+    .btn-primary:hover {
+      background: var(--lime-hover);
     }
 
-    /* Utilities */
-    .hidden { display: none !important; }
+    .btn-secondary {
+      background: transparent;
+      border: 1px solid var(--border-default);
+      color: var(--text-primary);
+    }
+
+    .btn-secondary:hover {
+      background: var(--bg-hover);
+    }
+
+    /* ===== UTILITIES ===== */
+    .hidden {
+      display: none !important;
+    }
   </style>
 </head>
-<body data-theme="dark">
-  <!-- License Screen -->
-  <div id="licenseScreen" class="license-screen">
-    <div class="license-card">
-      <div class="license-logo">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-          <rect x="3" y="3" width="18" height="18" rx="2"/>
-          <line x1="3" y1="9" x2="21" y2="9"/>
-          <line x1="9" y1="3" x2="9" y2="21"/>
-        </svg>
-      </div>
-      <h1 class="license-title">SheetGPT</h1>
-      <p class="license-subtitle">Введите лицензионный ключ</p>
-      
-      <input type="text" id="licenseInput" class="license-input" placeholder="XXXX-XXXX-XXXX" maxlength="14" autocomplete="off">
-      <button id="activateBtn" class="license-btn">Активировать</button>
-      
-      <div id="licenseError" class="license-error">Неверный ключ</div>
-      
-      <div class="license-help">
-        <p>Нет ключа?</p>
-        <a href="https://t.me/sheetgptBot" target="_blank">
-          <svg viewBox="0 0 24 24" fill="currentColor"><path d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z"/></svg>
-          @sheetgptBot
-        </a>
-      </div>
-    </div>
-  </div>
-
-  <!-- Header -->
+<body>
+  <!-- Header (always visible) -->
   <header class="header">
     <div class="logo">
-      <div class="logo-icon">
+      <div class="logo-mark">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
           <rect x="3" y="3" width="18" height="18" rx="2"/>
           <line x1="3" y1="9" x2="21" y2="9"/>
           <line x1="9" y1="3" x2="9" y2="21"/>
         </svg>
       </div>
-      <span class="logo-text">SheetGPT</span>
+      <span class="logo-text">Sheet<span>GPT</span></span>
     </div>
 
     <div class="header-actions">
-      <button class="icon-btn theme-toggle" id="themeToggle" aria-label="Сменить тему">
-        <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M4.93 4.93l1.41 1.41m11.32 11.32l1.41 1.41M2 12h2m16 0h2M6.34 17.66l-1.41 1.41m12.73-12.73l1.41-1.41"/>
+      <button class="icon-btn theme-toggle" id="themeToggle" title="Сменить тему">
+        <svg class="sun-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="4"/>
+          <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/>
         </svg>
-        <svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <svg class="moon-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
           <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
         </svg>
       </button>
-      <button class="icon-btn" id="historyBtn" aria-label="История">
+      <button class="icon-btn" id="historyBtn" title="История">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
+          <circle cx="12" cy="12" r="9"/>
+          <path d="M12 6v6l4 2"/>
         </svg>
       </button>
-      <button class="icon-btn" id="menuBtn" aria-label="Меню">
+      <button class="icon-btn" id="settingsBtn" title="Настройки">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <circle cx="12" cy="12" r="1"/><circle cx="12" cy="5" r="1"/><circle cx="12" cy="19" r="1"/>
+          <circle cx="12" cy="12" r="3"/>
+          <path d="M12 1v4M12 19v4M4.22 4.22l2.83 2.83M16.95 16.95l2.83 2.83M1 12h4M19 12h4M4.22 19.78l2.83-2.83M16.95 7.05l2.83-2.83"/>
         </svg>
       </button>
     </div>
 
-    <!-- Menu Dropdown -->
-    <div id="menuDropdown" class="dropdown">
-      <div class="dropdown-section">
-        <div class="user-row">
-          <div class="user-avatar">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-          </div>
-          <div class="user-info">
-            <div id="userEmail" class="user-email">user@mail.com</div>
-            <div id="userPlan" class="user-plan">Free</div>
-          </div>
-        </div>
-        <div class="usage-bar-wrap">
-          <div class="usage-labels">
-            <span class="usage-label">Запросов</span>
-            <span id="usageCount" class="usage-count">0/10</span>
-          </div>
-          <div class="usage-bar">
-            <div id="usageFill" class="usage-fill" style="width: 0%;"></div>
-          </div>
-        </div>
-      </div>
-      
-      <div class="dropdown-section">
-        <div class="menu-item" id="personalizeBtn">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
-          Настроить AI
-        </div>
-        <div class="menu-item upgrade" id="upgradeBtn">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
-          Unlimited
-        </div>
-      </div>
-      
-      <div class="dropdown-section">
-        <div class="menu-item danger" id="logoutBtn">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
-          Выйти
-        </div>
-      </div>
+    <!-- History Dropdown -->
+    <div id="historyDropdown" class="dropdown">
+      <div class="dropdown-header">История запросов</div>
+      <ul class="dropdown-list" id="historyList">
+        <li class="dropdown-empty">История пуста</li>
+      </ul>
     </div>
   </header>
 
-  <!-- Chat -->
-  <main class="chat-container" id="chatContainer">
-    <!-- Empty State -->
-    <div class="empty-state" id="emptyState">
-      <div class="welcome">
-        <div class="welcome-emoji">👋</div>
-        <h1 class="welcome-title">Привет!</h1>
-        <p class="welcome-subtitle">Я помогу работать с таблицей. Спроси что угодно — от формул до анализа данных.</p>
-      </div>
+  <!-- Login Screen -->
+  <div class="login-screen" id="loginScreen">
+    <div class="login-logo">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <rect x="3" y="3" width="18" height="18" rx="2"/>
+        <line x1="3" y1="9" x2="21" y2="9"/>
+        <line x1="9" y1="3" x2="9" y2="21"/>
+      </svg>
+    </div>
+    <h2 class="login-title">Добро пожаловать в Sheet<span>GPT</span></h2>
+    <p class="login-description">Введите лицензионный ключ для активации. Получить ключ можно в нашем Telegram-боте.</p>
+    
+    <div class="license-input-group">
+      <label class="license-label">Лицензионный ключ</label>
+      <input type="text" class="license-input" id="licenseInput" placeholder="XXXX-XXXX-XXXX-XXXX" maxlength="19">
+    </div>
+    
+    <div class="login-error" id="loginError">Неверный лицензионный ключ</div>
+    
+    <button class="login-btn" id="loginBtn">Активировать</button>
+    
+    <a href="https://t.me/sheetgpt_bot" target="_blank" class="telegram-link">
+      <svg viewBox="0 0 24 24" fill="currentColor">
+        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm4.64 6.8c-.15 1.58-.8 5.42-1.13 7.19-.14.75-.42 1-.68 1.03-.58.05-1.02-.38-1.58-.75-.88-.58-1.38-.94-2.23-1.5-.99-.65-.35-1.01.22-1.59.15-.15 2.71-2.48 2.76-2.69a.2.2 0 00-.05-.18c-.06-.05-.14-.03-.21-.02-.09.02-1.49.95-4.22 2.79-.4.27-.76.41-1.08.4-.36-.01-1.04-.2-1.55-.37-.63-.2-1.12-.31-1.08-.66.02-.18.27-.36.74-.55 2.92-1.27 4.86-2.11 5.83-2.51 2.78-1.16 3.35-1.36 3.73-1.36.08 0 .27.02.39.12.1.08.13.19.14.27-.01.06.01.24 0 .38z"/>
+      </svg>
+      Получить ключ в Telegram
+    </a>
+  </div>
 
-      <div class="steps">
-        <div class="step">
-          <div class="step-num">1</div>
-          <div class="step-content">
-            <div class="step-title">Выдели данные</div>
-            <div class="step-desc">Выбери ячейки с которыми работаем</div>
-          </div>
-        </div>
-        <div class="step">
-          <div class="step-num">2</div>
-          <div class="step-content">
-            <div class="step-title">Опиши задачу</div>
-            <div class="step-desc">Напиши что нужно сделать простым языком</div>
-          </div>
-        </div>
-        <div class="step">
-          <div class="step-num">3</div>
-          <div class="step-content">
-            <div class="step-title">Получи результат</div>
-            <div class="step-desc">Формула или действие применится автоматически</div>
-          </div>
-        </div>
+  <!-- Main App -->
+  <div class="main-app" id="mainApp">
+    <!-- User Bar -->
+    <div class="user-bar">
+      <div class="user-info">
+        <div class="user-avatar" id="userAvatar">U</div>
+        <span class="user-name" id="userName">Пользователь</span>
       </div>
-
-      <div class="suggestions">
-        <div class="suggestions-label">Попробуй спросить</div>
-        <div class="suggestions-list">
-          <button class="suggestion-chip" data-query="Посчитай сумму выделенных ячеек">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-            Сумма ячеек
-          </button>
-          <button class="suggestion-chip" data-query="Найди топ 5 по продажам">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><path d="m7 16 4-8 4 5 5-9"/></svg>
-            Топ 5
-          </button>
-          <button class="suggestion-chip" data-query="Подсветить где больше 100000">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/></svg>
-            Подсветить
-          </button>
-          <button class="suggestion-chip" data-query="Среднее по категориям">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5Z"/><path d="M2 17l10 5 10-5"/></svg>
-            Среднее
-          </button>
-          <button class="suggestion-chip" data-query="Создай таблицу ТОП-10 стран по ВВП">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v1m0 16v1m-9-9h1m16 0h1"/><circle cx="12" cy="12" r="4"/></svg>
-            Сгенерировать
-          </button>
-        </div>
+      <div class="user-plan">
+        <span class="plan-badge" id="planBadge">FREE</span>
+      </div>
+    </div>
+    
+    <!-- Usage Bar -->
+    <div class="usage-bar-container" id="usageContainer">
+      <div class="usage-info">
+        <span class="usage-label">Запросов сегодня</span>
+        <span class="usage-count"><span id="usageCount">0</span> / <span id="usageLimit">10</span></span>
+      </div>
+      <div class="usage-bar">
+        <div class="usage-bar-fill" id="usageBarFill" style="width: 0%"></div>
       </div>
     </div>
 
-    <!-- Messages will be inserted here -->
-    <div class="messages-list hidden" id="messagesList"></div>
-  </main>
+    <!-- Chat Container -->
+    <main class="chat-container" id="chatContainer">
+      <div class="empty-state" id="emptyState">
+        <div class="empty-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+            <rect x="3" y="3" width="18" height="18" rx="2"/>
+            <line x1="3" y1="9" x2="21" y2="9"/>
+            <line x1="9" y1="3" x2="9" y2="21"/>
+            <circle cx="12" cy="15" r="2" fill="currentColor"/>
+          </svg>
+        </div>
+        <h3 class="empty-title">Начните работу</h3>
+        <p class="empty-description">Задайте вопрос о данных в таблице или выберите быстрое действие ниже</p>
 
-  <!-- Input -->
-  <footer class="input-area">
-    <div class="input-wrapper">
-      <textarea id="inputField" class="input-field" placeholder="Что нужно сделать?" rows="1"></textarea>
-      <button id="sendBtn" class="send-btn" disabled>
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
-      </button>
-    </div>
-  </footer>
+        <div class="actions-label">Быстрые действия</div>
+        <div class="actions-grid">
+          <button class="action-card" data-query="Топ 5 по продажам">
+            <div class="action-icon chart">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M3 3v18h18"/><path d="M7 16l4-8 4 5 5-9"/>
+              </svg>
+            </div>
+            <span class="action-title">Топ записей</span>
+            <span class="action-desc">Анализ лидеров</span>
+          </button>
+          
+          <button class="action-card" data-query="Сумма где значение больше 50000">
+            <div class="action-icon calc">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <rect x="4" y="2" width="16" height="20" rx="2"/>
+                <line x1="8" y1="6" x2="16" y2="6"/>
+                <line x1="8" y1="18" x2="16" y2="18"/>
+              </svg>
+            </div>
+            <span class="action-title">SUMIF</span>
+            <span class="action-desc">Условная сумма</span>
+          </button>
+          
+          <button class="action-card" data-query="Выдели строки где сумма больше 100000">
+            <div class="action-icon paint">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M19 3H5a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2V5a2 2 0 00-2-2z"/>
+                <path d="M3 9h18"/><path d="M3 15h18"/>
+              </svg>
+            </div>
+            <span class="action-title">Выделение</span>
+            <span class="action-desc">Подсветка строк</span>
+          </button>
+          
+          <button class="action-card" data-query="Средняя цена по категориям">
+            <div class="action-icon layers">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M12 2L2 7l10 5 10-5-10-5z"/>
+                <path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/>
+              </svg>
+            </div>
+            <span class="action-title">Агрегация</span>
+            <span class="action-desc">Группировка</span>
+          </button>
+          
+          <button class="action-card featured" data-query="Создай таблицу топ-10 стран Европы по ВВП">
+            <div class="action-icon sparkle">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M12 3v1m0 16v1m-9-9h1m16 0h1"/>
+                <circle cx="12" cy="12" r="4"/>
+              </svg>
+            </div>
+            <span class="action-title">Генерация таблицы</span>
+            <span class="action-desc">Создать данные из AI-знаний</span>
+          </button>
+        </div>
+      </div>
+    </main>
 
-  <!-- Personalize Modal -->
-  <div id="personalizeModal" class="modal-overlay">
-    <div class="modal">
-      <div class="modal-header">
-        <h2 class="modal-title">Настроить AI</h2>
-        <button class="modal-close" id="closePersonalize">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+    <!-- Input Area -->
+    <footer class="input-area">
+      <div class="input-wrapper">
+        <textarea
+          id="messageInput"
+          class="prompt-input"
+          placeholder="Опишите задачу..."
+          rows="1"
+        ></textarea>
+        <button id="sendBtn" class="send-btn" disabled>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+            <line x1="5" y1="12" x2="19" y2="12"/>
+            <polyline points="12 5 19 12 12 19"/>
+          </svg>
         </button>
       </div>
+      <div class="input-hint">
+        <kbd class="kbd">Enter</kbd> отправить · <kbd class="kbd">Shift+Enter</kbd> новая строка
+      </div>
+    </footer>
+  </div>
+
+  <!-- Settings Modal -->
+  <div id="settingsModal" class="modal-overlay">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 class="modal-title">Настройки</h3>
+        <button class="modal-close" id="closeSettingsBtn">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M18 6L6 18M6 6l12 12"/>
+          </svg>
+        </button>
+      </div>
+      
       <div class="modal-body">
-        <div class="presets">
-          <button class="preset-btn" data-preset="sales">Продажи</button>
-          <button class="preset-btn" data-preset="finance">Финансы</button>
-          <button class="preset-btn" data-preset="marketing">Маркетинг</button>
-          <button class="preset-btn" data-preset="analyst">Аналитика</button>
+        <!-- User Profile -->
+        <div class="profile-section">
+          <div class="profile-avatar" id="settingsAvatar">U</div>
+          <div class="profile-info">
+            <div class="profile-name" id="settingsUserName">Пользователь</div>
+            <div class="profile-plan" id="settingsPlan">Бесплатный план</div>
+          </div>
+          <button class="logout-btn" id="logoutBtn">Выйти</button>
         </div>
-        <div class="prompt-wrap">
-          <label class="prompt-label">Или опиши контекст</label>
-          <textarea id="promptField" class="prompt-field" placeholder="Например: Я работаю с отчётами по продажам, фокусируйся на метриках ROI и конверсии..." maxlength="500"></textarea>
-          <span id="promptCounter" class="prompt-counter">0/500</span>
+
+        <!-- License Key -->
+        <div class="modal-section">
+          <label class="modal-label">Лицензионный ключ</label>
+          <input type="text" class="modal-input" id="settingsLicenseKey" readonly style="font-family: 'JetBrains Mono', monospace; letter-spacing: 0.05em;">
+        </div>
+
+        <!-- Personalization -->
+        <div class="modal-section">
+          <label class="modal-label">Персонализация AI</label>
+          <p class="modal-description">
+            Задайте контекст для более точных ответов. Например: «Ты финансовый аналитик».
+          </p>
+          <textarea
+            id="customContextInput"
+            class="modal-input modal-textarea"
+            placeholder="Оставьте пустым для стандартного режима..."
+            maxlength="2000"
+          ></textarea>
+          <div class="char-counter"><span id="charCount">0</span> / 2000</div>
+        </div>
+
+        <!-- User Name -->
+        <div class="modal-section">
+          <label class="modal-label">Ваше имя</label>
+          <input type="text" class="modal-input" id="userNameInput" placeholder="Введите ваше имя">
         </div>
       </div>
+
       <div class="modal-footer">
-        <button class="modal-btn secondary" id="clearPrompt">Сбросить</button>
-        <button class="modal-btn primary" id="savePrompt">Сохранить</button>
+        <button class="btn btn-secondary" id="cancelSettingsBtn">Отмена</button>
+        <button class="btn btn-primary" id="saveSettingsBtn">Сохранить</button>
       </div>
     </div>
   </div>
 
-  <script>
-    // Theme
-    function setTheme(theme) {
-      document.body.setAttribute('data-theme', theme);
-      localStorage.setItem('sheetgpt_theme', theme);
-    }
-
-    function toggleTheme() {
-      const current = document.body.getAttribute('data-theme');
-      setTheme(current === 'dark' ? 'light' : 'dark');
-    }
-
-    // Init
-    const savedTheme = localStorage.getItem('sheetgpt_theme') || 'dark';
-    setTheme(savedTheme);
-
-    document.getElementById('themeToggle').addEventListener('click', toggleTheme);
-
-    // Dropdowns
-    document.getElementById('menuBtn').addEventListener('click', (e) => {
-      e.stopPropagation();
-      document.getElementById('menuDropdown').classList.toggle('show');
-    });
-
-    document.addEventListener('click', () => {
-      document.getElementById('menuDropdown').classList.remove('show');
-    });
-
-    // Modal
-    document.getElementById('personalizeBtn').addEventListener('click', () => {
-      document.getElementById('menuDropdown').classList.remove('show');
-      document.getElementById('personalizeModal').classList.add('show');
-    });
-
-    document.getElementById('closePersonalize').addEventListener('click', () => {
-      document.getElementById('personalizeModal').classList.remove('show');
-    });
-
-    // Presets
-    document.querySelectorAll('.preset-btn').forEach(btn => {
-      btn.addEventListener('click', () => {
-        document.querySelectorAll('.preset-btn').forEach(b => b.classList.remove('active'));
-        btn.classList.add('active');
-      });
-    });
-
-    // Prompt counter
-    const promptField = document.getElementById('promptField');
-    const promptCounter = document.getElementById('promptCounter');
-    promptField.addEventListener('input', () => {
-      promptCounter.textContent = `${promptField.value.length}/500`;
-    });
-
-    // Suggestions
-    document.querySelectorAll('.suggestion-chip').forEach(chip => {
-      chip.addEventListener('click', () => {
-        const query = chip.dataset.query;
-        document.getElementById('inputField').value = query;
-        document.getElementById('sendBtn').disabled = false;
-      });
-    });
-
-    // Input
-    const inputField = document.getElementById('inputField');
-    const sendBtn = document.getElementById('sendBtn');
-
-    inputField.addEventListener('input', () => {
-      sendBtn.disabled = !inputField.value.trim();
-      inputField.style.height = 'auto';
-      inputField.style.height = Math.min(inputField.scrollHeight, 150) + 'px';
-    });
-
-    // Send button click handler (fallback - sidebar.js also adds this)
-    sendBtn.addEventListener('click', () => {
-      if (window.sendMessage) {
-        window.sendMessage();
-      } else {
-        console.error('[Inline] sendMessage not available');
-      }
-    });
-
-    // Enter key to send (fallback)
-    inputField.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter' && !e.shiftKey) {
-        e.preventDefault();
-        if (window.sendMessage) {
-          window.sendMessage();
-        }
-      }
-    });
-  </script>
-  <script src="response-templates.js"></script>
-  <script src="settings-menu.js"></script>
   <script src="sidebar.js"></script>
 </body>
 </html>
