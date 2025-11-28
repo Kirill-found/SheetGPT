@@ -572,10 +572,21 @@ function sendMessageToSidebar(data) {
   }
 }
 
+// ===== API CONFIGURATION =====
+// Set to 'local' to test with local server (http://localhost:8000)
+// Set to 'production' for Railway server
+const API_MODE = 'local';  // Change to 'production' for Railway server
+
+const API_URLS = {
+  local: 'http://localhost:8000/api/v1/formula',
+  production: 'https://sheetgpt-production.up.railway.app/api/v1/formula'
+};
+
 // ===== API HANDLERS =====
 
 async function processQuery(query) {
   console.log('[SheetGPT] Processing query:', query);
+  console.log('[SheetGPT] API Mode:', API_MODE, '| URL:', API_URLS[API_MODE]);
 
   // v7.9.4: Check context before any operations
   if (!isExtensionContextValid()) {
@@ -599,7 +610,7 @@ async function processQuery(query) {
   }
 
   // Call SheetGPT API
-  const response = await fetch('https://sheetgpt-production.up.railway.app/api/v1/formula', {
+  const response = await fetch(API_URLS[API_MODE], {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
