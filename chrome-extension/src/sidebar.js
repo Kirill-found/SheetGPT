@@ -205,13 +205,17 @@ async function checkAuthentication() {
 
       if (response.ok) {
         const data = await response.json();
-        if (data.valid || data.status === 'active') {
+        if (data.success || data.valid || data.status === 'active') {
           // Update user info from server
           state.user = {
             name: data.user_name || data.userName || data.telegram_username || state.user?.name || 'Пользователь',
-            plan: data.plan || data.subscription_type || state.user?.plan || 'free',
+            plan: data.subscription_tier || data.plan || data.subscription_type || state.user?.plan || 'free',
             email: data.email || state.user?.email || ''
           };
+          // Update usage limit based on subscription
+          const isPremium = ['premium', 'pro'].includes(data.subscription_tier) ||
+                            ['premium', 'pro'].includes(data.plan);
+          state.usageLimit = isPremium ? CONFIG.PRO_DAILY_LIMIT : CONFIG.FREE_DAILY_LIMIT;
           saveState();
           showMainApp();
           updateUserUI();
@@ -272,18 +276,20 @@ async function handleLogin() {
       const data = await response.json();
       console.log('[Login] API response data:', data);
 
-      // Check if license is valid
-      if (data.valid || data.status === 'active') {
+      // Check if license is valid (API returns success: true)
+      if (data.success || data.valid || data.status === 'active') {
         state.isAuthenticated = true;
         state.licenseKey = licenseKey;
         state.user = {
           name: data.user_name || data.userName || data.telegram_username || 'Пользователь',
-          plan: data.plan || data.subscription_type || 'free',
+          plan: data.subscription_tier || data.plan || data.subscription_type || 'free',
           email: data.email || ''
         };
-        state.usageLimit = (data.plan === 'pro' || data.subscription_type === 'pro')
-          ? CONFIG.PRO_DAILY_LIMIT
-          : CONFIG.FREE_DAILY_LIMIT;
+        // Check for premium/pro subscription
+        const isPremium = ['premium', 'pro'].includes(data.subscription_tier) ||
+                          ['premium', 'pro'].includes(data.plan) ||
+                          ['premium', 'pro'].includes(data.subscription_type);
+        state.usageLimit = isPremium ? CONFIG.PRO_DAILY_LIMIT : CONFIG.FREE_DAILY_LIMIT;
 
         saveState();
         showMainApp();
