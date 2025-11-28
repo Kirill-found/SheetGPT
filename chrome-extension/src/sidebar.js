@@ -98,6 +98,10 @@ function init() {
   setupEventListeners();
   applyTheme();
   checkAuthentication();
+  // v8.0.1: Sync customContext with chrome.storage.local on startup
+  if (state.customContext) {
+    sendToContentScript('SAVE_CUSTOM_CONTEXT', { context: state.customContext });
+  }
 }
 
 function loadState() {
@@ -540,11 +544,13 @@ function closeSettings() {
 function saveSettings() {
   const newName = elements.userNameInput.value.trim() || 'Пользователь';
   const newContext = elements.customContextInput.value.trim();
-  
+
   state.user.name = newName;
   state.customContext = newContext;
-  
+
   saveState();
+  // v8.0.1: Sync customContext with chrome.storage.local for content.js access
+  sendToContentScript('SAVE_CUSTOM_CONTEXT', { context: state.customContext });
   updateUserUI();
   closeSettings();
 }
@@ -582,6 +588,8 @@ function savePersonalization() {
       updateCharCounter();
     }
     saveState();
+    // v8.0.1: Sync customContext with chrome.storage.local for content.js access
+    sendToContentScript('SAVE_CUSTOM_CONTEXT', { context: state.customContext });
   }
   closePersonalization();
 }
