@@ -242,6 +242,13 @@ async def process_formula(
             custom_context=request.custom_context
         )
 
+        # DEBUG: Log full result immediately after processor
+        logger.info(f"[DEBUG] Processor result keys: {list(result.keys())}")
+        logger.info(f"[DEBUG] Processor result action_type: {result.get('action_type')}")
+        logger.info(f"[DEBUG] Processor result has chart_spec: {'chart_spec' in result}")
+        if 'chart_spec' in result:
+            logger.info(f"[DEBUG] chart_spec value: {result['chart_spec']}")
+
         logger.info(f"[SUCCESS] SimpleGPT processing completed")
         logger.info(f"[PROCESSOR] {result.get('processor', 'N/A')}")
         logger.info(f"[TIME] {result.get('processing_time', 'N/A')}")

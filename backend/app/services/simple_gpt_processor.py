@@ -1411,8 +1411,8 @@ result = df[df['Город'] == 'Москва']
             chart_action = self._detect_chart_action(query, column_names, df)
             if chart_action:
                 elapsed = time.time() - start_time
-                logger.info(f"[SimpleGPT] Returning chart action: {chart_action}")
-                return {
+                logger.info(f"[SimpleGPT] Chart action detected: {chart_action}")
+                chart_result = {
                     "success": True,
                     "action_type": "chart",
                     "result_type": "action",
@@ -1421,6 +1421,9 @@ result = df[df['Город'] == 'Москва']
                     "processing_time": f"{elapsed:.2f}s",
                     "processor": "SimpleGPT v1.0 (direct action)"
                 }
+                logger.info(f"[SimpleGPT] Returning chart result with keys: {list(chart_result.keys())}")
+                logger.info(f"[SimpleGPT] chart_result['chart_spec']: {chart_result.get('chart_spec')}")
+                return chart_result
 
             # Check for conditional formatting action
             conditional_action = self._detect_conditional_format_action(query, column_names, df)
