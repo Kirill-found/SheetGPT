@@ -843,16 +843,21 @@ Generate CORRECTED code that will work. Return ONLY the Python code."""
                     break
 
             # Проверяем тип запроса
-            # УЛУЧШЕННАЯ ЛОГИКА: поиск = ключевое слово + имя/фамилия
+            # v8.3.0: УПРОЩЕННАЯ ЛОГИКА - если "выдели" есть в запросе, ВСЕГДА пытаемся выделить
             is_search_query = False
-            search_keywords = ['фамили', 'имен', 'строк', 'найди', 'где']
+            search_keywords = ['фамили', 'имен', 'строк', 'строки', 'строку', 'найди', 'где', 'заказ', 'заказы']
 
-            # Случай 1: явные поисковые ключевые слова
-            if any(word in query_lower for word in search_keywords):
+            # Случай 1: "выдели" в запросе = ВСЕГДА поисковый запрос на выделение
+            if 'выдели' in query_lower:
+                is_search_query = True
+                print(f"[SEARCH_DETECT] 'выдели' found - forcing search query mode")
+
+            # Случай 2: явные поисковые ключевые слова
+            elif any(word in query_lower for word in search_keywords):
                 is_search_query = True
 
-            # Случай 2: "выдели" + слово с заглавной буквы (вероятно имя/фамилия)
-            elif 'выдели' in query_lower:
+            # Случай 3: слово с заглавной буквы (вероятно имя/фамилия)
+            elif 'подсвет' in query_lower or 'отметь' in query_lower:
                 # Ищем слова с заглавной буквы (кроме первого слова в запросе)
                 words = query.split()
                 for word in words[1:]:  # Пропускаем первое слово
@@ -866,14 +871,16 @@ Generate CORRECTED code that will work. Return ONLY the Python code."""
                 # AI УЖЕ ВЫПОЛНИЛ ПОИСК - используем результаты!
                 print(f"[SEARCH] AI executed search, analyzing results")
                 rows_to_highlight = []
-                
+
                 # Проверяем, что AI нашёл данные
                 result = exec_result.get('result')
+                print(f"[SEARCH_DEBUG] result type: {type(result)}, result is None: {result is None}")
+
                 if result is not None:
                     # Если result - это DataFrame, берём его индексы
-                    if hasattr(result, 'index'):
+                    if hasattr(result, 'index') and hasattr(result, 'shape'):
                         rows_to_highlight = [idx + 2 for idx in result.index.tolist()]
-                        print(f"[AI_RESULT] Found DataFrame with indices: {result.index.tolist()}")
+                        print(f"[AI_RESULT] Found DataFrame with indices: {result.index.tolist()} -> rows: {rows_to_highlight}")
                     # Если result - это list of dicts (после to_dict('records')), 
                     # ищем исходные индексы в DataFrame
                     elif isinstance(result, list) and len(result) > 0:
