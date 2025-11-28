@@ -1,1 +1,0 @@
-{"formula":null,"explanation":"","target_cell":null,"confidence":0.95,"response_type":"analysis","insights":[],"suggested_actions":null,"summary":"Сумма продаж, где сумма больше 500,000:\n\n1,300,000.00 руб.","methodology":"Отфильтрованы продажи больше 500,000 и просуммированы значения в колонке 'Продажи'.","key_findings":[]}

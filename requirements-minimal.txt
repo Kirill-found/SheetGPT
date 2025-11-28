@@ -1,7 +1,0 @@
-# Минимальный набор для быстрого тестирования
-fastapi
-uvicorn[standard]
-pydantic
-pydantic-settings
-google-generativeai
-python-dotenv
