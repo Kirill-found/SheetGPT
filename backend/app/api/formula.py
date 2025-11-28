@@ -155,6 +155,14 @@ async def generate_formula(request: FormulaRequest):
             response_dict["recommendations"] = result.get("recommendations")
             response_dict["warnings"] = result.get("warnings")
 
+            # v8.2.0: Add highlighting data if present (for "выдели строки" queries)
+            if "highlight_rows" in result and result["highlight_rows"]:
+                response_dict["highlight_rows"] = result["highlight_rows"]
+                response_dict["highlighted_count"] = result.get("highlighted_count", len(result["highlight_rows"]))
+                response_dict["highlight_color"] = result.get("highlight_color", "#FFFF00")
+                response_dict["highlight_message"] = result.get("highlight_message", "Строки выделены")
+                print(f"🎨 HIGHLIGHT: Added {len(result['highlight_rows'])} rows to response")
+
             print(f"📦 response_dict keys before return: {list(response_dict.keys())}")
             print(f"📦 response_dict['methodology']: {response_dict.get('methodology')}")
 

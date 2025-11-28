@@ -171,6 +171,14 @@ class AICodeExecutor:
         # Строим базовый промпт
         prompt = f"""You are a Python data analyst expert. Generate Python code to answer this question.
 
+CRITICAL LANGUAGE RULE:
+========================
+ALL 'summary' and 'methodology' variables MUST be in the SAME LANGUAGE as the user's query!
+- If query is in Russian → summary and methodology MUST be in Russian
+- If query is in English → summary and methodology MUST be in English
+- NEVER return "True" or "False" - return "Да" or "Нет" for Russian queries
+- NEVER use English words like "Found", "Total" in Russian context
+
 QUESTION: {query}
 
 AVAILABLE DATA:
@@ -342,6 +350,37 @@ result = df[mask]
 
 summary = f"Найдено записей: {{len(result)}}"
 methodology = f"Поиск по частичному совпадению в первой колонке (используется начало имени/фамилии)"
+```
+
+EXAMPLE CODE FOR "выдели строки с заказами Казани" or "highlight rows from Moscow":
+```python
+# For location/city filtering: search in ALL string columns
+search_term = "Казан"  # Use root of the word for flexible matching
+
+# Create mask by searching in all text columns
+mask = pd.Series([False] * len(df))
+for col in df.columns:
+    if df[col].dtype == 'object':
+        col_mask = df[col].astype(str).str.contains(search_term, case=False, na=False)
+        mask = mask | col_mask
+
+result = df[mask]
+
+summary = f"Найдено {{len(result)}} строк с заказами из Казани"
+methodology = f"Поиск по всем текстовым колонкам по ключевому слову '{search_term}'"
+```
+
+EXAMPLE CODE FOR boolean questions like "У Петрова был только 1 заказ?":
+```python
+# For yes/no questions - calculate and return Russian answer
+petrov_data = df[df['Менеджер'].str.contains('Петров', case=False, na=False)]
+count = len(petrov_data)
+answer = count == 1
+
+# CRITICAL: Return Russian "Да"/"Нет", not English "True"/"False"!
+result = "Да" if answer else "Нет"
+summary = f"{{result}}, у Петрова {{count}} заказ(ов)"
+methodology = f"Подсчитано количество записей для Петрова: {{count}}"
 ```
 
 EXAMPLE CODE FOR "разбей данные по ячейкам" or "split data to columns":
