@@ -374,6 +374,79 @@ async function highlightRows(spreadsheetId, sheetId, rowIndices, color = { red: 
 }
 
 /**
+ * Sort data in a range by column
+ * @param {string} spreadsheetId - The spreadsheet ID
+ * @param {number} sheetId - The sheet ID (not name!)
+ * @param {number} columnIndex - 0-based column index to sort by
+ * @param {string} sortOrder - "ASCENDING" or "DESCENDING"
+ * @param {number} startRowIndex - Start row (0-based, typically 1 to skip header)
+ * @param {number} endRowIndex - End row (exclusive), or -1 for all rows
+ */
+async function sortRange(spreadsheetId, sheetId, columnIndex, sortOrder = "ASCENDING", startRowIndex = 1, endRowIndex = -1) {
+  try {
+    const token = await getAuthToken();
+
+    // If endRowIndex is -1, we need to get the sheet dimensions first
+    let actualEndRowIndex = endRowIndex;
+    if (endRowIndex === -1) {
+      // Get sheet properties to find row count
+      const propsResponse = await fetch(
+        `${SHEETS_API_BASE}/${spreadsheetId}?fields=sheets.properties`,
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        }
+      );
+      const propsData = await propsResponse.json();
+      const sheet = propsData.sheets?.find(s => s.properties.sheetId === sheetId);
+      actualEndRowIndex = sheet?.properties?.gridProperties?.rowCount || 1000;
+    }
+
+    console.log(`[SheetsAPI] Sorting sheet ${sheetId}, column ${columnIndex}, order ${sortOrder}, rows ${startRowIndex}-${actualEndRowIndex}`);
+
+    const response = await fetch(
+      `${SHEETS_API_BASE}/${spreadsheetId}:batchUpdate`,
+      {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          requests: [{
+            sortRange: {
+              range: {
+                sheetId: sheetId,
+                startRowIndex: startRowIndex,  // Skip header row
+                endRowIndex: actualEndRowIndex
+              },
+              sortSpecs: [{
+                dimensionIndex: columnIndex,
+                sortOrder: sortOrder  // "ASCENDING" or "DESCENDING"
+              }]
+            }
+          }]
+        })
+      }
+    );
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(`Sheets API error: ${error.error?.message || response.statusText}`);
+    }
+
+    const result = await response.json();
+    console.log('[SheetsAPI] ✅ Range sorted:', result);
+    return result;
+  } catch (error) {
+    console.error('[SheetsAPI] Error sorting range:', error);
+    throw error;
+  }
+}
+
+/**
  * Get sheet ID by name
  */
 async function getSheetIdByName(spreadsheetId, sheetName) {
@@ -420,6 +493,7 @@ if (typeof module !== 'undefined' && module.exports) {
     appendSheetData,
     createNewSheet,
     highlightRows,
+    sortRange,
     getSheetIdByName
   };
 }

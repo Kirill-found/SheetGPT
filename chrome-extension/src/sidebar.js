@@ -847,6 +847,17 @@ function transformAPIResponse(apiResponse) {
     };
   }
 
+  // If response is a sort action
+  if (apiResponse.action_type === 'sort' && apiResponse.sort_column_index !== undefined) {
+    // Trigger sort action
+    sortRangeInSheet(apiResponse.sort_column_index, apiResponse.sort_order || 'ASCENDING');
+    return {
+      type: 'action',
+      text: apiResponse.summary || `Данные отсортированы по колонке "${apiResponse.sort_column}"`,
+      actionType: 'sort'
+    };
+  }
+
   // If response has highlight_rows
   if (apiResponse.highlight_rows && apiResponse.highlight_rows.length > 0) {
     // Trigger highlight action
@@ -946,6 +957,23 @@ async function highlightRowsInSheet(rows) {
     console.log('[Sidebar] Rows highlighted:', rows);
   } catch (error) {
     console.error('[Sidebar] Error highlighting rows:', error);
+  }
+}
+
+async function sortRangeInSheet(columnIndex, sortOrder) {
+  if (columnIndex === undefined || columnIndex === null) {
+    console.error('[Sidebar] Sort error: columnIndex is required');
+    return;
+  }
+
+  try {
+    await sendToContentScript('SORT_RANGE', {
+      columnIndex: columnIndex,
+      sortOrder: sortOrder || 'ASCENDING'
+    });
+    console.log(`[Sidebar] Range sorted by column ${columnIndex}, order ${sortOrder}`);
+  } catch (error) {
+    console.error('[Sidebar] Error sorting range:', error);
   }
 }
 

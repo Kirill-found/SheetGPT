@@ -291,6 +291,14 @@ async def process_formula(
         if "value" in result:
             response_dict["value"] = result["value"]
 
+        # Add sorting data
+        if "sort_column" in result:
+            response_dict["sort_column"] = result["sort_column"]
+        if "sort_column_index" in result:
+            response_dict["sort_column_index"] = result["sort_column_index"]
+        if "sort_order" in result:
+            response_dict["sort_order"] = result["sort_order"]
+
         # v9.0.0: Add hybrid processor metadata
         response_dict["processor_version"] = result.get("processor_version", "9.0.0")
         response_dict["complexity"] = result.get("complexity")

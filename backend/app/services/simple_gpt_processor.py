@@ -127,6 +127,11 @@ result = df[df['Город'] == 'Москва']
 Ответь ТОЛЬКО "OK" или "BAD":
 """
 
+    # Ключевые слова для действий над данными (не анализ, а модификация)
+    SORT_KEYWORDS = ['отсортируй', 'сортируй', 'сортировка', 'упорядочь', 'упорядочи', 'sort', 'order by']
+    SORT_DESC_KEYWORDS = ['убыван', 'desc', 'z-a', 'я-а', 'больш к меньш', 'от большего', 'по убыванию']
+    SORT_ASC_KEYWORDS = ['возраст', 'asc', 'a-z', 'а-я', 'меньш к больш', 'от меньшего', 'по возрастанию']
+
     def __init__(self):
         api_key = os.getenv("OPENAI_API_KEY")
         if not api_key:
@@ -144,6 +149,67 @@ result = df[df['Город'] == 'Москва']
         self.client = AsyncOpenAI(api_key=api_key)
         self.schema_extractor = get_schema_extractor()
 
+    def _detect_sort_action(self, query: str, column_names: List[str]) -> Optional[Dict[str, Any]]:
+        """
+        Определяет, является ли запрос командой сортировки.
+        Возвращает параметры сортировки или None.
+        """
+        query_lower = query.lower()
+
+        # Проверяем наличие ключевых слов сортировки
+        is_sort_query = any(kw in query_lower for kw in self.SORT_KEYWORDS)
+        if not is_sort_query:
+            return None
+
+        logger.info(f"[SimpleGPT] Sort action detected: {query}")
+
+        # Определяем порядок сортировки
+        is_descending = any(kw in query_lower for kw in self.SORT_DESC_KEYWORDS)
+        is_ascending = any(kw in query_lower for kw in self.SORT_ASC_KEYWORDS)
+
+        # По умолчанию - по возрастанию, если явно не указано убывание
+        sort_order = "DESCENDING" if is_descending and not is_ascending else "ASCENDING"
+
+        # Ищем название колонки в запросе
+        sort_column = None
+        sort_column_index = None
+
+        # Нормализуем названия колонок для поиска
+        for idx, col_name in enumerate(column_names):
+            col_lower = col_name.lower()
+            # Проверяем точное вхождение или частичное
+            if col_lower in query_lower or col_name in query:
+                sort_column = col_name
+                sort_column_index = idx
+                logger.info(f"[SimpleGPT] Found sort column: '{col_name}' at index {idx}")
+                break
+
+        # Если колонка не найдена, пробуем найти по частичному совпадению
+        if not sort_column:
+            for idx, col_name in enumerate(column_names):
+                # Разбиваем название колонки на слова
+                col_words = col_name.lower().split()
+                for word in col_words:
+                    if len(word) > 2 and word in query_lower:
+                        sort_column = col_name
+                        sort_column_index = idx
+                        logger.info(f"[SimpleGPT] Found sort column by partial match: '{col_name}' at index {idx}")
+                        break
+                if sort_column:
+                    break
+
+        if not sort_column:
+            logger.warning(f"[SimpleGPT] Sort column not found in query. Available columns: {column_names}")
+            return None
+
+        return {
+            "action_type": "sort",
+            "column_name": sort_column,
+            "column_index": sort_column_index,
+            "sort_order": sort_order,
+            "message": f"Сортировка по колонке '{sort_column}' ({('по убыванию' if sort_order == 'DESCENDING' else 'по возрастанию')})"
+        }
+
     async def process(
         self,
         query: str,
@@ -157,6 +223,23 @@ result = df[df['Город'] == 'Москва']
         start_time = time.time()
 
         try:
+            # 0. Check for direct actions (sort, format, etc.) - no GPT needed
+            sort_action = self._detect_sort_action(query, column_names)
+            if sort_action:
+                elapsed = time.time() - start_time
+                logger.info(f"[SimpleGPT] Returning sort action: {sort_action}")
+                return {
+                    "success": True,
+                    "action_type": "sort",
+                    "result_type": "action",
+                    "sort_column": sort_action["column_name"],
+                    "sort_column_index": sort_action["column_index"],
+                    "sort_order": sort_action["sort_order"],
+                    "summary": sort_action["message"],
+                    "processing_time": f"{elapsed:.2f}s",
+                    "processor": "SimpleGPT v1.0 (direct action)"
+                }
+
             # 1. Schema extraction
             logger.info(f"[SimpleGPT] Processing: {query[:50]}...")
             schema = self.schema_extractor.extract_schema(df)

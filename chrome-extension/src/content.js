@@ -508,6 +508,10 @@ window.addEventListener('message', async (event) => {
         result = await highlightRows(data.rows, data.color);
         break;
 
+      case 'SORT_RANGE':
+        result = await sortRangeInSheet(data.columnIndex, data.sortOrder);
+        break;
+
       default:
         throw new Error(`Unknown action: ${action}`);
     }
@@ -793,6 +797,37 @@ async function highlightRows(rows, color) {
     return {
       success: false,
       message: `Ошибка выделения строк: ${error.message}`
+    };
+  }
+}
+
+async function sortRangeInSheet(columnIndex, sortOrder) {
+  console.log('[SheetGPT] Sort range by column:', columnIndex, 'order:', sortOrder);
+
+  try {
+    // Sort via Sheets API
+    const response = await safeSendMessage({
+      action: 'SORT_RANGE',
+      data: {
+        columnIndex: columnIndex,
+        sortOrder: sortOrder  // "ASCENDING" or "DESCENDING"
+      }
+    });
+
+    if (!response.success) {
+      throw new Error(response.error);
+    }
+
+    console.log('[SheetGPT] ✅ Range sorted via API:', response.result);
+    return {
+      success: true,
+      message: `Данные отсортированы ${sortOrder === 'DESCENDING' ? 'по убыванию' : 'по возрастанию'}`
+    };
+  } catch (error) {
+    console.error('[SheetGPT] Error sorting range:', error);
+    return {
+      success: false,
+      message: `Ошибка сортировки: ${error.message}`
     };
   }
 }

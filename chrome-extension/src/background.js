@@ -46,6 +46,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           result = await handleHighlightRows(sender.tab.id, sender.tab.url, data);
           break;
 
+        case 'SORT_RANGE':
+          result = await handleSortRange(sender.tab.id, sender.tab.url, data);
+          break;
+
         case 'CHECK_AUTH':
           result = await checkAuth();
           break;
@@ -228,6 +232,36 @@ async function handleHighlightRows(tabId, tabUrl, data) {
   const result = await highlightRows(spreadsheetId, sheetId, rowIndices, color);
 
   console.log('[Background] ✅ Rows highlighted:', result);
+  return result;
+}
+
+/**
+ * Sort data in Google Sheet by column
+ */
+async function handleSortRange(tabId, tabUrl, data) {
+  console.log('[Background] Sorting range:', data);
+
+  const spreadsheetId = getSpreadsheetIdFromUrl(tabUrl);
+  if (!spreadsheetId) {
+    throw new Error('Not a valid Google Sheets URL');
+  }
+
+  const { columnIndex, sortOrder } = data;
+
+  // Get saved sheet name from storage (saved by handleGetSheetData)
+  const storageKey = `sheetName_${spreadsheetId}`;
+  const storageData = await chrome.storage.local.get(storageKey);
+  const sheetName = storageData[storageKey] || 'Лист1'; // Fallback to Russian default
+
+  console.log(`[Background] Using sheet name "${sheetName}" for sorting`);
+
+  // Get sheet ID
+  const sheetId = await getSheetIdByName(spreadsheetId, sheetName);
+
+  // Sort range (start from row 1 to skip header)
+  const result = await sortRange(spreadsheetId, sheetId, columnIndex, sortOrder, 1, -1);
+
+  console.log('[Background] ✅ Range sorted:', result);
   return result;
 }
 
