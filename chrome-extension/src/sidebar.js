@@ -545,26 +545,24 @@ async function sendMessage() {
   const loadingEl = addLoadingIndicator();
   
   try {
-    // Get sheet data first
-    const sheetData = await getSheetData();
-    
-    // Send to API
-    const response = await callAPI(query, sheetData);
-    
+    // Use PROCESS_QUERY action via content.js (it handles sheet data and API call)
+    const result = await sendToContentScript('PROCESS_QUERY', { query });
+
     // Remove loading
     loadingEl.remove();
-    
-    // Add AI response
+
+    // Transform and display AI response
+    const response = transformAPIResponse(result);
     addAIMessage(response);
-    
+
     // Update usage
     updateUsage();
-    
+
   } catch (error) {
     loadingEl.remove();
     addAIMessage({
       type: 'error',
-      text: getErrorMessage(error)
+      text: error.message || 'Произошла ошибка при обработке запроса'
     });
   }
   
@@ -679,6 +677,40 @@ function scrollToBottom() {
 // ============================================
 // API COMMUNICATION
 // ============================================
+
+// Send message to content script and wait for response
+async function sendToContentScript(action, data = {}) {
+  return new Promise((resolve, reject) => {
+    const messageId = `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
+    const handler = (event) => {
+      // Check if this is our response
+      if (event.data && event.data.messageId === messageId) {
+        window.removeEventListener('message', handler);
+        clearTimeout(timeout);
+
+        if (event.data.success) {
+          resolve(event.data.result);
+        } else {
+          reject(new Error(event.data.error || 'Неизвестная ошибка'));
+        }
+      }
+    };
+
+    window.addEventListener('message', handler);
+
+    // Timeout after 30 seconds
+    const timeout = setTimeout(() => {
+      window.removeEventListener('message', handler);
+      reject(new Error('Таймаут ожидания ответа. Перезагрузите страницу.'));
+    }, 30000);
+
+    // Send message to parent (content script)
+    console.log('[Sidebar] Sending to content script:', { action, data, messageId });
+    window.parent.postMessage({ action, data, messageId }, '*');
+  });
+}
+
 async function getSheetData() {
   return new Promise((resolve) => {
     // Try to get data from parent window (Google Sheets)
@@ -706,40 +738,93 @@ async function getSheetData() {
 }
 
 async function callAPI(query, sheetData) {
+  // Format payload for /api/v1/formula endpoint
   const payload = {
-    query,
-    sheetData,
-    customContext: state.customContext,
-    licenseKey: state.licenseKey
+    query: query,
+    column_names: sheetData?.headers || [],
+    sheet_data: sheetData?.rows || [],
+    custom_context: state.customContext || ''
   };
-  
+
+  console.log('[API] Sending request:', payload);
+
   let lastError;
-  
+
   for (let attempt = 0; attempt < CONFIG.MAX_RETRIES; attempt++) {
     try {
-      const response = await fetch(`${CONFIG.API_URL}/api/chat`, {
+      const response = await fetch(`${CONFIG.API_URL}/api/v1/formula`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
         body: JSON.stringify(payload)
       });
-      
+
+      console.log('[API] Response status:', response.status);
+
       if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`);
+        const errorText = await response.text();
+        console.error('[API] Error response:', errorText);
+        throw new Error(`HTTP ${response.status}: ${errorText}`);
       }
-      
-      return await response.json();
-      
+
+      const result = await response.json();
+      console.log('[API] Response data:', result);
+
+      // Transform API response to UI format
+      return transformAPIResponse(result);
+
     } catch (error) {
+      console.error('[API] Attempt', attempt + 1, 'failed:', error);
       lastError = error;
-      
+
       if (attempt < CONFIG.MAX_RETRIES - 1) {
         await new Promise(r => setTimeout(r, CONFIG.RETRY_DELAYS[attempt]));
       }
     }
   }
-  
+
+  console.error('[API] All attempts failed, using demo response');
   // Return demo response if API fails
   return getDemoResponse(query);
+}
+
+// Transform API response to UI format
+function transformAPIResponse(apiResponse) {
+  // If response has formula
+  if (apiResponse.formula) {
+    return {
+      type: 'formula',
+      formula: apiResponse.formula,
+      explanation: apiResponse.explanation || apiResponse.summary || ''
+    };
+  }
+
+  // If response has highlight_rows
+  if (apiResponse.highlight_rows && apiResponse.highlight_rows.length > 0) {
+    return {
+      type: 'highlight',
+      text: `Найдено ${apiResponse.highlighted_count || apiResponse.highlight_rows.length} строк`,
+      rows: apiResponse.highlight_rows
+    };
+  }
+
+  // If response has structured_data (table)
+  if (apiResponse.structured_data) {
+    return {
+      type: 'table',
+      text: apiResponse.summary || 'Данные обработаны',
+      data: apiResponse.structured_data
+    };
+  }
+
+  // Default analysis response
+  return {
+    type: 'analysis',
+    title: apiResponse.response_type || 'Результат',
+    text: apiResponse.summary || apiResponse.explanation || apiResponse.message || 'Запрос обработан'
+  };
 }
 
 function getDemoResponse(query) {
