@@ -795,6 +795,42 @@ async function callAPI(query, sheetData) {
   return getDemoResponse(query);
 }
 
+// Translate common English responses to Russian
+function translateToRussian(text) {
+  if (!text) return text;
+
+  const str = String(text).trim();
+
+  // Boolean translations
+  const translations = {
+    'True': 'Да',
+    'true': 'Да',
+    'False': 'Нет',
+    'false': 'Нет',
+    'Yes': 'Да',
+    'yes': 'Да',
+    'No': 'Нет',
+    'no': 'Нет',
+    'None': 'Нет данных',
+    'null': 'Нет данных',
+    'undefined': 'Нет данных',
+    'N/A': 'Н/Д',
+    'Not found': 'Не найдено',
+    'No data': 'Нет данных',
+    'No results': 'Нет результатов',
+    'Success': 'Успешно',
+    'Error': 'Ошибка',
+    'Failed': 'Не удалось'
+  };
+
+  // Direct match
+  if (translations[str]) {
+    return translations[str];
+  }
+
+  return text;
+}
+
 // Transform API response to UI format
 function transformAPIResponse(apiResponse) {
   // Store structured_data globally for table insertion
@@ -807,7 +843,7 @@ function transformAPIResponse(apiResponse) {
     return {
       type: 'formula',
       formula: apiResponse.formula,
-      explanation: apiResponse.explanation || apiResponse.summary || ''
+      explanation: translateToRussian(apiResponse.explanation || apiResponse.summary || '')
     };
   }
 
@@ -831,10 +867,13 @@ function transformAPIResponse(apiResponse) {
     };
   }
 
-  // Default analysis response - don't show response_type as title
+  // Default analysis response - translate to Russian
+  let responseText = apiResponse.summary || apiResponse.explanation || apiResponse.value || apiResponse.message || 'Запрос обработан';
+  responseText = translateToRussian(responseText);
+
   return {
     type: 'analysis',
-    text: apiResponse.summary || apiResponse.explanation || apiResponse.value || apiResponse.message || 'Запрос обработан'
+    text: responseText
   };
 }
 
