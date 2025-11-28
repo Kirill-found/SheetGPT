@@ -166,6 +166,20 @@ result = df[df['Город'] == 'Москва']
                                     'красным где', 'зелёным где', 'зеленым где', 'жёлтым где', 'желтым где',
                                     'выдели где', 'покрась где', 'отметь где']
 
+    # Pivot table / grouping keywords
+    PIVOT_KEYWORDS = ['сводн', 'pivot', 'группир', 'group by', 'агрегир', 'итоги по', 'суммы по',
+                      'по категори', 'по менеджер', 'по регион', 'по месяц', 'по год',
+                      'разбивка по', 'в разрезе']
+
+    # Aggregation functions
+    AGG_FUNCTIONS = {
+        'сумм': 'sum', 'sum': 'sum', 'итог': 'sum',
+        'средн': 'mean', 'avg': 'mean', 'average': 'mean',
+        'количеств': 'count', 'count': 'count', 'число': 'count',
+        'макс': 'max', 'max': 'max', 'максимум': 'max',
+        'мин': 'min', 'min': 'min', 'минимум': 'min'
+    }
+
     # Color keywords for conditional formatting
     CONDITION_COLORS = {
         'красн': {'red': 1, 'green': 0.8, 'blue': 0.8},      # Light red
@@ -644,6 +658,137 @@ result = df[df['Город'] == 'Москва']
             "message": message
         }
 
+    def _detect_pivot_action(self, query: str, column_names: List[str], df: pd.DataFrame) -> Optional[Dict[str, Any]]:
+        """
+        Определяет, является ли запрос командой создания сводной таблицы.
+        Примеры:
+        - "сводная по менеджерам"
+        - "группировка продаж по регионам"
+        - "суммы по категориям"
+        """
+        query_lower = query.lower()
+
+        # Check for pivot keywords
+        is_pivot = any(kw in query_lower for kw in self.PIVOT_KEYWORDS)
+        if not is_pivot:
+            return None
+
+        logger.info(f"[SimpleGPT] Pivot action detected: {query}")
+
+        # Analyze columns
+        numeric_cols = []
+        categorical_cols = []
+
+        for idx, col_name in enumerate(column_names):
+            if idx >= len(df.columns):
+                continue
+            col_data = df.iloc[:, idx]
+
+            # Check if numeric
+            try:
+                numeric_data = pd.to_numeric(col_data, errors='coerce')
+                non_null_ratio = numeric_data.notna().sum() / len(numeric_data) if len(numeric_data) > 0 else 0
+                if non_null_ratio > 0.5:
+                    numeric_cols.append({'name': col_name, 'index': idx})
+                    continue
+            except:
+                pass
+
+            # Otherwise categorical
+            unique_count = col_data.nunique()
+            if unique_count < len(col_data) * 0.5:  # Less than 50% unique = categorical
+                categorical_cols.append({'name': col_name, 'index': idx})
+
+        logger.info(f"[SimpleGPT] Columns: numeric={[c['name'] for c in numeric_cols]}, categorical={[c['name'] for c in categorical_cols]}")
+
+        # Find grouping column (categorical mentioned in query)
+        group_column = None
+        for cat in categorical_cols:
+            cat_lower = cat['name'].lower()
+            if cat_lower in query_lower or cat['name'] in query:
+                group_column = cat
+                break
+            # Partial match
+            for word in cat_lower.split():
+                if len(word) > 2 and word in query_lower:
+                    group_column = cat
+                    break
+            if group_column:
+                break
+
+        # If not found, use first categorical
+        if not group_column and categorical_cols:
+            group_column = categorical_cols[0]
+
+        # Find value column (numeric mentioned in query or first numeric)
+        value_column = None
+        for num in numeric_cols:
+            num_lower = num['name'].lower()
+            if num_lower in query_lower or num['name'] in query:
+                value_column = num
+                break
+            for word in num_lower.split():
+                if len(word) > 2 and word in query_lower:
+                    value_column = num
+                    break
+            if value_column:
+                break
+
+        if not value_column and numeric_cols:
+            value_column = numeric_cols[0]
+
+        # Detect aggregation function
+        agg_func = 'sum'  # Default
+        for kw, func in self.AGG_FUNCTIONS.items():
+            if kw in query_lower:
+                agg_func = func
+                break
+
+        if not group_column or not value_column:
+            logger.warning(f"[SimpleGPT] Cannot create pivot: group_column={group_column}, value_column={value_column}")
+            return None
+
+        # Create pivot table using pandas
+        try:
+            pivot_df = df.groupby(df.iloc[:, group_column['index']]).agg({
+                df.columns[value_column['index']]: agg_func
+            }).reset_index()
+
+            # Rename columns
+            pivot_df.columns = [group_column['name'], f"{agg_func.upper()}({value_column['name']})"]
+
+            # Sort by value descending
+            pivot_df = pivot_df.sort_values(by=pivot_df.columns[1], ascending=False)
+
+            # Convert to structured data
+            pivot_data = {
+                "headers": list(pivot_df.columns),
+                "rows": pivot_df.to_dict(orient='records')
+            }
+
+            agg_names = {
+                'sum': 'Сумма',
+                'mean': 'Среднее',
+                'count': 'Количество',
+                'max': 'Максимум',
+                'min': 'Минимум'
+            }
+
+            message = f"Сводная таблица: {agg_names.get(agg_func, agg_func)} {value_column['name']} по {group_column['name']}"
+
+            return {
+                "action_type": "pivot_table",
+                "pivot_data": pivot_data,
+                "group_column": group_column['name'],
+                "value_column": value_column['name'],
+                "agg_func": agg_func,
+                "message": message
+            }
+
+        except Exception as e:
+            logger.error(f"[SimpleGPT] Error creating pivot: {e}")
+            return None
+
     async def process(
         self,
         query: str,
@@ -734,6 +879,24 @@ result = df[df['Город'] == 'Москва']
                     "result_type": "action",
                     "rule": conditional_action["rule"],
                     "summary": conditional_action["message"],
+                    "processing_time": f"{elapsed:.2f}s",
+                    "processor": "SimpleGPT v1.0 (direct action)"
+                }
+
+            # Check for pivot table action
+            pivot_action = self._detect_pivot_action(query, column_names, df)
+            if pivot_action:
+                elapsed = time.time() - start_time
+                logger.info(f"[SimpleGPT] Returning pivot table action: {pivot_action}")
+                return {
+                    "success": True,
+                    "action_type": "pivot_table",
+                    "result_type": "action",
+                    "pivot_data": pivot_action["pivot_data"],
+                    "group_column": pivot_action["group_column"],
+                    "value_column": pivot_action["value_column"],
+                    "agg_func": pivot_action["agg_func"],
+                    "summary": pivot_action["message"],
                     "processing_time": f"{elapsed:.2f}s",
                     "processor": "SimpleGPT v1.0 (direct action)"
                 }

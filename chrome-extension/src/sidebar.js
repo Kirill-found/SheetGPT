@@ -758,6 +758,24 @@ function addAIMessage(response) {
       </div>
       <div class="content-box success">${escapeHtml(response.text || 'Условное форматирование применено')}</div>
     `;
+  } else if (response.type === 'pivot_table') {
+    const rowCount = response.pivotData?.rows?.length || 0;
+    content = `
+      <div class="response-badge formula">
+        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <rect x="3" y="3" width="18" height="18" rx="2"/>
+          <path d="M3 9h18"/>
+          <path d="M9 3v18"/>
+          <path d="M9 15h6"/>
+        </svg>
+        Сводная
+      </div>
+      <p>${escapeHtml(response.text || 'Сводная таблица готова')}</p>
+      <p class="text-secondary">${rowCount} групп</p>
+      <div class="action-buttons">
+        <button class="action-btn" onclick="insertPivotTable()">Вставить таблицу</button>
+      </div>
+    `;
   } else {
     content = `<p>${escapeHtml(response.text || 'Готово')}</p>`;
   }
@@ -1024,6 +1042,21 @@ function transformAPIResponse(apiResponse) {
     };
   }
 
+  // If response is a pivot table action
+  if (apiResponse.action_type === 'pivot_table' && apiResponse.pivot_data) {
+    console.log('[Sidebar] ✅ Pivot table condition met! Creating...');
+    // Store pivot data for insertion
+    window.lastPivotData = apiResponse.pivot_data;
+    return {
+      type: 'pivot_table',
+      text: apiResponse.summary || 'Сводная таблица готова',
+      pivotData: apiResponse.pivot_data,
+      groupColumn: apiResponse.group_column,
+      valueColumn: apiResponse.value_column,
+      aggFunc: apiResponse.agg_func
+    };
+  }
+
   // If response has highlight_rows
   if (apiResponse.highlight_rows && apiResponse.highlight_rows.length > 0) {
     // Trigger highlight action
@@ -1247,6 +1280,43 @@ window.insertTable = async function() {
     addAIMessage({
       type: 'error',
       text: 'Ошибка при создании таблицы: ' + error.message
+    });
+  }
+};
+
+window.insertPivotTable = async function() {
+  const pivotData = window.lastPivotData;
+  if (!pivotData) {
+    addAIMessage({
+      type: 'error',
+      text: 'Нет данных для вставки. Сначала запросите создание сводной таблицы.'
+    });
+    return;
+  }
+
+  try {
+    // Create a new sheet with pivot data
+    const result = await sendToContentScript('CREATE_TABLE_AND_CHART', {
+      structuredData: pivotData
+    });
+    console.log('[Sidebar] Pivot table inserted:', result);
+
+    if (result.success) {
+      addAIMessage({
+        type: 'analysis',
+        text: result.message || 'Сводная таблица создана'
+      });
+    } else {
+      addAIMessage({
+        type: 'error',
+        text: result.message || 'Не удалось создать сводную таблицу'
+      });
+    }
+  } catch (error) {
+    console.error('[Sidebar] Error inserting pivot table:', error);
+    addAIMessage({
+      type: 'error',
+      text: 'Ошибка при создании сводной таблицы: ' + error.message
     });
   }
 };
