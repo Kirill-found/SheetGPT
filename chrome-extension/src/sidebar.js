@@ -843,6 +843,10 @@ function translateToRussian(text) {
 
 // Transform API response to UI format
 function transformAPIResponse(apiResponse) {
+  console.log('[Sidebar] transformAPIResponse received:', apiResponse);
+  console.log('[Sidebar] action_type:', apiResponse.action_type);
+  console.log('[Sidebar] chart_spec:', apiResponse.chart_spec);
+
   // Store structured_data globally for table insertion
   if (apiResponse.structured_data) {
     window.lastStructuredData = apiResponse.structured_data;
