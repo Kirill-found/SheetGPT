@@ -81,6 +81,7 @@ class SimpleGPTProcessor:
 - "сумма/среднее/макс/мин" → возвращай число
 - "топ N" → возвращай DataFrame с N строками
 - "отсортируй" → возвращай отсортированный DataFrame
+- "выдели/highlight" → возвращай DataFrame с отфильтрованными строками (сохраняй оригинальные индексы!)
 
 ПРИМЕРЫ:
 
@@ -206,8 +207,24 @@ result = df[df['Город'] == 'Москва']
                 "validation": validation
             }
 
-            # Add structured_data for tables/lists
-            if result_type == "table" and isinstance(formatted_result, list):
+            # Check if this is a highlight query
+            query_lower = query.lower()
+            is_highlight_query = any(kw in query_lower for kw in ['выдели', 'выделить', 'подсвети', 'подсветить', 'highlight', 'mark'])
+
+            if is_highlight_query:
+                logger.info(f"[SimpleGPT] Highlight query detected: {query[:50]}")
+                # Extract row indices from the result for highlighting
+                highlight_rows = self._extract_highlight_rows(result["result"])
+                if highlight_rows:
+                    response["highlight_rows"] = highlight_rows
+                    response["highlighted_count"] = len(highlight_rows)
+                    response["highlight_color"] = "#FFFF00"  # Yellow
+                    response["highlight_message"] = f"Выделено {len(highlight_rows)} строк"
+                    response["result_type"] = "highlight"
+                    logger.info(f"[SimpleGPT] Generated highlight_rows: {highlight_rows[:10]}... (total: {len(highlight_rows)})")
+
+            # Add structured_data for tables/lists (only if NOT highlight query)
+            if not is_highlight_query and result_type == "table" and isinstance(formatted_result, list):
                 # Extract headers from first row keys (rows are dicts from DataFrame)
                 headers = list(formatted_result[0].keys()) if formatted_result else []
                 response["structured_data"] = {
@@ -457,6 +474,36 @@ result = df[df['Город'] == 'Москва']
         else:
             # Текст
             return str(result)[:200] if result else "Результат обработан"
+
+    def _extract_highlight_rows(self, result: Any) -> List[int]:
+        """
+        Извлекает номера строк для выделения из результата.
+        Возвращает list[int] с номерами строк (1-based для Google Sheets, +1 для header).
+        """
+        try:
+            if isinstance(result, pd.DataFrame):
+                # Get original DataFrame indices and convert to Google Sheets row numbers
+                # +2 because: +1 for 1-based indexing, +1 for header row
+                indices = result.index.tolist()
+                row_numbers = [int(idx) + 2 for idx in indices]
+                logger.info(f"[SimpleGPT] Extracted {len(row_numbers)} row indices from DataFrame")
+                return row_numbers
+            elif isinstance(result, pd.Series):
+                # Series with row indices
+                indices = result.index.tolist()
+                row_numbers = [int(idx) + 2 for idx in indices]
+                return row_numbers
+            elif isinstance(result, list):
+                # If result is a list of row numbers
+                if all(isinstance(x, (int, np.integer)) for x in result):
+                    return [int(x) + 2 for x in result]
+                # If result is list of dicts (from DataFrame.to_dict), can't extract indices
+                return []
+            else:
+                return []
+        except Exception as e:
+            logger.error(f"[SimpleGPT] Error extracting highlight rows: {e}")
+            return []
 
     def _create_error_response(self, error: str, elapsed: float) -> Dict[str, Any]:
         """Создаёт ответ об ошибке."""
