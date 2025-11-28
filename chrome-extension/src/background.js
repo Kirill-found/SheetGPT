@@ -62,6 +62,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           result = await handleCreateChart(sender.tab.id, sender.tab.url, data);
           break;
 
+        case 'APPLY_CONDITIONAL_FORMAT':
+          result = await handleConditionalFormat(sender.tab.id, sender.tab.url, data);
+          break;
+
         case 'CHECK_AUTH':
           result = await checkAuth();
           break;
@@ -368,6 +372,40 @@ async function handleCreateChart(tabId, tabUrl, data) {
   const result = await createChart(spreadsheetId, sheetId, chartSpec);
 
   console.log('[Background] ✅ Chart created:', result);
+  return result;
+}
+
+/**
+ * Apply conditional formatting to Google Sheet
+ */
+async function handleConditionalFormat(tabId, tabUrl, data) {
+  console.log('[Background] Applying conditional format:', data);
+
+  const spreadsheetId = getSpreadsheetIdFromUrl(tabUrl);
+  if (!spreadsheetId) {
+    throw new Error('Not a valid Google Sheets URL');
+  }
+
+  const { rule } = data;
+
+  if (!rule) {
+    throw new Error('Conditional format rule is required');
+  }
+
+  // Get saved sheet name from storage
+  const storageKey = `sheetName_${spreadsheetId}`;
+  const storageData = await chrome.storage.local.get(storageKey);
+  const sheetName = storageData[storageKey] || 'Лист1';
+
+  console.log(`[Background] Using sheet name "${sheetName}" for conditional format`);
+
+  // Get sheet ID
+  const sheetId = await getSheetIdByName(spreadsheetId, sheetName);
+
+  // Apply conditional format
+  const result = await applyConditionalFormat(spreadsheetId, sheetId, rule);
+
+  console.log('[Background] ✅ Conditional format applied:', result);
   return result;
 }
 

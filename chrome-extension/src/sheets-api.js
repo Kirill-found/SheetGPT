@@ -771,6 +771,115 @@ async function getSheetIdByName(spreadsheetId, sheetName) {
   }
 }
 
+/**
+ * Apply conditional formatting to a column
+ * @param {string} spreadsheetId - The spreadsheet ID
+ * @param {number} sheetId - The sheet ID
+ * @param {object} rule - The conditional format rule with:
+ *   - column_index: Column to apply rule to
+ *   - condition_type: NUMBER_GREATER, NUMBER_LESS, NUMBER_EQ, BLANK, NOT_BLANK
+ *   - condition_value: Value to compare against (null for BLANK/NOT_BLANK)
+ *   - format_color: RGB color object {red, green, blue}
+ */
+async function applyConditionalFormat(spreadsheetId, sheetId, rule) {
+  try {
+    const token = await getAuthToken();
+
+    const { column_index, condition_type, condition_value, format_color } = rule;
+
+    console.log(`[SheetsAPI] Applying conditional format to column ${column_index}, type: ${condition_type}, value: ${condition_value}`);
+
+    // Build the condition based on type
+    let booleanCondition;
+
+    switch (condition_type) {
+      case 'NUMBER_GREATER':
+        booleanCondition = {
+          type: 'NUMBER_GREATER',
+          values: [{ userEnteredValue: String(condition_value) }]
+        };
+        break;
+      case 'NUMBER_LESS':
+        booleanCondition = {
+          type: 'NUMBER_LESS',
+          values: [{ userEnteredValue: String(condition_value) }]
+        };
+        break;
+      case 'NUMBER_EQ':
+        booleanCondition = {
+          type: 'NUMBER_EQ',
+          values: [{ userEnteredValue: String(condition_value) }]
+        };
+        break;
+      case 'BLANK':
+        booleanCondition = {
+          type: 'BLANK'
+        };
+        break;
+      case 'NOT_BLANK':
+        booleanCondition = {
+          type: 'NOT_BLANK'
+        };
+        break;
+      default:
+        booleanCondition = {
+          type: 'NUMBER_GREATER',
+          values: [{ userEnteredValue: '0' }]
+        };
+    }
+
+    // Build the conditional format request
+    const request = {
+      addConditionalFormatRule: {
+        rule: {
+          ranges: [{
+            sheetId: sheetId,
+            startRowIndex: 1, // Skip header row
+            startColumnIndex: column_index,
+            endColumnIndex: column_index + 1
+          }],
+          booleanRule: {
+            condition: booleanCondition,
+            format: {
+              backgroundColor: format_color || { red: 1, green: 1, blue: 0.7 }
+            }
+          }
+        },
+        index: 0 // Insert at the beginning of the conditional format rules
+      }
+    };
+
+    console.log('[SheetsAPI] Conditional format request:', JSON.stringify(request, null, 2));
+
+    const response = await fetch(
+      `${SHEETS_API_BASE}/${spreadsheetId}:batchUpdate`,
+      {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          requests: [request]
+        })
+      }
+    );
+
+    if (!response.ok) {
+      const error = await response.json();
+      console.error('[SheetsAPI] Conditional format error:', error);
+      throw new Error(`Sheets API error: ${error.error?.message || response.statusText}`);
+    }
+
+    const result = await response.json();
+    console.log('[SheetsAPI] ✅ Conditional format applied:', result);
+    return result;
+  } catch (error) {
+    console.error('[SheetsAPI] Error applying conditional format:', error);
+    throw error;
+  }
+}
+
 // Export functions
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = {
@@ -786,6 +895,7 @@ if (typeof module !== 'undefined' && module.exports) {
     freezeRowsColumns,
     formatRow,
     createChart,
-    getSheetIdByName
+    getSheetIdByName,
+    applyConditionalFormat
   };
 }

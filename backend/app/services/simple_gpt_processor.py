@@ -160,6 +160,28 @@ result = df[df['Город'] == 'Москва']
         'комбинир': 'COMBO', 'combo': 'COMBO', 'смешан': 'COMBO',
     }
 
+    # Conditional formatting keywords
+    CONDITIONAL_FORMAT_KEYWORDS = ['условн', 'conditional', 'где больше', 'где меньше', 'где равно',
+                                    'больше чем', 'меньше чем', 'если больше', 'если меньше',
+                                    'красным где', 'зелёным где', 'зеленым где', 'жёлтым где', 'желтым где',
+                                    'выдели где', 'покрась где', 'отметь где']
+
+    # Color keywords for conditional formatting
+    CONDITION_COLORS = {
+        'красн': {'red': 1, 'green': 0.8, 'blue': 0.8},      # Light red
+        'red': {'red': 1, 'green': 0.8, 'blue': 0.8},
+        'зелен': {'red': 0.85, 'green': 0.95, 'blue': 0.85}, # Light green
+        'green': {'red': 0.85, 'green': 0.95, 'blue': 0.85},
+        'жёлт': {'red': 1, 'green': 1, 'blue': 0.7},         # Light yellow
+        'желт': {'red': 1, 'green': 1, 'blue': 0.7},
+        'yellow': {'red': 1, 'green': 1, 'blue': 0.7},
+        'оранж': {'red': 1, 'green': 0.9, 'blue': 0.8},      # Light orange
+        'orange': {'red': 1, 'green': 0.9, 'blue': 0.8},
+        'синий': {'red': 0.85, 'green': 0.9, 'blue': 1},     # Light blue
+        'blue': {'red': 0.85, 'green': 0.9, 'blue': 1},
+        'голуб': {'red': 0.85, 'green': 0.95, 'blue': 1},    # Light cyan
+    }
+
     def __init__(self):
         api_key = os.getenv("OPENAI_API_KEY")
         if not api_key:
@@ -489,6 +511,139 @@ result = df[df['Город'] == 'Москва']
             "message": message
         }
 
+    def _detect_conditional_format_action(self, query: str, column_names: List[str], df: pd.DataFrame) -> Optional[Dict[str, Any]]:
+        """
+        Определяет, является ли запрос командой условного форматирования.
+        Примеры:
+        - "выдели красным где сумма больше 10000"
+        - "зелёным где прибыль положительная"
+        - "условное форматирование: жёлтым пустые ячейки"
+        """
+        query_lower = query.lower()
+
+        # Check for conditional format keywords
+        is_conditional = any(kw in query_lower for kw in self.CONDITIONAL_FORMAT_KEYWORDS)
+        if not is_conditional:
+            return None
+
+        logger.info(f"[SimpleGPT] Conditional format action detected: {query}")
+
+        # Detect color
+        format_color = {'red': 1, 'green': 1, 'blue': 0.7}  # Default yellow
+        color_name = "жёлтый"
+        for color_kw, color_value in self.CONDITION_COLORS.items():
+            if color_kw in query_lower:
+                format_color = color_value
+                color_name = color_kw
+                break
+
+        # Find column mentioned in query
+        target_column = None
+        target_column_index = None
+
+        for idx, col_name in enumerate(column_names):
+            col_lower = col_name.lower()
+            if col_lower in query_lower or col_name in query:
+                target_column = col_name
+                target_column_index = idx
+                break
+            # Partial match
+            for word in col_lower.split():
+                if len(word) > 2 and word in query_lower:
+                    target_column = col_name
+                    target_column_index = idx
+                    break
+            if target_column:
+                break
+
+        # If no column found, try to find numeric column
+        if not target_column:
+            for idx, col_name in enumerate(column_names):
+                if idx < len(df.columns):
+                    try:
+                        numeric_data = pd.to_numeric(df.iloc[:, idx], errors='coerce')
+                        if numeric_data.notna().sum() / len(numeric_data) > 0.5:
+                            target_column = col_name
+                            target_column_index = idx
+                            break
+                    except:
+                        pass
+
+        # Detect condition type and value
+        condition_type = "GREATER_THAN"  # Default
+        condition_value = None
+
+        # Patterns for conditions
+        import re
+
+        # "больше X" / "> X"
+        greater_match = re.search(r'(?:больше|>|более)\s*(?:чем\s*)?(\d+(?:[.,]\d+)?)', query_lower)
+        if greater_match:
+            condition_type = "NUMBER_GREATER"
+            condition_value = float(greater_match.group(1).replace(',', '.'))
+
+        # "меньше X" / "< X"
+        less_match = re.search(r'(?:меньше|<|менее)\s*(?:чем\s*)?(\d+(?:[.,]\d+)?)', query_lower)
+        if less_match:
+            condition_type = "NUMBER_LESS"
+            condition_value = float(less_match.group(1).replace(',', '.'))
+
+        # "равно X" / "= X"
+        equal_match = re.search(r'(?:равно|=|равен)\s*(\d+(?:[.,]\d+)?)', query_lower)
+        if equal_match:
+            condition_type = "NUMBER_EQ"
+            condition_value = float(equal_match.group(1).replace(',', '.'))
+
+        # "пусто" / "пустые"
+        if any(w in query_lower for w in ['пуст', 'empty', 'blank', 'нет данных']):
+            condition_type = "BLANK"
+            condition_value = None
+
+        # "не пусто" / "заполнено"
+        if any(w in query_lower for w in ['не пуст', 'not empty', 'заполнен', 'есть данные']):
+            condition_type = "NOT_BLANK"
+            condition_value = None
+
+        # "отрицательн" / "убыток"
+        if any(w in query_lower for w in ['отрицательн', 'убыт', 'negative', 'минус']):
+            condition_type = "NUMBER_LESS"
+            condition_value = 0
+
+        # "положительн" / "прибыль"
+        if any(w in query_lower for w in ['положительн', 'прибыл', 'positive', 'плюс']):
+            condition_type = "NUMBER_GREATER"
+            condition_value = 0
+
+        # Build the conditional format rule
+        rule = {
+            "column_index": target_column_index if target_column_index is not None else 0,
+            "column_name": target_column or column_names[0] if column_names else "A",
+            "condition_type": condition_type,
+            "condition_value": condition_value,
+            "format_color": format_color
+        }
+
+        # Generate message
+        condition_text = ""
+        if condition_type == "NUMBER_GREATER":
+            condition_text = f"> {condition_value}"
+        elif condition_type == "NUMBER_LESS":
+            condition_text = f"< {condition_value}"
+        elif condition_type == "NUMBER_EQ":
+            condition_text = f"= {condition_value}"
+        elif condition_type == "BLANK":
+            condition_text = "пустые"
+        elif condition_type == "NOT_BLANK":
+            condition_text = "непустые"
+
+        message = f"Условное форматирование: {target_column or 'колонка'} {condition_text} → {color_name}"
+
+        return {
+            "action_type": "conditional_format",
+            "rule": rule,
+            "message": message
+        }
+
     async def process(
         self,
         query: str,
@@ -564,6 +719,21 @@ result = df[df['Город'] == 'Москва']
                     "result_type": "action",
                     "chart_spec": chart_action["chart_spec"],
                     "summary": chart_action["message"],
+                    "processing_time": f"{elapsed:.2f}s",
+                    "processor": "SimpleGPT v1.0 (direct action)"
+                }
+
+            # Check for conditional formatting action
+            conditional_action = self._detect_conditional_format_action(query, column_names, df)
+            if conditional_action:
+                elapsed = time.time() - start_time
+                logger.info(f"[SimpleGPT] Returning conditional format action: {conditional_action}")
+                return {
+                    "success": True,
+                    "action_type": "conditional_format",
+                    "result_type": "action",
+                    "rule": conditional_action["rule"],
+                    "summary": conditional_action["message"],
                     "processing_time": f"{elapsed:.2f}s",
                     "processor": "SimpleGPT v1.0 (direct action)"
                 }

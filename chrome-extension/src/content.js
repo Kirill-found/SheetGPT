@@ -524,6 +524,10 @@ window.addEventListener('message', async (event) => {
         result = await createChartInSheet(data.chartSpec);
         break;
 
+      case 'APPLY_CONDITIONAL_FORMAT':
+        result = await applyConditionalFormat(data.rule);
+        break;
+
       default:
         throw new Error(`Unknown action: ${action}`);
     }
@@ -941,6 +945,35 @@ async function createChartInSheet(chartSpec) {
     return {
       success: false,
       message: `Ошибка создания диаграммы: ${error.message}`
+    };
+  }
+}
+
+async function applyConditionalFormat(rule) {
+  console.log('[SheetGPT] Apply conditional format:', rule);
+
+  try {
+    const response = await safeSendMessage({
+      action: 'APPLY_CONDITIONAL_FORMAT',
+      data: {
+        rule: rule
+      }
+    });
+
+    if (!response.success) {
+      throw new Error(response.error);
+    }
+
+    console.log('[SheetGPT] ✅ Conditional format applied via API:', response.result);
+    return {
+      success: true,
+      message: `Условное форматирование применено к колонке "${rule.column_name}"`
+    };
+  } catch (error) {
+    console.error('[SheetGPT] Error applying conditional format:', error);
+    return {
+      success: false,
+      message: `Ошибка условного форматирования: ${error.message}`
     };
   }
 }

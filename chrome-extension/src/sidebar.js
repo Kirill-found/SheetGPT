@@ -746,6 +746,18 @@ function addAIMessage(response) {
       </div>
       <div class="content-box success">${escapeHtml(response.text || 'Диаграмма создана')}</div>
     `;
+  } else if (response.type === 'conditional_format') {
+    content = `
+      <div class="response-badge analysis">
+        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <rect x="3" y="3" width="18" height="18" rx="2"/>
+          <path d="M3 9h18"/>
+          <path d="M9 3v18"/>
+        </svg>
+        Форматирование
+      </div>
+      <div class="content-box success">${escapeHtml(response.text || 'Условное форматирование применено')}</div>
+    `;
   } else {
     content = `<p>${escapeHtml(response.text || 'Готово')}</p>`;
   }
@@ -1000,6 +1012,18 @@ function transformAPIResponse(apiResponse) {
     };
   }
 
+  // If response is a conditional format action
+  if (apiResponse.action_type === 'conditional_format' && apiResponse.rule) {
+    console.log('[Sidebar] ✅ Conditional format condition met! Applying...');
+    // Trigger conditional format action
+    applyConditionalFormatInSheet(apiResponse.rule);
+    return {
+      type: 'conditional_format',
+      text: apiResponse.summary || 'Условное форматирование применено',
+      rule: apiResponse.rule
+    };
+  }
+
   // If response has highlight_rows
   if (apiResponse.highlight_rows && apiResponse.highlight_rows.length > 0) {
     // Trigger highlight action
@@ -1157,6 +1181,22 @@ async function createChartInSheet(chartSpec) {
     console.log(`[Sidebar] Chart "${chartSpec.title}" created`);
   } catch (error) {
     console.error('[Sidebar] Error creating chart:', error);
+  }
+}
+
+async function applyConditionalFormatInSheet(rule) {
+  if (!rule) {
+    console.error('[Sidebar] Conditional format error: rule is required');
+    return;
+  }
+
+  try {
+    await sendToContentScript('APPLY_CONDITIONAL_FORMAT', {
+      rule: rule
+    });
+    console.log(`[Sidebar] Conditional format applied to column "${rule.column_name}"`);
+  } catch (error) {
+    console.error('[Sidebar] Error applying conditional format:', error);
   }
 }
 
