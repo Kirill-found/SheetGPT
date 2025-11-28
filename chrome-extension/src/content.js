@@ -481,7 +481,7 @@ window.addEventListener('message', async (event) => {
 
     switch (action) {
       case 'PROCESS_QUERY':
-        result = await processQuery(data.query);
+        result = await processQuery(data.query, data.history);
         break;
 
       case 'GET_CUSTOM_CONTEXT':
@@ -584,7 +584,7 @@ const API_URLS = {
 
 // ===== API HANDLERS =====
 
-async function processQuery(query) {
+async function processQuery(query, history = []) {
   console.log('[SheetGPT] Processing query:', query);
   console.log('[SheetGPT] API Mode:', API_MODE, '| URL:', API_URLS[API_MODE]);
 
@@ -619,7 +619,8 @@ async function processQuery(query) {
       query: query,
       column_names: sheetData.headers,
       sheet_data: sheetData.data,
-      custom_context: customContext || null
+      custom_context: customContext || null,
+      history: history || []
     })
   });
 

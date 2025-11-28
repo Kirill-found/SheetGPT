@@ -498,9 +498,10 @@ function renderHistory() {
   });
 }
 
-function addToHistory(query) {
+function addToHistory(query, response = null) {
   state.chatHistory.unshift({
     query,
+    response: response, // Store response for conversation context
     timestamp: Date.now()
   });
   
@@ -631,8 +632,8 @@ async function sendMessage() {
   elements.messageInput.value = '';
   handleInputChange();
   
-  // Add to history
-  addToHistory(query);
+  // History will be updated after response
+  const currentQuery = query; // Save for history
   
   // Show loading
   state.isLoading = true;
@@ -641,7 +642,14 @@ async function sendMessage() {
   
   try {
     // Use PROCESS_QUERY action via content.js (it handles sheet data and API call)
-    const result = await sendToContentScript('PROCESS_QUERY', { query });
+    // Build conversation history for context (last 5 exchanges)
+    const conversationHistory = state.chatHistory
+      .slice(0, 5)
+      .filter(item => item.query && item.response)
+      .map(item => ({ query: item.query, response: item.response }))
+      .reverse(); // oldest first
+
+    const result = await sendToContentScript('PROCESS_QUERY', { query, history: conversationHistory });
 
     // Remove loading
     loadingEl.remove();
@@ -652,6 +660,9 @@ async function sendMessage() {
 
     // Update usage
     updateUsage();
+
+    // Add to history with response
+    addToHistory(currentQuery, result.summary || result.explanation || null);
 
   } catch (error) {
     loadingEl.remove();
@@ -935,6 +946,7 @@ async function callAPI(query, sheetData) {
   // Format payload for /api/v1/formula endpoint
   const payload = {
     query: query,
+    response: response, // Store response for conversation context
     column_names: sheetData?.headers || [],
     sheet_data: sheetData?.rows || [],
     custom_context: state.customContext || ''
