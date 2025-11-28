@@ -164,7 +164,13 @@ result = df[df['Город'] == 'Москва']
     CONDITIONAL_FORMAT_KEYWORDS = ['условн', 'conditional', 'где больше', 'где меньше', 'где равно',
                                     'больше чем', 'меньше чем', 'если больше', 'если меньше',
                                     'красным где', 'зелёным где', 'зеленым где', 'жёлтым где', 'желтым где',
-                                    'выдели где', 'покрась где', 'отметь где']
+                                    'выдели где', 'покрась где', 'отметь где',
+                                    # Additional patterns for color-based formatting
+                                    'покрась красн', 'покрась зелен', 'покрась жёлт', 'покрась желт',
+                                    'выдели красн', 'выдели зелен', 'выдели жёлт', 'выдели желт',
+                                    'если цена', 'если сумма', 'если значение',
+                                    'красным ячейки', 'зелёным ячейки', 'зеленым ячейки',
+                                    'пустые значения', 'пустые ячейки', 'желтым пуст', 'жёлтым пуст']
 
     # Pivot table / grouping keywords
     PIVOT_KEYWORDS = ['сводн', 'pivot', 'группир', 'group by', 'агрегир', 'итоги по', 'суммы по',
@@ -185,11 +191,14 @@ result = df[df['Город'] == 'Москва']
                       'удали пуст', 'remove empty', 'пустые строк', 'empty row',
                       'заполни пуст', 'fill empty', 'fill blank', 'fillna',
                       'убери пробел', 'trim', 'strip', 'пробелы',
-                      'нормализ', 'normalize', 'стандартиз']
+                      'нормализ', 'normalize', 'стандартиз',
+                      # Additional patterns
+                      'убери дублик', 'убери повтор', 'убери пуст', 'убери строки',
+                      'удали повтор', 'удали строки']
 
     # Cleaning operation types
     CLEAN_OPERATIONS = {
-        'duplicate': ['дублик', 'duplicate', 'повтор', 'одинаков'],
+        'duplicate': ['дублик', 'duplicate', 'повтор', 'одинаков', 'дубл'],
         'empty_rows': ['пуст', 'empty', 'blank', 'nan', 'null'],
         'trim': ['пробел', 'trim', 'strip', 'whitespace'],
         'fill': ['заполн', 'fill', 'замен', 'replace'],
@@ -210,8 +219,8 @@ result = df[df['Город'] == 'Москва']
         '>=': ['>=', '≥', 'больше или равно', 'не меньше'],
         '<=': ['<=', '≤', 'меньше или равно', 'не больше'],
         '!=': ['!=', '≠', '<>', 'не равно', 'не равен', 'кроме'],
-        '>': ['>', 'больше', 'выше', 'more than', 'greater'],
-        '<': ['<', 'меньше', 'ниже', 'less than', 'lower'],
+        '>': ['>', 'больше', 'выше', 'more than', 'greater', 'более'],
+        '<': ['<', 'меньше', 'ниже', 'less than', 'lower', 'менее'],
         '==': ['=', '==', 'равно', 'равен', 'equals', 'is'],
         'contains': ['содержит', 'contains', 'включает', 'includes'],
         'startswith': ['начинается', 'starts with', 'начинает'],
@@ -736,7 +745,7 @@ result = df[df['Город'] == 'Москва']
 
             # Otherwise categorical
             unique_count = col_data.nunique()
-            if unique_count < len(col_data) * 0.5:  # Less than 50% unique = categorical
+            if unique_count <= len(col_data) * 0.7:  # Up to 70% unique = categorical
                 categorical_cols.append({'name': col_name, 'index': idx})
 
         logger.info(f"[SimpleGPT] Columns: numeric={[c['name'] for c in numeric_cols]}, categorical={[c['name'] for c in categorical_cols]}")
@@ -748,11 +757,18 @@ result = df[df['Город'] == 'Москва']
             if cat_lower in query_lower or cat['name'] in query:
                 group_column = cat
                 break
-            # Partial match
+            # Partial match - check if column name stem is in query
             for word in cat_lower.split():
                 if len(word) > 2 and word in query_lower:
                     group_column = cat
                     break
+                # Check if word stem (first 4+ chars) is in query for Russian word forms
+                if len(word) >= 4:
+                    word_stem = word[:max(4, len(word) - 2)]  # Get stem (at least 4 chars)
+                    if word_stem in query_lower:
+                        group_column = cat
+                        logger.info(f"[SimpleGPT] Found pivot column by stem: '{word_stem}' in '{word}' -> {cat['name']}")
+                        break
             if group_column:
                 break
 
