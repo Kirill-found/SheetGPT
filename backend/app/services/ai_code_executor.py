@@ -978,6 +978,34 @@ Generate CORRECTED code that will work. Return ONLY the Python code."""
 
         # Старый метод как fallback (закомментирован)
         highlighting_data = self._generate_highlighting_if_needed(query, result_dict) if not highlighting_data else highlighting_data
+
+        # v8.3.1: КРИТИЧЕСКИЙ FALLBACK - если есть "выдели" и structured_data, генерируем highlight_rows из него!
+        if not highlighting_data and 'выдели' in query_lower and structured_data:
+            print(f"[FALLBACK] 'выдели' in query but no highlighting_data, generating from structured_data")
+            rows = structured_data.get('rows', [])
+            if rows and original_df is not None:
+                rows_to_highlight = []
+                # Ищем строки в оригинальном DataFrame по первой колонке
+                first_col = original_df.columns[0]
+                for row_data in rows:
+                    if isinstance(row_data, list) and len(row_data) > 0:
+                        search_value = row_data[0]
+                        matches = original_df[original_df[first_col] == search_value]
+                        if not matches.empty:
+                            for idx in matches.index.tolist():
+                                row_num = idx + 2  # +2 для Google Sheets (1-based + header)
+                                if row_num not in rows_to_highlight:
+                                    rows_to_highlight.append(row_num)
+
+                if rows_to_highlight:
+                    highlighting_data = {
+                        "action_type": "highlight_rows",
+                        "highlight_rows": rows_to_highlight,
+                        "highlight_color": "#FFFF00",
+                        "highlight_message": f"Выделено строк: {len(rows_to_highlight)}"
+                    }
+                    print(f"[FALLBACK_SUCCESS] Generated highlighting from structured_data: {highlighting_data}")
+
         if highlighting_data:
             print(f"✅ Highlighting data generated: {highlighting_data}")
         else:
