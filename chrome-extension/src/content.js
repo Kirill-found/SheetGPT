@@ -532,6 +532,10 @@ window.addEventListener('message', async (event) => {
         result = await overwriteSheetData(data.cleanedData);
         break;
 
+      case 'SET_DATA_VALIDATION':
+        result = await setDataValidationInSheet(data.rule);
+        break;
+
       default:
         throw new Error(`Unknown action: ${action}`);
     }
@@ -1017,6 +1021,39 @@ async function overwriteSheetData(cleanedData) {
     return {
       success: false,
       message: `Ошибка замены данных: ${error.message}`
+    };
+  }
+}
+
+async function setDataValidationInSheet(rule) {
+  console.log('[SheetGPT] Set data validation:', rule);
+
+  try {
+    if (!rule || !rule.allowed_values || rule.allowed_values.length === 0) {
+      throw new Error('Invalid validation rule');
+    }
+
+    const response = await safeSendMessage({
+      action: 'SET_DATA_VALIDATION',
+      data: {
+        rule: rule
+      }
+    });
+
+    if (!response.success) {
+      throw new Error(response.error);
+    }
+
+    console.log('[SheetGPT] ✅ Data validation set via API:', response.result);
+    return {
+      success: true,
+      message: `Выпадающий список создан для "${rule.column_name}" (${rule.allowed_values.length} вариантов)`
+    };
+  } catch (error) {
+    console.error('[SheetGPT] Error setting data validation:', error);
+    return {
+      success: false,
+      message: `Ошибка создания валидации: ${error.message}`
     };
   }
 }

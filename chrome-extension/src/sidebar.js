@@ -798,6 +798,27 @@ function addAIMessage(response) {
         <button class="action-btn secondary" onclick="overwriteWithCleanedData()">Заменить данные</button>
       </div>
     `;
+  } else if (response.type === 'data_validation') {
+    const valuesCount = response.rule?.allowed_values?.length || 0;
+    const valuesPreview = response.rule?.allowed_values?.slice(0, 5).join(', ') || '';
+    content = `
+      <div class="response-badge formula">
+        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M12 2v4"/>
+          <path d="M12 18v4"/>
+          <path d="M4.93 4.93l2.83 2.83"/>
+          <path d="M16.24 16.24l2.83 2.83"/>
+          <path d="M2 12h4"/>
+          <path d="M18 12h4"/>
+          <path d="M4.93 19.07l2.83-2.83"/>
+          <path d="M16.24 7.76l2.83-2.83"/>
+        </svg>
+        Валидация
+      </div>
+      <p>${escapeHtml(response.text || 'Выпадающий список создан')}</p>
+      <p class="text-secondary">${valuesCount} вариантов: ${escapeHtml(valuesPreview)}${valuesCount > 5 ? '...' : ''}</p>
+      <div class="content-box success">Выпадающий список применён к колонке</div>
+    `;
   } else {
     content = `<p>${escapeHtml(response.text || 'Готово')}</p>`;
   }
@@ -1095,6 +1116,18 @@ function transformAPIResponse(apiResponse) {
     };
   }
 
+  // If response is a data validation action
+  if (apiResponse.action_type === 'data_validation' && apiResponse.rule) {
+    console.log('[Sidebar] ✅ Data validation condition met!');
+    // Apply validation immediately
+    setDataValidationInSheet(apiResponse.rule);
+    return {
+      type: 'data_validation',
+      text: apiResponse.summary || 'Валидация данных создана',
+      rule: apiResponse.rule
+    };
+  }
+
   // If response has highlight_rows
   if (apiResponse.highlight_rows && apiResponse.highlight_rows.length > 0) {
     // Trigger highlight action
@@ -1268,6 +1301,22 @@ async function applyConditionalFormatInSheet(rule) {
     console.log(`[Sidebar] Conditional format applied to column "${rule.column_name}"`);
   } catch (error) {
     console.error('[Sidebar] Error applying conditional format:', error);
+  }
+}
+
+async function setDataValidationInSheet(rule) {
+  if (!rule) {
+    console.error('[Sidebar] Data validation error: rule is required');
+    return;
+  }
+
+  try {
+    await sendToContentScript('SET_DATA_VALIDATION', {
+      rule: rule
+    });
+    console.log(`[Sidebar] Data validation set for column "${rule.column_name}"`);
+  } catch (error) {
+    console.error('[Sidebar] Error setting data validation:', error);
   }
 }
 

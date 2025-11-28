@@ -66,6 +66,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           result = await handleConditionalFormat(sender.tab.id, sender.tab.url, data);
           break;
 
+        case 'SET_DATA_VALIDATION':
+          result = await handleSetDataValidation(sender.tab.id, sender.tab.url, data);
+          break;
+
         case 'CHECK_AUTH':
           result = await checkAuth();
           break;
@@ -406,6 +410,40 @@ async function handleConditionalFormat(tabId, tabUrl, data) {
   const result = await applyConditionalFormat(spreadsheetId, sheetId, rule);
 
   console.log('[Background] ✅ Conditional format applied:', result);
+  return result;
+}
+
+/**
+ * Set data validation (dropdown list) for a column
+ */
+async function handleSetDataValidation(tabId, tabUrl, data) {
+  console.log('[Background] Setting data validation:', data);
+
+  const spreadsheetId = getSpreadsheetIdFromUrl(tabUrl);
+  if (!spreadsheetId) {
+    throw new Error('Not a valid Google Sheets URL');
+  }
+
+  const { rule } = data;
+
+  if (!rule) {
+    throw new Error('Data validation rule is required');
+  }
+
+  // Get saved sheet name from storage
+  const storageKey = `sheetName_${spreadsheetId}`;
+  const storageData = await chrome.storage.local.get(storageKey);
+  const sheetName = storageData[storageKey] || 'Лист1';
+
+  console.log(`[Background] Using sheet name "${sheetName}" for data validation`);
+
+  // Get sheet ID
+  const sheetId = await getSheetIdByName(spreadsheetId, sheetName);
+
+  // Set data validation
+  const result = await setDataValidation(spreadsheetId, sheetId, rule);
+
+  console.log('[Background] ✅ Data validation set:', result);
   return result;
 }
 

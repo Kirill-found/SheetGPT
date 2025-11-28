@@ -195,6 +195,11 @@ result = df[df['Город'] == 'Москва']
         'fill': ['заполн', 'fill', 'замен', 'replace'],
     }
 
+    # Data validation keywords
+    VALIDATION_KEYWORDS = ['валидац', 'validation', 'выпадающ', 'dropdown', 'список',
+                           'ограничь', 'restrict', 'только', 'only', 'допустим',
+                           'разрешённ', 'allowed', 'выбор из', 'select from']
+
     # Color keywords for conditional formatting
     CONDITION_COLORS = {
         'красн': {'red': 1, 'green': 0.8, 'blue': 0.8},      # Light red
@@ -1000,6 +1005,129 @@ result = df[df['Город'] == 'Москва']
             logger.error(f"[SimpleGPT] Error cleaning data: {e}")
             return None
 
+    def _detect_validation_action(self, query: str, column_names: List[str], df: pd.DataFrame) -> Optional[Dict[str, Any]]:
+        """
+        Определяет, является ли запрос командой валидации данных (выпадающий список).
+        Примеры:
+        - "создай выпадающий список в колонке Статус"
+        - "добавь валидацию: только Да/Нет"
+        - "ограничь значения в колонке Категория"
+        """
+        query_lower = query.lower()
+
+        # Check for validation keywords
+        is_validation = any(kw in query_lower for kw in self.VALIDATION_KEYWORDS)
+        if not is_validation:
+            return None
+
+        logger.info(f"[SimpleGPT] Validation action detected: {query}")
+
+        # Find target column
+        target_column = None
+        target_column_index = None
+
+        for idx, col_name in enumerate(column_names):
+            col_lower = col_name.lower()
+            if col_lower in query_lower or col_name in query:
+                target_column = col_name
+                target_column_index = idx
+                break
+            # Partial match
+            for word in col_lower.split():
+                if len(word) > 2 and word in query_lower:
+                    target_column = col_name
+                    target_column_index = idx
+                    break
+            if target_column:
+                break
+
+        # Extract allowed values from query
+        allowed_values = []
+
+        # Pattern 1: "только X/Y/Z" or "только X, Y, Z"
+        import re
+        only_match = re.search(r'только\s+([^.!?]+)', query_lower)
+        if only_match:
+            values_str = only_match.group(1)
+            # Split by / or , or "или"
+            values = re.split(r'[/,]|\sили\s|\sor\s', values_str)
+            allowed_values = [v.strip() for v in values if v.strip()]
+
+        # Pattern 2: "значения: X, Y, Z" or "варианты: X, Y, Z"
+        values_match = re.search(r'(?:значения|варианты|options|values)[:\s]+([^.!?]+)', query_lower)
+        if values_match and not allowed_values:
+            values_str = values_match.group(1)
+            values = re.split(r'[/,]|\sили\s|\sor\s', values_str)
+            allowed_values = [v.strip() for v in values if v.strip()]
+
+        # Pattern 3: "Да/Нет" style in query
+        if not allowed_values:
+            # Look for slash-separated values
+            slash_match = re.search(r'([а-яёa-z0-9]+(?:/[а-яёa-z0-9]+)+)', query_lower)
+            if slash_match:
+                allowed_values = slash_match.group(1).split('/')
+
+        # If still no values and we have a target column, extract unique values from data
+        if not allowed_values and target_column and target_column_index is not None:
+            try:
+                unique_values = df.iloc[:, target_column_index].dropna().unique()
+                # Only use if reasonable number of unique values (< 20)
+                if len(unique_values) <= 20:
+                    allowed_values = [str(v) for v in unique_values]
+                    logger.info(f"[SimpleGPT] Auto-extracted {len(allowed_values)} unique values from column")
+            except Exception as e:
+                logger.warning(f"[SimpleGPT] Could not extract unique values: {e}")
+
+        if not target_column:
+            # Try to find first categorical column
+            for idx, col_name in enumerate(column_names):
+                if idx < len(df.columns):
+                    try:
+                        unique_count = df.iloc[:, idx].nunique()
+                        total_count = len(df)
+                        # Categorical if less than 50% unique values and <= 20 unique
+                        if unique_count <= 20 and unique_count < total_count * 0.5:
+                            target_column = col_name
+                            target_column_index = idx
+                            if not allowed_values:
+                                allowed_values = [str(v) for v in df.iloc[:, idx].dropna().unique()]
+                            break
+                    except:
+                        pass
+
+        if not target_column:
+            logger.warning(f"[SimpleGPT] No target column found for validation")
+            return None
+
+        if not allowed_values:
+            logger.warning(f"[SimpleGPT] No allowed values found for validation")
+            return None
+
+        # Capitalize first letter of each value for display
+        allowed_values = [v.strip().capitalize() if v.strip() else v for v in allowed_values]
+
+        # Build validation rule
+        rule = {
+            "column_index": target_column_index,
+            "column_name": target_column,
+            "validation_type": "ONE_OF_LIST",
+            "allowed_values": allowed_values,
+            "show_dropdown": True,
+            "strict": True  # Reject invalid input
+        }
+
+        values_preview = ", ".join(allowed_values[:5])
+        if len(allowed_values) > 5:
+            values_preview += f" (+{len(allowed_values) - 5})"
+
+        message = f"Валидация для '{target_column}': {values_preview}"
+
+        return {
+            "action_type": "data_validation",
+            "rule": rule,
+            "message": message
+        }
+
     async def process(
         self,
         query: str,
@@ -1129,6 +1257,21 @@ result = df[df['Город'] == 'Москва']
                     "cleaned_data": clean_action["cleaned_data"],
                     "changes": clean_action["changes"],
                     "summary": clean_action["message"],
+                    "processing_time": f"{elapsed:.2f}s",
+                    "processor": "SimpleGPT v1.0 (direct action)"
+                }
+
+            # Check for data validation action
+            validation_action = self._detect_validation_action(query, column_names, df)
+            if validation_action:
+                elapsed = time.time() - start_time
+                logger.info(f"[SimpleGPT] Returning data validation action: {validation_action}")
+                return {
+                    "success": True,
+                    "action_type": "data_validation",
+                    "result_type": "action",
+                    "rule": validation_action["rule"],
+                    "summary": validation_action["message"],
                     "processing_time": f"{elapsed:.2f}s",
                     "processor": "SimpleGPT v1.0 (direct action)"
                 }

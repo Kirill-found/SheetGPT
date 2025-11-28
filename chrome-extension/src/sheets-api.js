@@ -880,6 +880,68 @@ async function applyConditionalFormat(spreadsheetId, sheetId, rule) {
   }
 }
 
+/**
+ * Set data validation (dropdown list) for a column
+ */
+async function setDataValidation(spreadsheetId, sheetId, rule) {
+  try {
+    const token = await getAuthToken();
+
+    const { column_index, allowed_values, show_dropdown, strict } = rule;
+
+    console.log(`[SheetsAPI] Setting data validation for column ${column_index}, values: ${allowed_values.join(', ')}`);
+
+    // Build the data validation request
+    const request = {
+      setDataValidation: {
+        range: {
+          sheetId: sheetId,
+          startRowIndex: 1, // Skip header row
+          startColumnIndex: column_index,
+          endColumnIndex: column_index + 1
+        },
+        rule: {
+          condition: {
+            type: 'ONE_OF_LIST',
+            values: allowed_values.map(value => ({ userEnteredValue: value }))
+          },
+          showCustomUi: show_dropdown !== false, // Show dropdown by default
+          strict: strict !== false // Reject invalid input by default
+        }
+      }
+    };
+
+    console.log('[SheetsAPI] Data validation request:', JSON.stringify(request, null, 2));
+
+    const response = await fetch(
+      `${SHEETS_API_BASE}/${spreadsheetId}:batchUpdate`,
+      {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          requests: [request]
+        })
+      }
+    );
+
+    if (!response.ok) {
+      const error = await response.json();
+      console.error('[SheetsAPI] Data validation error:', error);
+      throw new Error(`Sheets API error: ${error.error?.message || response.statusText}`);
+    }
+
+    const result = await response.json();
+    console.log('[SheetsAPI] ✅ Data validation set:', result);
+    return result;
+  } catch (error) {
+    console.error('[SheetsAPI] Error setting data validation:', error);
+    throw error;
+  }
+}
+
 // Export functions
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = {
@@ -896,6 +958,7 @@ if (typeof module !== 'undefined' && module.exports) {
     formatRow,
     createChart,
     getSheetIdByName,
-    applyConditionalFormat
+    applyConditionalFormat,
+    setDataValidation
   };
 }
