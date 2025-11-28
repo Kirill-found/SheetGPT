@@ -213,8 +213,8 @@ async function checkAuthentication() {
             email: data.email || state.user?.email || ''
           };
           // Update usage limit based on subscription
-          const isPremium = ['premium', 'pro'].includes(data.subscription_tier) ||
-                            ['premium', 'pro'].includes(data.plan);
+          const isPremium = ['premium', 'pro', 'unlimited'].includes(data.subscription_tier) ||
+                            ['premium', 'pro', 'unlimited'].includes(data.plan);
           state.usageLimit = isPremium ? CONFIG.PRO_DAILY_LIMIT : CONFIG.FREE_DAILY_LIMIT;
           saveState();
           showMainApp();
@@ -285,10 +285,10 @@ async function handleLogin() {
           plan: data.subscription_tier || data.plan || data.subscription_type || 'free',
           email: data.email || ''
         };
-        // Check for premium/pro subscription
-        const isPremium = ['premium', 'pro'].includes(data.subscription_tier) ||
-                          ['premium', 'pro'].includes(data.plan) ||
-                          ['premium', 'pro'].includes(data.subscription_type);
+        // Check for premium/pro/unlimited subscription
+        const isPremium = ['premium', 'pro', 'unlimited'].includes(data.subscription_tier) ||
+                          ['premium', 'pro', 'unlimited'].includes(data.plan) ||
+                          ['premium', 'pro', 'unlimited'].includes(data.subscription_type);
         state.usageLimit = isPremium ? CONFIG.PRO_DAILY_LIMIT : CONFIG.FREE_DAILY_LIMIT;
 
         saveState();
@@ -352,11 +352,11 @@ function formatLicenseKey(e) {
 // ============================================
 function updateUserUI() {
   if (!state.user) return;
-  
+
   const name = state.user.name || 'Пользователь';
   const initial = name.charAt(0).toUpperCase();
-  const plan = state.user.plan || 'free';
-  const isPro = plan === 'pro';
+  const plan = (state.user.plan || 'free').toLowerCase();
+  const isPro = ['pro', 'premium', 'unlimited'].includes(plan);
   
   // Main UI
   elements.userAvatar.textContent = initial;
@@ -523,7 +523,9 @@ async function sendMessage() {
   if (!query || state.isLoading) return;
   
   // Check usage limit for free users
-  if (state.user.plan !== 'pro' && state.usageCount >= state.usageLimit) {
+  const userPlan = (state.user.plan || 'free').toLowerCase();
+  const isPremiumUser = ['pro', 'premium', 'unlimited'].includes(userPlan);
+  if (!isPremiumUser && state.usageCount >= state.usageLimit) {
     addAIMessage({
       type: 'error',
       text: 'Вы исчерпали лимит запросов на сегодня. Обновите план до PRO для безлимитного доступа.'
@@ -616,14 +618,12 @@ function addAIMessage(response) {
         </svg>
         Анализ
       </div>
-      ${response.title ? `<div class="section-title">${escapeHtml(response.title)}</div>` : ''}
       ${response.items ? `
         <ul class="list-items">
           ${response.items.map(item => `<li>${escapeHtml(item)}</li>`).join('')}
         </ul>
       ` : ''}
       ${response.text ? `<p>${escapeHtml(response.text)}</p>` : ''}
-      ${response.summary ? `<div class="content-box info">${escapeHtml(response.summary)}</div>` : ''}
     `;
   } else if (response.type === 'table') {
     content = `
@@ -797,6 +797,11 @@ async function callAPI(query, sheetData) {
 
 // Transform API response to UI format
 function transformAPIResponse(apiResponse) {
+  // Store structured_data globally for table insertion
+  if (apiResponse.structured_data) {
+    window.lastStructuredData = apiResponse.structured_data;
+  }
+
   // If response has formula
   if (apiResponse.formula) {
     return {
@@ -808,9 +813,11 @@ function transformAPIResponse(apiResponse) {
 
   // If response has highlight_rows
   if (apiResponse.highlight_rows && apiResponse.highlight_rows.length > 0) {
+    // Trigger highlight action
+    highlightRowsInSheet(apiResponse.highlight_rows);
     return {
       type: 'highlight',
-      text: `Найдено ${apiResponse.highlighted_count || apiResponse.highlight_rows.length} строк`,
+      text: `Выделено ${apiResponse.highlighted_count || apiResponse.highlight_rows.length} строк`,
       rows: apiResponse.highlight_rows
     };
   }
@@ -819,16 +826,15 @@ function transformAPIResponse(apiResponse) {
   if (apiResponse.structured_data) {
     return {
       type: 'table',
-      text: apiResponse.summary || 'Данные обработаны',
+      text: `Найдено ${apiResponse.structured_data.rows?.length || 0} записей`,
       data: apiResponse.structured_data
     };
   }
 
-  // Default analysis response
+  // Default analysis response - don't show response_type as title
   return {
     type: 'analysis',
-    title: apiResponse.response_type || 'Результат',
-    text: apiResponse.summary || apiResponse.explanation || apiResponse.message || 'Запрос обработан'
+    text: apiResponse.summary || apiResponse.explanation || apiResponse.value || apiResponse.message || 'Запрос обработан'
   };
 }
 
@@ -891,17 +897,68 @@ function getErrorMessage(error) {
 // ============================================
 // ACTIONS
 // ============================================
-window.insertFormula = function(formula) {
-  window.parent.postMessage({
-    type: 'INSERT_FORMULA',
-    formula: formula
-  }, '*');
+
+// Highlight rows in the sheet
+async function highlightRowsInSheet(rows) {
+  if (!rows || rows.length === 0) return;
+
+  try {
+    await sendToContentScript('HIGHLIGHT_ROWS', { rows: rows });
+    console.log('[Sidebar] Rows highlighted:', rows);
+  } catch (error) {
+    console.error('[Sidebar] Error highlighting rows:', error);
+  }
+}
+
+window.insertFormula = async function(formula) {
+  try {
+    await sendToContentScript('INSERT_FORMULA', { formula: formula });
+    console.log('[Sidebar] Formula inserted:', formula);
+  } catch (error) {
+    console.error('[Sidebar] Error inserting formula:', error);
+    // Fallback to old method
+    window.parent.postMessage({
+      type: 'INSERT_FORMULA',
+      formula: formula
+    }, '*');
+  }
 };
 
-window.insertTable = function() {
-  window.parent.postMessage({
-    type: 'INSERT_TABLE'
-  }, '*');
+window.insertTable = async function() {
+  const structuredData = window.lastStructuredData;
+  if (!structuredData) {
+    addAIMessage({
+      type: 'error',
+      text: 'Нет данных для вставки. Сначала запросите создание таблицы.'
+    });
+    return;
+  }
+
+  try {
+    // Note: content script expects camelCase 'structuredData'
+    const result = await sendToContentScript('CREATE_TABLE_AND_CHART', {
+      structuredData: structuredData
+    });
+    console.log('[Sidebar] Table inserted:', result);
+
+    if (result.success) {
+      addAIMessage({
+        type: 'analysis',
+        text: result.message || `Таблица создана`
+      });
+    } else {
+      addAIMessage({
+        type: 'error',
+        text: result.message || 'Не удалось создать таблицу'
+      });
+    }
+  } catch (error) {
+    console.error('[Sidebar] Error inserting table:', error);
+    addAIMessage({
+      type: 'error',
+      text: 'Ошибка при создании таблицы: ' + error.message
+    });
+  }
 };
 
 window.copyToClipboard = async function(text) {
