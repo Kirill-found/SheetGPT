@@ -31,6 +31,13 @@ class FormulaResponse(BaseModel):
     parameters: Optional[dict] = Field(None, description="Параметры вызванной функции")
     # v6.2.9: Chart creation field
     chart_spec: Optional[dict] = Field(None, description="Спецификация диаграммы для создания")
+    # Freeze rows/columns fields
+    freeze_rows: Optional[int] = Field(None, description="Количество строк для закрепления")
+    freeze_columns: Optional[int] = Field(None, description="Количество колонок для закрепления")
+    # Sort fields
+    sort_column: Optional[str] = Field(None, description="Название колонки для сортировки")
+    sort_column_index: Optional[int] = Field(None, description="Индекс колонки для сортировки")
+    sort_order: Optional[str] = Field(None, description="Порядок сортировки: asc | desc")
 
     class Config:
         json_schema_extra = {
