@@ -411,25 +411,30 @@ function toggleHistoryDropdown() {
 }
 
 function renderHistory() {
-  if (state.chatHistory.length === 0) {
+  // Filter out invalid history items
+  const validHistory = state.chatHistory.filter(item => item && item.query);
+
+  if (validHistory.length === 0) {
     elements.historyList.innerHTML = '<li class="dropdown-empty">История пуста</li>';
     return;
   }
-  
-  elements.historyList.innerHTML = state.chatHistory.slice(0, 10).map((item, index) => `
-    <li class="dropdown-item" data-index="${index}">
-      <div class="dropdown-item-title">${escapeHtml(item.query.substring(0, 40))}${item.query.length > 40 ? '...' : ''}</div>
-      <div class="dropdown-item-meta">${formatTime(item.timestamp)}</div>
-    </li>
-  `).join('');
-  
+
+  elements.historyList.innerHTML = validHistory.slice(0, 10).map((item, index) => {
+    const queryText = item.query || '';
+    return `
+      <li class="dropdown-item" data-index="${index}" data-query="${escapeHtml(queryText)}">
+        <div class="dropdown-item-title">${escapeHtml(queryText.substring(0, 40))}${queryText.length > 40 ? '...' : ''}</div>
+        <div class="dropdown-item-meta">${formatTime(item.timestamp)}</div>
+      </li>
+    `;
+  }).join('');
+
   // Add click handlers
   elements.historyList.querySelectorAll('.dropdown-item').forEach(item => {
     item.addEventListener('click', () => {
-      const index = parseInt(item.dataset.index);
-      const historyItem = state.chatHistory[index];
-      if (historyItem) {
-        elements.messageInput.value = historyItem.query;
+      const query = item.dataset.query;
+      if (query) {
+        elements.messageInput.value = query;
         handleInputChange();
         elements.historyDropdown.classList.remove('show');
       }
