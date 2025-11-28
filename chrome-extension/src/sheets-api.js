@@ -663,10 +663,14 @@ async function createChart(spreadsheetId, sheetId, chartSpec) {
           domains: [domain],
           series: series,
           headerCount: 1,
-          interpolateNulls: true,
           stackedType: 'NOT_STACKED'
         }
       };
+
+      // interpolateNulls only supported for LINE, AREA, SCATTER
+      if (['LINE', 'AREA', 'SCATTER'].includes(googleChartType)) {
+        spec.basicChart.interpolateNulls = true;
+      }
 
       // For scatter, add specific settings
       if (googleChartType === 'SCATTER') {
