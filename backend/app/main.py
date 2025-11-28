@@ -299,6 +299,22 @@ async def process_formula(
         if "sort_order" in result:
             response_dict["sort_order"] = result["sort_order"]
 
+        # Add freeze data
+        if "freeze_rows" in result:
+            response_dict["freeze_rows"] = result["freeze_rows"]
+        if "freeze_columns" in result:
+            response_dict["freeze_columns"] = result["freeze_columns"]
+
+        # Add format data
+        if "format_type" in result:
+            response_dict["format_type"] = result["format_type"]
+        if "target_row" in result:
+            response_dict["target_row"] = result["target_row"]
+        if "bold" in result:
+            response_dict["bold"] = result["bold"]
+        if "background_color" in result:
+            response_dict["background_color"] = result["background_color"]
+
         # v9.0.0: Add hybrid processor metadata
         response_dict["processor_version"] = result.get("processor_version", "9.0.0")
         response_dict["complexity"] = result.get("complexity")

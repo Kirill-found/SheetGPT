@@ -512,6 +512,14 @@ window.addEventListener('message', async (event) => {
         result = await sortRangeInSheet(data.columnIndex, data.sortOrder);
         break;
 
+      case 'FREEZE_ROWS':
+        result = await freezeRowsInSheet(data.freezeRows, data.freezeColumns);
+        break;
+
+      case 'FORMAT_ROW':
+        result = await formatRowInSheet(data.rowIndex, data.bold, data.backgroundColor);
+        break;
+
       default:
         throw new Error(`Unknown action: ${action}`);
     }
@@ -828,6 +836,78 @@ async function sortRangeInSheet(columnIndex, sortOrder) {
     return {
       success: false,
       message: `Ошибка сортировки: ${error.message}`
+    };
+  }
+}
+
+async function freezeRowsInSheet(freezeRows, freezeColumns) {
+  console.log('[SheetGPT] Freeze rows:', freezeRows, 'columns:', freezeColumns);
+
+  try {
+    const response = await safeSendMessage({
+      action: 'FREEZE_ROWS',
+      data: {
+        freezeRows: freezeRows || 0,
+        freezeColumns: freezeColumns || 0
+      }
+    });
+
+    if (!response.success) {
+      throw new Error(response.error);
+    }
+
+    console.log('[SheetGPT] ✅ Rows/columns frozen via API:', response.result);
+
+    let message = '';
+    if (freezeRows === 0 && freezeColumns === 0) {
+      message = 'Закрепление снято';
+    } else {
+      const parts = [];
+      if (freezeRows > 0) parts.push(`${freezeRows} строк`);
+      if (freezeColumns > 0) parts.push(`${freezeColumns} столбцов`);
+      message = `Закреплено: ${parts.join(' и ')}`;
+    }
+
+    return {
+      success: true,
+      message: message
+    };
+  } catch (error) {
+    console.error('[SheetGPT] Error freezing rows:', error);
+    return {
+      success: false,
+      message: `Ошибка закрепления: ${error.message}`
+    };
+  }
+}
+
+async function formatRowInSheet(rowIndex, bold, backgroundColor) {
+  console.log('[SheetGPT] Format row:', rowIndex, 'bold:', bold, 'bg:', backgroundColor);
+
+  try {
+    const response = await safeSendMessage({
+      action: 'FORMAT_ROW',
+      data: {
+        rowIndex: rowIndex || 0,
+        bold: bold,
+        backgroundColor: backgroundColor
+      }
+    });
+
+    if (!response.success) {
+      throw new Error(response.error);
+    }
+
+    console.log('[SheetGPT] ✅ Row formatted via API:', response.result);
+    return {
+      success: true,
+      message: 'Заголовки отформатированы'
+    };
+  } catch (error) {
+    console.error('[SheetGPT] Error formatting row:', error);
+    return {
+      success: false,
+      message: `Ошибка форматирования: ${error.message}`
     };
   }
 }

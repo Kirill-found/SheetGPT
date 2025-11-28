@@ -447,6 +447,132 @@ async function sortRange(spreadsheetId, sheetId, columnIndex, sortOrder = "ASCEN
 }
 
 /**
+ * Freeze rows and/or columns
+ * @param {string} spreadsheetId - The spreadsheet ID
+ * @param {number} sheetId - The sheet ID
+ * @param {number} frozenRowCount - Number of rows to freeze (0 to unfreeze)
+ * @param {number} frozenColumnCount - Number of columns to freeze (0 to unfreeze)
+ */
+async function freezeRowsColumns(spreadsheetId, sheetId, frozenRowCount = 1, frozenColumnCount = 0) {
+  try {
+    const token = await getAuthToken();
+
+    console.log(`[SheetsAPI] Freezing ${frozenRowCount} rows and ${frozenColumnCount} columns on sheet ${sheetId}`);
+
+    const response = await fetch(
+      `${SHEETS_API_BASE}/${spreadsheetId}:batchUpdate`,
+      {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          requests: [{
+            updateSheetProperties: {
+              properties: {
+                sheetId: sheetId,
+                gridProperties: {
+                  frozenRowCount: frozenRowCount,
+                  frozenColumnCount: frozenColumnCount
+                }
+              },
+              fields: 'gridProperties.frozenRowCount,gridProperties.frozenColumnCount'
+            }
+          }]
+        })
+      }
+    );
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(`Sheets API error: ${error.error?.message || response.statusText}`);
+    }
+
+    const result = await response.json();
+    console.log('[SheetsAPI] ✅ Rows/columns frozen:', result);
+    return result;
+  } catch (error) {
+    console.error('[SheetsAPI] Error freezing rows/columns:', error);
+    throw error;
+  }
+}
+
+/**
+ * Format cells (bold, background color)
+ * @param {string} spreadsheetId - The spreadsheet ID
+ * @param {number} sheetId - The sheet ID
+ * @param {number} rowIndex - 0-based row index to format
+ * @param {boolean} bold - Make text bold
+ * @param {string} backgroundColor - Hex color (e.g., "#FFFF00")
+ */
+async function formatRow(spreadsheetId, sheetId, rowIndex = 0, bold = true, backgroundColor = null) {
+  try {
+    const token = await getAuthToken();
+
+    console.log(`[SheetsAPI] Formatting row ${rowIndex} on sheet ${sheetId}, bold=${bold}, bg=${backgroundColor}`);
+
+    // Build cell format
+    const cellFormat = {};
+    const fields = [];
+
+    if (bold) {
+      cellFormat.textFormat = { bold: true };
+      fields.push('userEnteredFormat.textFormat.bold');
+    }
+
+    if (backgroundColor) {
+      // Convert hex to RGB (0-1 scale)
+      const hex = backgroundColor.replace('#', '');
+      const r = parseInt(hex.substring(0, 2), 16) / 255;
+      const g = parseInt(hex.substring(2, 4), 16) / 255;
+      const b = parseInt(hex.substring(4, 6), 16) / 255;
+
+      cellFormat.backgroundColor = { red: r, green: g, blue: b };
+      fields.push('userEnteredFormat.backgroundColor');
+    }
+
+    const response = await fetch(
+      `${SHEETS_API_BASE}/${spreadsheetId}:batchUpdate`,
+      {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          requests: [{
+            repeatCell: {
+              range: {
+                sheetId: sheetId,
+                startRowIndex: rowIndex,
+                endRowIndex: rowIndex + 1
+              },
+              cell: {
+                userEnteredFormat: cellFormat
+              },
+              fields: fields.join(',')
+            }
+          }]
+        })
+      }
+    );
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(`Sheets API error: ${error.error?.message || response.statusText}`);
+    }
+
+    const result = await response.json();
+    console.log('[SheetsAPI] ✅ Row formatted:', result);
+    return result;
+  } catch (error) {
+    console.error('[SheetsAPI] Error formatting row:', error);
+    throw error;
+  }
+}
+
+/**
  * Get sheet ID by name
  */
 async function getSheetIdByName(spreadsheetId, sheetName) {
@@ -494,6 +620,8 @@ if (typeof module !== 'undefined' && module.exports) {
     createNewSheet,
     highlightRows,
     sortRange,
+    freezeRowsColumns,
+    formatRow,
     getSheetIdByName
   };
 }

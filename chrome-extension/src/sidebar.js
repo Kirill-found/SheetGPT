@@ -858,6 +858,28 @@ function transformAPIResponse(apiResponse) {
     };
   }
 
+  // If response is a freeze action
+  if (apiResponse.action_type === 'freeze') {
+    // Trigger freeze action
+    freezeRowsInSheet(apiResponse.freeze_rows || 0, apiResponse.freeze_columns || 0);
+    return {
+      type: 'action',
+      text: apiResponse.summary || 'Строки/столбцы закреплены',
+      actionType: 'freeze'
+    };
+  }
+
+  // If response is a format action
+  if (apiResponse.action_type === 'format') {
+    // Trigger format action
+    formatRowInSheet(apiResponse.target_row - 1 || 0, apiResponse.bold, apiResponse.background_color);
+    return {
+      type: 'action',
+      text: apiResponse.summary || 'Форматирование применено',
+      actionType: 'format'
+    };
+  }
+
   // If response has highlight_rows
   if (apiResponse.highlight_rows && apiResponse.highlight_rows.length > 0) {
     // Trigger highlight action
@@ -974,6 +996,31 @@ async function sortRangeInSheet(columnIndex, sortOrder) {
     console.log(`[Sidebar] Range sorted by column ${columnIndex}, order ${sortOrder}`);
   } catch (error) {
     console.error('[Sidebar] Error sorting range:', error);
+  }
+}
+
+async function freezeRowsInSheet(freezeRows, freezeColumns) {
+  try {
+    await sendToContentScript('FREEZE_ROWS', {
+      freezeRows: freezeRows || 0,
+      freezeColumns: freezeColumns || 0
+    });
+    console.log(`[Sidebar] Frozen: ${freezeRows} rows, ${freezeColumns} columns`);
+  } catch (error) {
+    console.error('[Sidebar] Error freezing rows:', error);
+  }
+}
+
+async function formatRowInSheet(rowIndex, bold, backgroundColor) {
+  try {
+    await sendToContentScript('FORMAT_ROW', {
+      rowIndex: rowIndex || 0,
+      bold: bold,
+      backgroundColor: backgroundColor
+    });
+    console.log(`[Sidebar] Row ${rowIndex} formatted`);
+  } catch (error) {
+    console.error('[Sidebar] Error formatting row:', error);
   }
 }
 

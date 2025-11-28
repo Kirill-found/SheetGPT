@@ -132,6 +132,15 @@ result = df[df['Город'] == 'Москва']
     SORT_DESC_KEYWORDS = ['убыван', 'desc', 'z-a', 'я-а', 'больш к меньш', 'от большего', 'по убыванию']
     SORT_ASC_KEYWORDS = ['возраст', 'asc', 'a-z', 'а-я', 'меньш к больш', 'от меньшего', 'по возрастанию']
 
+    # Freeze keywords
+    FREEZE_KEYWORDS = ['заморозь', 'заморозить', 'закрепи', 'закрепить', 'freeze', 'pin']
+    UNFREEZE_KEYWORDS = ['разморозь', 'разморозить', 'открепи', 'открепить', 'unfreeze', 'unpin']
+
+    # Format keywords
+    FORMAT_BOLD_KEYWORDS = ['жирн', 'bold', 'выдели жирным']
+    FORMAT_HEADER_KEYWORDS = ['заголов', 'header', 'шапк', 'первую строку']
+    FORMAT_COLOR_KEYWORDS = ['цвет', 'color', 'покрась', 'закрась']
+
     def __init__(self):
         api_key = os.getenv("OPENAI_API_KEY")
         if not api_key:
@@ -210,6 +219,114 @@ result = df[df['Город'] == 'Москва']
             "message": f"Сортировка по колонке '{sort_column}' ({('по убыванию' if sort_order == 'DESCENDING' else 'по возрастанию')})"
         }
 
+    def _detect_freeze_action(self, query: str) -> Optional[Dict[str, Any]]:
+        """
+        Определяет, является ли запрос командой заморозки строк/столбцов.
+        """
+        query_lower = query.lower()
+
+        # Check for unfreeze first
+        is_unfreeze = any(kw in query_lower for kw in self.UNFREEZE_KEYWORDS)
+        if is_unfreeze:
+            logger.info(f"[SimpleGPT] Unfreeze action detected: {query}")
+            return {
+                "action_type": "freeze",
+                "freeze_rows": 0,
+                "freeze_columns": 0,
+                "message": "Закрепление снято"
+            }
+
+        # Check for freeze
+        is_freeze = any(kw in query_lower for kw in self.FREEZE_KEYWORDS)
+        if not is_freeze:
+            return None
+
+        logger.info(f"[SimpleGPT] Freeze action detected: {query}")
+
+        # Determine what to freeze
+        freeze_rows = 0
+        freeze_columns = 0
+
+        # Check for row freeze
+        if any(word in query_lower for word in ['строк', 'строку', 'row', 'первую', 'шапку', 'заголов']):
+            # Try to find number
+            import re
+            numbers = re.findall(r'(\d+)\s*(?:строк|строку|row)', query_lower)
+            if numbers:
+                freeze_rows = int(numbers[0])
+            else:
+                freeze_rows = 1  # Default to 1 row (header)
+
+        # Check for column freeze
+        if any(word in query_lower for word in ['столб', 'колонк', 'column', 'первый столб', 'первую колонк']):
+            import re
+            numbers = re.findall(r'(\d+)\s*(?:столб|колонк|column)', query_lower)
+            if numbers:
+                freeze_columns = int(numbers[0])
+            else:
+                freeze_columns = 1  # Default to 1 column
+
+        # If nothing specific mentioned, freeze first row
+        if freeze_rows == 0 and freeze_columns == 0:
+            freeze_rows = 1
+
+        message_parts = []
+        if freeze_rows > 0:
+            message_parts.append(f"{freeze_rows} строк" if freeze_rows > 1 else "первая строка")
+        if freeze_columns > 0:
+            message_parts.append(f"{freeze_columns} столбцов" if freeze_columns > 1 else "первый столбец")
+
+        return {
+            "action_type": "freeze",
+            "freeze_rows": freeze_rows,
+            "freeze_columns": freeze_columns,
+            "message": f"Закреплено: {', '.join(message_parts)}"
+        }
+
+    def _detect_format_action(self, query: str) -> Optional[Dict[str, Any]]:
+        """
+        Определяет, является ли запрос командой форматирования.
+        """
+        query_lower = query.lower()
+
+        # Check for bold formatting
+        is_bold = any(kw in query_lower for kw in self.FORMAT_BOLD_KEYWORDS)
+        is_header = any(kw in query_lower for kw in self.FORMAT_HEADER_KEYWORDS)
+
+        if not (is_bold or is_header):
+            return None
+
+        logger.info(f"[SimpleGPT] Format action detected: {query}")
+
+        # Determine format type
+        format_type = "bold_header" if (is_bold and is_header) or is_header else "bold"
+
+        # Check for color
+        color = None
+        if any(kw in query_lower for kw in self.FORMAT_COLOR_KEYWORDS):
+            # Try to detect color
+            color_map = {
+                'красн': '#FF0000', 'red': '#FF0000',
+                'синий': '#0000FF', 'blue': '#0000FF',
+                'зелен': '#00FF00', 'green': '#00FF00',
+                'желт': '#FFFF00', 'yellow': '#FFFF00',
+                'оранж': '#FFA500', 'orange': '#FFA500',
+                'серый': '#808080', 'сер': '#808080', 'gray': '#808080', 'grey': '#808080',
+            }
+            for color_word, color_code in color_map.items():
+                if color_word in query_lower:
+                    color = color_code
+                    break
+
+        return {
+            "action_type": "format",
+            "format_type": format_type,
+            "target_row": 1,  # First row (header)
+            "bold": is_bold or is_header,
+            "background_color": color,
+            "message": f"Заголовки отформатированы" + (f" (цвет: {color})" if color else "")
+        }
+
     async def process(
         self,
         query: str,
@@ -236,6 +353,40 @@ result = df[df['Город'] == 'Москва']
                     "sort_column_index": sort_action["column_index"],
                     "sort_order": sort_action["sort_order"],
                     "summary": sort_action["message"],
+                    "processing_time": f"{elapsed:.2f}s",
+                    "processor": "SimpleGPT v1.0 (direct action)"
+                }
+
+            # Check for freeze action
+            freeze_action = self._detect_freeze_action(query)
+            if freeze_action:
+                elapsed = time.time() - start_time
+                logger.info(f"[SimpleGPT] Returning freeze action: {freeze_action}")
+                return {
+                    "success": True,
+                    "action_type": "freeze",
+                    "result_type": "action",
+                    "freeze_rows": freeze_action["freeze_rows"],
+                    "freeze_columns": freeze_action["freeze_columns"],
+                    "summary": freeze_action["message"],
+                    "processing_time": f"{elapsed:.2f}s",
+                    "processor": "SimpleGPT v1.0 (direct action)"
+                }
+
+            # Check for format action
+            format_action = self._detect_format_action(query)
+            if format_action:
+                elapsed = time.time() - start_time
+                logger.info(f"[SimpleGPT] Returning format action: {format_action}")
+                return {
+                    "success": True,
+                    "action_type": "format",
+                    "result_type": "action",
+                    "format_type": format_action["format_type"],
+                    "target_row": format_action["target_row"],
+                    "bold": format_action["bold"],
+                    "background_color": format_action["background_color"],
+                    "summary": format_action["message"],
                     "processing_time": f"{elapsed:.2f}s",
                     "processor": "SimpleGPT v1.0 (direct action)"
                 }

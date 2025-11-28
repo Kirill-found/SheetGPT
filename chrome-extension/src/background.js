@@ -50,6 +50,14 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           result = await handleSortRange(sender.tab.id, sender.tab.url, data);
           break;
 
+        case 'FREEZE_ROWS':
+          result = await handleFreezeRows(sender.tab.id, sender.tab.url, data);
+          break;
+
+        case 'FORMAT_ROW':
+          result = await handleFormatRow(sender.tab.id, sender.tab.url, data);
+          break;
+
         case 'CHECK_AUTH':
           result = await checkAuth();
           break;
@@ -262,6 +270,66 @@ async function handleSortRange(tabId, tabUrl, data) {
   const result = await sortRange(spreadsheetId, sheetId, columnIndex, sortOrder, 1, -1);
 
   console.log('[Background] ✅ Range sorted:', result);
+  return result;
+}
+
+/**
+ * Freeze rows/columns in Google Sheet
+ */
+async function handleFreezeRows(tabId, tabUrl, data) {
+  console.log('[Background] Freezing rows/columns:', data);
+
+  const spreadsheetId = getSpreadsheetIdFromUrl(tabUrl);
+  if (!spreadsheetId) {
+    throw new Error('Not a valid Google Sheets URL');
+  }
+
+  const { freezeRows, freezeColumns } = data;
+
+  // Get saved sheet name from storage
+  const storageKey = `sheetName_${spreadsheetId}`;
+  const storageData = await chrome.storage.local.get(storageKey);
+  const sheetName = storageData[storageKey] || 'Лист1';
+
+  console.log(`[Background] Using sheet name "${sheetName}" for freezing`);
+
+  // Get sheet ID
+  const sheetId = await getSheetIdByName(spreadsheetId, sheetName);
+
+  // Freeze rows/columns
+  const result = await freezeRowsColumns(spreadsheetId, sheetId, freezeRows || 0, freezeColumns || 0);
+
+  console.log('[Background] ✅ Rows/columns frozen:', result);
+  return result;
+}
+
+/**
+ * Format row in Google Sheet (bold, color)
+ */
+async function handleFormatRow(tabId, tabUrl, data) {
+  console.log('[Background] Formatting row:', data);
+
+  const spreadsheetId = getSpreadsheetIdFromUrl(tabUrl);
+  if (!spreadsheetId) {
+    throw new Error('Not a valid Google Sheets URL');
+  }
+
+  const { rowIndex, bold, backgroundColor } = data;
+
+  // Get saved sheet name from storage
+  const storageKey = `sheetName_${spreadsheetId}`;
+  const storageData = await chrome.storage.local.get(storageKey);
+  const sheetName = storageData[storageKey] || 'Лист1';
+
+  console.log(`[Background] Using sheet name "${sheetName}" for formatting`);
+
+  // Get sheet ID
+  const sheetId = await getSheetIdByName(spreadsheetId, sheetName);
+
+  // Format row
+  const result = await formatRow(spreadsheetId, sheetId, rowIndex || 0, bold, backgroundColor);
+
+  console.log('[Background] ✅ Row formatted:', result);
   return result;
 }
 
