@@ -77,7 +77,15 @@ const elements = {
   customContextInput: document.getElementById('customContextInput'),
   userNameInput: document.getElementById('userNameInput'),
   charCount: document.getElementById('charCount'),
-  logoutBtn: document.getElementById('logoutBtn')
+  logoutBtn: document.getElementById('logoutBtn'),
+
+  // Personalization Modal (Design System v1.2)
+  personalizeBtn: document.getElementById('personalizeBtn'),
+  personalizationModal: document.getElementById('personalizationModal'),
+  closePersonalizationBtn: document.getElementById('closePersonalizationBtn'),
+  cancelPersonalizationBtn: document.getElementById('cancelPersonalizationBtn'),
+  savePersonalizationBtn: document.getElementById('savePersonalizationBtn'),
+  personalizationContextInput: document.getElementById('personalizationContextInput')
 };
 
 // ============================================
@@ -189,6 +197,54 @@ function setupEventListeners() {
       }
     });
   });
+
+  // Personalization Modal (Design System v1.2)
+  if (elements.personalizeBtn) {
+    elements.personalizeBtn.addEventListener('click', openPersonalization);
+  }
+  if (elements.closePersonalizationBtn) {
+    elements.closePersonalizationBtn.addEventListener('click', closePersonalization);
+  }
+  if (elements.cancelPersonalizationBtn) {
+    elements.cancelPersonalizationBtn.addEventListener('click', closePersonalization);
+  }
+  if (elements.savePersonalizationBtn) {
+    elements.savePersonalizationBtn.addEventListener('click', savePersonalization);
+  }
+  if (elements.personalizationModal) {
+    elements.personalizationModal.addEventListener('click', (e) => {
+      if (e.target === elements.personalizationModal) closePersonalization();
+    });
+  }
+
+  // Role preset cards (Design System v1.2)
+  document.querySelectorAll('.preset-card').forEach(preset => {
+    preset.addEventListener('click', () => {
+      // Remove selected from all
+      document.querySelectorAll('.preset-card').forEach(p => p.classList.remove('selected'));
+      // Add selected to clicked
+      preset.classList.add('selected');
+      // Set context based on preset type
+      const presetType = preset.dataset.preset;
+      const context = getPresetContext(presetType);
+      if (context && elements.personalizationContextInput) {
+        elements.personalizationContextInput.value = context;
+      }
+    });
+  });
+}
+
+// Get context text for preset role
+function getPresetContext(presetType) {
+  const presets = {
+    analyst: 'Я аналитик данных. Мне важны KPI, метрики производительности, тренды и визуализация данных. Помогай с анализом данных, построением отчётов и выявлением закономерностей.',
+    accountant: 'Я бухгалтер. Работаю с финансовой отчётностью, расчётами налогов, сверками и учётом. Помогай с формулами для финансовых расчётов и проверки данных.',
+    marketer: 'Я маркетолог. Работаю с метриками ROI, конверсий, воронок продаж и эффективности рекламных кампаний. Помогай анализировать маркетинговые данные.',
+    sales: 'Я менеджер по продажам. Работаю с CRM-данными, сделками, планами продаж и клиентской базой. Помогай с анализом продаж и прогнозированием.',
+    hr: 'Я HR-специалист. Работаю с кадровыми данными, зарплатами, отпусками и учётом сотрудников. Помогай с расчётами и анализом HR-метрик.',
+    logistics: 'Я логист. Работаю с данными склада, доставки, маршрутов и запасов. Помогай с анализом логистических операций и оптимизацией.'
+  };
+  return presets[presetType] || '';
 }
 
 // ============================================
@@ -495,6 +551,38 @@ function saveSettings() {
 function updateCharCounter() {
   const count = elements.customContextInput.value.length;
   elements.charCount.textContent = count;
+}
+
+// ============================================
+// PERSONALIZATION (Design System v1.2)
+// ============================================
+function openPersonalization() {
+  if (elements.personalizationModal) {
+    elements.personalizationModal.classList.add('show');
+    // Set current context in textarea
+    if (elements.personalizationContextInput) {
+      elements.personalizationContextInput.value = state.customContext || '';
+    }
+  }
+}
+
+function closePersonalization() {
+  if (elements.personalizationModal) {
+    elements.personalizationModal.classList.remove('show');
+  }
+}
+
+function savePersonalization() {
+  if (elements.personalizationContextInput) {
+    state.customContext = elements.personalizationContextInput.value.trim();
+    // Also sync with settings modal
+    if (elements.customContextInput) {
+      elements.customContextInput.value = state.customContext;
+      updateCharCounter();
+    }
+    saveState();
+  }
+  closePersonalization();
 }
 
 // ============================================
