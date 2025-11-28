@@ -3,6 +3,7 @@
   "name": "SheetGPT AI Assistant",
   "version": "1.0.0",
   "description": "AI-powered assistant for Google Sheets - analyze data, create tables, generate insights",
+  "default_locale": "ru",
   "permissions": [
     "activeTab",
     "storage",
@@ -46,7 +47,7 @@
   },
   "web_accessible_resources": [
     {
-      "resources": ["src/sidebar.html", "src/sidebar.js", "src/response-templates.js", "src/settings-menu.js"],
+      "resources": ["src/sidebar.html", "src/sidebar.js"],
       "matches": ["https://docs.google.com/*"]
     }
   ]
