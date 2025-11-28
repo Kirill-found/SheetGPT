@@ -776,6 +776,28 @@ function addAIMessage(response) {
         <button class="action-btn" onclick="insertPivotTable()">Вставить таблицу</button>
       </div>
     `;
+  } else if (response.type === 'clean_data') {
+    const originalRows = response.originalRows || 0;
+    const finalRows = response.finalRows || 0;
+    const removedRows = originalRows - finalRows;
+    content = `
+      <div class="response-badge analysis">
+        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M3 6h18"/>
+          <path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6"/>
+          <path d="M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2"/>
+          <path d="M10 11v6"/>
+          <path d="M14 11v6"/>
+        </svg>
+        Очистка
+      </div>
+      <p>${escapeHtml(response.text || 'Данные очищены')}</p>
+      <p class="text-secondary">${originalRows} → ${finalRows} строк${removedRows > 0 ? ` (−${removedRows})` : ''}</p>
+      <div class="action-buttons">
+        <button class="action-btn" onclick="insertCleanedData()">Создать новый лист</button>
+        <button class="action-btn secondary" onclick="overwriteWithCleanedData()">Заменить данные</button>
+      </div>
+    `;
   } else {
     content = `<p>${escapeHtml(response.text || 'Готово')}</p>`;
   }
@@ -1057,6 +1079,22 @@ function transformAPIResponse(apiResponse) {
     };
   }
 
+  // If response is a clean data action
+  if (apiResponse.action_type === 'clean_data' && apiResponse.cleaned_data) {
+    console.log('[Sidebar] ✅ Clean data condition met!');
+    // Store cleaned data for insertion
+    window.lastCleanedData = apiResponse.cleaned_data;
+    return {
+      type: 'clean_data',
+      text: apiResponse.summary || 'Данные очищены',
+      cleanedData: apiResponse.cleaned_data,
+      originalRows: apiResponse.original_rows,
+      finalRows: apiResponse.final_rows,
+      operations: apiResponse.operations,
+      changes: apiResponse.changes
+    };
+  }
+
   // If response has highlight_rows
   if (apiResponse.highlight_rows && apiResponse.highlight_rows.length > 0) {
     // Trigger highlight action
@@ -1317,6 +1355,81 @@ window.insertPivotTable = async function() {
     addAIMessage({
       type: 'error',
       text: 'Ошибка при создании сводной таблицы: ' + error.message
+    });
+  }
+};
+
+window.insertCleanedData = async function() {
+  const cleanedData = window.lastCleanedData;
+  if (!cleanedData) {
+    addAIMessage({
+      type: 'error',
+      text: 'Нет данных для вставки. Сначала запросите очистку данных.'
+    });
+    return;
+  }
+
+  try {
+    // Create a new sheet with cleaned data
+    const result = await sendToContentScript('CREATE_TABLE_AND_CHART', {
+      structuredData: cleanedData,
+      sheetTitle: 'Очищенные данные'
+    });
+    console.log('[Sidebar] Cleaned data inserted:', result);
+
+    if (result.success) {
+      addAIMessage({
+        type: 'analysis',
+        text: result.message || 'Новый лист с очищенными данными создан'
+      });
+    } else {
+      addAIMessage({
+        type: 'error',
+        text: result.message || 'Не удалось создать лист с данными'
+      });
+    }
+  } catch (error) {
+    console.error('[Sidebar] Error inserting cleaned data:', error);
+    addAIMessage({
+      type: 'error',
+      text: 'Ошибка при создании листа: ' + error.message
+    });
+  }
+};
+
+window.overwriteWithCleanedData = async function() {
+  const cleanedData = window.lastCleanedData;
+  if (!cleanedData) {
+    addAIMessage({
+      type: 'error',
+      text: 'Нет данных для замены. Сначала запросите очистку данных.'
+    });
+    return;
+  }
+
+  try {
+    // Overwrite current sheet with cleaned data
+    const result = await sendToContentScript('OVERWRITE_SHEET_DATA', {
+      cleanedData: cleanedData
+    });
+    console.log('[Sidebar] Data overwritten:', result);
+
+    if (result.success) {
+      addAIMessage({
+        type: 'analysis',
+        text: result.message || 'Данные успешно заменены'
+      });
+    } else {
+      addAIMessage({
+        type: 'error',
+        text: result.message || 'Не удалось заменить данные'
+      });
+    }
+  } catch (error) {
+    console.error('[Sidebar] Error overwriting data:', error);
+    addAIMessage({
+      type: 'error',
+      text: 'Ошибка при замене данных: ' + error.message
     });
   }
 };

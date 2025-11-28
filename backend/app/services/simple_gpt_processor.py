@@ -180,6 +180,21 @@ result = df[df['Город'] == 'Москва']
         'мин': 'min', 'min': 'min', 'минимум': 'min'
     }
 
+    # Data cleaning keywords
+    CLEAN_KEYWORDS = ['очист', 'clean', 'удали дублик', 'remove duplicate', 'дубликат',
+                      'удали пуст', 'remove empty', 'пустые строк', 'empty row',
+                      'заполни пуст', 'fill empty', 'fill blank', 'fillna',
+                      'убери пробел', 'trim', 'strip', 'пробелы',
+                      'нормализ', 'normalize', 'стандартиз']
+
+    # Cleaning operation types
+    CLEAN_OPERATIONS = {
+        'duplicate': ['дублик', 'duplicate', 'повтор', 'одинаков'],
+        'empty_rows': ['пуст', 'empty', 'blank', 'nan', 'null'],
+        'trim': ['пробел', 'trim', 'strip', 'whitespace'],
+        'fill': ['заполн', 'fill', 'замен', 'replace'],
+    }
+
     # Color keywords for conditional formatting
     CONDITION_COLORS = {
         'красн': {'red': 1, 'green': 0.8, 'blue': 0.8},      # Light red
@@ -789,6 +804,202 @@ result = df[df['Город'] == 'Москва']
             logger.error(f"[SimpleGPT] Error creating pivot: {e}")
             return None
 
+    def _detect_clean_action(self, query: str, column_names: List[str], df: pd.DataFrame) -> Optional[Dict[str, Any]]:
+        """
+        Определяет, является ли запрос командой очистки данных.
+        Примеры:
+        - "удали дубликаты"
+        - "удали пустые строки"
+        - "заполни пустые ячейки нулями"
+        - "очисти данные"
+        """
+        query_lower = query.lower()
+
+        # Check for clean keywords
+        is_clean = any(kw in query_lower for kw in self.CLEAN_KEYWORDS)
+        if not is_clean:
+            return None
+
+        logger.info(f"[SimpleGPT] Clean action detected: {query}")
+
+        # Determine operation type
+        operations = []
+
+        # Check for duplicate removal
+        if any(kw in query_lower for kw in self.CLEAN_OPERATIONS['duplicate']):
+            operations.append('remove_duplicates')
+
+        # Check for empty row removal
+        if any(kw in query_lower for kw in self.CLEAN_OPERATIONS['empty_rows']):
+            # Distinguish between "удали пустые" vs "заполни пустые"
+            if any(w in query_lower for w in ['удали', 'убери', 'remove', 'delete']):
+                operations.append('remove_empty_rows')
+            elif any(w in query_lower for w in ['заполн', 'fill', 'замен']):
+                operations.append('fill_empty')
+
+        # Check for trimming whitespace
+        if any(kw in query_lower for kw in self.CLEAN_OPERATIONS['trim']):
+            operations.append('trim_whitespace')
+
+        # Check for fill operation (if not already detected)
+        if 'fill_empty' not in operations and any(kw in query_lower for kw in self.CLEAN_OPERATIONS['fill']):
+            operations.append('fill_empty')
+
+        # Default to all common operations if just "очисти данные"
+        if not operations and any(w in query_lower for w in ['очисти', 'clean']):
+            operations = ['remove_duplicates', 'remove_empty_rows', 'trim_whitespace']
+
+        if not operations:
+            return None
+
+        # Detect fill value if applicable
+        fill_value = None
+        if 'fill_empty' in operations:
+            # Check for specific fill values
+            import re
+
+            # "нулями" / "0" / "zeros"
+            if any(w in query_lower for w in ['нул', 'zero', '0']):
+                fill_value = 0
+            # "пустой строкой" / ""
+            elif any(w in query_lower for w in ['строк', 'string', 'текст']):
+                fill_value = ""
+            # "средним" / "mean" / "average"
+            elif any(w in query_lower for w in ['средн', 'mean', 'average', 'avg']):
+                fill_value = "mean"
+            # "медианой" / "median"
+            elif any(w in query_lower for w in ['медиан', 'median']):
+                fill_value = "median"
+            # "предыдущим" / "forward fill"
+            elif any(w in query_lower for w in ['предыдущ', 'forward', 'ffill', 'последн']):
+                fill_value = "ffill"
+            # Specific number
+            number_match = re.search(r'(\d+(?:[.,]\d+)?)', query_lower)
+            if number_match and fill_value is None:
+                fill_value = float(number_match.group(1).replace(',', '.'))
+
+            # Default to 0 if not specified
+            if fill_value is None:
+                fill_value = 0
+
+        # Find target column if specified
+        target_column = None
+        target_column_index = None
+
+        for idx, col_name in enumerate(column_names):
+            col_lower = col_name.lower()
+            if col_lower in query_lower or col_name in query:
+                target_column = col_name
+                target_column_index = idx
+                break
+            # Partial match
+            for word in col_lower.split():
+                if len(word) > 2 and word in query_lower:
+                    target_column = col_name
+                    target_column_index = idx
+                    break
+            if target_column:
+                break
+
+        # Execute cleaning and get preview
+        try:
+            cleaned_df = df.copy()
+            original_rows = len(cleaned_df)
+            changes = []
+
+            for op in operations:
+                if op == 'remove_duplicates':
+                    before = len(cleaned_df)
+                    if target_column:
+                        cleaned_df = cleaned_df.drop_duplicates(subset=[cleaned_df.columns[target_column_index]])
+                    else:
+                        cleaned_df = cleaned_df.drop_duplicates()
+                    removed = before - len(cleaned_df)
+                    if removed > 0:
+                        changes.append(f"удалено {removed} дубликатов")
+
+                elif op == 'remove_empty_rows':
+                    before = len(cleaned_df)
+                    if target_column:
+                        cleaned_df = cleaned_df.dropna(subset=[cleaned_df.columns[target_column_index]])
+                    else:
+                        cleaned_df = cleaned_df.dropna(how='all')
+                    removed = before - len(cleaned_df)
+                    if removed > 0:
+                        changes.append(f"удалено {removed} пустых строк")
+
+                elif op == 'trim_whitespace':
+                    # Trim string columns
+                    str_cols = cleaned_df.select_dtypes(include=['object']).columns
+                    for col in str_cols:
+                        cleaned_df[col] = cleaned_df[col].apply(
+                            lambda x: x.strip() if isinstance(x, str) else x
+                        )
+                    if len(str_cols) > 0:
+                        changes.append(f"убраны пробелы в {len(str_cols)} колонках")
+
+                elif op == 'fill_empty':
+                    if target_column:
+                        col = cleaned_df.columns[target_column_index]
+                        empty_count = cleaned_df[col].isna().sum()
+                        if fill_value == "mean":
+                            cleaned_df[col] = cleaned_df[col].fillna(cleaned_df[col].mean())
+                        elif fill_value == "median":
+                            cleaned_df[col] = cleaned_df[col].fillna(cleaned_df[col].median())
+                        elif fill_value == "ffill":
+                            cleaned_df[col] = cleaned_df[col].fillna(method='ffill')
+                        else:
+                            cleaned_df[col] = cleaned_df[col].fillna(fill_value)
+                        if empty_count > 0:
+                            changes.append(f"заполнено {empty_count} пустых ячеек в '{target_column}'")
+                    else:
+                        # Fill all numeric columns
+                        num_cols = cleaned_df.select_dtypes(include=[np.number]).columns
+                        total_filled = 0
+                        for col in num_cols:
+                            empty_count = cleaned_df[col].isna().sum()
+                            total_filled += empty_count
+                            if fill_value == "mean":
+                                cleaned_df[col] = cleaned_df[col].fillna(cleaned_df[col].mean())
+                            elif fill_value == "median":
+                                cleaned_df[col] = cleaned_df[col].fillna(cleaned_df[col].median())
+                            elif fill_value == "ffill":
+                                cleaned_df[col] = cleaned_df[col].fillna(method='ffill')
+                            else:
+                                cleaned_df[col] = cleaned_df[col].fillna(fill_value)
+                        if total_filled > 0:
+                            changes.append(f"заполнено {total_filled} пустых ячеек")
+
+            final_rows = len(cleaned_df)
+
+            # Prepare result data
+            cleaned_data = {
+                "headers": list(cleaned_df.columns),
+                "rows": cleaned_df.to_dict(orient='records')
+            }
+
+            # Build message
+            if changes:
+                message = "Очистка данных: " + ", ".join(changes)
+            else:
+                message = "Данные уже чистые, изменений не требуется"
+
+            return {
+                "action_type": "clean_data",
+                "operations": operations,
+                "fill_value": fill_value,
+                "target_column": target_column,
+                "original_rows": original_rows,
+                "final_rows": final_rows,
+                "cleaned_data": cleaned_data,
+                "changes": changes,
+                "message": message
+            }
+
+        except Exception as e:
+            logger.error(f"[SimpleGPT] Error cleaning data: {e}")
+            return None
+
     async def process(
         self,
         query: str,
@@ -897,6 +1108,27 @@ result = df[df['Город'] == 'Москва']
                     "value_column": pivot_action["value_column"],
                     "agg_func": pivot_action["agg_func"],
                     "summary": pivot_action["message"],
+                    "processing_time": f"{elapsed:.2f}s",
+                    "processor": "SimpleGPT v1.0 (direct action)"
+                }
+
+            # Check for data cleaning action
+            clean_action = self._detect_clean_action(query, column_names, df)
+            if clean_action:
+                elapsed = time.time() - start_time
+                logger.info(f"[SimpleGPT] Returning clean data action: {clean_action}")
+                return {
+                    "success": True,
+                    "action_type": "clean_data",
+                    "result_type": "action",
+                    "operations": clean_action["operations"],
+                    "fill_value": clean_action["fill_value"],
+                    "target_column": clean_action["target_column"],
+                    "original_rows": clean_action["original_rows"],
+                    "final_rows": clean_action["final_rows"],
+                    "cleaned_data": clean_action["cleaned_data"],
+                    "changes": clean_action["changes"],
+                    "summary": clean_action["message"],
                     "processing_time": f"{elapsed:.2f}s",
                     "processor": "SimpleGPT v1.0 (direct action)"
                 }

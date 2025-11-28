@@ -528,6 +528,10 @@ window.addEventListener('message', async (event) => {
         result = await applyConditionalFormat(data.rule);
         break;
 
+      case 'OVERWRITE_SHEET_DATA':
+        result = await overwriteSheetData(data.cleanedData);
+        break;
+
       default:
         throw new Error(`Unknown action: ${action}`);
     }
@@ -974,6 +978,45 @@ async function applyConditionalFormat(rule) {
     return {
       success: false,
       message: `Ошибка условного форматирования: ${error.message}`
+    };
+  }
+}
+
+async function overwriteSheetData(cleanedData) {
+  console.log('[SheetGPT] Overwrite sheet with cleaned data:', cleanedData);
+
+  try {
+    if (!cleanedData || !cleanedData.headers || !cleanedData.rows) {
+      throw new Error('Invalid cleaned data format');
+    }
+
+    // Convert to 2D array
+    const values = convertStructuredDataToValues(cleanedData);
+
+    // Write to current sheet (overwrite from A1)
+    const response = await safeSendMessage({
+      action: 'WRITE_SHEET_DATA',
+      data: {
+        values: values,
+        startCell: 'A1',
+        mode: 'overwrite'
+      }
+    });
+
+    if (!response.success) {
+      throw new Error(response.error);
+    }
+
+    console.log('[SheetGPT] ✅ Data overwritten via API:', response.result);
+    return {
+      success: true,
+      message: `Данные заменены (${values.length - 1} строк)`
+    };
+  } catch (error) {
+    console.error('[SheetGPT] Error overwriting data:', error);
+    return {
+      success: false,
+      message: `Ошибка замены данных: ${error.message}`
     };
   }
 }
