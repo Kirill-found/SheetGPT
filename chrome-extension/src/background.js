@@ -349,9 +349,10 @@ async function handleFormatRow(tabId, tabUrl, data) {
  * Create a chart in Google Sheet
  */
 async function handleCreateChart(tabId, tabUrl, data) {
-  console.log('[Background] Creating chart:', data);
+  console.log('[Background] 📊 Creating chart, data:', JSON.stringify(data));
 
   const spreadsheetId = getSpreadsheetIdFromUrl(tabUrl);
+  console.log('[Background] 📊 Spreadsheet ID:', spreadsheetId);
   if (!spreadsheetId) {
     throw new Error('Not a valid Google Sheets URL');
   }
@@ -367,15 +368,18 @@ async function handleCreateChart(tabId, tabUrl, data) {
   const storageData = await chrome.storage.local.get(storageKey);
   const sheetName = storageData[storageKey] || 'Лист1';
 
-  console.log(`[Background] Using sheet name "${sheetName}" for chart`);
+  console.log(`[Background] 📊 Using sheet name "${sheetName}" for chart (storageKey: ${storageKey})`);
 
   // Get sheet ID
+  console.log('[Background] 📊 Getting sheet ID...');
   const sheetId = await getSheetIdByName(spreadsheetId, sheetName);
+  console.log('[Background] 📊 Sheet ID:', sheetId);
 
   // Create chart
+  console.log('[Background] 📊 Calling createChart API...');
   const result = await createChart(spreadsheetId, sheetId, chartSpec);
 
-  console.log('[Background] ✅ Chart created:', result);
+  console.log('[Background] ✅ Chart created successfully:', result);
   return result;
 }
 

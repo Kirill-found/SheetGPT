@@ -521,7 +521,9 @@ window.addEventListener('message', async (event) => {
         break;
 
       case 'CREATE_CHART':
+        console.log('[SheetGPT] 📊 CREATE_CHART received with spec:', JSON.stringify(data.chartSpec));
         result = await createChartInSheet(data.chartSpec);
+        console.log('[SheetGPT] 📊 CREATE_CHART result:', result);
         break;
 
       case 'APPLY_CONDITIONAL_FORMAT':

@@ -1081,12 +1081,17 @@ function transformAPIResponse(apiResponse) {
   });
 
   if (apiResponse.action_type === 'chart' && apiResponse.chart_spec) {
-    console.log('[Sidebar] ✅ Chart condition met! Creating chart...');
-    // Trigger chart creation
-    createChartInSheet(apiResponse.chart_spec);
+    console.log('[Sidebar] ✅ Chart condition met! Creating chart with spec:', JSON.stringify(apiResponse.chart_spec));
+    // Trigger chart creation and handle result
+    createChartInSheet(apiResponse.chart_spec).then(() => {
+      console.log('[Sidebar] ✅ Chart creation promise resolved');
+      addAIMessage({ type: 'success', text: '✅ Диаграмма успешно создана!' });
+    }).catch(err => {
+      console.error('[Sidebar] ❌ Chart creation promise rejected:', err);
+    });
     return {
       type: 'chart',
-      text: apiResponse.summary || `Диаграмма "${apiResponse.chart_spec.title || 'Диаграмма'}" создана`,
+      text: apiResponse.summary || `Создаю диаграмму "${apiResponse.chart_spec.title || 'Диаграмма'}"...`,
       chartSpec: apiResponse.chart_spec
     };
   }
