@@ -572,15 +572,24 @@ let isProcessing = false;
 
     function addMessage(content, type) {
       const container = document.getElementById('chatContainer');
-      const messageDiv = document.createElement('div');
-      messageDiv.className = `message ${type}`;
 
-      const bubble = document.createElement('div');
-      bubble.className = 'message-bubble';
-      bubble.textContent = content;
+      // Use new templates from response-templates.js if available
+      if (type === 'user' && typeof createUserMessage === 'function') {
+        container.insertAdjacentHTML('beforeend', createUserMessage(content));
+      } else if (type === 'ai' && typeof createAIMessage === 'function') {
+        container.insertAdjacentHTML('beforeend', createAIMessage(content));
+      } else {
+        // Fallback with v5 CSS classes
+        const messageDiv = document.createElement('div');
+        messageDiv.className = type === 'user' ? 'message message-user' : 'message message-ai';
 
-      messageDiv.appendChild(bubble);
-      container.appendChild(messageDiv);
+        const bubble = document.createElement('div');
+        bubble.className = type === 'user' ? 'user-bubble' : 'ai-bubble';
+        bubble.textContent = content;
+
+        messageDiv.appendChild(bubble);
+        container.appendChild(messageDiv);
+      }
 
       scrollToBottom();
     }
@@ -593,27 +602,12 @@ let isProcessing = false;
         if (typeof renderAIResponse === 'function') {
           renderAIResponse(result);
         } else {
-          // Fallback to simple display
+          // Fallback with v5 CSS classes
           const messageDiv = document.createElement('div');
-          messageDiv.className = 'message ai';
+          messageDiv.className = 'message message-ai';
           const bubble = document.createElement('div');
-          bubble.className = 'message-bubble';
-          bubble.innerHTML = `
-            <div class="ai-response">
-              <div class="response-header">
-                <div class="response-type-icon analysis">
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M3 3v18h18"/><path d="M7 12l4-4 4 4 5-5"/>
-                  </svg>
-                </div>
-                <span class="response-type-label">Анализ</span>
-              </div>
-              <div class="response-body">
-                <div class="response-result">${result.summary || result.explanation || 'Результат'}</div>
-                ${result.methodology ? `<div class="response-explanation">${result.methodology}</div>` : ''}
-              </div>
-            </div>
-          `;
+          bubble.className = 'ai-bubble';
+          bubble.innerHTML = `<p>${result.summary || result.explanation || 'Результат'}</p>`;
           messageDiv.appendChild(bubble);
           container.appendChild(messageDiv);
         }
@@ -821,14 +815,11 @@ let isProcessing = false;
       if (typeof createLoadingMessage === 'function') {
         container.insertAdjacentHTML('beforeend', createLoadingMessage());
       } else {
-        // Fallback to old loading
+        // Fallback with v5 CSS classes
         const loadingDiv = document.createElement('div');
-        loadingDiv.className = 'message ai';
+        loadingDiv.className = 'message message-ai';
         loadingDiv.id = 'loadingMessage';
-        const loading = document.createElement('div');
-        loading.className = 'loading-indicator';
-        loading.innerHTML = '<div class="loading-dots"><span></span><span></span><span></span></div><span class="loading-text">Думаю...</span>';
-        loadingDiv.appendChild(loading);
+        loadingDiv.innerHTML = '<div class="ai-bubble"><div class="typing"><span></span><span></span><span></span></div></div>';
         container.appendChild(loadingDiv);
       }
       scrollToBottom();
