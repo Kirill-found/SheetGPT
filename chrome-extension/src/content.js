@@ -617,6 +617,8 @@ async function processQuery(query) {
   }
 
   const result = await response.json();
+  console.log('[SheetGPT] 📥 API Response:', JSON.stringify(result, null, 2));
+  console.log('[SheetGPT] 📥 Has chart_spec?', !!result.chart_spec, result.chart_spec);
   return result;
 }
 
