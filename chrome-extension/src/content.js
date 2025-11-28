@@ -575,7 +575,7 @@ function sendMessageToSidebar(data) {
 // ===== API CONFIGURATION =====
 // Set to 'local' to test with local server (http://localhost:8000)
 // Set to 'production' for Railway server
-const API_MODE = 'local';  // Change to 'production' for Railway server
+const API_MODE = 'production';  // Change to 'production' for Railway server
 
 const API_URLS = {
   local: 'http://localhost:8000/api/v1/formula',
