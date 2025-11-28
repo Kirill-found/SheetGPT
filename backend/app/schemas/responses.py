@@ -29,6 +29,8 @@ class FormulaResponse(BaseModel):
     # v7.4.0: Function calling metadata
     function_used: Optional[str] = Field(None, description="Название использованной функции")
     parameters: Optional[dict] = Field(None, description="Параметры вызванной функции")
+    # v6.2.9: Chart creation field
+    chart_spec: Optional[dict] = Field(None, description="Спецификация диаграммы для создания")
 
     class Config:
         json_schema_extra = {
