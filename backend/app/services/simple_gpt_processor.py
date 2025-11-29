@@ -70,42 +70,57 @@ class SimpleGPTProcessor:
 1. DataFrame уже загружен в переменную `df`
 2. Используй ТОЛЬКО pandas, numpy, datetime, math
 3. Результат сохрани в переменную `result`
-4. НЕ используй print(), просто присвой результат
-5. Обрабатывай NaN значения (dropna() или fillna())
-6. Для чисел: pd.to_numeric(df[col], errors='coerce')
+4. ОБЯЗАТЕЛЬНО создай переменную `explanation` с ПОДРОБНЫМ объяснением на русском
+5. НЕ используй print(), просто присвой результат
+6. Обрабатывай NaN значения (dropna() или fillna())
+7. Для чисел: pd.to_numeric(df[col], errors='coerce')
+
+КРИТИЧНО - ПЕРЕМЕННАЯ explanation:
+- ВСЕГДА создавай переменную `explanation` с развёрнутым объяснением
+- Для "почему?" - объясни ЛОГИКУ и РАССУЖДЕНИЯ с цифрами
+- Для числовых результатов - объясни КАК посчитал
+- Для сравнений - покажи РАЗНИЦУ между значениями
+- Включай КОНКРЕТНЫЕ ЦИФРЫ из расчётов
 
 ВАЖНО - ПОНИМАЙ НАМЕРЕНИЕ:
-- "какие/какой/что" → возвращай СПИСОК конкретных значений, НЕ количество!
-- "сколько" → возвращай число (count)
-- "покажи/выведи" → возвращай DataFrame или список
-- "сумма/среднее/макс/мин" → возвращай число
-- "топ N" → возвращай DataFrame с N строками
-- "отсортируй" → возвращай отсортированный DataFrame
-- "выдели/highlight" → возвращай DataFrame с отфильтрованными строками (сохраняй оригинальные индексы!)
+- "какие/какой/что" -> возвращай СПИСОК конкретных значений
+- "сколько" -> возвращай число (count)
+- "покажи/выведи" -> возвращай DataFrame или список
+- "сумма/среднее/макс/мин" -> возвращай число
+- "топ N" -> возвращай DataFrame с N строками
+- "почему?" -> объясни причину с расчётами и сравнениями
 
 ПРИМЕРЫ:
 
-Запрос: "Какие продукты продал Иванов"
+Запрос: "Какой менеджер самый продуктивный"
 ```python
-result = df[df['Менеджер'] == 'Иванов']['Продукт'].unique().tolist()
+sales = df.groupby('Менеджер')['Сумма'].sum().sort_values(ascending=False)
+result = sales.idxmax()
+explanation = f"Самый продуктивный - {result} ({sales.max():,.0f} руб). Сравнение: " + ", ".join([f"{m}: {s:,.0f}" for m,s in sales.items()])
+```
+
+Запрос: "почему?" (после вопроса о продуктивности)
+```python
+sales = df.groupby('Менеджер')['Сумма'].sum().sort_values(ascending=False)
+leader, leader_sum = sales.index[0], sales.iloc[0]
+others = sales.iloc[1:]
+result = sales.to_dict()
+explanation = f"{leader} лидирует с суммой {leader_sum:,.0f} руб. "
+if len(others) > 0:
+    second, second_sum = others.index[0], others.iloc[0]
+    diff = leader_sum - second_sum
+    explanation += f"Это на {diff:,.0f} руб. ({diff/second_sum*100:.0f}%) больше чем у {second} ({second_sum:,.0f} руб)."
 ```
 
 Запрос: "Сколько продаж у Иванова"
 ```python
-result = len(df[df['Менеджер'] == 'Иванов'])
+ivanov = df[df['Менеджер'].str.contains('Иванов', case=False, na=False)]
+result = len(ivanov)
+total = ivanov['Сумма'].sum()
+explanation = f"У Иванова {result} продаж на сумму {total:,.0f} руб."
 ```
 
-Запрос: "Топ 5 менеджеров по продажам"
-```python
-result = df.groupby('Менеджер')['Сумма'].sum().nlargest(5).reset_index()
-```
-
-Запрос: "Покажи все заказы из Москвы"
-```python
-result = df[df['Город'] == 'Москва']
-```
-
-Возвращай ТОЛЬКО код внутри ```python ... ```, без объяснений.
+Возвращай ТОЛЬКО код внутри ```python ... ```
 """
 
     VALIDATION_PROMPT = """Ты проверяешь качество ответа на запрос пользователя.
@@ -1555,8 +1570,13 @@ result = df[df['Город'] == 'Москва']
             formatted_result = self._format_result(result["result"])
             result_type = self._get_result_type(result["result"])
 
-            # Generate human-readable summary
-            summary = self._generate_summary(result["result"], result_type, query)
+            # Use explanation from code if available, otherwise generate summary
+            explanation = result.get("explanation", "")
+            if explanation:
+                summary = explanation
+                logger.info(f"[SimpleGPT] Using explanation from code: {explanation[:100]}...")
+            else:
+                summary = self._generate_summary(result["result"], result_type, query)
 
             response = {
                 "success": True,
@@ -1638,8 +1658,8 @@ result = df[df['Город'] == 'Москва']
 
             # Execute code
             try:
-                result = self._execute_code(code, df)
-                return {"success": True, "result": result, "code": code}
+                exec_result = self._execute_code(code, df)
+                return {"success": True, "result": exec_result['result'], "explanation": exec_result.get('explanation', ''), "code": code}
             except Exception as e:
                 previous_error = f"{type(e).__name__}: {str(e)}"
                 logger.warning(f"[SimpleGPT] Attempt {attempt + 1} failed: {previous_error}")
@@ -1761,8 +1781,8 @@ result = df[df['Город'] == 'Москва']
 
         return True, None
 
-    def _execute_code(self, code: str, df: pd.DataFrame) -> Any:
-        """Выполняет код в sandbox."""
+    def _execute_code(self, code: str, df: pd.DataFrame) -> dict:
+        """Выполняет код в sandbox. Возвращает dict с result и explanation."""
 
         # Create safe namespace
         namespace = {
@@ -1770,6 +1790,7 @@ result = df[df['Город'] == 'Москва']
             'pd': pd,
             'np': np,
             'result': None,
+            'explanation': None,
             'datetime': __import__('datetime'),
             'timedelta': __import__('datetime').timedelta,
             're': __import__('re'),
@@ -1782,7 +1803,9 @@ result = df[df['Город'] == 'Москва']
         if result is None:
             raise ValueError("Код не вернул результат (result = None)")
 
-        return result
+        explanation = namespace.get('explanation', '')
+
+        return {'result': result, 'explanation': explanation}
 
     def _format_result(self, result: Any) -> Any:
         """Форматирует результат для JSON."""
