@@ -248,7 +248,7 @@ explanation += f"• Средний чек: {avg:,.0f} руб.
         # Column charts (vertical bars) - default
         'столбч': 'COLUMN', 'column': 'COLUMN', 'столбик': 'COLUMN', 'гистограмм': 'COLUMN',
         # Pie charts
-        'круговой': 'PIE', 'pie': 'PIE', 'пирог': 'PIE', 'долей': 'PIE', 'процент': 'PIE',
+        'кругов': 'PIE', 'pie': 'PIE', 'пирог': 'PIE', 'долей': 'PIE', 'процент': 'PIE', 'долями': 'PIE', 'доли': 'PIE',
         # Area charts
         'область': 'AREA', 'area': 'AREA', 'заливк': 'AREA',
         # Scatter plots
