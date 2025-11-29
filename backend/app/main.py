@@ -239,7 +239,8 @@ async def process_formula(
             query=request.query,
             df=df,
             column_names=request.column_names,
-            custom_context=request.custom_context
+            custom_context=request.custom_context,
+            history=request.history or []
         )
 
         # DEBUG: Log full result immediately after processor

@@ -1348,7 +1348,8 @@ result = df[df['Город'] == 'Москва']
         query: str,
         df: pd.DataFrame,
         column_names: List[str],
-        custom_context: Optional[str] = None
+        custom_context: Optional[str] = None,
+        history: List[Dict[str, Any]] = None
     ) -> Dict[str, Any]:
         """
         Главный метод обработки запроса.
@@ -1527,7 +1528,8 @@ result = df[df['Город'] == 'Москва']
                 query=query,
                 df=df,
                 schema_prompt=schema_prompt,
-                custom_context=custom_context
+                custom_context=custom_context,
+                history=history
             )
 
             if not result["success"]:
@@ -1544,6 +1546,7 @@ result = df[df['Город'] == 'Москва']
                     df=df,
                     schema_prompt=schema_prompt,
                     custom_context=custom_context,
+                    history=history,
                     clarification="Предыдущий результат не соответствовал запросу. Убедись что возвращаешь правильный тип данных: список для 'какие', число для 'сколько', DataFrame для 'покажи'."
                 )
 
@@ -1607,6 +1610,7 @@ result = df[df['Город'] == 'Москва']
         df: pd.DataFrame,
         schema_prompt: str,
         custom_context: Optional[str] = None,
+        history: List[Dict[str, Any]] = None,
         clarification: Optional[str] = None,
         previous_error: Optional[str] = None
     ) -> Dict[str, Any]:
@@ -1618,6 +1622,7 @@ result = df[df['Город'] == 'Москва']
                 query=query,
                 schema_prompt=schema_prompt,
                 custom_context=custom_context,
+                history=history,
                 clarification=clarification,
                 previous_error=previous_error
             )
@@ -1647,6 +1652,7 @@ result = df[df['Город'] == 'Москва']
         query: str,
         schema_prompt: str,
         custom_context: Optional[str] = None,
+        history: List[Dict[str, Any]] = None,
         clarification: Optional[str] = None,
         previous_error: Optional[str] = None
     ) -> Optional[str]:
@@ -1658,6 +1664,26 @@ result = df[df['Город'] == 'Москва']
 ЗАПРОС: {query}
 """
 
+        # Build history context if available
+        history_context = ""
+        if history and len(history) > 0:
+            history_context = "\nИСТОРИЯ РАЗГОВОРА (предыдущие вопросы и ответы):\n"
+            for i, item in enumerate(history[-5:], 1):
+                prev_query = item.get('query', '')
+                prev_response = item.get('response', '')
+                if prev_query:
+                    history_context += f"{i}. Вопрос: {prev_query}\n"
+                    if prev_response:
+                        resp_str = str(prev_response)
+                        history_context += f"   Ответ: {resp_str[:150]}...\n" if len(resp_str) > 150 else f"   Ответ: {resp_str}\n"
+            history_context += "ВАЖНО: Используй историю чтобы понять контекст вопросов типа 'почему?' или 'а Петров?'\n"
+            logger.info(f"[SimpleGPT] Added conversation history: {len(history)} messages")
+
+        user_prompt = f"""СХЕМА ДАННЫХ:
+{schema_prompt}
+{history_context}
+ЗАПРОС: {query}
+"""
         if custom_context:
             user_prompt += f"\nКОНТЕКСТ: {custom_context}\n"
 
