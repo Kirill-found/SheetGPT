@@ -33,60 +33,71 @@ const state = {
 // ============================================
 // DOM ELEMENTS
 // ============================================
-const elements = {
-  // Screens
-  loginScreen: document.getElementById('loginScreen'),
-  mainApp: document.getElementById('mainApp'),
-  
-  // Login
-  licenseInput: document.getElementById('licenseInput'),
-  loginBtn: document.getElementById('loginBtn'),
-  loginError: document.getElementById('loginError'),
-  
-  // User Info
-  userAvatar: document.getElementById('userAvatar'),
-  userName: document.getElementById('userName'),
-  planBadge: document.getElementById('planBadge'),
-  usageCount: document.getElementById('usageCount'),
-  usageLimit: document.getElementById('usageLimit'),
-  usageBarFill: document.getElementById('usageBarFill'),
-  usageContainer: document.getElementById('usageContainer'),
-  
-  // Chat
-  chatContainer: document.getElementById('chatContainer'),
-  emptyState: document.getElementById('emptyState'),
-  messageInput: document.getElementById('messageInput'),
-  sendBtn: document.getElementById('sendBtn'),
-  
-  // Header
-  themeToggle: document.getElementById('themeToggle'),
-  historyBtn: document.getElementById('historyBtn'),
-  settingsBtn: document.getElementById('settingsBtn'),
-  historyDropdown: document.getElementById('historyDropdown'),
-  historyList: document.getElementById('historyList'),
-  
-  // Settings Modal
-  settingsModal: document.getElementById('settingsModal'),
-  closeSettingsBtn: document.getElementById('closeSettingsBtn'),
-  cancelSettingsBtn: document.getElementById('cancelSettingsBtn'),
-  saveSettingsBtn: document.getElementById('saveSettingsBtn'),
-  settingsAvatar: document.getElementById('settingsAvatar'),
-  settingsUserName: document.getElementById('settingsUserName'),
-  settingsPlan: document.getElementById('settingsPlan'),
-  settingsLicenseKey: document.getElementById('settingsLicenseKey'),
-  customContextInput: document.getElementById('customContextInput'),
-  userNameInput: document.getElementById('userNameInput'),
-  charCount: document.getElementById('charCount'),
-  logoutBtn: document.getElementById('logoutBtn'),
+// Elements will be initialized after DOM is ready
+let elements = {};
 
-  // Personalization Modal (Design System v1.2)
-  personalizeBtn: document.getElementById('personalizeBtn'),
-  personalizationModal: document.getElementById('personalizationModal'),
-  closePersonalizationBtn: document.getElementById('closePersonalizationBtn'),
-  cancelPersonalizationBtn: document.getElementById('cancelPersonalizationBtn'),
-  savePersonalizationBtn: document.getElementById('savePersonalizationBtn'),
-  personalizationContextInput: document.getElementById('personalizationContextInput')
-};
+function initElements() {
+  elements = {
+    // Screens
+    loginScreen: document.getElementById('loginScreen'),
+    mainApp: document.getElementById('mainApp'),
+    
+    // Login
+    licenseInput: document.getElementById('licenseInput'),
+    loginBtn: document.getElementById('loginBtn'),
+    loginError: document.getElementById('loginError'),
+    
+    // User Info
+    userAvatar: document.getElementById('userAvatar'),
+    userName: document.getElementById('userName'),
+    planBadge: document.getElementById('planBadge'),
+    usageCount: document.getElementById('usageCount'),
+    usageLimit: document.getElementById('usageLimit'),
+    usageBarFill: document.getElementById('usageBarFill'),
+    usageContainer: document.getElementById('usageContainer'),
+    
+    // Chat
+    chatContainer: document.getElementById('chatContainer'),
+    emptyState: document.getElementById('emptyState'),
+    messageInput: document.getElementById('messageInput'),
+    sendBtn: document.getElementById('sendBtn'),
+    
+    // Header
+    themeToggle: document.getElementById('themeToggle'),
+    historyBtn: document.getElementById('historyBtn'),
+    settingsBtn: document.getElementById('settingsBtn'),
+    historyDropdown: document.getElementById('historyDropdown'),
+    historyList: document.getElementById('historyList'),
+    
+    // Settings Modal
+    settingsModal: document.getElementById('settingsModal'),
+    closeSettingsBtn: document.getElementById('closeSettingsBtn'),
+    cancelSettingsBtn: document.getElementById('cancelSettingsBtn'),
+    saveSettingsBtn: document.getElementById('saveSettingsBtn'),
+    settingsAvatar: document.getElementById('settingsAvatar'),
+    settingsUserName: document.getElementById('settingsUserName'),
+    settingsPlan: document.getElementById('settingsPlan'),
+    settingsLicenseKey: document.getElementById('settingsLicenseKey'),
+    customContextInput: document.getElementById('customContextInput'),
+    userNameInput: document.getElementById('userNameInput'),
+    charCount: document.getElementById('charCount'),
+    logoutBtn: document.getElementById('logoutBtn'),
+
+    // Personalization Modal (Design System v1.2)
+    personalizeBtn: document.getElementById('personalizeBtn'),
+    personalizationModal: document.getElementById('personalizationModal'),
+    closePersonalizationBtn: document.getElementById('closePersonalizationBtn'),
+    cancelPersonalizationBtn: document.getElementById('cancelPersonalizationBtn'),
+    savePersonalizationBtn: document.getElementById('savePersonalizationBtn'),
+    personalizationContextInput: document.getElementById('personalizationContextInput')
+  };
+  
+  // Debug: log which elements are null
+  const nullElements = Object.entries(elements).filter(([k, v]) => v === null).map(([k]) => k);
+  if (nullElements.length > 0) {
+    console.warn('[Sidebar] Missing DOM elements:', nullElements);
+  }
+}
 
 // ============================================
 // INITIALIZATION
@@ -94,6 +105,7 @@ const elements = {
 document.addEventListener('DOMContentLoaded', init);
 
 function init() {
+  initElements();
   loadState();
   setupEventListeners();
   applyTheme();
