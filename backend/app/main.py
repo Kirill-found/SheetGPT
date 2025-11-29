@@ -250,6 +250,30 @@ async def process_formula(
         if 'chart_spec' in result:
             logger.info(f"[DEBUG] chart_spec value: {result['chart_spec']}")
 
+
+        # v10.0.1: Handle processing errors gracefully (don't throw 422)
+        if not result.get("success", True):
+            error_msg = result.get("error", "Не удалось обработать запрос")
+            logger.warning(f"[PROCESSOR ERROR] {error_msg}")
+            # Return a friendly error response instead of 422
+            return {
+                "formula": None,
+                "explanation": "",
+                "target_cell": None,
+                "confidence": 0.0,
+                "response_type": "error",
+                "insights": [],
+                "suggested_actions": None,
+                "summary": f"❌ Ошибка обработки: {error_msg}\n\nПопробуйте переформулировать запрос или проверьте данные.",
+                "methodology": None,
+                "key_findings": [],
+                "function_used": None,
+                "parameters": None,
+                "error": error_msg,
+                "processing_time": result.get("processing_time", "0s"),
+                "processor_version": "10.0.1"
+            }
+
         logger.info(f"[SUCCESS] SimpleGPT processing completed")
         logger.info(f"[PROCESSOR] {result.get('processor', 'N/A')}")
         logger.info(f"[TIME] {result.get('processing_time', 'N/A')}")
