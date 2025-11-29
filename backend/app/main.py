@@ -347,6 +347,13 @@ async def process_formula(
         if "background_color" in result:
             response_dict["background_color"] = result["background_color"]
 
+        # Add pivot table data
+        if "pivot_data" in result:
+            response_dict["pivot_data"] = result["pivot_data"]
+            response_dict["group_column"] = result.get("group_column")
+            response_dict["value_column"] = result.get("value_column")
+            response_dict["agg_func"] = result.get("agg_func")
+
         # Add chart data
         logger.info(f"[DEBUG] Checking for chart_spec in result keys: {list(result.keys())}")
         logger.info(f"[DEBUG] chart_spec in result? {'chart_spec' in result}")
