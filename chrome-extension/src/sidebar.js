@@ -1580,7 +1580,7 @@ window.overwriteWithCleanedData = async function() {
 
 window.applySplitData = async function() {
   const splitData = window.lastSplitData;
-  if (\!splitData) {
+  if (!splitData) {
     addAIMessage({
       type: 'error',
       text: 'Нет данных для вставки. Сначала запросите разбиение данных.'
