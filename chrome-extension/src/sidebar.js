@@ -1552,11 +1552,17 @@ window.insertCleanedData = async function() {
     return;
   }
 
+  // Prompt for sheet name
+  const sheetName = prompt('Введите имя нового листа:', 'Очищенные данные');
+  if (!sheetName) {
+    return; // User cancelled
+  }
+
   try {
     // Create a new sheet with cleaned data
     const result = await sendToContentScript('CREATE_TABLE_AND_CHART', {
       structuredData: cleanedData,
-      sheetTitle: 'Очищенные данные'
+      sheetTitle: sheetName
     });
     console.log('[Sidebar] Cleaned data inserted:', result);
 
