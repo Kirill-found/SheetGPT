@@ -45,6 +45,11 @@ class FormulaResponse(BaseModel):
     background_color: Optional[str] = Field(None, description="Цвет фона")
     # Value field (for simple calculations)
     value: Optional[Any] = Field(None, description="Вычисленное значение")
+    # Pivot table fields
+    pivot_data: Optional[dict] = Field(None, description="Данные сводной таблицы {headers, rows}")
+    group_column: Optional[str] = Field(None, description="Колонка группировки")
+    value_column: Optional[str] = Field(None, description="Колонка значений")
+    agg_func: Optional[str] = Field(None, description="Функция агрегации (sum, mean, count...)")
     # Processor metadata
     processor_version: Optional[str] = Field(None, description="Версия процессора")
     complexity: Optional[str] = Field(None, description="Сложность запроса")
