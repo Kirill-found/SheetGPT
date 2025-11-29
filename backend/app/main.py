@@ -246,6 +246,9 @@ async def process_formula(
         # DEBUG: Log full result immediately after processor
         logger.info(f"[DEBUG] Processor result keys: {list(result.keys())}")
         logger.info(f"[DEBUG] Processor result action_type: {result.get('action_type')}")
+        logger.info(f"[DEBUG] Processor result has pivot_data: {'pivot_data' in result}")
+        if 'pivot_data' in result:
+            logger.info(f"[DEBUG] pivot_data: {result['pivot_data']}")
         logger.info(f"[DEBUG] Processor result has chart_spec: {'chart_spec' in result}")
         if 'chart_spec' in result:
             logger.info(f"[DEBUG] chart_spec value: {result['chart_spec']}")
