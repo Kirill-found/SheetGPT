@@ -1038,8 +1038,7 @@ explanation += f"• Средний чек: {avg:,.0f} руб.
                 row_str = str(row.iloc[0]) if len(row) > 0 else ''
                 all_data.append(row_str)
             
-            csv_text = '
-'.join(all_data)
+            csv_text = chr(10).join(all_data)
             
             # Parse CSV
             split_df = pd.read_csv(io.StringIO(csv_text), sep=delimiter, header=0, dtype=str)
