@@ -351,11 +351,16 @@ async def process_formula(
             response_dict["background_color"] = result["background_color"]
 
         # Add pivot table data
+        logger.info(f"[PIVOT DEBUG] result keys before adding: {list(result.keys())}")
+        logger.info(f"[PIVOT DEBUG] pivot_data in result: {'pivot_data' in result}")
         if "pivot_data" in result:
+            logger.info(f"[PIVOT DEBUG] Adding pivot_data to response_dict")
             response_dict["pivot_data"] = result["pivot_data"]
             response_dict["group_column"] = result.get("group_column")
             response_dict["value_column"] = result.get("value_column")
             response_dict["agg_func"] = result.get("agg_func")
+        else:
+            logger.warning(f"[PIVOT DEBUG] NO pivot_data in result!")
 
         # Add chart data
         logger.info(f"[DEBUG] Checking for chart_spec in result keys: {list(result.keys())}")
