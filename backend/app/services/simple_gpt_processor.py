@@ -1035,25 +1035,33 @@ explanation += f"• Средний чек: {avg:,.0f} руб.
         # Split data
         try:
             import io
-            # Combine all data into a single string
+            # IMPORTANT: column_names contains the FIRST row from Google Sheets
+            # which was separated as "headers" by frontend. We need to include it!
+            
+            # Start with first row (column_names) - it's actually the first data row
             all_data = []
+            if column_names and len(column_names) == 1 and delimiter in str(column_names[0]):
+                # First row is CSV text in single cell - add it
+                all_data.append(str(column_names[0]))
+            
+            # Add remaining rows from df
             for idx, row in df.iterrows():
                 row_str = str(row.iloc[0]) if len(row) > 0 else ''
                 all_data.append(row_str)
             
+            logger.info(f"[SimpleGPT] CSV split - total rows including header: {len(all_data)}")
             csv_text = chr(10).join(all_data)
 
-            # Parse CSV without using any row as header
-            split_df = pd.read_csv(io.StringIO(csv_text), sep=delimiter, header=None, dtype=str)
+            # Parse CSV - first row becomes headers
+            split_df = pd.read_csv(io.StringIO(csv_text), sep=delimiter, header=0, dtype=str)
 
-            # First row of data becomes our headers
-            first_row = split_df.iloc[0].tolist()
-            headers = [str(h).strip() if pd.notna(h) else f"Col{i+1}" for i, h in enumerate(first_row)]
+            # Use pandas-extracted headers
+            headers = split_df.columns.tolist()
+            logger.info(f"[SimpleGPT] CSV split - headers: {headers}")
 
-            # Remaining rows become data  
-            data_df = split_df.iloc[1:].copy()
-            data_df.columns = headers
-            rows = data_df.fillna('').to_dict('records')
+            # All remaining rows are data
+            rows = split_df.fillna('').to_dict('records')
+            logger.info(f"[SimpleGPT] CSV split - data rows: {len(rows)}")
             
             structured_data = {
                 'headers': headers,
