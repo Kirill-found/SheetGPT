@@ -214,6 +214,45 @@ function setupEventListeners() {
     });
   });
 
+  // Event delegation for action buttons (CSP-compliant)
+  document.addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-action]');
+    if (!btn) return;
+    
+    const action = btn.dataset.action;
+    console.log('[Sidebar] Action button clicked:', action);
+    
+    switch (action) {
+      case 'insertFormula':
+        insertFormula(btn.dataset.formula);
+        break;
+      case 'copyToClipboard':
+        copyToClipboard(btn.dataset.text);
+        break;
+      case 'insertTable':
+        insertTable();
+        break;
+      case 'insertPivotTable':
+        insertPivotTable();
+        break;
+      case 'applySplitData':
+        applySplitData();
+        break;
+      case 'insertCleanedData':
+        insertCleanedData();
+        break;
+      case 'overwriteWithCleanedData':
+        overwriteWithCleanedData();
+        break;
+      case 'insertFilteredData':
+        insertFilteredData();
+        break;
+      case 'highlightFilteredRows':
+        highlightFilteredRows();
+        break;
+    }
+  });
+
   // Personalization Modal (Design System v1.2)
   if (elements.personalizeBtn) {
     elements.personalizeBtn.addEventListener('click', openPersonalization);
@@ -725,8 +764,8 @@ function addAIMessage(response) {
       <div class="formula-code">${escapeHtml(response.formula)}</div>
       ${response.explanation ? `<p>${escapeHtml(response.explanation)}</p>` : ''}
       <div class="action-buttons">
-        <button class="action-btn" onclick="insertFormula('${escapeHtml(response.formula)}')">Вставить</button>
-        <button class="action-btn secondary" onclick="copyToClipboard('${escapeHtml(response.formula)}')">Копировать</button>
+        <button class="action-btn" data-action="insertFormula" data-formula="${escapeHtml(response.formula)}">Вставить</button>
+        <button class="action-btn secondary" data-action="copyToClipboard" data-text="${escapeHtml(response.formula)}">Копировать</button>
       </div>
     `;
   } else if (response.type === 'analysis') {
@@ -754,7 +793,7 @@ function addAIMessage(response) {
       </div>
       <p>${escapeHtml(response.text || 'Таблица готова к вставке')}</p>
       <div class="action-buttons">
-        <button class="action-btn" onclick="insertTable()">Вставить таблицу</button>
+        <button class="action-btn" data-action="insertTable">Вставить таблицу</button>
       </div>
     `;
   } else if (response.type === 'highlight') {
@@ -804,7 +843,7 @@ function addAIMessage(response) {
       <p>${escapeHtml(response.text || 'Сводная таблица готова')}</p>
       <p class="text-secondary">${rowCount} групп</p>
       <div class="action-buttons">
-        <button class="action-btn" onclick="insertPivotTable()">Вставить таблицу</button>
+        <button class="action-btn" data-action="insertPivotTable">Вставить таблицу</button>
       </div>
     `;
   } else if (response.type === 'csv_split') {
@@ -823,7 +862,7 @@ function addAIMessage(response) {
       <p>${escapeHtml(response.text || 'Данные разбиты по ячейкам')}</p>
       <p class="text-secondary">${newRows} строк × ${newCols} колонок</p>
       <div class="action-buttons">
-        <button class="action-btn" onclick="applySplitData()">Заменить данные</button>
+        <button class="action-btn" data-action="applySplitData">Заменить данные</button>
       </div>
     `;
   } else if (response.type === 'clean_data') {
@@ -844,8 +883,8 @@ function addAIMessage(response) {
       <p>${escapeHtml(response.text || 'Данные очищены')}</p>
       <p class="text-secondary">${originalRows} → ${finalRows} строк${removedRows > 0 ? ` (−${removedRows})` : ''}</p>
       <div class="action-buttons">
-        <button class="action-btn" onclick="insertCleanedData()">Создать новый лист</button>
-        <button class="action-btn secondary" onclick="overwriteWithCleanedData()">Заменить данные</button>
+        <button class="action-btn" data-action="insertCleanedData">Создать новый лист</button>
+        <button class="action-btn secondary" data-action="overwriteWithCleanedData">Заменить данные</button>
       </div>
     `;
   } else if (response.type === 'data_validation') {
@@ -883,8 +922,8 @@ function addAIMessage(response) {
       <p class="text-secondary">${escapeHtml(response.conditionStr || '')}</p>
       <p class="text-secondary">${filteredRows} из ${originalRows} строк</p>
       <div class="action-buttons">
-        <button class="action-btn" onclick="insertFilteredData()">Создать новый лист</button>
-        <button class="action-btn secondary" onclick="highlightFilteredRows()">Выделить строки</button>
+        <button class="action-btn" data-action="insertFilteredData">Создать новый лист</button>
+        <button class="action-btn secondary" data-action="highlightFilteredRows">Выделить строки</button>
       </div>
     `;
   } else {
