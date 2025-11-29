@@ -1018,7 +1018,13 @@ explanation += f"• Средний чек: {avg:,.0f} руб.
                 'min': 'Минимум'
             }
 
-            message = f"Сводная таблица: {agg_names.get(agg_func, agg_func)} {value_column['name']} по {group_column['name']}"
+            # Avoid duplication like "Сумма Сумма" when column name matches agg function name
+            agg_name = agg_names.get(agg_func, agg_func)
+            col_name = value_column['name']
+            if agg_name.lower() in col_name.lower() or col_name.lower() in agg_name.lower():
+                message = f"Сводная таблица: {col_name} по {group_column['name']}"
+            else:
+                message = f"Сводная таблица: {agg_name} {col_name} по {group_column['name']}"
 
             return {
                 "action_type": "pivot_table",
