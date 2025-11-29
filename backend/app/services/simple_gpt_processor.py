@@ -1040,14 +1040,17 @@ explanation += f"• Средний чек: {avg:,.0f} руб.
             
             csv_text = chr(10).join(all_data)
 
-            # Parse CSV - first row becomes headers (standard CSV format)
-            split_df = pd.read_csv(io.StringIO(csv_text), sep=delimiter, header=0, dtype=str)
+            # Parse CSV without using any row as header
+            split_df = pd.read_csv(io.StringIO(csv_text), sep=delimiter, header=None, dtype=str)
 
-            # First row is used as column names
-            headers = split_df.columns.tolist()
+            # First row of data becomes our headers
+            first_row = split_df.iloc[0].tolist()
+            headers = [str(h).strip() if pd.notna(h) else f"Col{i+1}" for i, h in enumerate(first_row)]
 
-            # Remaining rows become data
-            rows = split_df.fillna('').to_dict('records')
+            # Remaining rows become data  
+            data_df = split_df.iloc[1:].copy()
+            data_df.columns = headers
+            rows = data_df.fillna('').to_dict('records')
             
             structured_data = {
                 'headers': headers,
