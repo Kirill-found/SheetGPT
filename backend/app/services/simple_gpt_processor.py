@@ -336,6 +336,12 @@ explanation += f"• Средний чек: {avg:,.0f} руб.
                       'убери дублик', 'убери повтор', 'убери пуст', 'убери строки',
                       'удали повтор', 'удали строки']
 
+    # CSV Split / Text-to-columns keywords
+    CSV_SPLIT_KEYWORDS = ['разбей', 'разбить', 'split', 'разделить', 'разделяй', 
+                          'по ячейкам', 'text to columns', 'текст по столбцам',
+                          'csv', 'по колонкам', 'по столбцам', 'распарси', 'парсинг',
+                          'раздели данные', 'разбей данные', 'разбей csv', 'разбей текст']
+
     # Cleaning operation types
     CLEAN_OPERATIONS = {
         'duplicate': ['дублик', 'duplicate', 'повтор', 'одинаков', 'дубл'],
@@ -985,6 +991,91 @@ explanation += f"• Средний чек: {avg:,.0f} руб.
             logger.error(f"[SimpleGPT] Error creating pivot: {e}")
             return None
 
+    def _detect_csv_split_action(self, query: str, column_names: List[str], df: pd.DataFrame) -> Optional[Dict[str, Any]]:
+        """
+        Определяет, является ли запрос командой разбиения CSV/текста по ячейкам.
+        Примеры:
+        - "разбей данные по ячейкам"
+        - "раздели csv по столбцам"
+        - "text to columns"
+        """
+        query_lower = query.lower()
+        
+        # Check for CSV split keywords
+        is_csv_split = any(kw in query_lower for kw in self.CSV_SPLIT_KEYWORDS)
+        if not is_csv_split:
+            return None
+        
+        logger.info(f"[SimpleGPT] CSV split action detected: {query}")
+        
+        # Detect delimiter from data
+        delimiter = None
+        first_row = df.iloc[0, 0] if len(df) > 0 and len(df.columns) > 0 else ''
+        first_row_str = str(first_row)
+        
+        # Check common delimiters
+        if ';' in first_row_str:
+            delimiter = ';'
+        elif ',' in first_row_str:
+            delimiter = ','
+        elif '	' in first_row_str:
+            delimiter = '	'
+        elif '|' in first_row_str:
+            delimiter = '|'
+        
+        if not delimiter:
+            logger.warning(f"[SimpleGPT] Could not detect delimiter in data")
+            return None
+        
+        logger.info(f"[SimpleGPT] Detected delimiter: '{delimiter}'")
+        
+        # Split data
+        try:
+            import io
+            # Combine all data into a single string
+            all_data = []
+            for idx, row in df.iterrows():
+                row_str = str(row.iloc[0]) if len(row) > 0 else ''
+                all_data.append(row_str)
+            
+            csv_text = '
+'.join(all_data)
+            
+            # Parse CSV
+            split_df = pd.read_csv(io.StringIO(csv_text), sep=delimiter, header=0, dtype=str)
+            
+            # Convert to structured data format
+            headers = split_df.columns.tolist()
+            rows = split_df.fillna('').to_dict('records')
+            
+            structured_data = {
+                'headers': headers,
+                'rows': rows
+            }
+            
+            message = f"""**✅ Данные разбиты по ячейкам**
+
+📋 Результат:
+• Колонок: {len(headers)}
+• Строк данных: {len(rows)}
+• Разделитель: '{delimiter}'
+• Колонки: {', '.join(headers[:5])}{'...' if len(headers) > 5 else ''}
+
+💡 Нажмите кнопку ниже, чтобы заменить данные в таблице."""
+            
+            return {
+                'structured_data': structured_data,
+                'original_rows': len(df),
+                'new_rows': len(rows),
+                'new_cols': len(headers),
+                'delimiter': delimiter,
+                'message': message
+            }
+            
+        except Exception as e:
+            logger.error(f"[SimpleGPT] CSV split error: {e}")
+            return None
+
     def _detect_clean_action(self, query: str, column_names: List[str], df: pd.DataFrame) -> Optional[Dict[str, Any]]:
         """
         Определяет, является ли запрос командой очистки данных.
@@ -1595,6 +1686,25 @@ explanation += f"• Средний чек: {avg:,.0f} руб.
                     "value_column": pivot_action["value_column"],
                     "agg_func": pivot_action["agg_func"],
                     "summary": pivot_action["message"],
+                    "processing_time": f"{elapsed:.2f}s",
+                    "processor": "SimpleGPT v1.0 (direct action)"
+                }
+
+            # Check for CSV split action (text to columns)
+            csv_split_action = self._detect_csv_split_action(query, column_names, df)
+            if csv_split_action:
+                elapsed = time.time() - start_time
+                logger.info(f"[SimpleGPT] Returning CSV split action")
+                return {
+                    "success": True,
+                    "action_type": "csv_split",
+                    "result_type": "action",
+                    "structured_data": csv_split_action["structured_data"],
+                    "original_rows": csv_split_action["original_rows"],
+                    "new_rows": csv_split_action["new_rows"],
+                    "new_cols": csv_split_action["new_cols"],
+                    "delimiter": csv_split_action["delimiter"],
+                    "summary": csv_split_action["message"],
                     "processing_time": f"{elapsed:.2f}s",
                     "processor": "SimpleGPT v1.0 (direct action)"
                 }

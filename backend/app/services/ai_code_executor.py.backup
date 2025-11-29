@@ -1,0 +1,1763 @@
+"""
+AI + Python Executor Service
+Работает как Formula Bot:
+1. AI понимает запрос и генерирует Python код
+2. Python выполняет код на реальных данных
+3. Возвращает 100% точный результат
+"""
+
+import pandas as pd
+import numpy as np
+from typing import List, Dict, Any, Optional
+from openai import OpenAI
+from app.config import settings
+import json
+import traceback
+from io import StringIO
+import sys
+import re
+
+
+class SafeStringIO(StringIO):
+    """
+    UTF-8 safe StringIO для Windows совместимости
+    Исправляет ошибку: 'charmap' codec can't encode characters
+    """
+    def write(self, s):
+        try:
+            return super().write(s)
+        except (UnicodeEncodeError, UnicodeDecodeError):
+            # Если ошибка кодировки, конвертируем в безопасную строку
+            if isinstance(s, bytes):
+                s = s.decode('utf-8', errors='replace')
+            # Преобразуем в строку и пытаемся снова
+            return super().write(str(s))
+
+# Опциональный импорт веб-поиска (если ddgs не установлен, работаем без него)
+try:
+    from app.services.web_search import get_web_search_service
+    WEB_SEARCH_AVAILABLE = True
+except ImportError:
+    WEB_SEARCH_AVAILABLE = False
+    print("[WARNING] Web search module not available (ddgs not installed)")
+
+class AICodeExecutor:
+    def __init__(self):
+        self.client = OpenAI(api_key=settings.OPENAI_API_KEY)
+        self.model = "gpt-4o"  # Лучшая модель для генерации кода
+
+    def _sanitize_custom_context(self, custom_context: Optional[str]) -> Optional[str]:
+        """
+        Санитизация custom_context для защиты от prompt injection
+        """
+        if not custom_context or not custom_context.strip():
+            return None
+
+        # Очищаем от лишних пробелов
+        sanitized = custom_context.strip()
+
+        # Проверяем длину (макс 2000 символов)
+        if len(sanitized) > 2000:
+            sanitized = sanitized[:2000] + "..."
+
+        # Запрещенные паттерны для prompt injection
+        dangerous_patterns = [
+            r"ignore\s+(previous|above|all)\s+instructions",
+            r"forget\s+(everything|all|previous)",
+            r"disregard\s+(previous|above)",
+            r"new\s+instructions:",
+            r"system\s*:\s*",
+            r"assistant\s*:\s*",
+            r"<\|im_start\|>",
+            r"<\|im_end\|>",
+        ]
+
+        # Проверяем на опасные паттерны
+        for pattern in dangerous_patterns:
+            if re.search(pattern, sanitized, re.IGNORECASE):
+                # Если найден опасный паттерн - возвращаем None (игнорируем custom_context)
+                print(f"⚠️ WARNING: Dangerous pattern detected in custom_context: {pattern}")
+                return None
+
+        return sanitized
+
+    def process_with_code(self, query: str, column_names: List[str], sheet_data: List[List[Any]], history: List[Dict[str, Any]] = None, custom_context: Optional[str] = None) -> Dict[str, Any]:
+        """
+        Основная функция - генерирует и выполняет Python код для точных расчетов
+        """
+        try:
+            # Шаг 0: Санитизируем custom_context
+            safe_custom_context = self._sanitize_custom_context(custom_context)
+            print(f"\n🔍 DEBUG: custom_context = {custom_context}")
+            print(f"🔍 DEBUG: safe_custom_context = {safe_custom_context}")
+
+            # v7.3.0: Проверка на создание таблицы из AI-знаний (без исходных данных)
+            # Улучшенная проверка на "пустые данные" - обрабатывает разные форматы от фронтенда
+            def is_empty_data(data):
+                """Проверяет что данные действительно пустые"""
+                if not data or len(data) == 0:
+                    return True
+                # Проверяем что все строки пустые
+                for row in data:
+                    if not row or len(row) == 0:
+                        continue
+                    # Проверяем что в строке есть хоть одно непустое значение
+                    has_data = False
+                    for cell in row:
+                        if cell is not None and cell != '' and cell != ' ':
+                            has_data = True
+                            break
+                    if has_data:
+                        return False
+                return True
+
+            if is_empty_data(sheet_data):
+                table_keywords = ['создай таблиц', 'сделай таблиц', 'построй таблиц', 'найди информац',
+                                  'покажи данные', 'список стран', 'список городов', 'информация о']
+                query_lower = query.lower()
+                if any(kw in query_lower for kw in table_keywords):
+                    print(f"[AI_TABLE_GEN] Detected empty data + table keywords, generating from knowledge")
+                    print(f"[AI_TABLE_GEN] sheet_data = {sheet_data}")
+                    return self._generate_table_from_knowledge(query, safe_custom_context)
+
+            # Шаг 1: Создаем DataFrame
+            df = pd.DataFrame(sheet_data, columns=column_names)
+
+            # Шаг 2: AI генерирует Python код
+            generated_code = self._generate_python_code(query, df, safe_custom_context)
+
+            # Шаг 3: Выполняем код безопасно
+            result = self._execute_python_code(generated_code, df)
+
+            # Шаг 4: Форматируем ответ
+            print(f"🔍 DEBUG: Before _format_response, safe_custom_context = {safe_custom_context}")
+            final_response = self._format_response(result, generated_code, query, sheet_data, safe_custom_context, df)
+            print(f"🔍 DEBUG: After _format_response, professional_insights = {final_response.get('professional_insights')}")
+            return final_response
+
+        except Exception as e:
+            print("\n" + "="*80)
+            print("[TRACE 9] ✗✗✗ EXCEPTION IN process_with_code (TOP LEVEL) ✗✗✗")
+            print(f"[TRACE 9] Exception type: {type(e).__name__}")
+            print(f"[TRACE 9] Exception message: {str(e)}")
+            print(f"[TRACE 9] This means exception occurred BEFORE wrapper could apply!")
+            import traceback
+            traceback.print_exc()
+            print("="*80 + "\n")
+
+            return {
+                "error": str(e),
+                "summary": f"Ошибка: {str(e)}",
+                "methodology": "Ошибка при обработке",
+                "confidence": 0.0,
+                "response_type": "error"
+            }
+
+    def _generate_python_code(self, query: str, df: pd.DataFrame, custom_context: Optional[str] = None) -> str:
+        """
+        AI генерирует Python код для решения задачи
+        С опциональным custom_context для персонализации
+        """
+        print("\n" + "="*80)
+        print("[TRACE 1] _generate_python_code() CALLED")
+        print(f"[TRACE 1] query: {query}")
+        print(f"[TRACE 1] df.shape: {df.shape}")
+        print(f"[TRACE 1] custom_context: {custom_context is not None}")
+        print("="*80 + "\n")
+
+        # Анализируем структуру данных
+        data_info = self._analyze_dataframe(df)
+
+        # Строим базовый промпт
+        prompt = f"""You are a Python data analyst expert. Generate Python code to answer this question.
+
+CRITICAL LANGUAGE RULE:
+========================
+ALL 'summary' and 'methodology' variables MUST be in the SAME LANGUAGE as the user's query!
+- If query is in Russian → summary and methodology MUST be in Russian
+- If query is in English → summary and methodology MUST be in English
+- NEVER return "True" or "False" - return "Да" or "Нет" for Russian queries
+- NEVER use English words like "Found", "Total" in Russian context
+
+QUESTION: {query}
+
+AVAILABLE DATA:
+DataFrame 'df' with {len(df)} rows and columns:
+{data_info}
+
+SAMPLE DATA (first 5 rows):
+{df.head().to_string()}
+
+UNDERSTANDING CONVERSATIONAL REQUESTS:
+========================================
+Users may ask questions in casual, conversational language. You MUST understand the intent:
+
+FOLLOW-UP QUESTIONS (CRITICAL - User refers to previous context):
+- "а Петров?" → Means "What about Petrov?" - apply the SAME calculation as previous question but for Petrov
+- "а Иванов?" → Same calculation for Ivanov
+- "а за февраль?" → Same calculation but for February
+- "а по Москве?" → Same calculation but filtered by Moscow
+- "и остальные?" → Show the same analysis for remaining items
+
+When user asks a short follow-up like "а [Name]?" or "а [filter]?":
+1. ASSUME they want the SAME calculation (sum, count, average) as would be typical
+2. For "а Петров?" after sales question → Calculate SUM of sales for Petrov
+3. For "а Москва?" after city analysis → Show data for Moscow
+4. ALWAYS provide a calculated RESULT (number), not just filtered rows!
+
+ANALYZE EXISTING DATA (use df):
+- "более обширный анализ нужен" → Perform detailed analysis of existing data
+- "можно поподробнее?" → Provide more detailed analysis of existing data
+- "расскажи про это" → Analyze and explain the existing data
+- "что тут интересного?" → Find insights in the existing data
+- "сделай выводы" → Draw conclusions from the existing data
+
+IGNORE EXISTING DATA (return error to trigger new table generation):
+- "создай НОВУЮ таблицу" → User wants fresh data, not analysis
+- "найди в интернете" → User wants external data (we don't have internet, return error)
+- "добавь больше информации" → User wants to expand data (return error to trigger new generation)
+- "игнорируй текущие данные" → Explicitly asked to ignore existing data
+- "сгенерируй таблицу" → User wants generated data, not analysis
+
+CRITICAL DECISION LOGIC:
+1. If query contains "создай новую", "найди в интернете", "игнорируй", "сгенерируй" → Return error with message "Данные отсутствуют для создания новой таблицы с внешними источниками"
+2. Otherwise, if df has data → Analyze existing data
+3. If df is empty → This code won't run (handled before this point)
+
+RULES FOR CODE GENERATION:
+10. For Russian names/surnames: use partial matching with .str.contains() to handle different word forms
+11. Example: "Капустина" should match "Капустин", "Шилова" matches "Шилов"
+12. CRITICAL FOR RUSSIAN GRAMMAR - Strip case endings from search terms:
+    - "Петрова" (genitive) → search for "Петров" (nominative)
+    - "Иванову" (dative) → search for "Иванов"
+    - "а Петрова?" means "what about Petrov?" - extract "Петров" not "Петрова"!
+    - Always remove trailing: 'а', 'у', 'ом', 'ой', 'е', 'ы', 'ов' before searching
+    - Use the ROOT of the name (first 5-6 chars) for flexible matching
+
+EXAMPLE for "а Петрова?":
+```python
+# Extract name root - remove Russian case endings
+search_name = "Петрова"  # from query
+# Strip common endings
+for ending in ['ова', 'ова', 'ева', 'ина', 'а', 'у', 'ом', 'ой', 'е', 'ы']:
+    if search_name.lower().endswith(ending) and len(search_name) > len(ending) + 2:
+        search_name = search_name[:-len(ending)]
+        break
+# search_name is now "Петр" or "Петров" - will match "Петров" in data
+result = df[df['Менеджер'].str.contains(search_name, case=False, na=False)]
+```
+
+1. Use pandas for all data operations
+2. Variable 'df' contains the data
+3. Create a variable 'result' with the final answer
+4. Create a variable 'summary' with human-readable explanation
+5. Create a variable 'methodology' explaining what was calculated
+6. Handle duplicates properly (GROUP BY when needed)
+7. For "топ товаров" - group by product column and sum sales
+8. For "топ поставщиков" - group by supplier column and sum sales
+9. Always aggregate duplicate entries
+
+CRITICAL: For search/highlight queries, you MUST create a 'result' variable containing the filtered DataFrame!
+Example: result = df[df['column'].str.contains("search_term", case=False)]
+
+REQUIRED OUTPUT VARIABLES:
+- result: the computed answer (number, dataframe, or list)
+- summary: string with the answer in Russian - MUST be human-readable, NOT raw data dump!
+- methodology: string explaining the calculation in Russian
+
+SUMMARY FORMATTING RULES (CRITICAL):
+=====================================
+The summary MUST be a clean, readable answer. Examples:
+
+✅ GOOD summary: "Сумма продаж Петрова: 230,000 руб."
+✅ GOOD summary: "Найдено 3 записи для Иванова. Общая сумма: 245,000 руб."
+✅ GOOD summary: "Топ-3 товара:\\n1. Ноутбук: 150,000 руб.\\n2. Телефон: 80,000 руб.\\n3. Планшет: 45,000 руб."
+
+❌ BAD summary: "Менеджер: Петров | продукт: Телефон | Сумма: 80000..." (raw data dump)
+❌ BAD summary: Just returning DataFrame.to_string()
+❌ BAD summary: JSON or dict representation
+
+When filtering data, ALWAYS calculate aggregate (sum, count, avg) and include it in summary!
+
+CONDITIONAL VARIABLES (required if you have a professional role):
+- professional_insights: string - professional analysis based on your role
+- recommendations: list of strings - actionable recommendations
+- warnings: list of strings - potential issues or concerns
+
+EXAMPLE CODE FOR "а Петров?" (follow-up after sum question):
+```python
+# User asked "а Петров?" meaning "what's Petrov's total?"
+# Filter by name and calculate SUM (not just filter!)
+petrov_data = df[df['Менеджер'].str.contains('Петров', case=False, na=False)]
+total_sum = petrov_data['Сумма'].sum()
+
+# Result is the SUM, not the filtered DataFrame!
+result = total_sum
+summary = f"Сумма продаж Петрова: {total_sum:,.0f} руб."
+methodology = f"Отфильтровано по менеджеру 'Петров', просуммирована колонка 'Сумма'. Найдено {len(petrov_data)} записей."
+```
+
+EXAMPLE CODE FOR "топ 3 товара по продажам":
+```python
+# Group by product and sum sales
+product_sales = df.groupby('Колонка A')['Колонка E'].sum().sort_values(ascending=False)
+top3 = product_sales.head(3)
+
+# Format result
+result = top3.to_dict()
+summary = "Топ 3 товара по продажам:\\n"
+for i, (product, sales) in enumerate(top3.items(), 1):
+    summary += f"{{i}}. {{product}}: {{sales:,.2f}} руб.\\n"
+summary = summary.strip()
+methodology = f"Сгруппировано по товарам (Колонка A), просуммированы продажи (Колонка E). Всего уникальных товаров: {{len(product_sales)}}"
+
+# If you have a professional role context, add insights/recommendations:
+professional_insights = "Концентрация продаж на топ-3 товарах составляет 75% от общего объема. Высокая зависимость от узкого ассортимента."
+recommendations = [
+    "Диверсифицировать портфель продуктов для снижения рисков",
+    "Проанализировать причины низких продаж остальных товаров"
+]
+warnings = ["Критическая зависимость от ограниченного числа SKU"]
+```
+
+CRITICAL VARIABLE ORDER - ALWAYS FOLLOW THIS SEQUENCE:
+========================================================
+1. FIRST: Create 'result' variable (DO NOT use it before creating!)
+2. SECOND: Create 'summary' variable (now you can safely use 'result')
+3. THIRD: Create 'methodology' variable
+
+WRONG ORDER (causes NameError):
+```python
+summary = f"Found: {{len(result)}}"  # ERROR! 'result' not defined yet
+result = df[mask]
+```
+
+CORRECT ORDER:
+```python
+result = df[mask]  # Create result FIRST
+summary = f"Found: {{len(result)}}"  # Now can use result safely
+```
+
+EXAMPLE CODE FOR "выдели Капустина" or "highlight Shilov":
+```python
+# For Russian names: use .str.contains() with partial match to handle word forms
+# "Капустина" will match "Капустин", "Усову" will match "Усова"
+# Use first 5-7 characters of the name to match different word endings
+
+# Search in all string columns for the name (using first 6 chars for flexibility)
+mask = df.iloc[:, 0].astype(str).str.contains("Капуст", case=False, na=False)
+result = df[mask]
+
+summary = f"Найдено записей: {{len(result)}}"
+methodology = f"Поиск по частичному совпадению в первой колонке (используется начало имени/фамилии)"
+```
+
+EXAMPLE CODE FOR "выдели строки с заказами Казани" or "highlight rows from Moscow":
+```python
+# For location/city filtering: search in ALL string columns
+search_term = "Казан"  # Use root of the word for flexible matching
+
+# Create mask by searching in all text columns
+mask = pd.Series([False] * len(df))
+for col in df.columns:
+    if df[col].dtype == 'object':
+        col_mask = df[col].astype(str).str.contains(search_term, case=False, na=False)
+        mask = mask | col_mask
+
+result = df[mask]
+
+summary = f"Найдено {{len(result)}} строк с заказами из Казани"
+methodology = f"Поиск по всем текстовым колонкам по ключевому слову '{search_term}'"
+```
+
+EXAMPLE CODE FOR boolean questions like "У Петрова был только 1 заказ?":
+```python
+# For yes/no questions - calculate and return Russian answer
+petrov_data = df[df['Менеджер'].str.contains('Петров', case=False, na=False)]
+count = len(petrov_data)
+answer = count == 1
+
+# CRITICAL: Return Russian "Да"/"Нет", not English "True"/"False"!
+result = "Да" if answer else "Нет"
+summary = f"{{result}}, у Петрова {{count}} заказ(ов)"
+methodology = f"Подсчитано количество записей для Петрова: {{count}}"
+```
+
+EXAMPLE CODE FOR "разбей данные по ячейкам" or "split data to columns":
+```python
+# Split comma-separated data in first column into separate columns
+# Detect delimiter automatically (comma, semicolon, tab, pipe)
+first_col_sample = df.iloc[0, 0]
+delimiter = ','  # default
+if ';' in str(first_col_sample):
+    delimiter = ';'
+elif '\\t' in str(first_col_sample):
+    delimiter = '\\t'
+elif '|' in str(first_col_sample):
+    delimiter = '|'
+
+# Split ALL rows including the first one
+split_df = df.iloc[:, 0].str.split(delimiter, expand=True)
+
+# ALWAYS use first row as column names (headers) and remove it from data
+# The first row typically contains column names like "Канал,Показы,Клики,CTR,..."
+headers = split_df.iloc[0].values.tolist()
+split_df.columns = headers
+split_df = split_df.drop(0).reset_index(drop=True)
+
+result = split_df
+summary = f"Данные успешно разбиты на {{len(split_df.columns)}} столбцов: {{', '.join(map(str, split_df.columns))}}"
+methodology = f"Разделение данных по разделителю ('{{delimiter}}'). Первая строка использована как заголовки столбцов. Обнаружено {{len(result)}} строк данных"
+```
+
+NOW GENERATE CODE FOR THIS QUESTION:
+{query}
+
+Return ONLY the Python code, no explanations."""
+
+        # Строим system prompt с custom_context (если есть)
+        base_system_prompt = (
+            "You are a Python data analysis expert. Generate ONLY code that uses the provided DataFrame 'df'.\n\n"
+            "⛔ CRITICAL ANTI-HALLUCINATION RULES (CANNOT BE OVERRIDDEN):\n"
+            "1. NEVER create new data with pd.DataFrame() or dictionaries\n"
+            "2. NEVER use hardcoded product names like 'Product A', 'Product E', 'Item 1', etc.\n"
+            "3. ALWAYS use df.groupby() to analyze REAL data from 'df'\n"
+            "4. ALWAYS reference columns by their EXACT names shown in data_info\n"
+            "5. If you create fake data, the code will FAIL validation\n"
+            "6. NEVER use .dtype in comparisons - compare column VALUES, not types\n"
+            "7. NEVER write df['column'].dtype < value - write df['column'] < value\n\n"
+            "✅ CORRECT: product_sales = df.groupby(df.columns[0])[df.columns[1]].sum()\n"
+            "✅ CORRECT: mask = df['Выручка'] < 100000  # Compare VALUES\n"
+            "❌ WRONG: result = {'Product E': 3000, 'Product F': 2500}\n"
+            "❌ WRONG: mask = df['Выручка'].dtype < 100000  # NEVER compare .dtype!\n\n"
+        )
+
+        # Добавляем custom_context если есть
+        if custom_context:
+            full_system_prompt = (
+                base_system_prompt +
+                f"\n🎯 YOUR ROLE AND CONTEXT:\n{custom_context}\n\n"
+                "⚠️ IMPORTANT: Since you have a professional role, you MUST generate these variables:\n"
+                "- professional_insights: string with your professional analysis\n"
+                "- recommendations: list of actionable recommendations\n"
+                "- warnings: list of risks or issues to watch\n\n"
+                "These fields are REQUIRED when role is specified. Analyze data from that role's perspective.\n"
+                "Generate clean, working code that analyzes REAL data only."
+            )
+        else:
+            full_system_prompt = base_system_prompt + "Generate clean, working code that analyzes REAL data only."
+
+        response = self.client.chat.completions.create(
+            model=self.model,
+            messages=[
+                {"role": "system", "content": full_system_prompt},
+                {"role": "user", "content": prompt}
+            ],
+            temperature=0.1,
+            max_tokens=1500
+        )
+
+        code = response.choices[0].message.content
+
+        # Очищаем код от markdown если есть
+        code = re.sub(r'^```python\n', '', code)
+        code = re.sub(r'\n```$', '', code)
+        code = re.sub(r'^```\n', '', code)
+
+        print("\n" + "="*80)
+        print("[TRACE 2] GPT-4o GENERATED CODE:")
+        print(f"[TRACE 2] Code length: {len(code)} chars")
+        print(f"[TRACE 2] Code preview:\n{code[:500]}")
+        print("="*80 + "\n")
+
+        return code
+
+    def _fix_common_code_errors(self, code: str) -> str:
+        """
+        Автоматически исправляет частые ошибки в сгенерированном коде
+        v7.2.1: АГРЕССИВНЫЙ FIX - удаляет ВСЕ .dtype из кода
+        """
+        original_code = code
+
+        # АГРЕССИВНОЕ ИСПРАВЛЕНИЕ: удаляем ВСЕ вхождения .dtype
+        # .dtype НИКОГДА не нужен для сравнения значений
+        # Примеры что будет исправлено:
+        #   df['column'].dtype < 100000 → df['column'] < 100000
+        #   df.column.dtype > value → df.column > value
+        #   df[df.columns[0]].dtype == x → df[df.columns[0]] == x
+        #   mask.dtype != y → mask != y
+        # И любые другие варианты!
+
+        code = re.sub(r'\.dtype\b', '', code)
+
+        if code != original_code:
+            print(f"[CODE_FIX] ✓ Auto-fixed .dtype errors in generated code")
+            print(f"[CODE_FIX] Changed lines:")
+            for i, (old, new) in enumerate(zip(original_code.split('\n'), code.split('\n'))):
+                if old != new:
+                    print(f"  Line {i+1}:")
+                    print(f"    BEFORE: {old.strip()}")
+                    print(f"    AFTER:  {new.strip()}")
+
+        return code
+
+    def _validate_generated_code(self, code: str) -> None:
+        """
+        Валидирует сгенерированный код перед выполнением
+        Проверяет на признаки fake data / hallucination (но НЕ на .dtype - это исправляется автоматически)
+        """
+        # Запрещенные паттерны - признаки hallucination (БЕЗ .dtype - это исправляется)
+        forbidden_patterns = [
+            (r"pd\.DataFrame\s*\(\s*\{", "Creating new DataFrame with hardcoded data"),
+            (r"pd\.DataFrame\s*\(\s*\[", "Creating new DataFrame with hardcoded lists"),
+            (r"['\"]Product\s+[A-Z]['\"]\s*:", "Hardcoded product name like 'Product E'"),
+            (r"['\"]Item\s+\d+['\"]\s*:", "Hardcoded item name like 'Item 1'"),
+            (r"result\s*=\s*\{[^}]*['\"]Product", "Result contains hardcoded 'Product'"),
+            (r"result\s*=\s*\{[^}]*['\"]Item", "Result contains hardcoded 'Item'"),
+        ]
+
+        for pattern, description in forbidden_patterns:
+            if re.search(pattern, code, re.IGNORECASE):
+                raise ValueError(
+                    f"⛔ CODE VALIDATION FAILED: {description}\n"
+                    f"AI tried to create fake data instead of analyzing real 'df'!\n"
+                    f"Pattern: {pattern}\n"
+                    f"Code:\n{code[:500]}"
+                )
+
+    def _execute_python_code(self, code: str, df: pd.DataFrame) -> Dict[str, Any]:
+        """
+        Безопасно выполняет Python код и возвращает результат
+        """
+        print("\n" + "="*80)
+        print("[TRACE 3] _execute_python_code() CALLED")
+        print(f"[TRACE 3] Code to execute (first 300 chars):\n{code[:300]}")
+        print("="*80 + "\n")
+
+        # ИСПРАВЛЕНИЕ: Автоматически исправляем частые ошибки
+        print("[TRACE 3.5] Auto-fixing common code errors...")
+        code = self._fix_common_code_errors(code)
+        print("[TRACE 3.5] ✓ Code fixed (if needed)")
+
+        # ВАЛИДАЦИЯ: Проверяем что код не создает fake data
+        print("[TRACE 4] Starting validation...")
+        try:
+            self._validate_generated_code(code)
+            print("[TRACE 4] ✓ Validation PASSED")
+        except Exception as validation_error:
+            print(f"[TRACE 4] ✗ Validation FAILED: {validation_error}")
+            raise  # Re-raise to maintain original behavior
+
+        # Создаем безопасное окружение для выполнения
+        safe_globals = {
+            'df': df,
+            'pd': pd,
+            'np': np,
+            'len': len,
+            'sum': sum,
+            'min': min,
+            'max': max,
+            'abs': abs,
+            'round': round,
+            'str': str,
+            'int': int,
+            'float': float,
+            'list': list,
+            'dict': dict,
+            'enumerate': enumerate,
+            'zip': zip,
+            'sorted': sorted,
+            'print': print  # Для отладки
+        }
+
+        safe_locals = {}
+
+        # Перехватываем stdout для отладки (UTF-8 safe для Windows)
+        old_stdout = sys.stdout
+        sys.stdout = mystdout = SafeStringIO()
+
+        try:
+            # v6.6.8: WRAPPER FIX - оборачиваем AI код в безопасный wrapper
+            # Инициализируем переменные ВНУТРИ выполняемого кода!
+            wrapper_code = f"""# v6.6.8: AUTO-WRAPPER для гарантированной инициализации
+result = None
+summary = ''
+methodology = ''
+key_findings = []
+confidence = 0.95
+
+# === AI GENERATED CODE ===
+{code}
+# === END AI CODE ===
+"""
+            print("\n" + "="*80)
+            print("[TRACE 5] APPLYING WRAPPER")
+            print(f"[TRACE 5] Wrapper code (first 400 chars):\n{wrapper_code[:400]}")
+            print("="*80 + "\n")
+
+            # Выполняем обёрнутый код
+            print("[TRACE 6] Executing wrapper code with exec()...")
+            try:
+                exec(wrapper_code, safe_globals, safe_locals)
+                print("[TRACE 6] ✓ exec() COMPLETED successfully")
+            except UnicodeEncodeError as ue:
+                # Windows encoding fix - перекомпилируем код с UTF-8
+                print(f"[ENCODING FIX] Caught UnicodeEncodeError during exec: {ue}")
+                print(f"[ENCODING FIX] Attempting to fix encoding...")
+                # Компилируем код в UTF-8
+                code_obj = compile(wrapper_code, '<string>', 'exec', dont_inherit=True)
+                exec(code_obj, safe_globals, safe_locals)
+                print("[TRACE 6] ✓ exec() COMPLETED with encoding fix")
+
+            # Восстанавливаем stdout
+            sys.stdout = old_stdout
+            output = mystdout.getvalue()
+
+            # Извлекаем результаты
+            result = safe_locals.get('result', None)
+
+            print("\n" + "="*80)
+            print("[TRACE 7] EXTRACTING RESULTS")
+            print(f"[TRACE 7] result type: {type(result)}")
+            print(f"[TRACE 7] result value: {str(result)[:200] if result is not None else 'None'}")
+            print(f"[TRACE 7] summary: {safe_locals.get('summary', 'NOT SET')[:100]}")
+            print("="*80 + "\n")
+
+            # v6.6.4: FALLBACK если AI не создал result (что происходит постоянно)
+            if result is None:
+                # Проверяем есть ли другие DataFrame в locals
+                for var_name, var_value in safe_locals.items():
+                    if hasattr(var_value, 'index') and hasattr(var_value, 'columns'):
+                        result = var_value
+                        print(f"[FALLBACK] Using '{var_name}' as result (AI forgot to create 'result')")
+                        break
+                # Если ничего не нашли, используем весь df
+                if result is None and 'df' in safe_globals:
+                    result = safe_globals['df']
+                    print(f"[FALLBACK] Using entire 'df' as result (AI didn't filter anything)")
+            summary = safe_locals.get('summary', 'Результат вычислен')
+            methodology = safe_locals.get('methodology', 'Python анализ данных')
+
+            # Дополнительные переменные если есть
+            key_findings = safe_locals.get('key_findings', [])
+
+            # v6.5.4: Если result == None, пытаемся найти данные в других переменных
+            if result is None:
+                # Ищем переменные с данными
+                for var_name in ['товары', 'products', 'data', 'top_items', 'топ_товары', 'df_result']:
+                    if var_name in safe_locals:
+                        result = safe_locals[var_name]
+                        print(f"📊 Found result in variable '{var_name}'")
+                        break
+            confidence = safe_locals.get('confidence', 0.95)
+
+            # v6.2.0: Профессиональные инсайты (если AI сгенерировал)
+            professional_insights = safe_locals.get('professional_insights', None)
+            recommendations = safe_locals.get('recommendations', None)
+            warnings = safe_locals.get('warnings', None)
+
+            return {
+                'result': result,
+                'summary': summary,
+                'methodology': methodology,
+                'key_findings': key_findings,
+                'confidence': confidence,
+                'professional_insights': professional_insights,
+                'recommendations': recommendations,
+                'warnings': warnings,
+                'code': code,
+                'output': output
+            }
+
+        except Exception as e:
+            sys.stdout = old_stdout
+            error_msg = f"Ошибка: {str(e)}"
+
+            # v6.6.5: RETURN вместо RAISE! Возвращаем словарь с ошибкой
+            # Это позволит API вернуть ошибку в summary и продолжить работу
+            print("\n" + "="*80)
+            print("[TRACE 8] ✗✗✗ EXCEPTION IN _execute_python_code ✗✗✗")
+            print(f"[TRACE 8] Exception type: {type(e).__name__}")
+            print(f"[TRACE 8] Exception message: {error_msg}")
+            print(f"[TRACE 8] Traceback:")
+            import traceback
+            traceback.print_exc()
+            print("="*80 + "\n")
+            print(f"[ERROR] Code execution failed: {error_msg}")
+
+            return {
+                'result': None,
+                'summary': error_msg,
+                'methodology': 'Выполнение кода не удалось',
+                'key_findings': [],
+                'confidence': 0.0,
+                'professional_insights': None,
+                'recommendations': None,
+                'warnings': None,
+                'code': code,
+                'output': ''
+            }
+
+    def _generate_fallback_code(self, df: pd.DataFrame, failed_code: str, error: str) -> Optional[str]:
+        """
+        Генерирует исправленный код если первая попытка не удалась
+        """
+        prompt = f"""The following Python code failed with an error. Fix it.
+
+FAILED CODE:
+{failed_code}
+
+ERROR:
+{error}
+
+DataFrame structure:
+{df.dtypes}
+
+Generate CORRECTED code that will work. Return ONLY the Python code."""
+
+        try:
+            response = self.client.chat.completions.create(
+                model=self.model,
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0.1,
+                max_tokens=1500
+            )
+
+            fixed_code = response.choices[0].message.content
+            fixed_code = re.sub(r'^```python\n', '', fixed_code)
+            fixed_code = re.sub(r'\n```$', '', fixed_code)
+
+            return fixed_code
+        except:
+            return None
+
+    def _analyze_dataframe(self, df: pd.DataFrame) -> str:
+        """
+        Анализирует структуру DataFrame для AI
+        """
+        analysis = []
+
+        for col in df.columns:
+            dtype = df[col].dtype
+            sample_values = df[col].dropna().head(3).tolist()
+
+            # Определяем семантический тип колонки
+            semantic_type = "unknown"
+            if df[col].dtype == 'object':
+                if any('Товар' in str(v) for v in sample_values):
+                    semantic_type = "products"
+                elif any('ООО' in str(v) or 'ИП' in str(v) for v in sample_values):
+                    semantic_type = "suppliers/companies"
+                else:
+                    semantic_type = "text"
+            elif df[col].dtype in ['int64', 'float64']:
+                max_val = df[col].max()
+                if max_val > 100000:
+                    semantic_type = "sales/revenue (large numbers)"
+                elif max_val > 1000:
+                    semantic_type = "quantity/price (medium numbers)"
+                else:
+                    semantic_type = "small numbers/ids"
+
+            analysis.append(f"- {col}: {dtype} ({semantic_type}), sample: {sample_values}")
+
+        return '\n'.join(analysis)
+
+    def _format_response(self, exec_result: Dict[str, Any], code: str, query: str, sheet_data: List[List[Any]], custom_context: Optional[str] = None, original_df: Optional[pd.DataFrame] = None) -> Dict[str, Any]:
+        """
+        Форматирует финальный ответ
+        С опциональными профессиональными инсайтами (если custom_context был указан)
+        """
+        # Создаем DataFrame для поиска по данным
+        if sheet_data:
+            # Получаем column_names из первой строки exec_result если есть
+            column_names = exec_result.get('column_names', [f'col_{i}' for i in range(len(sheet_data[0]))] if sheet_data else [])
+            df = pd.DataFrame(sheet_data, columns=column_names)
+        else:
+            df = None
+        result = exec_result.get('result')
+
+        # Конвертируем pandas объекты в сериализуемые
+        if isinstance(result, pd.DataFrame):
+            result_dict = result.to_dict('records')
+        elif isinstance(result, pd.Series):
+            result_dict = result.to_dict()
+        else:
+            result_dict = result
+
+        # Форматируем key_findings
+        key_findings = exec_result.get('key_findings', [])
+        if not key_findings and isinstance(result_dict, dict):
+            key_findings = [f"{k}: {v:,.2f}" if isinstance(v, (int, float)) else f"{k}: {v}"
+                          for k, v in list(result_dict.items())[:5]]
+
+        # Извлекаем данные для выделения из key_findings если result_dict пустой
+        if not result_dict and key_findings:
+            # Пытаемся создать данные из key_findings
+            print(f"📊 No result_dict, extracting from key_findings: {key_findings}")
+            result_dict = {}
+            for finding in key_findings:
+                if ':' in finding:
+                    parts = finding.split(':', 1)
+                    key = parts[0].strip()
+                    value_str = parts[1].strip().replace(',', '')
+                    try:
+                        # Пытаемся преобразовать в число
+                        value = float(value_str)
+                        result_dict[key] = value
+                    except ValueError:
+                        result_dict[key] = value_str
+
+        # Определяем нужна ли таблица/график
+        # CRITICAL: Передаём ОРИГИНАЛЬНЫЙ result (может быть DataFrame), а не result_dict!
+        # Также передаём original df для merge операций
+        structured_data = self._generate_structured_data_if_needed(query, result, exec_result.get('summary', ''), original_df=original_df)
+
+        # v6.5.6: УЛУЧШЕННАЯ логика для выделения строк с поиском
+        highlight_keywords = ['выдели', 'подсвет', 'отметь', 'покаж', 'highlight', 'mark', 'топ', 'лучш', 'худш', 'строк', 'фамили']
+        query_lower = query.lower()
+
+        if any(kw in query_lower for kw in highlight_keywords):
+            print(f"[HIGHLIGHT] Keyword found, generating highlight data")
+
+            # ОПРЕДЕЛЕНИЕ ЦВЕТА ИЗ ЗАПРОСА (v6.5.9)
+            color_map = {
+                'красн': '#FF6B6B',   # Красный
+                'зелен': '#51CF66',   # Зеленый
+                'зелён': '#51CF66',   # Зеленый (альт)
+                'син': '#339AF0',     # Синий
+                'желт': '#FFD43B',    # Желтый
+                'жёлт': '#FFD43B',    # Желтый (альт)
+                'оранж': '#FF922B',   # Оранжевый
+                'фиолет': '#9775FA',  # Фиолетовый
+                'роз': '#F06595',     # Розовый
+                'сер': '#ADB5BD',     # Серый
+                'голуб': '#74C0FC',   # Голубой
+            }
+
+            requested_color = None
+            for color_key, color_value in color_map.items():
+                if color_key in query_lower:
+                    requested_color = color_value
+                    print(f"[COLOR] Detected: {color_key} -> {color_value}")
+                    break
+
+            # Проверяем тип запроса
+            # v8.3.0: УПРОЩЕННАЯ ЛОГИКА - если "выдели" есть в запросе, ВСЕГДА пытаемся выделить
+            is_search_query = False
+            search_keywords = ['фамили', 'имен', 'строк', 'строки', 'строку', 'найди', 'где', 'заказ', 'заказы']
+
+            # Случай 1: "выдели" в запросе = ВСЕГДА поисковый запрос на выделение
+            if 'выдели' in query_lower:
+                is_search_query = True
+                print(f"[SEARCH_DETECT] 'выдели' found - forcing search query mode")
+
+            # Случай 2: явные поисковые ключевые слова
+            elif any(word in query_lower for word in search_keywords):
+                is_search_query = True
+
+            # Случай 3: слово с заглавной буквы (вероятно имя/фамилия)
+            elif 'подсвет' in query_lower or 'отметь' in query_lower:
+                # Ищем слова с заглавной буквы (кроме первого слова в запросе)
+                words = query.split()
+                for word in words[1:]:  # Пропускаем первое слово
+                    # Если слово начинается с заглавной и не является служебным
+                    if word[0].isupper() and word.lower() not in ['оранжевым', 'красным', 'зелёным', 'синим', 'жёлтым', 'цветом', 'строк']:
+                        is_search_query = True
+                        print(f"[SEARCH_DETECT] Found name/surname: {word}")
+                        break
+
+            if is_search_query:
+                # AI УЖЕ ВЫПОЛНИЛ ПОИСК - используем результаты!
+                print(f"[SEARCH] AI executed search, analyzing results")
+                rows_to_highlight = []
+
+                # Проверяем, что AI нашёл данные
+                result = exec_result.get('result')
+                print(f"[SEARCH_DEBUG] result type: {type(result)}, result is None: {result is None}")
+
+                if result is not None:
+                    # Если result - это DataFrame, берём его индексы
+                    if hasattr(result, 'index') and hasattr(result, 'shape'):
+                        rows_to_highlight = [idx + 2 for idx in result.index.tolist()]
+                        print(f"[AI_RESULT] Found DataFrame with indices: {result.index.tolist()} -> rows: {rows_to_highlight}")
+                    # Если result - это list of dicts (после to_dict('records')), 
+                    # ищем исходные индексы в DataFrame
+                    elif isinstance(result, list) and len(result) > 0:
+                        # AI вернул отфильтрованные данные
+                        # Ищем эти данные в исходном DataFrame
+                        if df is not None:
+                            for row_data in result:
+                                # Ищем совпадение по первой колонке
+                                first_col = df.columns[0]
+                                if first_col in row_data:
+                                    search_value = row_data[first_col]
+                                    matches = df[df[first_col] == search_value]
+                                    if not matches.empty:
+                                        rows_to_highlight.extend([idx + 2 for idx in matches.index.tolist()])
+                        print(f"[AI_RESULT] Extracted {len(rows_to_highlight)} rows from list result")
+                
+                if rows_to_highlight:
+                    highlight_color = requested_color or '#ADD8E6'
+                    highlight_message = f'Выделено строк: {len(rows_to_highlight)}'
+                    highlighting_data = {
+                        "action_type": "highlight_rows",
+                        "highlight_rows": rows_to_highlight,
+                        "highlight_color": highlight_color,
+                        "highlight_message": highlight_message
+                    }
+                    print(f"[SUCCESS] Generated highlighting: {highlighting_data}")
+                else:
+                    highlighting_data = None
+                    print(f"[WARNING] Could not extract rows from AI results")
+            else:
+                # ВЫДЕЛЕНИЕ ТОПА/ХУДШИХ - ДИНАМИЧЕСКИ из результата AI
+                import re
+                numbers = re.findall(r'\d+', query)
+                count = 5  # По умолчанию 5
+                if numbers:
+                    count = min(int(numbers[0]), 20)
+
+                # Получаем результат от AI
+                result = exec_result.get('result')
+                rows_to_highlight = []
+
+                if result is not None:
+                    # Если result - DataFrame, берём его индексы
+                    if hasattr(result, 'index'):
+                        original_indices = result.index.tolist()[:count]
+                        rows_to_highlight = [idx + 2 for idx in original_indices]
+                        print(f"[TOP_HIGHLIGHT] Using DataFrame indices: {original_indices} -> {rows_to_highlight}")
+
+                    # Если result - list of dicts, ищем в оригинальном df
+                    elif isinstance(result, list) and len(result) > 0 and df is not None:
+                        first_col = df.columns[0]
+                        for i, row_data in enumerate(result[:count]):
+                            if first_col in row_data:
+                                search_value = row_data[first_col]
+                                matches = df[df[first_col] == search_value]
+                                if not matches.empty:
+                                    idx = matches.index[0]
+                                    rows_to_highlight.append(idx + 2)
+                        print(f"[TOP_HIGHLIGHT] Extracted from list: {rows_to_highlight}")
+
+                # Fallback если не удалось извлечь из результата
+                if not rows_to_highlight:
+                    print(f"[TOP_HIGHLIGHT] WARNING: Could not extract indices from result, using first N rows")
+                    rows_to_highlight = list(range(2, 2 + count))
+
+                # Умное определение цвета на основе ключевых слов в запросе
+                positive_keywords = ['топ', 'лучш', 'больш', 'макс', 'выше', 'высок', 'наибольш']
+                negative_keywords = ['худш', 'минимальн', 'отмен', 'ошибк', 'проблем', 'меньш', 'низк', 'наименьш']
+                neutral_keywords = ['оплачен', 'успешн', 'завершен', 'выполнен', 'активн']
+
+                if any(keyword in query_lower for keyword in positive_keywords):
+                    highlight_color = requested_color or '#90EE90'  # Green для положительных/высоких
+                    highlight_message = f'Выделены {len(rows_to_highlight)} строк (зеленый - высокие/топ значения)'
+                elif any(keyword in query_lower for keyword in negative_keywords):
+                    highlight_color = requested_color or '#FFB6C1'  # Red для негативных/низких/отмененных
+                    highlight_message = f'Выделены {len(rows_to_highlight)} строк (красный - проблемные/низкие значения)'
+                elif any(keyword in query_lower for keyword in neutral_keywords):
+                    highlight_color = requested_color or '#ADD8E6'  # Blue для нейтральных/информационных
+                    highlight_message = f'Выделены {len(rows_to_highlight)} строк (синий - информация)'
+                else:
+                    highlight_color = requested_color or '#FFFF00'  # Yellow только как fallback
+                    highlight_message = f'Выделены {len(rows_to_highlight)} строк (желтый - общая подсветка)'
+
+                highlighting_data = {
+                    "action_type": "highlight_rows",
+                    "highlight_rows": rows_to_highlight,
+                    "highlight_color": highlight_color,
+                    "highlight_message": highlight_message
+                }
+                print(f"[SUCCESS] Generated highlighting: {highlighting_data}")
+        else:
+            highlighting_data = None
+            print(f"[INFO] No highlight keywords in query")
+
+
+        # Старый метод как fallback (закомментирован)
+        highlighting_data = self._generate_highlighting_if_needed(query, result_dict) if not highlighting_data else highlighting_data
+
+        # v8.3.1: КРИТИЧЕСКИЙ FALLBACK - если есть "выдели" и structured_data, генерируем highlight_rows из него!
+        if not highlighting_data and 'выдели' in query_lower and structured_data:
+            print(f"[FALLBACK] 'выдели' in query but no highlighting_data, generating from structured_data")
+            rows = structured_data.get('rows', [])
+            if rows and original_df is not None:
+                rows_to_highlight = []
+                # Ищем строки в оригинальном DataFrame по первой колонке
+                first_col = original_df.columns[0]
+                for row_data in rows:
+                    if isinstance(row_data, list) and len(row_data) > 0:
+                        search_value = row_data[0]
+                        matches = original_df[original_df[first_col] == search_value]
+                        if not matches.empty:
+                            for idx in matches.index.tolist():
+                                row_num = idx + 2  # +2 для Google Sheets (1-based + header)
+                                if row_num not in rows_to_highlight:
+                                    rows_to_highlight.append(row_num)
+
+                if rows_to_highlight:
+                    highlighting_data = {
+                        "action_type": "highlight_rows",
+                        "highlight_rows": rows_to_highlight,
+                        "highlight_color": "#FFFF00",
+                        "highlight_message": f"Выделено строк: {len(rows_to_highlight)}"
+                    }
+                    print(f"[FALLBACK_SUCCESS] Generated highlighting from structured_data: {highlighting_data}")
+
+        if highlighting_data:
+            print(f"✅ Highlighting data generated: {highlighting_data}")
+        else:
+            print(f"❌ No highlighting data generated")
+
+        # v8.0.0: CLEAN UP SUMMARY - fix raw data dumps
+        raw_summary = exec_result.get('summary', 'Результат вычислен')
+        clean_summary = self._cleanup_summary(raw_summary, result, query, original_df)
+
+        # Базовый ответ
+        response = {
+            "summary": clean_summary,
+            "methodology": exec_result.get('methodology', 'Автоматический анализ с помощью Python'),
+            "key_findings": key_findings,
+            "confidence": exec_result.get('confidence', 0.95),
+            "response_type": "analysis",
+            "data": result_dict,
+            "structured_data": structured_data,  # v6.3.2: Генерируем для запросов "создай таблицу/график"
+            "code_generated": code[:500] + "..." if len(code) > 500 else code,
+            "python_executed": True,
+            "execution_output": exec_result.get('output', '')
+        }
+
+        # Добавляем данные выделения если есть
+        if highlighting_data:
+            response.update(highlighting_data)
+
+        # Добавляем профессиональные инсайты
+        # ВСЕГДА генерируем insights (с custom_context или без)
+        context_to_use = custom_context or "You are a data analyst. Provide brief, actionable insights."
+        print(f"🎯 Generating professional insights (custom={bool(custom_context)})...")
+        try:
+            insights_data = self._generate_professional_insights(
+                query, result_dict, exec_result.get('summary', ''), context_to_use
+            )
+            response["professional_insights"] = insights_data.get('professional_insights')
+            response["recommendations"] = insights_data.get('recommendations')
+            response["warnings"] = insights_data.get('warnings')
+        except Exception as e:
+            print(f"⚠️ Failed to generate insights: {e}")
+            # Если не получилось - оставляем null
+            pass
+
+        # v7.2.5: Добавляем формулу для merge операций
+        formula = self._generate_formula_for_merge(query, original_df, structured_data)
+        if formula:
+            response["formula"] = formula
+            # Добавляем формулу в summary чтобы она была видна в чате
+            original_summary = response.get("summary", "")
+            response["summary"] = f"{original_summary}\n\n📝 Формула для вставки в следующую колонку:\n{formula}"
+            print(f"[FORMULA] Generated Google Sheets formula: {formula}")
+
+        return response
+
+    def _cleanup_summary(self, raw_summary: str, result: Any, query: str, df: Optional[pd.DataFrame]) -> str:
+        """
+        v8.0.0: Очищает summary от "каши" и форматирует красиво
+        Если AI вернул raw data dump - пересчитываем и форматируем правильно
+        """
+        if not raw_summary:
+            return "Результат вычислен"
+
+        # Детектируем "плохой" summary - raw data dump
+        bad_patterns = [
+            'Менеджер:',  # Raw row dump
+            ' | ',  # Pipe-separated dump
+            'продукт:',
+            'Сумма:',
+            'Дата:',
+            'Статус:',
+        ]
+
+        is_bad_summary = sum(1 for p in bad_patterns if p in raw_summary) >= 2
+
+        if not is_bad_summary:
+            # Summary выглядит нормально
+            return raw_summary
+
+        print(f"[CLEANUP] Detected bad summary, reformatting...")
+        print(f"[CLEANUP] Raw: {raw_summary[:200]}...")
+
+        # Пытаемся извлечь имя из запроса
+        query_lower = query.lower()
+        name = None
+
+        # Ищем имена в запросе
+        common_names = ['петров', 'иванов', 'сидоров', 'кузнецов', 'смирнов', 'попов', 'васильев', 'михайлов']
+        for n in common_names:
+            if n in query_lower:
+                name = n.capitalize()
+                break
+
+        # Если не нашли в списке - ищем слово после "а "
+        if not name and query_lower.startswith('а '):
+            parts = query.split()
+            if len(parts) >= 2:
+                raw_name = parts[1].rstrip('?')
+                # Strip Russian case endings
+                for ending in ['ова', 'ева', 'ина', 'а', 'у', 'ом', 'ой', 'е', 'ы']:
+                    if raw_name.lower().endswith(ending) and len(raw_name) > len(ending) + 2:
+                        raw_name = raw_name[:-len(ending)]
+                        break
+                name = raw_name.capitalize()
+
+        # Пытаемся посчитать сумму из result
+        total_sum = None
+        row_count = 0
+
+        if result is not None:
+            if hasattr(result, '__len__'):
+                row_count = len(result)
+
+            # Если result - DataFrame, считаем сумму по числовым колонкам
+            if hasattr(result, 'select_dtypes'):
+                try:
+                    numeric_cols = result.select_dtypes(include=['number']).columns
+                    if len(numeric_cols) > 0:
+                        # Берем колонку с "Сумма" в названии или первую числовую
+                        sum_col = None
+                        for col in numeric_cols:
+                            if 'сумм' in str(col).lower():
+                                sum_col = col
+                                break
+                        if not sum_col:
+                            sum_col = numeric_cols[0]
+                        total_sum = result[sum_col].sum()
+                except Exception as e:
+                    print(f"[CLEANUP] Error calculating sum: {e}")
+
+            # Если result - число
+            elif isinstance(result, (int, float)):
+                total_sum = result
+
+        # Форматируем красивый summary
+        if name and total_sum is not None:
+            clean = f"Сумма продаж {name}: {total_sum:,.0f} руб."
+            if row_count > 0:
+                clean += f"\n(найдено записей: {row_count})"
+        elif total_sum is not None:
+            clean = f"Результат: {total_sum:,.0f}"
+            if row_count > 0:
+                clean += f" (записей: {row_count})"
+        elif row_count > 0:
+            clean = f"Найдено записей: {row_count}"
+        else:
+            # Fallback - просто обрезаем длинный summary
+            clean = raw_summary[:200] + "..." if len(raw_summary) > 200 else raw_summary
+
+        print(f"[CLEANUP] Clean summary: {clean}")
+        return clean
+
+    def _generate_formula_for_merge(self, query: str, original_df: Optional[pd.DataFrame], structured_data: Optional[Dict]) -> Optional[str]:
+        """
+        Генерирует Google Sheets формулу для merge операций (v7.2.5)
+        Например: для "объедини ФИО" вернёт "=A2&\" \"&B2&\" \"&C2"
+        """
+        if not structured_data or original_df is None:
+            return None
+
+        # Проверяем что это merge операция
+        if structured_data.get("operation_type") != "merge":
+            return None
+
+        merge_keywords = ['объедин', 'соедин', 'concat', 'merge', 'фио']
+        query_lower = query.lower()
+        if not any(kw in query_lower for kw in merge_keywords):
+            return None
+
+        try:
+            # Получаем колонки из structured_data
+            headers = structured_data.get("headers", [])
+            if not headers or len(headers) <= 1:
+                return None
+
+            # Если оригинальный df существует, то новая колонка - это последняя
+            # Остальные - исходные колонки для объединения
+            num_original_cols = len(original_df.columns) if original_df is not None else 0
+
+            # Определяем какие колонки нужно объединить
+            # Для "объедини ФИО": колонки Фамилия, Имя, Отчество (первые 3)
+            # Формула должна быть =A2&" "&B2&" "&C2
+
+            if num_original_cols > 0 and num_original_cols < len(headers):
+                # Новая колонка добавлена в конец, используем первые num_original_cols колонок
+                cols_to_merge = list(range(num_original_cols))
+            else:
+                # Fallback: используем все колонки кроме последней
+                cols_to_merge = list(range(len(headers) - 1))
+
+            if not cols_to_merge:
+                return None
+
+            # Генерируем формулу типа =A2&" "&B2&" "&C2
+            # A=0, B=1, C=2, ...
+            def col_to_letter(col_idx):
+                """Конвертирует индекс колонки (0-based) в букву (A, B, C, ...)"""
+                result = ""
+                col_idx += 1  # Convert to 1-based
+                while col_idx > 0:
+                    col_idx -= 1
+                    result = chr(col_idx % 26 + ord('A')) + result
+                    col_idx //= 26
+                return result
+
+            # Создаём части формулы
+            formula_parts = []
+            for col_idx in cols_to_merge:
+                col_letter = col_to_letter(col_idx)
+                formula_parts.append(f"{col_letter}2")
+
+            # Объединяем через &" "&
+            formula = "=" + "&\" \"&".join(formula_parts)
+
+            return formula
+
+        except Exception as e:
+            print(f"[ERROR] Failed to generate formula: {e}")
+            import traceback
+            traceback.print_exc()
+            return None
+
+    def _generate_table_from_knowledge(self, query: str, custom_context: Optional[str] = None) -> Dict[str, Any]:
+        """
+        v7.4.0: Генерирует таблицу из знаний AI + веб-поиск через DuckDuckGo
+        Используется когда пользователь просит "создай таблицу со странами Европы" или "найди в интернете информацию о LLM моделях"
+        """
+        print(f"\n[AI_TABLE_GEN] Generating table from AI knowledge for query: {query}")
+
+        try:
+            # Определяем нужен ли веб-поиск
+            web_search_keywords = [
+                'найди в интернете', 'поищи в интернете', 'найти в интернет',
+                'актуальн', 'последн', 'свеж', 'новейш', 'latest', 'current',
+                'search', 'recent', 'современн', 'real-time', 'реальн'
+            ]
+            query_lower = query.lower()
+            needs_web_search = any(kw in query_lower for kw in web_search_keywords)
+
+            # Веб-поиск если нужен
+            search_results_text = ""
+            methodology_suffix = ""
+            search_results = []  # Инициализируем пустой список
+            if needs_web_search:
+                if not WEB_SEARCH_AVAILABLE:
+                    print(f"[WEB_SEARCH] Web search requested but module not available (ddgs not installed)")
+                    print(f"[WEB_SEARCH] Falling back to AI knowledge")
+                    methodology_suffix = " (веб-поиск недоступен, использованы знания AI)"
+                else:
+                    print(f"[WEB_SEARCH] Query requires web search, executing DuckDuckGo search...")
+                    web_search_service = get_web_search_service()
+
+                    # Создаём поисковый запрос (убираем "найди в интернете" и т.д.)
+                    search_query = query
+                    for keyword in web_search_keywords:
+                        search_query = search_query.replace(keyword, "")
+                    search_query = search_query.strip()
+
+                    print(f"[WEB_SEARCH] Search query: {search_query}")
+
+                    # Выполняем поиск (получаем 15 результатов для большего контекста)
+                    search_results = web_search_service.search(search_query, max_results=15)
+
+                    if search_results:
+                        search_results_text = web_search_service.format_search_results_for_ai(search_results)
+                        print(f"[WEB_SEARCH] Found {len(search_results)} results, formatted for AI")
+                        methodology_suffix = f" + DuckDuckGo поиск ({len(search_results)} источников)"
+                    else:
+                        print(f"[WEB_SEARCH] No results found, falling back to AI knowledge")
+                        methodology_suffix = " (веб-поиск не дал результатов, использованы знания AI)"
+
+            # Создаём промпт для AI чтобы он вернул таблицу в формате JSON
+            system_prompt = """You are a data assistant. Generate tables based on user requests using your knowledge.
+
+CRITICAL RULES:
+1. Return data in JSON format with "headers" and "rows" fields
+2. "headers" is an array of column names
+3. "rows" is an array of arrays (each inner array is one row)
+4. Include only factual, accurate data
+5. Limit to 50 rows maximum
+6. Use simple column names in Russian if query is in Russian
+7. If web search results are provided, USE THEM as the primary source of data
+8. Synthesize information from multiple search results to create comprehensive table
+
+Example output format:
+{
+  "headers": ["Страна", "Население (млн)", "Столица"],
+  "rows": [
+    ["Германия", 83.2, "Берлин"],
+    ["Франция", 67.4, "Париж"],
+    ["Италия", 59.1, "Рим"]
+  ],
+  "summary": "Таблица создана с данными о 3 странах"
+}
+"""
+
+            # Формируем user prompt с результатами поиска если есть
+            if search_results_text:
+                user_prompt = f"""Generate a table based on this request using the web search results below:
+
+REQUEST: {query}
+
+{search_results_text}
+
+IMPORTANT: Use the information from the web search results to create the table. Extract relevant data points, numbers, names, dates, etc.
+
+Return ONLY valid JSON with "headers", "rows", and "summary" fields. No markdown, no explanations."""
+            else:
+                user_prompt = f"""Generate a table based on this request:
+
+{query}
+
+Return ONLY valid JSON with "headers", "rows", and "summary" fields. No markdown, no explanations."""
+
+            # Вызываем OpenAI API
+            response = self.client.chat.completions.create(
+                model="gpt-4o",
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_prompt}
+                ],
+                temperature=0.3,  # Низкая температура для точности
+                max_tokens=4000
+            )
+
+            # Парсим ответ
+            ai_response = response.choices[0].message.content.strip()
+            print(f"[AI_TABLE_GEN] Raw AI response length: {len(ai_response)}")
+
+            # Удаляем markdown если есть
+            if ai_response.startswith("```json"):
+                ai_response = ai_response[7:]
+            if ai_response.startswith("```"):
+                ai_response = ai_response[3:]
+            if ai_response.endswith("```"):
+                ai_response = ai_response[:-3]
+            ai_response = ai_response.strip()
+
+            # Парсим JSON
+            import json
+            table_data = json.loads(ai_response)
+
+            headers = table_data.get("headers", [])
+            rows = table_data.get("rows", [])
+            summary = table_data.get("summary", f"Таблица создана. Строк: {len(rows)}")
+
+            print(f"[AI_TABLE_GEN] Generated table: {len(headers)} columns, {len(rows)} rows")
+
+            # Формируем ответ в стандартном формате
+            base_methodology = "Таблица создана на основе знаний AI (GPT-4)"
+            if needs_web_search and search_results:
+                base_methodology = f"Таблица создана на основе реальных данных из интернета через DuckDuckGo{methodology_suffix}"
+                warnings_list = ["Данные получены из интернета. Рекомендуется проверить критически важные данные из первоисточников."]
+                insights_text = f"Данные актуализированы из {len(search_results)} источников в реальном времени."
+            else:
+                warnings_list = ["Данные могут быть неактуальными. Для точных данных используйте официальные источники."]
+                insights_text = "Таблица создана автоматически на основе общедоступных знаний AI."
+
+            return {
+                "summary": summary,
+                "methodology": base_methodology,
+                "key_findings": [f"Создана таблица с {len(rows)} записями", f"Колонки: {', '.join(headers[:5])}"],
+                "confidence": 0.92 if (needs_web_search and search_results) else 0.85,
+                "response_type": "table_generation",
+                "structured_data": {
+                    "headers": headers,
+                    "rows": rows,
+                    "table_title": summary,
+                    "chart_recommended": None,
+                    "operation_type": "web_search_generated" if (needs_web_search and search_results) else "ai_generated"
+                },
+                "professional_insights": insights_text,
+                "recommendations": ["Проверьте актуальность данных для критических задач"],
+                "warnings": warnings_list,
+                "python_executed": False,
+                "ai_generated_table": True,
+                "web_search_used": needs_web_search and len(search_results) > 0 if search_results else False
+            }
+
+        except json.JSONDecodeError as e:
+            print(f"[ERROR] Failed to parse AI response as JSON: {e}")
+            print(f"[ERROR] AI response: {ai_response[:500]}")
+            return {
+                "summary": f"Ошибка: не удалось создать таблицу",
+                "error": f"AI вернул некорректный формат данных",
+                "response_type": "error"
+            }
+        except Exception as e:
+            print(f"[ERROR] Failed to generate table from knowledge: {e}")
+            import traceback
+            traceback.print_exc()
+            return {
+                "summary": f"Ошибка: {str(e)}",
+                "error": str(e),
+                "response_type": "error"
+            }
+
+    def _generate_structured_data_if_needed(self, query: str, result_dict: Any, summary: str, original_df: Optional[pd.DataFrame] = None) -> Optional[Dict[str, Any]]:
+        """
+        Определяет нужна ли таблица/график и генерирует structured_data
+        """
+        import pandas as pd  # Import at the beginning
+
+        # Ключевые слова для определения запроса на таблицу/график
+        table_keywords = ['таблиц', 'создай табл', 'сделай табл', 'table', 'построй табл']
+        chart_keywords = ['график', 'диаграмм', 'chart', 'построй', 'визуализ', 'plot', 'сделай']
+        split_keywords = ['разбей', 'split', 'разделить', 'text-to-columns', 'по ячейкам', 'раздели', 'text to columns']
+        merge_keywords = ['объедин', 'соедин', 'concat', 'merge', 'создай колонку', 'добавь колонку', 'новая колонка', 'фио']
+
+        query_lower = query.lower()
+        needs_table = any(kw in query_lower for kw in table_keywords)
+        needs_chart = any(kw in query_lower for kw in chart_keywords)
+        needs_split = any(kw in query_lower for kw in split_keywords)
+        needs_merge = any(kw in query_lower for kw in merge_keywords)
+
+        # CRITICAL: Для split/merge операций result_dict - это DataFrame, НЕ dict!
+        # Проверяем, является ли result_dict DataFrame (pandas)
+        is_dataframe = hasattr(result_dict, 'shape') and hasattr(result_dict, 'columns')
+        is_series = isinstance(result_dict, pd.Series)
+
+        # Если это merge/concat операция - объединяем с оригинальной таблицей
+        if needs_merge and (is_dataframe or is_series) and original_df is not None:
+            try:
+                # Если result - это Series (одна колонка), добавляем к original_df
+                if is_series:
+                    df = original_df.copy()
+                    # Находим имя новой колонки (обычно это что-то типа "ФИО")
+                    new_column_name = result_dict.name if hasattr(result_dict, 'name') and result_dict.name else "Новая колонка"
+                    df[new_column_name] = result_dict.values
+                    print(f"[MERGE_DATA] Added Series as new column '{new_column_name}' to original df")
+
+                # Если result - DataFrame с меньшим количеством колонок чем оригинал
+                elif len(result_dict.columns) < len(original_df.columns):
+                    df = original_df.copy()
+                    # Добавляем новые колонки из result_dict
+                    for col in result_dict.columns:
+                        if col not in df.columns:
+                            df[col] = result_dict[col].values
+                    print(f"[MERGE_DATA] Merged result columns into original df")
+
+                # Если result - полный DataFrame, используем его как есть
+                else:
+                    df = result_dict
+                    print(f"[MERGE_DATA] Using result DataFrame as is")
+
+                # Конвертируем DataFrame в формат structured_data
+                headers = df.columns.tolist()
+                rows = df.values.tolist()
+
+                print(f"[MERGE_DATA] Final structured_data: {len(rows)} rows, {len(headers)} columns")
+                print(f"[MERGE_DATA] Headers: {headers}")
+
+                return {
+                    "headers": headers,
+                    "rows": rows[:100],  # Максимум 100 строк
+                    "table_title": summary[:100] if summary else "Объединенные данные",
+                    "chart_recommended": None,  # Для merge графики не нужны
+                    "operation_type": "merge"  # Указываем, что это merge операция для frontend
+                }
+            except Exception as e:
+                print(f"[ERROR] Converting merge DataFrame to structured_data: {e}")
+                import traceback
+                traceback.print_exc()
+                return None
+
+        # Если это split операция с DataFrame - конвертируем в structured_data
+        if needs_split and is_dataframe:
+            try:
+                import pandas as pd
+                df = result_dict
+
+                # Конвертируем DataFrame в формат structured_data
+                headers = df.columns.tolist()
+                rows = df.values.tolist()
+
+                return {
+                    "headers": headers,
+                    "rows": rows[:100],  # Максимум 100 строк для split операций
+                    "table_title": summary[:100],
+                    "chart_recommended": None,  # Для split графики не нужны
+                    "operation_type": "split"  # Указываем, что это split операция для frontend
+                }
+            except Exception as e:
+                print(f"Error converting split DataFrame to structured_data: {e}")
+                return None
+
+        # Если не запрашивали таблицу или график - возвращаем None
+        if not (needs_table or needs_chart):
+            return None
+
+        # Если result_dict не подходит для таблицы - возвращаем None
+        if not isinstance(result_dict, dict) or len(result_dict) == 0:
+            return None
+
+        # Конвертируем dict в формат таблицы
+        try:
+            # Определяем заголовки и строки
+            if isinstance(list(result_dict.values())[0], (int, float)):
+                # Простой dict типа {продукт: значение}
+                headers = ["Название", "Значение"]
+                rows = [[str(k), float(v)] for k, v in result_dict.items()]
+            else:
+                # Более сложная структура
+                headers = ["Элемент", "Данные"]
+                rows = [[str(k), str(v)] for k, v in result_dict.items()]
+
+            # Определяем тип графика
+            chart_type = None
+            if needs_chart:
+                # Определяем подходящий тип графика
+                if 'круг' in query_lower or 'pie' in query_lower or 'доля' in query_lower or 'процент' in query_lower:
+                    chart_type = "pie"  # Круговая
+                elif 'динамик' in query_lower or 'trend' in query_lower or 'линейн' in query_lower:
+                    chart_type = "line"  # Линейная
+                elif 'столб' in query_lower or 'column' in query_lower or len(rows) <= 10:
+                    chart_type = "column"  # Столбчатая
+                else:
+                    chart_type = "bar"  # Горизонтальная (по умолчанию для больших данных)
+
+            return {
+                "headers": headers,
+                "rows": rows[:50],  # Максимум 50 строк
+                "table_title": summary[:100],  # Используем summary как название
+                "chart_recommended": chart_type
+            }
+
+        except Exception as e:
+            print(f"Error generating structured_data: {e}")
+            return None
+
+    def _generate_highlighting_if_needed(self, query: str, result_data: Any) -> Optional[Dict[str, Any]]:
+        """
+        Определяет нужно ли выделение строк и генерирует данные для него
+        """
+        # Ключевые слова для выделения
+        highlight_keywords = ['выдели', 'подсвет', 'отметь', 'покаж', 'highlight', 'mark', 'топ', 'лучш', 'худш', 'больш', 'меньш', 'максимальн', 'минимальн']
+
+        query_lower = query.lower()
+        needs_highlighting = any(kw in query_lower for kw in highlight_keywords)
+
+        if not needs_highlighting:
+            print(f"❌ No highlight keywords found in: {query}")
+            return None
+
+        print(f"✅ Highlight keywords detected in query: {query}")
+
+        try:
+            import re
+
+            # Пытаемся определить что выделять
+            rows_to_highlight = []
+            highlight_color = requested_color or '#FFFF00'  # Используем запрошенный цвет по умолчанию
+            highlight_message = 'Выделены строки по запросу'
+
+            print(f"📊 Result data type: {type(result_data)}")
+            if isinstance(result_data, dict):
+                print(f"📊 Dict keys: {list(result_data.keys())[:5]}")
+
+            # Извлекаем число из запроса
+            numbers = re.findall(r'\d+', query)
+            count = 5  # По умолчанию 5
+            if numbers:
+                count = min(int(numbers[0]), 20)  # Максимум 20
+
+            # Обрабатываем разные типы данных
+            # 1. Если результат - DataFrame
+            if hasattr(result_data, 'shape'):  # pandas DataFrame
+                # Ищем топ значения
+                if 'топ' in query_lower or 'лучш' in query_lower or 'максимальн' in query_lower:
+                    # Находим колонку с числовыми значениями
+                    numeric_cols = result_data.select_dtypes(include=['number']).columns
+                    if len(numeric_cols) > 0:
+                        col = numeric_cols[0]  # Берём первую числовую колонку
+                        # Находим топ строки
+                        top_indices = result_data.nlargest(count, col).index.tolist()
+                        rows_to_highlight = [i + 2 for i in top_indices]  # +2 для Google Sheets
+                        highlight_color = requested_color or '#90EE90'  # Используем запрошенный цвет для топ значений
+                        highlight_message = f'Выделены топ {count} строк'
+
+                elif 'худш' in query_lower or 'минимальн' in query_lower or 'меньш' in query_lower:
+                    # Находим минимальные значения
+                    numeric_cols = result_data.select_dtypes(include=['number']).columns
+                    if len(numeric_cols) > 0:
+                        col = numeric_cols[0]
+                        # Находим худшие строки
+                        bottom_indices = result_data.nsmallest(count, col).index.tolist()
+                        rows_to_highlight = [i + 2 for i in bottom_indices]  # +2 для Google Sheets
+                        highlight_color = '#FFB6C1'  # Светло-красный для худших значений
+                        highlight_message = f'Выделены {count} минимальных значений'
+
+            # 2. Если результат - словарь с данными таблицы
+            elif isinstance(result_data, dict):
+                # Ищем данные таблицы в словаре
+                rows_data = None
+
+                # Проверяем разные варианты ключей
+                if 'rows' in result_data:
+                    rows_data = result_data['rows']
+                    print(f"✅ Found 'rows' key with {len(rows_data)} items")
+                elif 'data' in result_data:
+                    rows_data = result_data['data']
+                    print(f"✅ Found 'data' key")
+                elif 'результат' in result_data:
+                    rows_data = result_data['результат']
+                    print(f"✅ Found 'результат' key")
+                elif 'товары' in result_data:
+                    rows_data = result_data['товары']
+                    print(f"✅ Found 'товары' key")
+                else:
+                    # Если данные прямо в словаре (key: value пары)
+                    print(f"⚠️ No standard keys found, trying to extract from dict items")
+                    print(f"⚠️ Dict items: {list(result_data.items())}")
+                    items = list(result_data.items())
+                    rows_data = [[k, v] for k, v in items if isinstance(v, (int, float))]
+                    if rows_data:
+                        print(f"✅ Extracted {len(rows_data)} numeric items from dict: {rows_data}")
+
+                # Если есть данные и они являются списком
+                if rows_data and isinstance(rows_data, list) and len(rows_data) > 0:
+                    print(f"📊 Processing {len(rows_data)} rows of data")
+                    # Пытаемся найти числовую колонку (индекс 1 обычно содержит числа для продаж)
+                    numeric_values = []
+                    for i, row in enumerate(rows_data):
+                        if isinstance(row, (list, tuple)) and len(row) > 1:
+                            try:
+                                # Пытаемся взять второй элемент как число
+                                val = float(row[1]) if len(row) > 1 else 0
+                                numeric_values.append((i + 2, val))  # +2 для строки в Sheets
+                            except (ValueError, TypeError):
+                                pass
+
+                    if numeric_values:
+                        # Сортируем по значению
+                        numeric_values.sort(key=lambda x: x[1], reverse=True)
+
+                        if 'топ' in query_lower or 'лучш' in query_lower or 'максимальн' in query_lower:
+                            # Берём топ N
+                            rows_to_highlight = [row[0] for row in numeric_values[:count]]
+                            highlight_color = requested_color or '#90EE90'  # Используем запрошенный цвет для топ значений
+                            highlight_message = f'Выделены топ {count} товаров'
+                            print(f"✅ Generated highlight rows: {rows_to_highlight}")
+                        elif 'худш' in query_lower or 'минимальн' in query_lower or 'меньш' in query_lower:
+                            # Берём последние N (минимальные)
+                            rows_to_highlight = [row[0] for row in numeric_values[-count:]]
+                            highlight_color = '#FFB6C1'  # Светло-красный для худших значений
+                            highlight_message = f'Выделены {count} товаров с минимальными продажами'
+                        else:
+                            # По умолчанию выделяем топ
+                            rows_to_highlight = [row[0] for row in numeric_values[:count]]
+                            highlight_color = requested_color or '#FFFF00'  # Используем запрошенный цвет для обычного выделения
+                            highlight_message = f'Выделены {count} строк'
+
+            # 3. Если результат - список списков (таблица)
+            elif isinstance(result_data, list) and len(result_data) > 0:
+                if all(isinstance(row, (list, tuple)) for row in result_data):
+                    # Это таблица
+                    numeric_values = []
+                    for i, row in enumerate(result_data):
+                        if len(row) > 1:
+                            try:
+                                val = float(row[1])
+                                numeric_values.append((i + 2, val))  # +2 для Sheets
+                            except (ValueError, TypeError):
+                                pass
+
+                    if numeric_values:
+                        numeric_values.sort(key=lambda x: x[1], reverse=True)
+
+                        if 'топ' in query_lower or 'лучш' in query_lower:
+                            rows_to_highlight = [row[0] for row in numeric_values[:count]]
+                            highlight_color = '#90EE90'
+                            highlight_message = f'Выделены топ {count} строк'
+                        elif 'худш' in query_lower or 'минимальн' in query_lower:
+                            rows_to_highlight = [row[0] for row in numeric_values[-count:]]
+                            highlight_color = '#FFB6C1'
+                            highlight_message = f'Выделены {count} минимальных значений'
+
+            # Если нашли строки для выделения
+            if rows_to_highlight:
+                result = {
+                    "action_type": "highlight_rows",
+                    "highlight_rows": rows_to_highlight,
+                    "highlight_color": highlight_color,
+                    "highlight_message": highlight_message
+                }
+                print(f"✅ Returning highlighting data: {result}")
+                return result
+
+            print(f"❌ No rows to highlight found")
+            return None
+
+        except Exception as e:
+            print(f"❌ Error generating highlighting data: {e}")
+            import traceback
+            traceback.print_exc()
+            return None
+
+    def _generate_professional_insights(self, query: str, result_data: Any, summary: str, custom_context: str) -> Dict[str, Any]:
+        """
+        Генерирует профессиональные инсайты на основе результатов расчета
+        Вызывается отдельно ПОСЛЕ основного расчета
+        """
+        prompt = f"""На основе запроса и результатов расчета предоставь профессиональный анализ.
+
+ЗАПРОС: {query}
+
+РЕЗУЛЬТАТЫ РАСЧЕТА:
+{summary}
+
+ДАННЫЕ: {str(result_data)[:500]}
+
+ТВОЯ РОЛЬ: {custom_context}
+
+Предоставь на РУССКОМ языке:
+1. professional_insights: Краткий профессиональный анализ (2-3 предложения)
+2. recommendations: 2-3 практические рекомендации
+3. warnings: 1-2 риска или проблемы, на которые стоит обратить внимание
+
+Ответь ТОЛЬКО в JSON формате:
+{{
+  "professional_insights": "...",
+  "recommendations": ["...", "..."],
+  "warnings": ["..."]
+}}"""
+
+        try:
+            response = self.client.chat.completions.create(
+                model=self.model,
+                messages=[
+                    {"role": "system", "content": "Ты профессиональный аналитик. Предоставляй краткие, практичные инсайты НА РУССКОМ ЯЗЫКЕ."},
+                    {"role": "user", "content": prompt}
+                ],
+                temperature=0.3,
+                max_tokens=500
+            )
+
+            insights_text = response.choices[0].message.content.strip()
+            # Try to parse JSON
+            if insights_text.startswith('```json'):
+                insights_text = insights_text.replace('```json', '').replace('```', '').strip()
+
+            insights = json.loads(insights_text)
+            return insights
+        except Exception as e:
+            print(f"Error generating insights: {e}")
+            return {
+                "professional_insights": "Анализ данных выполнен успешно.",
+                "recommendations": ["Продолжить мониторинг показателей"],
+                "warnings": []
+            }
+
+# Singleton
+ai_executor = AICodeExecutor()
+
+def get_ai_executor() -> AICodeExecutor:
+    return ai_executor

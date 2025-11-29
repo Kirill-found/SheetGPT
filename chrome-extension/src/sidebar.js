@@ -795,6 +795,25 @@ function addAIMessage(response) {
         <button class="action-btn" onclick="insertPivotTable()">Вставить таблицу</button>
       </div>
     `;
+  } else if (response.type === 'csv_split') {
+    const originalRows = response.originalRows || 0;
+    const newRows = response.newRows || 0;
+    const newCols = response.newCols || 0;
+    content = `
+      <div class="response-badge analysis">
+        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <rect x="3" y="3" width="18" height="18" rx="2"/>
+          <path d="M3 9h18"/>
+          <path d="M9 21V9"/>
+        </svg>
+        Разбиение
+      </div>
+      <p>${escapeHtml(response.text || 'Данные разбиты по ячейкам')}</p>
+      <p class="text-secondary">${newRows} строк × ${newCols} колонок</p>
+      <div class="action-buttons">
+        <button class="action-btn" onclick="applySplitData()">Заменить данные</button>
+      </div>
+    `;
   } else if (response.type === 'clean_data') {
     const originalRows = response.originalRows || 0;
     const finalRows = response.finalRows || 0;
@@ -1543,6 +1562,43 @@ window.overwriteWithCleanedData = async function() {
     addAIMessage({
       type: 'error',
       text: 'Ошибка при замене данных: ' + error.message
+    });
+  }
+};
+
+window.applySplitData = async function() {
+  const splitData = window.lastSplitData;
+  if (\!splitData) {
+    addAIMessage({
+      type: 'error',
+      text: 'Нет данных для вставки. Сначала запросите разбиение данных.'
+    });
+    return;
+  }
+
+  try {
+    // Overwrite current sheet with split data
+    const result = await sendToContentScript('OVERWRITE_SHEET_DATA', {
+      cleanedData: splitData
+    });
+    console.log('[Sidebar] Split data applied:', result);
+
+    if (result.success) {
+      addAIMessage({
+        type: 'analysis',
+        text: result.message || 'Данные успешно разбиты по ячейкам'
+      });
+    } else {
+      addAIMessage({
+        type: 'error',
+        text: result.message || 'Не удалось применить разбитые данные'
+      });
+    }
+  } catch (error) {
+    console.error('[Sidebar] Error applying split data:', error);
+    addAIMessage({
+      type: 'error',
+      text: 'Ошибка при применении данных: ' + error.message
     });
   }
 };
