@@ -1705,7 +1705,10 @@ explanation = f"У Иванова {result} продаж на сумму {total:,
 ЗАПРОС: {query}
 """
         if custom_context:
-            user_prompt += f"\nКОНТЕКСТ: {custom_context}\n"
+            user_prompt += f"""
+РОЛЬ ПОЛЬЗОВАТЕЛЯ: {custom_context}
+ВАЖНО: Учитывай роль в explanation! Фокусируйся на метриках важных для этой роли.
+"""
 
         if clarification:
             user_prompt += f"\nВАЖНО: {clarification}\n"
