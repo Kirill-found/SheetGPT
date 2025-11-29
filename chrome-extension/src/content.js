@@ -7,6 +7,28 @@
 
 console.log('[SheetGPT] Content script loaded');
 
+// Debug: expose function to test activation from console
+window.testSheetGPTActivation = function(key) {
+  const iframe = document.getElementById('sheetgpt-sidebar-iframe');
+  if (iframe && iframe.contentWindow) {
+    console.log('[SheetGPT] Sending test activation to sidebar...');
+    iframe.contentWindow.postMessage({ type: 'DEBUG_ACTIVATE', key: key || 'TEST-TEST-TEST-TEST' }, '*');
+  } else {
+    console.error('[SheetGPT] Sidebar iframe not found!');
+  }
+};
+
+window.checkSheetGPTSidebar = function() {
+  const iframe = document.getElementById('sheetgpt-sidebar-iframe');
+  const container = document.getElementById('sheetgpt-sidebar-container');
+  console.log('[SheetGPT] Debug info:', {
+    containerExists: !!container,
+    iframeExists: !!iframe,
+    iframeSrc: iframe?.src,
+    containerTransform: container?.style.transform
+  });
+};
+
 // v7.9.4: Check if extension context is valid
 function isExtensionContextValid() {
   try {
@@ -167,6 +189,15 @@ function injectSidebar() {
     border-left: 1px solid #e5e7eb;
     box-shadow: -2px 0 10px rgba(0, 0, 0, 0.1);
   `;
+
+  // Log iframe loading
+  iframe.addEventListener('load', () => {
+    console.log('[SheetGPT] ✅ Sidebar iframe loaded successfully');
+  });
+
+  iframe.addEventListener('error', (e) => {
+    console.error('[SheetGPT] ❌ Sidebar iframe failed to load:', e);
+  });
 
   container.appendChild(iframe);
 
@@ -424,6 +455,18 @@ window.addEventListener('message', async (event) => {
     return;
   }
 
+  // Handle SAVE_CONTEXT message from sidebar
+  if (event.data && event.data.type === 'SHEETGPT_SAVE_CONTEXT') {
+    console.log('[SheetGPT] 💾 Saving context to chrome.storage:', event.data.context);
+    try {
+      await chrome.storage.local.set({ customContext: event.data.context });
+      console.log('[SheetGPT] ✅ Context saved to chrome.storage');
+    } catch (e) {
+      console.error('[SheetGPT] Failed to save context:', e);
+    }
+    return;
+  }
+
   // Verify it's a message from our sidebar (has our message structure)
   if (!event.data || typeof event.data !== 'object' || !event.data.action || !event.data.messageId) {
     console.log('[SheetGPT] Ignoring message - not from sidebar (missing action or messageId)');
@@ -438,7 +481,7 @@ window.addEventListener('message', async (event) => {
 
     switch (action) {
       case 'PROCESS_QUERY':
-        result = await processQuery(data.query);
+        result = await processQuery(data.query, data.history);
         break;
 
       case 'GET_CUSTOM_CONTEXT':
@@ -463,6 +506,36 @@ window.addEventListener('message', async (event) => {
 
       case 'HIGHLIGHT_ROWS':
         result = await highlightRows(data.rows, data.color);
+        break;
+
+      case 'SORT_RANGE':
+        result = await sortRangeInSheet(data.columnIndex, data.sortOrder);
+        break;
+
+      case 'FREEZE_ROWS':
+        result = await freezeRowsInSheet(data.freezeRows, data.freezeColumns);
+        break;
+
+      case 'FORMAT_ROW':
+        result = await formatRowInSheet(data.rowIndex, data.bold, data.backgroundColor);
+        break;
+
+      case 'CREATE_CHART':
+        console.log('[SheetGPT] 📊 CREATE_CHART received with spec:', JSON.stringify(data.chartSpec));
+        result = await createChartInSheet(data.chartSpec);
+        console.log('[SheetGPT] 📊 CREATE_CHART result:', result);
+        break;
+
+      case 'APPLY_CONDITIONAL_FORMAT':
+        result = await applyConditionalFormat(data.rule);
+        break;
+
+      case 'OVERWRITE_SHEET_DATA':
+        result = await overwriteSheetData(data.cleanedData);
+        break;
+
+      case 'SET_DATA_VALIDATION':
+        result = await setDataValidationInSheet(data.rule);
         break;
 
       default:
@@ -499,10 +572,21 @@ function sendMessageToSidebar(data) {
   }
 }
 
+// ===== API CONFIGURATION =====
+// Set to 'local' to test with local server (http://localhost:8000)
+// Set to 'production' for Railway server
+const API_MODE = 'production';  // Change to 'production' for Railway server
+
+const API_URLS = {
+  local: 'http://localhost:8000/api/v1/formula',
+  production: 'https://sheetgpt-production.up.railway.app/api/v1/formula'
+};
+
 // ===== API HANDLERS =====
 
-async function processQuery(query) {
+async function processQuery(query, history = []) {
   console.log('[SheetGPT] Processing query:', query);
+  console.log('[SheetGPT] API Mode:', API_MODE, '| URL:', API_URLS[API_MODE]);
 
   // v7.9.4: Check context before any operations
   if (!isExtensionContextValid()) {
@@ -526,7 +610,7 @@ async function processQuery(query) {
   }
 
   // Call SheetGPT API
-  const response = await fetch('https://sheetgpt-production.up.railway.app/api/v1/formula', {
+  const response = await fetch(API_URLS[API_MODE], {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -535,7 +619,8 @@ async function processQuery(query) {
       query: query,
       column_names: sheetData.headers,
       sheet_data: sheetData.data,
-      custom_context: customContext || null
+      custom_context: customContext || null,
+      history: history || []
     })
   });
 
@@ -544,6 +629,8 @@ async function processQuery(query) {
   }
 
   const result = await response.json();
+  console.log('[SheetGPT] 📥 API Response:', JSON.stringify(result, null, 2));
+  console.log('[SheetGPT] 📥 Has chart_spec?', !!result.chart_spec, result.chart_spec);
   return result;
 }
 
@@ -594,11 +681,42 @@ async function insertFormula(formula, targetCell) {
 }
 
 async function createTableAndChart(structuredData) {
-  console.log('[SheetGPT] Create table and chart:', structuredData);
+  console.log('[SheetGPT] Create table and chart called');
+  console.log('[SheetGPT] structuredData:', JSON.stringify(structuredData, null, 2));
 
   try {
+    // v9.0.2: Enhanced validation
+    if (!structuredData) {
+      throw new Error('structuredData is null or undefined');
+    }
+
+    console.log('[SheetGPT] structuredData keys:', Object.keys(structuredData));
+    console.log('[SheetGPT] headers:', structuredData.headers);
+    console.log('[SheetGPT] rows:', structuredData.rows);
+    console.log('[SheetGPT] rows count:', structuredData.rows?.length);
+
+    // v9.0.2: Validate that we have actual data to write
+    if (!structuredData.headers || !Array.isArray(structuredData.headers) || structuredData.headers.length === 0) {
+      throw new Error('No headers in structured data');
+    }
+
+    if (!structuredData.rows || !Array.isArray(structuredData.rows)) {
+      throw new Error('No rows array in structured data');
+    }
+
+    if (structuredData.rows.length === 0) {
+      console.warn('[SheetGPT] ⚠️ Warning: rows array is empty, creating sheet with headers only');
+    }
+
     // Convert structured data to 2D array
     const values = convertStructuredDataToValues(structuredData);
+    console.log('[SheetGPT] Converted values:', values);
+    console.log('[SheetGPT] Values length:', values.length);
+
+    // v9.0.2: Double-check values before sending
+    if (!values || values.length === 0) {
+      throw new Error('Converted values array is empty');
+    }
 
     // Generate sheet title
     const timestamp = new Date().toLocaleString('ru-RU', {
@@ -723,6 +841,228 @@ async function highlightRows(rows, color) {
   }
 }
 
+async function sortRangeInSheet(columnIndex, sortOrder) {
+  console.log('[SheetGPT] Sort range by column:', columnIndex, 'order:', sortOrder);
+
+  try {
+    // Sort via Sheets API
+    const response = await safeSendMessage({
+      action: 'SORT_RANGE',
+      data: {
+        columnIndex: columnIndex,
+        sortOrder: sortOrder  // "ASCENDING" or "DESCENDING"
+      }
+    });
+
+    if (!response.success) {
+      throw new Error(response.error);
+    }
+
+    console.log('[SheetGPT] ✅ Range sorted via API:', response.result);
+    return {
+      success: true,
+      message: `Данные отсортированы ${sortOrder === 'DESCENDING' ? 'по убыванию' : 'по возрастанию'}`
+    };
+  } catch (error) {
+    console.error('[SheetGPT] Error sorting range:', error);
+    return {
+      success: false,
+      message: `Ошибка сортировки: ${error.message}`
+    };
+  }
+}
+
+async function freezeRowsInSheet(freezeRows, freezeColumns) {
+  console.log('[SheetGPT] Freeze rows:', freezeRows, 'columns:', freezeColumns);
+
+  try {
+    const response = await safeSendMessage({
+      action: 'FREEZE_ROWS',
+      data: {
+        freezeRows: freezeRows || 0,
+        freezeColumns: freezeColumns || 0
+      }
+    });
+
+    if (!response.success) {
+      throw new Error(response.error);
+    }
+
+    console.log('[SheetGPT] ✅ Rows/columns frozen via API:', response.result);
+
+    let message = '';
+    if (freezeRows === 0 && freezeColumns === 0) {
+      message = 'Закрепление снято';
+    } else {
+      const parts = [];
+      if (freezeRows > 0) parts.push(`${freezeRows} строк`);
+      if (freezeColumns > 0) parts.push(`${freezeColumns} столбцов`);
+      message = `Закреплено: ${parts.join(' и ')}`;
+    }
+
+    return {
+      success: true,
+      message: message
+    };
+  } catch (error) {
+    console.error('[SheetGPT] Error freezing rows:', error);
+    return {
+      success: false,
+      message: `Ошибка закрепления: ${error.message}`
+    };
+  }
+}
+
+async function formatRowInSheet(rowIndex, bold, backgroundColor) {
+  console.log('[SheetGPT] Format row:', rowIndex, 'bold:', bold, 'bg:', backgroundColor);
+
+  try {
+    const response = await safeSendMessage({
+      action: 'FORMAT_ROW',
+      data: {
+        rowIndex: rowIndex || 0,
+        bold: bold,
+        backgroundColor: backgroundColor
+      }
+    });
+
+    if (!response.success) {
+      throw new Error(response.error);
+    }
+
+    console.log('[SheetGPT] ✅ Row formatted via API:', response.result);
+    return {
+      success: true,
+      message: 'Заголовки отформатированы'
+    };
+  } catch (error) {
+    console.error('[SheetGPT] Error formatting row:', error);
+    return {
+      success: false,
+      message: `Ошибка форматирования: ${error.message}`
+    };
+  }
+}
+
+async function createChartInSheet(chartSpec) {
+  console.log('[SheetGPT] Create chart:', chartSpec);
+
+  try {
+    const response = await safeSendMessage({
+      action: 'CREATE_CHART',
+      data: {
+        chartSpec: chartSpec
+      }
+    });
+
+    if (!response || !response.success) {
+      throw new Error(response?.error || 'Неизвестная ошибка при создании диаграммы');
+    }
+
+    console.log('[SheetGPT] ✅ Chart created via API:', response.result);
+    return {
+      success: true,
+      message: `Диаграмма "${chartSpec.title || 'Диаграмма'}" создана`
+    };
+  } catch (error) {
+    console.error('[SheetGPT] Error creating chart:', error);
+    // Re-throw error so it's properly handled by the message handler
+    throw new Error(`Ошибка создания диаграммы: ${error.message}`);
+  }
+}
+
+async function applyConditionalFormat(rule) {
+  console.log('[SheetGPT] Apply conditional format:', rule);
+
+  try {
+    const response = await safeSendMessage({
+      action: 'APPLY_CONDITIONAL_FORMAT',
+      data: {
+        rule: rule
+      }
+    });
+
+    if (!response || !response.success) {
+      throw new Error(response?.error || 'Неизвестная ошибка');
+    }
+
+    console.log('[SheetGPT] ✅ Conditional format applied via API:', response.result);
+    return {
+      success: true,
+      message: `Условное форматирование применено к колонке "${rule.column_name}"`
+    };
+  } catch (error) {
+    console.error('[SheetGPT] Error applying conditional format:', error);
+    throw new Error(`Ошибка условного форматирования: ${error.message}`);
+  }
+}
+
+async function overwriteSheetData(cleanedData) {
+  console.log('[SheetGPT] Overwrite sheet with cleaned data:', cleanedData);
+
+  try {
+    if (!cleanedData || !cleanedData.headers || !cleanedData.rows) {
+      throw new Error('Invalid cleaned data format');
+    }
+
+    // Convert to 2D array
+    const values = convertStructuredDataToValues(cleanedData);
+
+    // Write to current sheet (overwrite from A1)
+    const response = await safeSendMessage({
+      action: 'WRITE_SHEET_DATA',
+      data: {
+        values: values,
+        startCell: 'A1',
+        mode: 'overwrite'
+      }
+    });
+
+    if (!response || !response.success) {
+      throw new Error(response?.error || 'Неизвестная ошибка');
+    }
+
+    console.log('[SheetGPT] ✅ Data overwritten via API:', response.result);
+    return {
+      success: true,
+      message: `Данные заменены (${values.length - 1} строк)`
+    };
+  } catch (error) {
+    console.error('[SheetGPT] Error overwriting data:', error);
+    throw new Error(`Ошибка замены данных: ${error.message}`);
+  }
+}
+
+async function setDataValidationInSheet(rule) {
+  console.log('[SheetGPT] Set data validation:', rule);
+
+  try {
+    if (!rule || !rule.allowed_values || rule.allowed_values.length === 0) {
+      throw new Error('Invalid validation rule');
+    }
+
+    const response = await safeSendMessage({
+      action: 'SET_DATA_VALIDATION',
+      data: {
+        rule: rule
+      }
+    });
+
+    if (!response || !response.success) {
+      throw new Error(response?.error || 'Неизвестная ошибка');
+    }
+
+    console.log('[SheetGPT] ✅ Data validation set via API:', response.result);
+    return {
+      success: true,
+      message: `Выпадающий список создан для "${rule.column_name}" (${rule.allowed_values.length} вариантов)`
+    };
+  } catch (error) {
+    console.error('[SheetGPT] Error setting data validation:', error);
+    throw new Error(`Ошибка создания валидации: ${error.message}`);
+  }
+}
+
 // Helper function to convert structured data to 2D array
 function convertStructuredDataToValues(structuredData) {
   console.log('[SheetGPT] Converting structured data:', structuredData);
@@ -731,10 +1071,40 @@ function convertStructuredDataToValues(structuredData) {
     throw new Error('Invalid structured data format: data is null or undefined');
   }
 
-  // Backend returns format: { headers: [...], rows: [[...], [...]], ... }
+  // If we have rows but no headers, extract headers from first row keys
+  if (structuredData.rows && structuredData.rows.length > 0 && !structuredData.headers) {
+    const firstRow = structuredData.rows[0];
+    if (firstRow && typeof firstRow === 'object' && !Array.isArray(firstRow)) {
+      structuredData.headers = Object.keys(firstRow);
+      console.log('[SheetGPT] Auto-extracted headers:', structuredData.headers);
+    }
+  }
+
+  // Backend returns format: { headers: [...], rows: [...], ... }
   if (structuredData.headers && structuredData.rows) {
     console.log('[SheetGPT] Using headers/rows format');
-    return [structuredData.headers, ...structuredData.rows];
+    const headers = structuredData.headers;
+
+    // Check if rows are objects (from DataFrame.to_dict('records')) or arrays
+    const firstRow = structuredData.rows[0];
+    if (firstRow && typeof firstRow === 'object' && !Array.isArray(firstRow)) {
+      // Rows are objects - convert to arrays using headers as keys
+      console.log('[SheetGPT] 🔄 Converting object rows to arrays using headers:', headers);
+      const convertedRows = structuredData.rows.map((row, idx) => {
+        const convertedRow = headers.map(header => {
+          const value = row[header];
+          return value !== undefined && value !== null ? String(value) : '';
+        });
+        if (idx === 0) console.log('[SheetGPT] First converted row:', convertedRow);
+        return convertedRow;
+      });
+      console.log('[SheetGPT] ✅ Converted', convertedRows.length, 'rows');
+      return [headers, ...convertedRows];
+    } else {
+      // Rows are already arrays
+      console.log('[SheetGPT] Rows are already arrays');
+      return [headers, ...structuredData.rows];
+    }
   }
 
   // Alternative format: { columns: [...], data: [...] }

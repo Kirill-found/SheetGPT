@@ -1,0 +1,232 @@
+# v6.2.8 - Custom Context Debug
+# v6.2.9 - Chart spec generation
+from fastapi import APIRouter, HTTPException
+from app.schemas.requests import FormulaRequest
+from app.schemas.responses import FormulaResponse, ErrorResponse
+from app.services.ai_service import ai_service
+import logging
+
+router = APIRouter(prefix="/api/v1", tags=["formula"])
+logger = logging.getLogger(__name__)
+
+
+@router.post("/debug-request", include_in_schema=False)
+async def debug_request(request: FormulaRequest):
+    """Debug endpoint to see what's being received"""
+    return {
+        "query": request.query,
+        "custom_context": request.custom_context,
+        "custom_context_type": str(type(request.custom_context)),
+        "custom_context_len": len(request.custom_context) if request.custom_context else 0,
+        "has_custom_context": bool(request.custom_context)
+    }
+
+
+@router.post(
+    "/formula",
+    response_model=FormulaResponse,
+    responses={
+        400: {"model": ErrorResponse},
+        500: {"model": ErrorResponse}
+    },
+    summary="Генерация Google Sheets формулы",
+    description="Принимает запрос на естественном языке и возвращает готовую формулу"
+)
+async def generate_formula(request: FormulaRequest):
+    """
+    Генерирует Google Sheets формулу на основе запроса пользователя.
+
+    **Пример запроса:**
+    ```json
+    {
+      "query": "Сумма продаж где сумма больше 500000",
+      "column_names": ["Дата", "Продажи", "Менеджер"],
+      "sheet_data": [
+        ["2024-01-01", 600000, "Иванов"],
+        ["2024-01-02", 400000, "Петров"]
+      ]
+    }
+    ```
+
+    **Ответ:**
+    ```json
+    {
+      "formula": "=SUMIF(B:B, \">500000\", B:B)",
+      "explanation": "Суммирует все значения...",
+      "target_cell": "D1",
+      "confidence": 0.98
+    }
+    ```
+    """
+
+    try:
+        # Валидация
+        if not request.query.strip():
+            raise HTTPException(
+                status_code=400,
+                detail="Запрос не может быть пустым"
+            )
+
+        if not request.column_names:
+            raise HTTPException(
+                status_code=400,
+                detail="Необходимо указать названия колонок"
+            )
+
+        # DEBUG: Log custom_context
+        print(f"\n🎯 FORMULA.PY: request.custom_context = {request.custom_context}")
+        print(f"🎯 FORMULA.PY: custom_context type = {type(request.custom_context)}")
+
+        # Обрабатываем запрос через AI
+        # Если есть conversation_id - используем generate_actions (Interactive Builder с историей)
+        # Иначе используем старый process_query
+        if request.conversation_id:
+            # Используем Interactive Builder с поддержкой conversation history
+            sheet_data_dict = {
+                "columns": request.column_names,
+                "sample_data": request.sheet_data[1:] if request.sheet_data and len(request.sheet_data) > 1 else [],
+                "row_count": len(request.sheet_data) if request.sheet_data else 0,
+                "sheet_id": "default",
+                "selected_range": request.selected_range,
+                "active_cell": request.active_cell
+            }
+            result = await ai_service.generate_actions(
+                query=request.query,
+                sheet_data=sheet_data_dict,
+                conversation_id=request.conversation_id
+            )
+        else:
+            # v6.2.0: Use AI Code Executor with optional custom_context
+            result = ai_service.process_formula_request(
+                query=request.query,
+                column_names=request.column_names,
+                sheet_data=request.sheet_data,
+                history=request.history or [],
+                custom_context=request.custom_context  # v6.2.0: Персонализированная роль AI
+            )
+
+        # Проверяем confidence
+        if result.get("confidence", 0) < 0.5:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Не удалось понять запрос: {result.get('explanation', result.get('answer', 'Неясный запрос'))}"
+            )
+
+        # Возвращаем ответ в зависимости от типа
+        response_type = result.get("response_type", result.get("type", "formula"))
+        print(f"🚨 FORMULA.PY: response_type = '{response_type}'")
+        print(f"🚨 FORMULA.PY: result.get('response_type') = '{result.get('response_type')}'")
+        print(f"🚨 FORMULA.PY: Condition check: response_type == 'analysis' = {response_type == 'analysis'}")
+
+        if response_type == "analysis" or response_type == "question":
+            # DEBUG: Log result from AI service
+            print(f"📥 formula.py received result keys: {list(result.keys())}")
+            print(f"📥 result has methodology: {('methodology' in result)}")
+            if 'methodology' in result:
+                print(f"📥 methodology value: {result['methodology']}")
+
+            # Для анализа возвращаем структурированный ответ
+            response_data = FormulaResponse(
+                formula=None,  # Нет формулы
+                explanation=result.get("answer", result.get("summary", "")),  # Fallback для совместимости
+                insights=result.get("insights", []),
+                suggested_actions=result.get("suggested_actions", []),
+                target_cell=None,
+                confidence=result["confidence"],
+                response_type="analysis"
+            )
+            # Добавляем структурированные поля
+            response_dict = response_data.model_dump()
+            response_dict["summary"] = result.get("summary")
+            response_dict["methodology"] = result.get("methodology")  # CRITICAL: Show which data was used
+            response_dict["key_findings"] = result.get("key_findings", [])
+            # CRITICAL: Add structured_data for table/chart creation
+            print(f"🔍 DEBUG: 'structured_data' in result: {'structured_data' in result}")
+            if "structured_data" in result:
+                print(f"🔍 DEBUG: structured_data value: {result['structured_data']}")
+                response_dict["structured_data"] = result["structured_data"]
+            else:
+                print(f"🔍 DEBUG: result keys: {list(result.keys())}")
+            # DEBUG: Add generated Python code for troubleshooting
+            response_dict["code_generated"] = result.get("code_generated")
+            response_dict["python_executed"] = result.get("python_executed", False)
+            response_dict["execution_output"] = result.get("execution_output", "")
+            # v6.2.8: Add professional insights if present (custom_context feature)
+            response_dict["professional_insights"] = result.get("professional_insights")
+            response_dict["recommendations"] = result.get("recommendations")
+            response_dict["warnings"] = result.get("warnings")
+
+            # v8.2.0: Add highlighting data if present (for "выдели строки" queries)
+            if "highlight_rows" in result and result["highlight_rows"]:
+                response_dict["highlight_rows"] = result["highlight_rows"]
+                response_dict["highlighted_count"] = result.get("highlighted_count", len(result["highlight_rows"]))
+                response_dict["highlight_color"] = result.get("highlight_color", "#FFFF00")
+                response_dict["highlight_message"] = result.get("highlight_message", "Строки выделены")
+                print(f"🎨 HIGHLIGHT: Added {len(result['highlight_rows'])} rows to response")
+
+            print(f"📦 response_dict keys before return: {list(response_dict.keys())}")
+            print(f"📦 response_dict['methodology']: {response_dict.get('methodology')}")
+
+            if result.get("conversation_id"):
+                response_dict["conversation_id"] = result["conversation_id"]
+            return response_dict
+        elif response_type == "action":
+            # ОПТИМИЗАЦИЯ: Если есть только одна формула (игнорируем format_cells и другие второстепенные действия)
+            insights = result.get("insights", [])
+            formula_actions = [a for a in insights if a.get("type") == "insert_formula"]
+
+            # Если есть ровно ОДНА формула для вставки, возвращаем как простой formula response
+            if len(formula_actions) == 1:
+                formula_config = formula_actions[0].get("config", {})
+                response_data = FormulaResponse(
+                    formula=formula_config.get("formula"),
+                    explanation=result.get("explanation", ""),
+                    target_cell=formula_config.get("cell"),
+                    confidence=result["confidence"],
+                    response_type="formula"
+                )
+                response_dict = response_data.model_dump()
+                if result.get("conversation_id"):
+                    response_dict["conversation_id"] = result["conversation_id"]
+                return response_dict
+
+            # Для множественных actions возвращаем план действий
+            response_data = FormulaResponse(
+                formula=None,  # Нет формулы
+                explanation=result.get("explanation", ""),
+                insights=result.get("insights", []),  # Действия передаем в insights
+                suggested_actions=None,
+                target_cell=None,
+                confidence=result["confidence"],
+                response_type="action"
+            )
+            # Добавляем metadata из 2-step prompting
+            response_dict = response_data.model_dump()
+            response_dict["intent"] = result.get("intent")
+            response_dict["depth"] = result.get("depth")
+            if result.get("conversation_id"):
+                response_dict["conversation_id"] = result["conversation_id"]
+            return response_dict
+        else:
+            # Для формулы
+            response_data = FormulaResponse(
+                formula=result.get("formula"),
+                explanation=result.get("explanation"),
+                target_cell=result.get("target_cell"),
+                confidence=result["confidence"],
+                response_type="formula"
+            )
+            # Добавляем conversation_id если он есть в result
+            response_dict = response_data.model_dump()
+            if result.get("conversation_id"):
+                response_dict["conversation_id"] = result["conversation_id"]
+            return response_dict
+
+    except HTTPException:
+        raise
+
+    except Exception as e:
+        raise HTTPException(
+            status_code=500,
+            detail=f"Ошибка генерации формулы: {str(e)}"
+        )

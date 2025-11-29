@@ -29,6 +29,31 @@ class FormulaResponse(BaseModel):
     # v7.4.0: Function calling metadata
     function_used: Optional[str] = Field(None, description="Название использованной функции")
     parameters: Optional[dict] = Field(None, description="Параметры вызванной функции")
+    # v6.2.9: Chart creation field
+    chart_spec: Optional[dict] = Field(None, description="Спецификация диаграммы для создания")
+    # Freeze rows/columns fields
+    freeze_rows: Optional[int] = Field(None, description="Количество строк для закрепления")
+    freeze_columns: Optional[int] = Field(None, description="Количество колонок для закрепления")
+    # Sort fields
+    sort_column: Optional[str] = Field(None, description="Название колонки для сортировки")
+    sort_column_index: Optional[int] = Field(None, description="Индекс колонки для сортировки")
+    sort_order: Optional[str] = Field(None, description="Порядок сортировки: asc | desc")
+    # Format fields
+    format_type: Optional[str] = Field(None, description="Тип форматирования")
+    target_row: Optional[int] = Field(None, description="Целевая строка для форматирования")
+    bold: Optional[bool] = Field(None, description="Жирный текст")
+    background_color: Optional[str] = Field(None, description="Цвет фона")
+    # Value field (for simple calculations)
+    value: Optional[Any] = Field(None, description="Вычисленное значение")
+    # Processor metadata
+    processor_version: Optional[str] = Field(None, description="Версия процессора")
+    complexity: Optional[str] = Field(None, description="Сложность запроса")
+    strategy: Optional[str] = Field(None, description="Стратегия обработки")
+    processing_time: Optional[str] = Field(None, description="Время обработки")
+    retry_count: Optional[int] = Field(None, description="Количество повторов")
+    # Debug fields
+    code_generated: Optional[str] = Field(None, description="Сгенерированный Python код")
+    python_executed: Optional[bool] = Field(None, description="Был ли выполнен Python код")
 
     class Config:
         json_schema_extra = {

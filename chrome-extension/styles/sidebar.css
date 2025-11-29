@@ -1,34 +1,134 @@
 /**
  * SheetGPT Chrome Extension - Sidebar Styles
+ * Design System v1.2 — Premium Monochrome (Notion-like)
  */
 
+/* ============================================
+   DESIGN TOKENS v1.2
+   ============================================ */
+:root {
+  /* Fonts */
+  --font-sans: 'Geist Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-mono: 'Geist Mono', 'SF Mono', monospace;
+
+  /* Spacing */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+
+  /* Radius — VERY rounded */
+  --radius-xs: 6px;
+  --radius-sm: 10px;
+  --radius-md: 14px;
+  --radius-lg: 20px;
+  --radius-xl: 28px;
+  --radius-2xl: 36px;
+  --radius-full: 9999px;
+
+  /* Transitions */
+  --duration-fast: 120ms;
+  --duration-normal: 220ms;
+  --duration-slow: 350ms;
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+
+  /* Light Theme */
+  --bg-base: #f7f7f7;
+  --bg-primary: #ffffff;
+  --bg-secondary: #fafafa;
+  --bg-tertiary: #f0f0f0;
+  --bg-hover: #e8e8e8;
+  --bg-elevated: #ffffff;
+
+  --text-primary: #111111;
+  --text-secondary: #555555;
+  --text-tertiary: #888888;
+  --text-muted: #aaaaaa;
+  --text-inverse: #ffffff;
+
+  --border-subtle: rgba(0, 0, 0, 0.04);
+  --border-light: rgba(0, 0, 0, 0.06);
+  --border-default: rgba(0, 0, 0, 0.1);
+  --border-strong: rgba(0, 0, 0, 0.15);
+  --border-focus: #111111;
+
+  --accent: #111111;
+  --accent-hover: #222222;
+  --accent-subtle: rgba(17, 17, 17, 0.06);
+
+  --success: #10b981;
+  --success-subtle: rgba(16, 185, 129, 0.1);
+  --error: #ef4444;
+  --error-subtle: rgba(239, 68, 68, 0.1);
+
+  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.04);
+  --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.06);
+  --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.08);
+}
+
+/* Dark Theme */
+[data-theme="dark"] {
+  --bg-base: #050505;
+  --bg-primary: #0a0a0a;
+  --bg-secondary: #111111;
+  --bg-tertiary: #1a1a1a;
+  --bg-hover: #222222;
+  --bg-elevated: #141414;
+
+  --text-primary: #f5f5f5;
+  --text-secondary: #a0a0a0;
+  --text-tertiary: #666666;
+  --text-muted: #444444;
+  --text-inverse: #0a0a0a;
+
+  --border-subtle: rgba(255, 255, 255, 0.03);
+  --border-light: rgba(255, 255, 255, 0.05);
+  --border-default: rgba(255, 255, 255, 0.08);
+  --border-strong: rgba(255, 255, 255, 0.12);
+  --border-focus: #f5f5f5;
+
+  --accent: #f5f5f5;
+  --accent-hover: #e0e0e0;
+  --accent-subtle: rgba(245, 245, 245, 0.08);
+
+  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.5);
+  --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.5);
+  --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.6);
+}
+
+/* ============================================
+   INJECTED SIDEBAR CONTAINER
+   ============================================ */
 .sheetgpt-sidebar {
   position: fixed;
   top: 0;
   right: 0;
   width: 400px;
   height: 100vh;
-  background: #ffffff;
-  box-shadow: -2px 0 10px rgba(0, 0, 0, 0.1);
+  background: var(--bg-primary);
+  box-shadow: -4px 0 24px rgba(0, 0, 0, 0.08);
   z-index: 999999;
   display: flex;
   flex-direction: column;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-  transition: transform 0.3s ease;
+  font-family: var(--font-mono);
+  transition: transform var(--duration-normal) var(--ease-out);
+  border-left: 1px solid var(--border-light);
 }
 
 .sheetgpt-sidebar-collapsed {
   transform: translateX(100%);
 }
 
-.sheetgpt-sidebar-collapsed .sheetgpt-toggle-btn {
-  transform: translateX(-100%);
-}
-
-/* Toggle button */
+/* ============================================
+   TOGGLE BUTTON
+   ============================================ */
 .sheetgpt-sidebar-header {
   position: absolute;
-  left: -48px;
+  left: -52px;
   top: 50%;
   transform: translateY(-50%);
 }
@@ -36,89 +136,137 @@
 .sheetgpt-toggle-btn {
   width: 48px;
   height: 48px;
-  background: #4285f4;
+  background: var(--accent);
   border: none;
-  border-radius: 24px 0 0 24px;
-  color: white;
+  border-radius: var(--radius-lg) 0 0 var(--radius-lg);
+  color: var(--text-inverse);
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: -2px 2px 8px rgba(0, 0, 0, 0.2);
-  transition: background 0.2s;
+  box-shadow: var(--shadow-md);
+  transition: all var(--duration-fast) var(--ease-spring);
 }
 
 .sheetgpt-toggle-btn:hover {
-  background: #3367d6;
+  transform: scale(1.05);
 }
 
-/* Header */
+.sheetgpt-toggle-btn svg {
+  width: 22px;
+  height: 22px;
+}
+
+/* ============================================
+   HEADER
+   ============================================ */
 .sheetgpt-header {
-  padding: 16px 20px;
-  border-bottom: 1px solid #e0e0e0;
+  padding: var(--space-4) var(--space-5);
+  border-bottom: 1px solid var(--border-light);
   display: flex;
   align-items: center;
   justify-content: space-between;
-  background: #f8f9fa;
+  background: var(--bg-primary);
 }
 
 .sheetgpt-header h2 {
   margin: 0;
-  font-size: 18px;
-  font-weight: 600;
-  color: #202124;
+  font-family: var(--font-mono);
+  font-size: 15px;
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  color: var(--text-primary);
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.sheetgpt-header h2 .logo-equal {
+  color: var(--text-tertiary);
 }
 
 .sheetgpt-close-btn {
-  background: none;
-  border: none;
-  font-size: 28px;
-  color: #5f6368;
+  width: 36px;
+  height: 36px;
+  background: transparent;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  color: var(--text-tertiary);
   cursor: pointer;
-  line-height: 1;
-  padding: 0;
-  width: 32px;
-  height: 32px;
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 4px;
-  transition: background 0.2s;
+  transition: all var(--duration-fast) var(--ease-out);
 }
 
 .sheetgpt-close-btn:hover {
-  background: #e8eaed;
+  background: var(--bg-hover);
+  border-color: var(--border-strong);
+  color: var(--text-primary);
 }
 
-/* Chat area */
+.sheetgpt-close-btn svg {
+  width: 18px;
+  height: 18px;
+}
+
+/* ============================================
+   CHAT AREA
+   ============================================ */
 .sheetgpt-sidebar-content {
   display: flex;
   flex-direction: column;
   height: 100%;
+  background: var(--bg-secondary);
 }
 
 .sheetgpt-chat {
   flex: 1;
   overflow-y: auto;
-  padding: 16px;
+  padding: var(--space-6);
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: var(--space-6);
 }
 
+/* Custom Scrollbar */
+.sheetgpt-chat::-webkit-scrollbar {
+  width: 8px;
+}
+
+.sheetgpt-chat::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.sheetgpt-chat::-webkit-scrollbar-thumb {
+  background: var(--border-default);
+  border-radius: var(--radius-full);
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+.sheetgpt-chat::-webkit-scrollbar-thumb:hover {
+  background: var(--border-strong);
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+/* ============================================
+   MESSAGES
+   ============================================ */
 .sheetgpt-message {
   max-width: 85%;
-  padding: 12px 16px;
-  border-radius: 12px;
+  padding: var(--space-4) var(--space-5);
+  border-radius: var(--radius-xl);
   font-size: 14px;
-  line-height: 1.5;
-  animation: slideIn 0.2s ease;
+  line-height: 1.6;
+  animation: slideIn var(--duration-normal) var(--ease-out);
 }
 
 @keyframes slideIn {
   from {
     opacity: 0;
-    transform: translateY(10px);
+    transform: translateY(12px);
   }
   to {
     opacity: 1;
@@ -128,132 +276,311 @@
 
 .sheetgpt-message-user {
   align-self: flex-end;
-  background: #4285f4;
-  color: white;
-  border-bottom-right-radius: 4px;
+  background: var(--accent);
+  color: var(--text-inverse);
+  border-bottom-right-radius: var(--radius-sm);
 }
 
 .sheetgpt-message-ai {
   align-self: flex-start;
-  background: #f1f3f4;
-  color: #202124;
-  border-bottom-left-radius: 4px;
+  background: var(--bg-primary);
+  color: var(--text-primary);
+  border: 1px solid var(--border-light);
+  border-bottom-left-radius: var(--radius-sm);
 }
 
 .sheetgpt-message-content ul {
-  margin: 8px 0;
-  padding-left: 20px;
+  margin: var(--space-2) 0;
+  padding-left: var(--space-5);
 }
 
 .sheetgpt-message-content li {
-  margin: 4px 0;
+  margin: var(--space-1) 0;
 }
 
+.sheetgpt-message-content code {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  background: var(--bg-tertiary);
+  padding: 2px 6px;
+  border-radius: var(--radius-xs);
+  color: var(--text-primary);
+}
+
+/* Loading State */
 .sheetgpt-loading {
   position: relative;
 }
 
 .sheetgpt-loading::after {
   content: '';
-  display: inline-block;
-  width: 4px;
-  height: 4px;
-  border-radius: 50%;
-  background: #5f6368;
-  animation: pulse 1.5s infinite;
-  margin-left: 4px;
+  display: inline-flex;
+  width: 6px;
+  height: 6px;
+  border-radius: var(--radius-full);
+  background: var(--text-tertiary);
+  animation: loadingPulse 1.5s infinite;
+  margin-left: 6px;
 }
 
-@keyframes pulse {
-  0%, 100% {
-    opacity: 0.3;
-  }
-  50% {
-    opacity: 1;
-  }
+@keyframes loadingPulse {
+  0%, 100% { opacity: 0.3; transform: scale(0.8); }
+  50% { opacity: 1; transform: scale(1); }
 }
 
-/* Insert button */
+/* ============================================
+   INSERT BUTTON
+   ============================================ */
 .sheetgpt-insert-btn {
-  margin-top: 8px;
-  padding: 8px 16px;
-  background: #34a853;
-  color: white;
+  margin-top: var(--space-3);
+  padding: var(--space-2) var(--space-4);
+  height: 32px;
+  background: var(--accent);
+  color: var(--text-inverse);
   border: none;
-  border-radius: 4px;
+  border-radius: var(--radius-full);
   cursor: pointer;
-  font-size: 13px;
+  font-family: var(--font-mono);
+  font-size: 12px;
   font-weight: 500;
-  transition: background 0.2s;
+  transition: all var(--duration-fast) var(--ease-out);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
 }
 
 .sheetgpt-insert-btn:hover {
-  background: #2d8e47;
+  background: var(--accent-hover);
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-sm);
 }
 
-/* Input area */
+.sheetgpt-insert-btn:active {
+  transform: scale(0.97);
+}
+
+.sheetgpt-insert-btn svg {
+  width: 14px;
+  height: 14px;
+}
+
+/* ============================================
+   INPUT AREA
+   ============================================ */
 .sheetgpt-input-container {
-  padding: 16px;
-  border-top: 1px solid #e0e0e0;
+  padding: var(--space-4) var(--space-5);
+  border-top: 1px solid var(--border-light);
   display: flex;
-  gap: 8px;
-  background: #ffffff;
+  gap: var(--space-3);
+  background: var(--bg-primary);
 }
 
 .sheetgpt-input {
   flex: 1;
-  padding: 10px 12px;
-  border: 1px solid #dadce0;
-  border-radius: 8px;
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
   font-size: 14px;
-  font-family: inherit;
+  font-family: var(--font-mono);
+  background: var(--bg-secondary);
+  color: var(--text-primary);
   resize: none;
   outline: none;
-  transition: border-color 0.2s;
+  transition: all var(--duration-fast) var(--ease-out);
 }
 
 .sheetgpt-input:focus {
-  border-color: #4285f4;
+  border-color: var(--border-focus);
+  box-shadow: 0 0 0 3px var(--accent-subtle);
+}
+
+.sheetgpt-input::placeholder {
+  color: var(--text-muted);
 }
 
 .sheetgpt-send-btn {
   width: 40px;
   height: 40px;
-  background: #4285f4;
+  background: var(--accent);
   border: none;
-  border-radius: 8px;
-  color: white;
+  border-radius: var(--radius-full);
+  color: var(--text-inverse);
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: background 0.2s;
+  transition: all var(--duration-fast) var(--ease-out);
   flex-shrink: 0;
+  box-shadow: var(--shadow-sm);
 }
 
-.sheetgpt-send-btn:hover {
-  background: #3367d6;
+.sheetgpt-send-btn:hover:not(:disabled) {
+  transform: scale(1.05);
+  box-shadow: var(--shadow-md);
+}
+
+.sheetgpt-send-btn:active:not(:disabled) {
+  transform: scale(0.95);
 }
 
 .sheetgpt-send-btn:disabled {
-  background: #dadce0;
+  opacity: 0.3;
   cursor: not-allowed;
 }
 
-/* Scrollbar styling */
-.sheetgpt-chat::-webkit-scrollbar {
-  width: 8px;
+.sheetgpt-send-btn svg {
+  width: 18px;
+  height: 18px;
 }
 
-.sheetgpt-chat::-webkit-scrollbar-track {
-  background: #f1f3f4;
+/* ============================================
+   PERSONALIZATION MODAL
+   ============================================ */
+.personalize-modal {
+  max-width: 100% !important;
+  width: 100%;
+  margin: 0;
+  border-radius: 0;
+  max-height: 100vh;
+  height: 100%;
 }
 
-.sheetgpt-chat::-webkit-scrollbar-thumb {
-  background: #dadce0;
-  border-radius: 4px;
+.modal-header-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
 }
 
-.sheetgpt-chat::-webkit-scrollbar-thumb:hover {
-  background: #bdc1c6;
+.modal-subtitle {
+  font-size: 11px;
+  color: var(--text-tertiary);
+  font-weight: 400;
+}
+
+/* Roles Grid */
+.roles-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+}
+
+/* Role Card */
+.role-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  border-radius: var(--radius-lg);
+  border: 2px solid transparent;
+  background: var(--bg-secondary);
+  cursor: pointer;
+  transition: all var(--duration-fast) var(--ease-out);
+  outline: none;
+  font-family: inherit;
+}
+
+.role-card:hover {
+  background: var(--bg-hover);
+}
+
+.role-card.selected {
+  border-color: var(--accent);
+  background: var(--accent-subtle);
+}
+
+/* Role Icon */
+.role-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-md);
+  background: var(--bg-tertiary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all var(--duration-fast);
+  color: var(--text-tertiary);
+}
+
+.role-icon svg {
+  width: 20px;
+  height: 20px;
+  stroke: currentColor;
+  fill: none;
+  stroke-width: 1.5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.role-card.selected .role-icon {
+  background: var(--accent);
+  color: var(--text-inverse);
+}
+
+/* Role Label */
+.role-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-align: center;
+  line-height: 1.3;
+  transition: color var(--duration-fast);
+}
+
+.role-card.selected .role-label {
+  color: var(--text-primary);
+}
+
+/* Prompt Section */
+.prompt-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--space-2);
+}
+
+.prompt-container {
+  position: relative;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border-default);
+  background: var(--bg-primary);
+  overflow: hidden;
+  transition: all var(--duration-fast);
+}
+
+.prompt-container:focus-within {
+  border-color: var(--border-focus);
+  box-shadow: 0 0 0 3px var(--accent-subtle);
+}
+
+.prompt-indicator {
+  height: 3px;
+  background: var(--accent);
+  transition: background var(--duration-normal);
+}
+
+.prompt-textarea {
+  width: 100%;
+  min-height: 140px;
+  padding: var(--space-4);
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--text-primary);
+  background: transparent;
+  border: none;
+  outline: none;
+  resize: vertical;
+  font-family: var(--font-mono);
+}
+
+.prompt-textarea::placeholder {
+  color: var(--text-muted);
+}
+
+/* Character Counter */
+.char-counter {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-muted);
 }

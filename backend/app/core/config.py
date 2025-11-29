@@ -41,6 +41,10 @@ class Settings(BaseSettings):
     ANALYSIS_MODEL: str = "gpt-4o"
     REPORT_MODEL: str = "gpt-4o"
 
+    # Telegram Bot
+    TELEGRAM_BOT_TOKEN: str = ""
+    TELEGRAM_ADMIN_ID: int = 0  # Твой Telegram ID для админских команд
+
     class Config:
         env_file = ".env"
         case_sensitive = True

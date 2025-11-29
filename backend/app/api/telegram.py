@@ -276,6 +276,47 @@ async def upgrade_to_premium(
     }
 
 
+@router.post("/admin/set-premium")
+async def admin_set_premium(
+    telegram_user_id: int,
+    admin_key: str = Header(...),
+    duration_days: int = 365,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Админский endpoint для установки Premium подписки по telegram_user_id
+    """
+    if admin_key != "sheetgpt_admin_2025":
+        raise HTTPException(status_code=403, detail="Invalid admin key")
+
+    result = await db.execute(
+        select(TelegramUser).where(TelegramUser.telegram_user_id == telegram_user_id)
+    )
+    user = result.scalar_one_or_none()
+
+    if not user:
+        raise HTTPException(status_code=404, detail=f"User {telegram_user_id} not found")
+
+    # Используем метод модели для корректного обновления всех полей
+    user.upgrade_to_premium(duration_days=duration_days)
+
+    await db.commit()
+    await db.refresh(user)
+
+    logger.info(f"[ADMIN] User {telegram_user_id} set to premium until {user.premium_until}")
+
+    return {
+        "success": True,
+        "message": f"User {telegram_user_id} upgraded to Premium for {duration_days} days",
+        "user": {
+            "telegram_user_id": user.telegram_user_id,
+            "username": user.username,
+            "subscription_tier": user.subscription_tier,
+            "premium_until": user.premium_until
+        }
+    }
+
+
 @router.post("/reset-daily-limits")
 async def reset_daily_limits(
     admin_key: str = Header(...),
@@ -303,6 +344,314 @@ async def reset_daily_limits(
         "success": True,
         "message": f"Reset daily limits for {len(users)} users"
     }
+
+
+# ==================== LICENSE ENDPOINTS ====================
+
+class LicenseGenerateRequest(BaseModel):
+    telegram_user_id: int
+    username: Optional[str] = None
+    first_name: Optional[str] = None
+
+
+class LicenseResponse(BaseModel):
+    success: bool
+    license_key: Optional[str] = None
+    message: str
+    telegram_user_id: Optional[int] = None
+    subscription_tier: Optional[str] = None
+    # Дополнительные данные для Chrome Extension
+    username: Optional[str] = None
+    first_name: Optional[str] = None
+    queries_used_today: Optional[int] = None
+    queries_limit: Optional[int] = None
+    total_queries: Optional[int] = None
+
+
+@router.post("/license/generate", response_model=LicenseResponse)
+async def generate_license_key(
+    request: LicenseGenerateRequest,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Генерация лицензионного ключа для пользователя.
+    Вызывается из Telegram бота при нажатии "Сгенерировать ключ".
+    """
+    logger.info(f"Generating license for user: {request.telegram_user_id}")
+
+    # Ищем или создаём пользователя
+    result = await db.execute(
+        select(TelegramUser).where(TelegramUser.telegram_user_id == request.telegram_user_id)
+    )
+    user = result.scalar_one_or_none()
+
+    if not user:
+        # Создаём нового пользователя
+        user = TelegramUser(
+            telegram_user_id=request.telegram_user_id,
+            username=request.username,
+            first_name=request.first_name,
+            api_token=TelegramUser.generate_api_token(),
+            license_key=TelegramUser.generate_license_key(),
+            subscription_tier="free",
+            queries_used_today=0,
+            queries_limit=10,
+            total_queries=0,
+            is_active=True
+        )
+        db.add(user)
+        await db.commit()
+        await db.refresh(user)
+        logger.info(f"Created new user with license: {user.license_key}")
+    else:
+        # Генерируем новый ключ для существующего пользователя
+        user.license_key = TelegramUser.generate_license_key()
+        user.updated_at = datetime.now(timezone.utc)
+        await db.commit()
+        await db.refresh(user)
+        logger.info(f"Updated license for user: {user.license_key}")
+
+    return LicenseResponse(
+        success=True,
+        license_key=user.license_key,
+        message="License key generated successfully",
+        telegram_user_id=user.telegram_user_id,
+        subscription_tier=user.subscription_tier
+    )
+
+
+@router.get("/license/validate/{license_key}", response_model=LicenseResponse)
+async def validate_license_key(
+    license_key: str,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Проверка лицензионного ключа.
+    Вызывается из Chrome Extension при активации.
+    """
+    logger.info(f"Validating license: {license_key}")
+
+    # Нормализуем ключ (убираем пробелы, приводим к верхнему регистру)
+    license_key = license_key.strip().upper()
+
+    result = await db.execute(
+        select(TelegramUser).where(TelegramUser.license_key == license_key)
+    )
+    user = result.scalar_one_or_none()
+
+    if not user:
+        logger.warning(f"License not found: {license_key}")
+        return LicenseResponse(
+            success=False,
+            license_key=license_key,
+            message="License key not found"
+        )
+
+    if not user.is_active:
+        logger.warning(f"License inactive: {license_key}")
+        return LicenseResponse(
+            success=False,
+            license_key=license_key,
+            message="License key is inactive"
+        )
+
+    logger.info(f"License valid: {license_key} for user {user.telegram_user_id}")
+    return LicenseResponse(
+        success=True,
+        license_key=license_key,
+        message="License key is valid",
+        telegram_user_id=user.telegram_user_id,
+        subscription_tier=user.subscription_tier,
+        username=user.username,
+        first_name=user.first_name,
+        queries_used_today=user.queries_used_today,
+        queries_limit=user.queries_limit,
+        total_queries=user.total_queries
+    )
+
+
+class ActivateLicenseRequest(BaseModel):
+    license_key: str
+
+
+@router.post("/activate-license", response_model=LicenseResponse)
+async def activate_license(
+    request: ActivateLicenseRequest,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Активация лицензионного ключа (POST версия для Chrome Extension).
+    Принимает JSON: {"license_key": "XXXX-XXXX-XXXX-XXXX"}
+    """
+    license_key = request.license_key.strip().upper()
+    logger.info(f"Activating license (POST): {license_key}")
+
+    result = await db.execute(
+        select(TelegramUser).where(TelegramUser.license_key == license_key)
+    )
+    user = result.scalar_one_or_none()
+
+    if not user:
+        logger.warning(f"License not found: {license_key}")
+        return LicenseResponse(
+            success=False,
+            license_key=license_key,
+            message="License key not found"
+        )
+
+    if not user.is_active:
+        logger.warning(f"License inactive: {license_key}")
+        return LicenseResponse(
+            success=False,
+            license_key=license_key,
+            message="License key is inactive"
+        )
+
+    logger.info(f"License activated: {license_key} for user {user.telegram_user_id}")
+    return LicenseResponse(
+        success=True,
+        license_key=license_key,
+        message="License activated successfully",
+        telegram_user_id=user.telegram_user_id,
+        subscription_tier=user.subscription_tier,
+        username=user.username,
+        first_name=user.first_name,
+        queries_used_today=user.queries_used_today,
+        queries_limit=user.queries_limit,
+        total_queries=user.total_queries
+    )
+
+
+class UsageIncrementResponse(BaseModel):
+    success: bool
+    queries_used_today: int
+    queries_limit: int
+    queries_remaining: int
+    can_make_query: bool
+    message: str
+
+
+@router.post("/license/{license_key}/increment-usage", response_model=UsageIncrementResponse)
+async def increment_usage_by_license(
+    license_key: str,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Увеличить счётчик использования по лицензионному ключу.
+    Вызывается из Chrome Extension после каждого запроса.
+    """
+    license_key = license_key.strip().upper()
+    logger.info(f"Incrementing usage for license: {license_key}")
+
+    result = await db.execute(
+        select(TelegramUser).where(TelegramUser.license_key == license_key)
+    )
+    user = result.scalar_one_or_none()
+
+    if not user:
+        raise HTTPException(status_code=404, detail="License not found")
+
+    if not user.is_active:
+        raise HTTPException(status_code=403, detail="License inactive")
+
+    # Определяем, является ли пользователь premium/unlimited
+    is_unlimited = (
+        user.subscription_tier == "premium" or
+        user.queries_limit == -1
+    )
+
+    # Проверяем лимит перед инкрементом
+    if not user.can_make_query():
+        queries_remaining = -1 if is_unlimited else max(0, user.queries_limit - user.queries_used_today)
+        return UsageIncrementResponse(
+            success=False,
+            queries_used_today=user.queries_used_today,
+            queries_limit=user.queries_limit,
+            queries_remaining=queries_remaining,
+            can_make_query=False,
+            message="Daily limit exceeded"
+        )
+
+    # Инкрементим использование
+    user.increment_usage()
+    await db.commit()
+    await db.refresh(user)
+
+    queries_remaining = -1 if is_unlimited else max(0, user.queries_limit - user.queries_used_today)
+
+    logger.info(f"Usage incremented for {license_key}: {user.queries_used_today}/{user.queries_limit}")
+
+    return UsageIncrementResponse(
+        success=True,
+        queries_used_today=user.queries_used_today,
+        queries_limit=user.queries_limit,
+        queries_remaining=queries_remaining,
+        can_make_query=user.can_make_query(),
+        message="Usage incremented"
+    )
+
+
+@router.get("/license/{license_key}/status", response_model=LicenseResponse)
+async def get_status_by_license(
+    license_key: str,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Получить текущий статус пользователя по лицензионному ключу.
+    """
+    license_key = license_key.strip().upper()
+
+    result = await db.execute(
+        select(TelegramUser).where(TelegramUser.license_key == license_key)
+    )
+    user = result.scalar_one_or_none()
+
+    if not user:
+        return LicenseResponse(
+            success=False,
+            message="License not found"
+        )
+
+    return LicenseResponse(
+        success=True,
+        license_key=license_key,
+        message="Status retrieved",
+        telegram_user_id=user.telegram_user_id,
+        subscription_tier=user.subscription_tier,
+        username=user.username,
+        first_name=user.first_name,
+        queries_used_today=user.queries_used_today,
+        queries_limit=user.queries_limit,
+        total_queries=user.total_queries
+    )
+
+
+@router.get("/license/user/{telegram_user_id}", response_model=LicenseResponse)
+async def get_user_license(
+    telegram_user_id: int,
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Получить лицензионный ключ пользователя по telegram_user_id.
+    """
+    result = await db.execute(
+        select(TelegramUser).where(TelegramUser.telegram_user_id == telegram_user_id)
+    )
+    user = result.scalar_one_or_none()
+
+    if not user or not user.license_key:
+        return LicenseResponse(
+            success=False,
+            message="No license found for this user"
+        )
+
+    return LicenseResponse(
+        success=True,
+        license_key=user.license_key,
+        message="License found",
+        telegram_user_id=user.telegram_user_id,
+        subscription_tier=user.subscription_tier
+    )
 
 
 @router.get("/test-db")
@@ -364,6 +713,54 @@ async def init_telegram_database(
         }
     except Exception as e:
         logger.error(f"Failed to create telegram_users table: {e}")
+        import traceback
+        return {
+            "success": False,
+            "error": str(e),
+            "traceback": traceback.format_exc()
+        }
+
+
+@router.post("/migrate-license-key")
+async def migrate_license_key_column(
+    admin_key: str = Header(...),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    Добавить колонку license_key в таблицу telegram_users
+    (Миграция для существующей таблицы)
+    """
+    if admin_key != "sheetgpt_admin_2025":
+        raise HTTPException(status_code=403, detail="Invalid admin key")
+
+    try:
+        from sqlalchemy import text
+
+        # Добавляем колонку если её нет
+        await db.execute(text("""
+            ALTER TABLE telegram_users
+            ADD COLUMN IF NOT EXISTS license_key VARCHAR(19) UNIQUE
+        """))
+        await db.commit()
+
+        # Создаём индекс
+        try:
+            await db.execute(text("""
+                CREATE INDEX IF NOT EXISTS ix_telegram_users_license_key
+                ON telegram_users(license_key)
+            """))
+            await db.commit()
+        except Exception:
+            pass  # Индекс уже существует
+
+        logger.info("license_key column added successfully")
+
+        return {
+            "success": True,
+            "message": "license_key column added successfully"
+        }
+    except Exception as e:
+        logger.error(f"Failed to add license_key column: {e}")
         import traceback
         return {
             "success": False,

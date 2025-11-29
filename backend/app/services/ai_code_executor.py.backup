@@ -124,7 +124,7 @@ class AICodeExecutor:
             df = pd.DataFrame(sheet_data, columns=column_names)
 
             # Шаг 2: AI генерирует Python код
-            generated_code = self._generate_python_code(query, df, safe_custom_context, history)
+            generated_code = self._generate_python_code(query, df, safe_custom_context)
 
             # Шаг 3: Выполняем код безопасно
             result = self._execute_python_code(generated_code, df)
@@ -153,7 +153,7 @@ class AICodeExecutor:
                 "response_type": "error"
             }
 
-    def _generate_python_code(self, query: str, df: pd.DataFrame, custom_context: Optional[str] = None, history: List[Dict[str, Any]] = None) -> str:
+    def _generate_python_code(self, query: str, df: pd.DataFrame, custom_context: Optional[str] = None) -> str:
         """
         AI генерирует Python код для решения задачи
         С опциональным custom_context для персонализации
@@ -163,36 +163,10 @@ class AICodeExecutor:
         print(f"[TRACE 1] query: {query}")
         print(f"[TRACE 1] df.shape: {df.shape}")
         print(f"[TRACE 1] custom_context: {custom_context is not None}")
-        print(f"[TRACE 1] history: {len(history) if history else 0} messages")
         print("="*80 + "\n")
 
         # Анализируем структуру данных
         data_info = self._analyze_dataframe(df)
-
-        # v8.0.1: Строим контекст истории разговора
-        history_context = ""
-        if history and len(history) > 0:
-            history_context = "
-CONVERSATION HISTORY (previous questions and answers):
-"
-            history_context += "=" * 50 + "
-"
-            for i, item in enumerate(history[-5:], 1):  # Last 5 messages
-                prev_query = item.get('query', '')
-                prev_response = item.get('response', '')
-                if prev_query:
-                    history_context += f"{i}. User asked: {prev_query}
-"
-                    if prev_response:
-                        history_context += f"   AI answered: {prev_response[:200]}...
-" if len(prev_response) > 200 else f"   AI answered: {prev_response}
-"
-            history_context += "=" * 50 + "
-"
-            history_context += "IMPORTANT: Use this context to understand follow-up questions like 'почему?' (why?), 'а Петров?' (what about Petrov?), etc.
-
-"
-            print(f"[HISTORY] Added conversation context: {len(history)} messages")
 
         # Строим базовый промпт
         prompt = f"""You are a Python data analyst expert. Generate Python code to answer this question.
@@ -204,7 +178,7 @@ ALL 'summary' and 'methodology' variables MUST be in the SAME LANGUAGE as the us
 - If query is in English → summary and methodology MUST be in English
 - NEVER return "True" or "False" - return "Да" or "Нет" for Russian queries
 - NEVER use English words like "Found", "Total" in Russian context
-{history_context}
+
 QUESTION: {query}
 
 AVAILABLE DATA:

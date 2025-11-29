@@ -46,6 +46,30 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           result = await handleHighlightRows(sender.tab.id, sender.tab.url, data);
           break;
 
+        case 'SORT_RANGE':
+          result = await handleSortRange(sender.tab.id, sender.tab.url, data);
+          break;
+
+        case 'FREEZE_ROWS':
+          result = await handleFreezeRows(sender.tab.id, sender.tab.url, data);
+          break;
+
+        case 'FORMAT_ROW':
+          result = await handleFormatRow(sender.tab.id, sender.tab.url, data);
+          break;
+
+        case 'CREATE_CHART':
+          result = await handleCreateChart(sender.tab.id, sender.tab.url, data);
+          break;
+
+        case 'APPLY_CONDITIONAL_FORMAT':
+          result = await handleConditionalFormat(sender.tab.id, sender.tab.url, data);
+          break;
+
+        case 'SET_DATA_VALIDATION':
+          result = await handleSetDataValidation(sender.tab.id, sender.tab.url, data);
+          break;
+
         case 'CHECK_AUTH':
           result = await checkAuth();
           break;
@@ -164,7 +188,11 @@ async function handleWriteSheetData(tabId, tabUrl, data) {
  * Create a new sheet and write data
  */
 async function handleCreateNewSheet(tabId, tabUrl, data) {
-  console.log('[Background] Creating new sheet:', data);
+  console.log('[Background] Creating new sheet, received data:', JSON.stringify(data, null, 2));
+  console.log('[Background] data.sheetTitle:', data?.sheetTitle);
+  console.log('[Background] data.values:', data?.values);
+  console.log('[Background] data.values length:', data?.values?.length);
+  console.log('[Background] data.values[0] (headers):', data?.values?.[0]);
 
   const spreadsheetId = getSpreadsheetIdFromUrl(tabUrl);
   if (!spreadsheetId) {
@@ -173,13 +201,26 @@ async function handleCreateNewSheet(tabId, tabUrl, data) {
 
   const { sheetTitle, values } = data;
 
+  // v9.0.2: Validate values before creating sheet
+  if (!values || !Array.isArray(values)) {
+    console.error('[Background] ❌ ERROR: values is not an array!', values);
+    throw new Error('Invalid data: values must be an array');
+  }
+
+  if (values.length === 0) {
+    console.error('[Background] ❌ ERROR: values array is empty!');
+    throw new Error('Invalid data: values array is empty');
+  }
+
+  console.log('[Background] ✅ Validated values:', values.length, 'rows');
+
   // Create new sheet
   const sheetProperties = await createNewSheet(spreadsheetId, sheetTitle);
   console.log('[Background] ✅ Sheet created:', sheetProperties);
 
   // Write data to new sheet
   await writeSheetData(spreadsheetId, sheetTitle, values, 'A1');
-  console.log('[Background] ✅ Data written to new sheet');
+  console.log('[Background] ✅ Data written to new sheet:', values.length, 'rows');
 
   return { sheetProperties, rowsWritten: values.length };
 }
@@ -211,6 +252,202 @@ async function handleHighlightRows(tabId, tabUrl, data) {
   const result = await highlightRows(spreadsheetId, sheetId, rowIndices, color);
 
   console.log('[Background] ✅ Rows highlighted:', result);
+  return result;
+}
+
+/**
+ * Sort data in Google Sheet by column
+ */
+async function handleSortRange(tabId, tabUrl, data) {
+  console.log('[Background] Sorting range:', data);
+
+  const spreadsheetId = getSpreadsheetIdFromUrl(tabUrl);
+  if (!spreadsheetId) {
+    throw new Error('Not a valid Google Sheets URL');
+  }
+
+  const { columnIndex, sortOrder } = data;
+
+  // Get saved sheet name from storage (saved by handleGetSheetData)
+  const storageKey = `sheetName_${spreadsheetId}`;
+  const storageData = await chrome.storage.local.get(storageKey);
+  const sheetName = storageData[storageKey] || 'Лист1'; // Fallback to Russian default
+
+  console.log(`[Background] Using sheet name "${sheetName}" for sorting`);
+
+  // Get sheet ID
+  const sheetId = await getSheetIdByName(spreadsheetId, sheetName);
+
+  // Sort range (start from row 1 to skip header)
+  const result = await sortRange(spreadsheetId, sheetId, columnIndex, sortOrder, 1, -1);
+
+  console.log('[Background] ✅ Range sorted:', result);
+  return result;
+}
+
+/**
+ * Freeze rows/columns in Google Sheet
+ */
+async function handleFreezeRows(tabId, tabUrl, data) {
+  console.log('[Background] Freezing rows/columns:', data);
+
+  const spreadsheetId = getSpreadsheetIdFromUrl(tabUrl);
+  if (!spreadsheetId) {
+    throw new Error('Not a valid Google Sheets URL');
+  }
+
+  const { freezeRows, freezeColumns } = data;
+
+  // Get saved sheet name from storage
+  const storageKey = `sheetName_${spreadsheetId}`;
+  const storageData = await chrome.storage.local.get(storageKey);
+  const sheetName = storageData[storageKey] || 'Лист1';
+
+  console.log(`[Background] Using sheet name "${sheetName}" for freezing`);
+
+  // Get sheet ID
+  const sheetId = await getSheetIdByName(spreadsheetId, sheetName);
+
+  // Freeze rows/columns
+  const result = await freezeRowsColumns(spreadsheetId, sheetId, freezeRows || 0, freezeColumns || 0);
+
+  console.log('[Background] ✅ Rows/columns frozen:', result);
+  return result;
+}
+
+/**
+ * Format row in Google Sheet (bold, color)
+ */
+async function handleFormatRow(tabId, tabUrl, data) {
+  console.log('[Background] Formatting row:', data);
+
+  const spreadsheetId = getSpreadsheetIdFromUrl(tabUrl);
+  if (!spreadsheetId) {
+    throw new Error('Not a valid Google Sheets URL');
+  }
+
+  const { rowIndex, bold, backgroundColor } = data;
+
+  // Get saved sheet name from storage
+  const storageKey = `sheetName_${spreadsheetId}`;
+  const storageData = await chrome.storage.local.get(storageKey);
+  const sheetName = storageData[storageKey] || 'Лист1';
+
+  console.log(`[Background] Using sheet name "${sheetName}" for formatting`);
+
+  // Get sheet ID
+  const sheetId = await getSheetIdByName(spreadsheetId, sheetName);
+
+  // Format row
+  const result = await formatRow(spreadsheetId, sheetId, rowIndex || 0, bold, backgroundColor);
+
+  console.log('[Background] ✅ Row formatted:', result);
+  return result;
+}
+
+/**
+ * Create a chart in Google Sheet
+ */
+async function handleCreateChart(tabId, tabUrl, data) {
+  console.log('[Background] 📊 Creating chart, data:', JSON.stringify(data));
+
+  const spreadsheetId = getSpreadsheetIdFromUrl(tabUrl);
+  console.log('[Background] 📊 Spreadsheet ID:', spreadsheetId);
+  if (!spreadsheetId) {
+    throw new Error('Not a valid Google Sheets URL');
+  }
+
+  const { chartSpec } = data;
+
+  if (!chartSpec) {
+    throw new Error('Chart specification is required');
+  }
+
+  // Get saved sheet name from storage
+  const storageKey = `sheetName_${spreadsheetId}`;
+  const storageData = await chrome.storage.local.get(storageKey);
+  const sheetName = storageData[storageKey] || 'Лист1';
+
+  console.log(`[Background] 📊 Using sheet name "${sheetName}" for chart (storageKey: ${storageKey})`);
+
+  // Get sheet ID
+  console.log('[Background] 📊 Getting sheet ID...');
+  const sheetId = await getSheetIdByName(spreadsheetId, sheetName);
+  console.log('[Background] 📊 Sheet ID:', sheetId);
+
+  // Create chart
+  console.log('[Background] 📊 Calling createChart API...');
+  const result = await createChart(spreadsheetId, sheetId, chartSpec);
+
+  console.log('[Background] ✅ Chart created successfully:', result);
+  return result;
+}
+
+/**
+ * Apply conditional formatting to Google Sheet
+ */
+async function handleConditionalFormat(tabId, tabUrl, data) {
+  console.log('[Background] Applying conditional format:', data);
+
+  const spreadsheetId = getSpreadsheetIdFromUrl(tabUrl);
+  if (!spreadsheetId) {
+    throw new Error('Not a valid Google Sheets URL');
+  }
+
+  const { rule } = data;
+
+  if (!rule) {
+    throw new Error('Conditional format rule is required');
+  }
+
+  // Get saved sheet name from storage
+  const storageKey = `sheetName_${spreadsheetId}`;
+  const storageData = await chrome.storage.local.get(storageKey);
+  const sheetName = storageData[storageKey] || 'Лист1';
+
+  console.log(`[Background] Using sheet name "${sheetName}" for conditional format`);
+
+  // Get sheet ID
+  const sheetId = await getSheetIdByName(spreadsheetId, sheetName);
+
+  // Apply conditional format
+  const result = await applyConditionalFormat(spreadsheetId, sheetId, rule);
+
+  console.log('[Background] ✅ Conditional format applied:', result);
+  return result;
+}
+
+/**
+ * Set data validation (dropdown list) for a column
+ */
+async function handleSetDataValidation(tabId, tabUrl, data) {
+  console.log('[Background] Setting data validation:', data);
+
+  const spreadsheetId = getSpreadsheetIdFromUrl(tabUrl);
+  if (!spreadsheetId) {
+    throw new Error('Not a valid Google Sheets URL');
+  }
+
+  const { rule } = data;
+
+  if (!rule) {
+    throw new Error('Data validation rule is required');
+  }
+
+  // Get saved sheet name from storage
+  const storageKey = `sheetName_${spreadsheetId}`;
+  const storageData = await chrome.storage.local.get(storageKey);
+  const sheetName = storageData[storageKey] || 'Лист1';
+
+  console.log(`[Background] Using sheet name "${sheetName}" for data validation`);
+
+  // Get sheet ID
+  const sheetId = await getSheetIdByName(spreadsheetId, sheetName);
+
+  // Set data validation
+  const result = await setDataValidation(spreadsheetId, sheetId, rule);
+
+  console.log('[Background] ✅ Data validation set:', result);
   return result;
 }
 

@@ -374,6 +374,372 @@ async function highlightRows(spreadsheetId, sheetId, rowIndices, color = { red: 
 }
 
 /**
+ * Sort data in a range by column
+ * @param {string} spreadsheetId - The spreadsheet ID
+ * @param {number} sheetId - The sheet ID (not name!)
+ * @param {number} columnIndex - 0-based column index to sort by
+ * @param {string} sortOrder - "ASCENDING" or "DESCENDING"
+ * @param {number} startRowIndex - Start row (0-based, typically 1 to skip header)
+ * @param {number} endRowIndex - End row (exclusive), or -1 for all rows
+ */
+async function sortRange(spreadsheetId, sheetId, columnIndex, sortOrder = "ASCENDING", startRowIndex = 1, endRowIndex = -1) {
+  try {
+    const token = await getAuthToken();
+
+    // If endRowIndex is -1, we need to get the sheet dimensions first
+    let actualEndRowIndex = endRowIndex;
+    if (endRowIndex === -1) {
+      // Get sheet properties to find row count
+      const propsResponse = await fetch(
+        `${SHEETS_API_BASE}/${spreadsheetId}?fields=sheets.properties`,
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json'
+          }
+        }
+      );
+      const propsData = await propsResponse.json();
+      const sheet = propsData.sheets?.find(s => s.properties.sheetId === sheetId);
+      actualEndRowIndex = sheet?.properties?.gridProperties?.rowCount || 1000;
+    }
+
+    console.log(`[SheetsAPI] Sorting sheet ${sheetId}, column ${columnIndex}, order ${sortOrder}, rows ${startRowIndex}-${actualEndRowIndex}`);
+
+    const response = await fetch(
+      `${SHEETS_API_BASE}/${spreadsheetId}:batchUpdate`,
+      {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          requests: [{
+            sortRange: {
+              range: {
+                sheetId: sheetId,
+                startRowIndex: startRowIndex,  // Skip header row
+                endRowIndex: actualEndRowIndex
+              },
+              sortSpecs: [{
+                dimensionIndex: columnIndex,
+                sortOrder: sortOrder  // "ASCENDING" or "DESCENDING"
+              }]
+            }
+          }]
+        })
+      }
+    );
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(`Sheets API error: ${error.error?.message || response.statusText}`);
+    }
+
+    const result = await response.json();
+    console.log('[SheetsAPI] ✅ Range sorted:', result);
+    return result;
+  } catch (error) {
+    console.error('[SheetsAPI] Error sorting range:', error);
+    throw error;
+  }
+}
+
+/**
+ * Freeze rows and/or columns
+ * @param {string} spreadsheetId - The spreadsheet ID
+ * @param {number} sheetId - The sheet ID
+ * @param {number} frozenRowCount - Number of rows to freeze (0 to unfreeze)
+ * @param {number} frozenColumnCount - Number of columns to freeze (0 to unfreeze)
+ */
+async function freezeRowsColumns(spreadsheetId, sheetId, frozenRowCount = 1, frozenColumnCount = 0) {
+  try {
+    const token = await getAuthToken();
+
+    console.log(`[SheetsAPI] Freezing ${frozenRowCount} rows and ${frozenColumnCount} columns on sheet ${sheetId}`);
+
+    const response = await fetch(
+      `${SHEETS_API_BASE}/${spreadsheetId}:batchUpdate`,
+      {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          requests: [{
+            updateSheetProperties: {
+              properties: {
+                sheetId: sheetId,
+                gridProperties: {
+                  frozenRowCount: frozenRowCount,
+                  frozenColumnCount: frozenColumnCount
+                }
+              },
+              fields: 'gridProperties.frozenRowCount,gridProperties.frozenColumnCount'
+            }
+          }]
+        })
+      }
+    );
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(`Sheets API error: ${error.error?.message || response.statusText}`);
+    }
+
+    const result = await response.json();
+    console.log('[SheetsAPI] ✅ Rows/columns frozen:', result);
+    return result;
+  } catch (error) {
+    console.error('[SheetsAPI] Error freezing rows/columns:', error);
+    throw error;
+  }
+}
+
+/**
+ * Format cells (bold, background color)
+ * @param {string} spreadsheetId - The spreadsheet ID
+ * @param {number} sheetId - The sheet ID
+ * @param {number} rowIndex - 0-based row index to format
+ * @param {boolean} bold - Make text bold
+ * @param {string} backgroundColor - Hex color (e.g., "#FFFF00")
+ */
+async function formatRow(spreadsheetId, sheetId, rowIndex = 0, bold = true, backgroundColor = null) {
+  try {
+    const token = await getAuthToken();
+
+    console.log(`[SheetsAPI] Formatting row ${rowIndex} on sheet ${sheetId}, bold=${bold}, bg=${backgroundColor}`);
+
+    // Build cell format
+    const cellFormat = {};
+    const fields = [];
+
+    if (bold) {
+      cellFormat.textFormat = { bold: true };
+      fields.push('userEnteredFormat.textFormat.bold');
+    }
+
+    if (backgroundColor) {
+      // Convert hex to RGB (0-1 scale)
+      const hex = backgroundColor.replace('#', '');
+      const r = parseInt(hex.substring(0, 2), 16) / 255;
+      const g = parseInt(hex.substring(2, 4), 16) / 255;
+      const b = parseInt(hex.substring(4, 6), 16) / 255;
+
+      cellFormat.backgroundColor = { red: r, green: g, blue: b };
+      fields.push('userEnteredFormat.backgroundColor');
+    }
+
+    const response = await fetch(
+      `${SHEETS_API_BASE}/${spreadsheetId}:batchUpdate`,
+      {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          requests: [{
+            repeatCell: {
+              range: {
+                sheetId: sheetId,
+                startRowIndex: rowIndex,
+                endRowIndex: rowIndex + 1
+              },
+              cell: {
+                userEnteredFormat: cellFormat
+              },
+              fields: fields.join(',')
+            }
+          }]
+        })
+      }
+    );
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(`Sheets API error: ${error.error?.message || response.statusText}`);
+    }
+
+    const result = await response.json();
+    console.log('[SheetsAPI] ✅ Row formatted:', result);
+    return result;
+  } catch (error) {
+    console.error('[SheetsAPI] Error formatting row:', error);
+    throw error;
+  }
+}
+
+/**
+ * Create a chart in Google Sheets
+ * @param {string} spreadsheetId - The spreadsheet ID
+ * @param {number} sheetId - The sheet ID
+ * @param {object} chartSpec - Chart specification from backend
+ */
+async function createChart(spreadsheetId, sheetId, chartSpec) {
+  try {
+    const token = await getAuthToken();
+
+    const { chart_type, title, x_column_index, y_column_indices, row_count, col_count } = chartSpec;
+
+    console.log(`[SheetsAPI] Creating ${chart_type} chart: "${title}"`);
+    console.log(`[SheetsAPI] X column: ${x_column_index}, Y columns: ${y_column_indices}, rows: ${row_count}`);
+
+    // Build series for each Y column
+    const series = y_column_indices.map((yColIndex, idx) => ({
+      series: {
+        sourceRange: {
+          sources: [{
+            sheetId: sheetId,
+            startRowIndex: 0,
+            endRowIndex: row_count + 1, // Include header
+            startColumnIndex: yColIndex,
+            endColumnIndex: yColIndex + 1
+          }]
+        }
+      },
+      targetAxis: 'LEFT_AXIS'
+    }));
+
+    // Build domain (X axis)
+    const domain = {
+      domain: {
+        sourceRange: {
+          sources: [{
+            sheetId: sheetId,
+            startRowIndex: 0,
+            endRowIndex: row_count + 1, // Include header
+            startColumnIndex: x_column_index,
+            endColumnIndex: x_column_index + 1
+          }]
+        }
+      }
+    };
+
+    // Map chart type to Google Sheets API type
+    const chartTypeMap = {
+      'LINE': 'LINE',
+      'BAR': 'BAR',
+      'COLUMN': 'COLUMN',
+      'PIE': 'PIE',
+      'AREA': 'AREA',
+      'SCATTER': 'SCATTER',
+      'COMBO': 'COMBO'
+    };
+
+    const googleChartType = chartTypeMap[chart_type] || 'COLUMN';
+
+    // Build chart spec based on type
+    let spec;
+
+    if (googleChartType === 'PIE') {
+      // Pie charts have different structure
+      spec = {
+        pieChart: {
+          legendPosition: 'RIGHT_LEGEND',
+          domain: domain.domain,
+          series: series[0]?.series || series[0],
+          threeDimensional: false
+        }
+      };
+    } else {
+      // Line, Bar, Column, Area, Scatter, Combo
+      spec = {
+        basicChart: {
+          chartType: googleChartType,
+          legendPosition: 'BOTTOM_LEGEND',
+          axis: [
+            {
+              position: 'BOTTOM_AXIS',
+              title: chartSpec.x_column_name || ''
+            },
+            {
+              position: 'LEFT_AXIS',
+              title: chartSpec.y_column_names?.join(', ') || ''
+            }
+          ],
+          domains: [domain],
+          series: series,
+          headerCount: 1,
+          stackedType: 'NOT_STACKED'
+        }
+      };
+
+      // interpolateNulls only supported for LINE, AREA, SCATTER
+      if (['LINE', 'AREA', 'SCATTER'].includes(googleChartType)) {
+        spec.basicChart.interpolateNulls = true;
+      }
+
+      // For scatter, add specific settings
+      if (googleChartType === 'SCATTER') {
+        spec.basicChart.lineSmoothing = false;
+      }
+
+      // For area chart, stack if multiple series
+      if (googleChartType === 'AREA' && series.length > 1) {
+        spec.basicChart.stackedType = 'STACKED';
+      }
+    }
+
+    // Build the full chart request
+    const chartRequest = {
+      addChart: {
+        chart: {
+          spec: {
+            title: title,
+            ...spec
+          },
+          position: {
+            overlayPosition: {
+              anchorCell: {
+                sheetId: sheetId,
+                rowIndex: 1,
+                columnIndex: col_count + 1 // Place chart next to data
+              },
+              offsetXPixels: 20,
+              offsetYPixels: 20,
+              widthPixels: 600,
+              heightPixels: 400
+            }
+          }
+        }
+      }
+    };
+
+    console.log('[SheetsAPI] Chart request:', JSON.stringify(chartRequest, null, 2));
+
+    const response = await fetch(
+      `${SHEETS_API_BASE}/${spreadsheetId}:batchUpdate`,
+      {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          requests: [chartRequest]
+        })
+      }
+    );
+
+    if (!response.ok) {
+      const error = await response.json();
+      console.error('[SheetsAPI] Chart error:', error);
+      throw new Error(`Sheets API error: ${error.error?.message || response.statusText}`);
+    }
+
+    const result = await response.json();
+    console.log('[SheetsAPI] ✅ Chart created:', result);
+    return result;
+  } catch (error) {
+    console.error('[SheetsAPI] Error creating chart:', error);
+    throw error;
+  }
+}
+
+/**
  * Get sheet ID by name
  */
 async function getSheetIdByName(spreadsheetId, sheetName) {
@@ -409,6 +775,177 @@ async function getSheetIdByName(spreadsheetId, sheetName) {
   }
 }
 
+/**
+ * Apply conditional formatting to a column
+ * @param {string} spreadsheetId - The spreadsheet ID
+ * @param {number} sheetId - The sheet ID
+ * @param {object} rule - The conditional format rule with:
+ *   - column_index: Column to apply rule to
+ *   - condition_type: NUMBER_GREATER, NUMBER_LESS, NUMBER_EQ, BLANK, NOT_BLANK
+ *   - condition_value: Value to compare against (null for BLANK/NOT_BLANK)
+ *   - format_color: RGB color object {red, green, blue}
+ */
+async function applyConditionalFormat(spreadsheetId, sheetId, rule) {
+  try {
+    const token = await getAuthToken();
+
+    const { column_index, condition_type, condition_value, format_color } = rule;
+
+    console.log(`[SheetsAPI] Applying conditional format to column ${column_index}, type: ${condition_type}, value: ${condition_value}`);
+
+    // Build the condition based on type
+    let booleanCondition;
+
+    switch (condition_type) {
+      case 'NUMBER_GREATER':
+        booleanCondition = {
+          type: 'NUMBER_GREATER',
+          values: [{ userEnteredValue: String(condition_value) }]
+        };
+        break;
+      case 'NUMBER_LESS':
+        booleanCondition = {
+          type: 'NUMBER_LESS',
+          values: [{ userEnteredValue: String(condition_value) }]
+        };
+        break;
+      case 'NUMBER_EQ':
+        booleanCondition = {
+          type: 'NUMBER_EQ',
+          values: [{ userEnteredValue: String(condition_value) }]
+        };
+        break;
+      case 'BLANK':
+        booleanCondition = {
+          type: 'BLANK'
+        };
+        break;
+      case 'NOT_BLANK':
+        booleanCondition = {
+          type: 'NOT_BLANK'
+        };
+        break;
+      default:
+        booleanCondition = {
+          type: 'NUMBER_GREATER',
+          values: [{ userEnteredValue: '0' }]
+        };
+    }
+
+    // Build the conditional format request
+    const request = {
+      addConditionalFormatRule: {
+        rule: {
+          ranges: [{
+            sheetId: sheetId,
+            startRowIndex: 1, // Skip header row
+            startColumnIndex: column_index,
+            endColumnIndex: column_index + 1
+          }],
+          booleanRule: {
+            condition: booleanCondition,
+            format: {
+              backgroundColor: format_color || { red: 1, green: 1, blue: 0.7 }
+            }
+          }
+        },
+        index: 0 // Insert at the beginning of the conditional format rules
+      }
+    };
+
+    console.log('[SheetsAPI] Conditional format request:', JSON.stringify(request, null, 2));
+
+    const response = await fetch(
+      `${SHEETS_API_BASE}/${spreadsheetId}:batchUpdate`,
+      {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          requests: [request]
+        })
+      }
+    );
+
+    if (!response.ok) {
+      const error = await response.json();
+      console.error('[SheetsAPI] Conditional format error:', error);
+      throw new Error(`Sheets API error: ${error.error?.message || response.statusText}`);
+    }
+
+    const result = await response.json();
+    console.log('[SheetsAPI] ✅ Conditional format applied:', result);
+    return result;
+  } catch (error) {
+    console.error('[SheetsAPI] Error applying conditional format:', error);
+    throw error;
+  }
+}
+
+/**
+ * Set data validation (dropdown list) for a column
+ */
+async function setDataValidation(spreadsheetId, sheetId, rule) {
+  try {
+    const token = await getAuthToken();
+
+    const { column_index, allowed_values, show_dropdown, strict } = rule;
+
+    console.log(`[SheetsAPI] Setting data validation for column ${column_index}, values: ${allowed_values.join(', ')}`);
+
+    // Build the data validation request
+    const request = {
+      setDataValidation: {
+        range: {
+          sheetId: sheetId,
+          startRowIndex: 1, // Skip header row
+          startColumnIndex: column_index,
+          endColumnIndex: column_index + 1
+        },
+        rule: {
+          condition: {
+            type: 'ONE_OF_LIST',
+            values: allowed_values.map(value => ({ userEnteredValue: value }))
+          },
+          showCustomUi: show_dropdown !== false, // Show dropdown by default
+          strict: strict !== false // Reject invalid input by default
+        }
+      }
+    };
+
+    console.log('[SheetsAPI] Data validation request:', JSON.stringify(request, null, 2));
+
+    const response = await fetch(
+      `${SHEETS_API_BASE}/${spreadsheetId}:batchUpdate`,
+      {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          requests: [request]
+        })
+      }
+    );
+
+    if (!response.ok) {
+      const error = await response.json();
+      console.error('[SheetsAPI] Data validation error:', error);
+      throw new Error(`Sheets API error: ${error.error?.message || response.statusText}`);
+    }
+
+    const result = await response.json();
+    console.log('[SheetsAPI] ✅ Data validation set:', result);
+    return result;
+  } catch (error) {
+    console.error('[SheetsAPI] Error setting data validation:', error);
+    throw error;
+  }
+}
+
 // Export functions
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = {
@@ -420,6 +957,12 @@ if (typeof module !== 'undefined' && module.exports) {
     appendSheetData,
     createNewSheet,
     highlightRows,
-    getSheetIdByName
+    sortRange,
+    freezeRowsColumns,
+    formatRow,
+    createChart,
+    getSheetIdByName,
+    applyConditionalFormat,
+    setDataValidation
   };
 }

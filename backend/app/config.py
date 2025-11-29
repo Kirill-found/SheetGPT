@@ -35,6 +35,10 @@ class Settings(BaseSettings):
     APP_VERSION: str = "6.2.8"
     DEBUG: bool = False
 
+    # Telegram Bot
+    TELEGRAM_BOT_TOKEN: str = ""
+    TELEGRAM_ADMIN_ID: int = 0
+
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"

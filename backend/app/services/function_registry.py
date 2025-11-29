@@ -1489,11 +1489,13 @@ class FunctionRegistry:
 
             {
                 "name": "get_unique_values",
-                "description": "Получить СПИСОК уникальных значений из колонки. ОБЯЗАТЕЛЬНО используй для 'какие', 'какие значения', 'список городов/менеджеров/продуктов', 'покажи уникальные', 'все уникальные'. Возвращает DataFrame со списком значений, НЕ количество!",
+                "description": "Получить СПИСОК уникальных значений из колонки. ОБЯЗАТЕЛЬНО используй для 'какие', 'какие продукты', 'какие товары продал X', 'список городов/менеджеров/продуктов', 'покажи уникальные'. Примеры: 'какие продукты продал Иванов' → column='Продукт', filter_column='Менеджер', filter_value='Иванов'. Возвращает СПИСОК значений, НЕ количество!",
                 "parameters": {
                     "type": "object",
                     "properties": {
-                        "column": {"type": "string", "description": "Колонка из которой нужно получить уникальные значения"}
+                        "column": {"type": "string", "description": "Колонка из которой нужно получить уникальные значения"},
+                        "filter_column": {"type": "string", "description": "Колонка для фильтрации (опционально). Пример: 'Менеджер'"},
+                        "filter_value": {"type": "string", "description": "Значение для фильтрации (опционально). Пример: 'Иванов'"}
                     },
                     "required": ["column"]
                 }
@@ -2479,10 +2481,17 @@ class FunctionRegistry:
         column = self._find_column(df, column)
         return int(df[column].nunique())
 
-    def get_unique_values(self, df: pd.DataFrame, column: str) -> pd.DataFrame:
-        """Получить список уникальных значений из колонки"""
+    def get_unique_values(self, df: pd.DataFrame, column: str, filter_column: Optional[str] = None, filter_value: Optional[str] = None) -> pd.DataFrame:
+        """Получить список уникальных значений из колонки, с опциональной фильтрацией"""
         column = self._find_column(df, column)
-        unique_vals = df[column].dropna().unique()
+
+        # Применяем фильтр если указан
+        filtered_df = df
+        if filter_column and filter_value:
+            filter_column = self._find_column(df, filter_column)
+            filtered_df = df[df[filter_column].astype(str).str.contains(str(filter_value), case=False, na=False)]
+
+        unique_vals = filtered_df[column].dropna().unique()
         # Возвращаем DataFrame с одной колонкой для consistency
         result_df = pd.DataFrame({column: sorted(unique_vals)})
         return result_df

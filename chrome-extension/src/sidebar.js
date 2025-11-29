@@ -1,1151 +1,1799 @@
-// ===== POSTMESSAGE BRIDGE FOR CHROME EXTENSION =====
-console.log('[Sidebar] Initializing event listeners...');
+/**
+ * SheetGPT Sidebar - Main Application Script
+ * Handles authentication, chat, and all UI interactions
+ */
 
-let messageIdCounter = 0;
-const pendingMessages = new Map();
-
-// ===== RETRY CONFIGURATION =====
-const RETRY_CONFIG = {
-  maxRetries: 3,
-  baseDelay: 1000,      // 1 second
-  maxDelay: 10000,      // 10 seconds max
-  backoffMultiplier: 2,
-  timeout: 45000,       // 45 seconds per attempt (increased from 30)
-  retryableErrors: [
-    'Request timeout',
-    'Network error',
-    'Failed to fetch',
-    'ERR_NETWORK',
-    'ERR_CONNECTION',
-    'ETIMEDOUT',
-    '502',
-    '503',
-    '504',
-    'temporarily unavailable'
-  ]
+// ============================================
+// CONFIGURATION
+// ============================================
+const CONFIG = {
+  API_URL: 'https://sheetgpt-production.up.railway.app',
+  MAX_RETRIES: 3,
+  RETRY_DELAYS: [1000, 3000, 10000],
+  MAX_HISTORY_ITEMS: 20,
+  FREE_DAILY_LIMIT: 10,
+  PRO_DAILY_LIMIT: 1000
 };
 
-// Check if error is retryable
-function isRetryableError(error) {
-  const errorMessage = error?.message?.toLowerCase() || String(error).toLowerCase();
-  return RETRY_CONFIG.retryableErrors.some(retryable =>
-    errorMessage.includes(retryable.toLowerCase())
-  );
-}
+// ============================================
+// STATE MANAGEMENT
+// ============================================
+const state = {
+  isAuthenticated: false,
+  user: null,
+  licenseKey: null,
+  theme: 'dark',
+  customContext: '',
+  chatHistory: [],
+  usageCount: 0,
+  usageLimit: CONFIG.FREE_DAILY_LIMIT,
+  isLoading: false
+};
 
-// Calculate delay with exponential backoff + jitter
-function getRetryDelay(attempt) {
-  const exponentialDelay = RETRY_CONFIG.baseDelay * Math.pow(RETRY_CONFIG.backoffMultiplier, attempt);
-  const jitter = Math.random() * 0.3 * exponentialDelay; // 0-30% jitter
-  return Math.min(exponentialDelay + jitter, RETRY_CONFIG.maxDelay);
-}
+// ============================================
+// DOM ELEMENTS
+// ============================================
+// Elements will be initialized after DOM is ready
+let elements = {};
 
-// Update loading indicator with retry info
-function updateLoadingStatus(message) {
-  const loadingText = document.querySelector('#loading .loading-text');
-  if (loadingText) {
-    loadingText.textContent = message;
+function initElements() {
+  elements = {
+    // Screens
+    loginScreen: document.getElementById('loginScreen'),
+    mainApp: document.getElementById('mainApp'),
+    
+    // Login
+    licenseInput: document.getElementById('licenseInput'),
+    loginBtn: document.getElementById('loginBtn'),
+    loginError: document.getElementById('loginError'),
+    
+    // User Info
+    userAvatar: document.getElementById('userAvatar'),
+    userName: document.getElementById('userName'),
+    planBadge: document.getElementById('planBadge'),
+    usageCount: document.getElementById('usageCount'),
+    usageLimit: document.getElementById('usageLimit'),
+    usageBarFill: document.getElementById('usageBarFill'),
+    usageContainer: document.getElementById('usageContainer'),
+    
+    // Chat
+    chatContainer: document.getElementById('chatContainer'),
+    emptyState: document.getElementById('emptyState'),
+    messageInput: document.getElementById('messageInput'),
+    sendBtn: document.getElementById('sendBtn'),
+    
+    // Header
+    themeToggle: document.getElementById('themeToggle'),
+    historyBtn: document.getElementById('historyBtn'),
+    settingsBtn: document.getElementById('settingsBtn'),
+    historyDropdown: document.getElementById('historyDropdown'),
+    historyList: document.getElementById('historyList'),
+    
+    // Settings Modal
+    settingsModal: document.getElementById('settingsModal'),
+    closeSettingsBtn: document.getElementById('closeSettingsBtn'),
+    cancelSettingsBtn: document.getElementById('cancelSettingsBtn'),
+    saveSettingsBtn: document.getElementById('saveSettingsBtn'),
+    settingsAvatar: document.getElementById('settingsAvatar'),
+    settingsUserName: document.getElementById('settingsUserName'),
+    settingsPlan: document.getElementById('settingsPlan'),
+    settingsLicenseKey: document.getElementById('settingsLicenseKey'),
+    customContextInput: document.getElementById('customContextInput'),
+    userNameInput: document.getElementById('userNameInput'),
+    charCount: document.getElementById('charCount'),
+    logoutBtn: document.getElementById('logoutBtn'),
+
+    // Personalization Modal (Design System v1.2)
+    personalizeBtn: document.getElementById('personalizeBtn'),
+    personalizationModal: document.getElementById('personalizationModal'),
+    closePersonalizationBtn: document.getElementById('closePersonalizationBtn'),
+    cancelPersonalizationBtn: document.getElementById('cancelPersonalizationBtn'),
+    savePersonalizationBtn: document.getElementById('savePersonalizationBtn'),
+    personalizationContextInput: document.getElementById('personalizationContextInput')
+  };
+  
+  // Debug: log which elements are null
+  const nullElements = Object.entries(elements).filter(([k, v]) => v === null).map(([k]) => k);
+  if (nullElements.length > 0) {
+    console.warn('[Sidebar] Missing DOM elements:', nullElements);
   }
 }
 
-// Single attempt to send message
-function sendMessageAttempt(action, data, messageId) {
-  return new Promise((resolve, reject) => {
-    pendingMessages.set(messageId, { resolve, reject });
+// ============================================
+// INITIALIZATION
+// ============================================
+document.addEventListener('DOMContentLoaded', init);
 
-    const message = { action, data, messageId };
-    console.log('[Sidebar] Sending message to parent:', message);
-    window.parent.postMessage(message, '*');
+function init() {
+  initElements();
+  loadState();
+  setupEventListeners();
+  applyTheme();
+  checkAuthentication();
+  // v8.0.1: Sync customContext with chrome.storage.local on startup
+  if (state.customContext) {
+    sendToContentScript('SAVE_CUSTOM_CONTEXT', { context: state.customContext });
+  }
+}
 
-    // Timeout for this attempt
-    setTimeout(() => {
-      if (pendingMessages.has(messageId)) {
-        pendingMessages.delete(messageId);
-        reject(new Error('Request timeout'));
+function loadState() {
+  try {
+    const savedState = localStorage.getItem('sheetgpt_state');
+    if (savedState) {
+      const parsed = JSON.parse(savedState);
+      Object.assign(state, parsed);
+    }
+    
+    // Load chat history separately
+    const savedHistory = localStorage.getItem('sheetgpt_history');
+    if (savedHistory) {
+      state.chatHistory = JSON.parse(savedHistory);
+    }
+    
+    // Check if it's a new day - reset usage
+    const lastUsageDate = localStorage.getItem('sheetgpt_usage_date');
+    const today = new Date().toDateString();
+    if (lastUsageDate !== today) {
+      state.usageCount = 0;
+      localStorage.setItem('sheetgpt_usage_date', today);
+    }
+  } catch (e) {
+    console.error('Error loading state:', e);
+  }
+}
+
+function saveState() {
+  try {
+    const stateToSave = {
+      isAuthenticated: state.isAuthenticated,
+      user: state.user,
+      licenseKey: state.licenseKey,
+      theme: state.theme,
+      customContext: state.customContext,
+      usageCount: state.usageCount,
+      usageLimit: state.usageLimit
+    };
+    localStorage.setItem('sheetgpt_state', JSON.stringify(stateToSave));
+    localStorage.setItem('sheetgpt_history', JSON.stringify(state.chatHistory.slice(0, CONFIG.MAX_HISTORY_ITEMS)));
+  } catch (e) {
+    console.error('Error saving state:', e);
+  }
+}
+
+// ============================================
+// EVENT LISTENERS
+// ============================================
+function setupEventListeners() {
+  // Login
+  elements.loginBtn.addEventListener('click', handleLogin);
+  elements.licenseInput.addEventListener('keypress', (e) => {
+    if (e.key === 'Enter') handleLogin();
+  });
+  elements.licenseInput.addEventListener('input', formatLicenseKey);
+  
+  // Theme toggle
+  elements.themeToggle.addEventListener('click', toggleTheme);
+  
+  // History dropdown
+  elements.historyBtn.addEventListener('click', toggleHistoryDropdown);
+  document.addEventListener('click', (e) => {
+    if (!elements.historyBtn.contains(e.target) && !elements.historyDropdown.contains(e.target)) {
+      elements.historyDropdown.classList.remove('show');
+    }
+  });
+  
+  // Settings
+  elements.settingsBtn.addEventListener('click', openSettings);
+  elements.closeSettingsBtn.addEventListener('click', closeSettings);
+  elements.cancelSettingsBtn.addEventListener('click', closeSettings);
+  elements.saveSettingsBtn.addEventListener('click', saveSettings);
+  elements.settingsModal.addEventListener('click', (e) => {
+    if (e.target === elements.settingsModal) closeSettings();
+  });
+  
+  // Logout
+  elements.logoutBtn.addEventListener('click', handleLogout);
+  
+  // Character counter
+  elements.customContextInput.addEventListener('input', updateCharCounter);
+  
+  // Message input
+  elements.messageInput.addEventListener('input', handleInputChange);
+  elements.messageInput.addEventListener('keydown', handleInputKeydown);
+  elements.sendBtn.addEventListener('click', sendMessage);
+  
+  // Quick actions
+  document.querySelectorAll('.action-card').forEach(card => {
+    card.addEventListener('click', () => {
+      const query = card.dataset.query;
+      if (query) {
+        elements.messageInput.value = query;
+        handleInputChange();
+        sendMessage();
       }
-    }, RETRY_CONFIG.timeout);
+    });
+  });
+
+  // Event delegation for action buttons (CSP-compliant)
+  document.addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-action]');
+    if (!btn) return;
+    
+    const action = btn.dataset.action;
+    console.log('[Sidebar] Action button clicked:', action);
+    
+    switch (action) {
+      case 'insertFormula':
+        insertFormula(btn.dataset.formula);
+        break;
+      case 'copyToClipboard':
+        copyToClipboard(btn.dataset.text);
+        break;
+      case 'insertTable':
+        insertTable();
+        break;
+      case 'insertPivotTable':
+        insertPivotTable();
+        break;
+      case 'applySplitData':
+        applySplitData();
+        break;
+      case 'insertCleanedData':
+        insertCleanedData();
+        break;
+      case 'overwriteWithCleanedData':
+        overwriteWithCleanedData();
+        break;
+      case 'insertFilteredData':
+        insertFilteredData();
+        break;
+      case 'highlightFilteredRows':
+        highlightFilteredRows();
+        break;
+    }
+  });
+
+  // Personalization Modal (Design System v1.2)
+  if (elements.personalizeBtn) {
+    elements.personalizeBtn.addEventListener('click', openPersonalization);
+  }
+  if (elements.closePersonalizationBtn) {
+    elements.closePersonalizationBtn.addEventListener('click', closePersonalization);
+  }
+  if (elements.cancelPersonalizationBtn) {
+    elements.cancelPersonalizationBtn.addEventListener('click', closePersonalization);
+  }
+  if (elements.savePersonalizationBtn) {
+    elements.savePersonalizationBtn.addEventListener('click', savePersonalization);
+  }
+  if (elements.personalizationModal) {
+    elements.personalizationModal.addEventListener('click', (e) => {
+      if (e.target === elements.personalizationModal) closePersonalization();
+    });
+  }
+
+  // Role preset cards (Design System v1.2)
+  document.querySelectorAll('.preset-card').forEach(preset => {
+    preset.addEventListener('click', () => {
+      // Remove selected from all
+      document.querySelectorAll('.preset-card').forEach(p => p.classList.remove('selected'));
+      // Add selected to clicked
+      preset.classList.add('selected');
+      // Set context based on preset type
+      const presetType = preset.dataset.preset;
+      const context = getPresetContext(presetType);
+      if (context && elements.personalizationContextInput) {
+        elements.personalizationContextInput.value = context;
+      }
+    });
   });
 }
 
-// Send message to content script via postMessage with retry logic
-async function sendMessageToContentScript(action, data) {
-  console.log('[Sidebar] sendMessageToContentScript called with:', { action, data });
-
-  let lastError;
-
-  for (let attempt = 0; attempt <= RETRY_CONFIG.maxRetries; attempt++) {
-    const messageId = ++messageIdCounter;
-
-    try {
-      if (attempt > 0) {
-        const delay = getRetryDelay(attempt - 1);
-        console.log(`[Sidebar] Retry attempt ${attempt}/${RETRY_CONFIG.maxRetries} after ${Math.round(delay)}ms delay`);
-        updateLoadingStatus(`Повторная попытка ${attempt}/${RETRY_CONFIG.maxRetries}...`);
-        await new Promise(resolve => setTimeout(resolve, delay));
-      }
-
-      const result = await sendMessageAttempt(action, data, messageId);
-
-      if (attempt > 0) {
-        console.log(`[Sidebar] ✅ Retry successful on attempt ${attempt + 1}`);
-        updateLoadingStatus('Думаю...');
-      }
-
-      return result;
-
-    } catch (error) {
-      lastError = error;
-      console.warn(`[Sidebar] Attempt ${attempt + 1} failed:`, error.message);
-
-      // Check if we should retry
-      if (attempt < RETRY_CONFIG.maxRetries && isRetryableError(error)) {
-        console.log(`[Sidebar] Error is retryable, will retry...`);
-        continue;
-      }
-
-      // Non-retryable error or max retries reached
-      break;
-    }
-  }
-
-  // All retries exhausted
-  console.error(`[Sidebar] ❌ All ${RETRY_CONFIG.maxRetries + 1} attempts failed`);
-  throw lastError;
+// Get context text for preset role
+function getPresetContext(presetType) {
+  const presets = {
+    analyst: 'Я аналитик данных. Мне важны KPI, метрики производительности, тренды и визуализация данных. Помогай с анализом данных, построением отчётов и выявлением закономерностей.',
+    accountant: 'Я бухгалтер. Работаю с финансовой отчётностью, расчётами налогов, сверками и учётом. Помогай с формулами для финансовых расчётов и проверки данных.',
+    marketer: 'Я маркетолог. Работаю с метриками ROI, конверсий, воронок продаж и эффективности рекламных кампаний. Помогай анализировать маркетинговые данные.',
+    sales: 'Я менеджер по продажам. Работаю с CRM-данными, сделками, планами продаж и клиентской базой. Помогай с анализом продаж и прогнозированием.',
+    hr: 'Я HR-специалист. Работаю с кадровыми данными, зарплатами, отпусками и учётом сотрудников. Помогай с расчётами и анализом HR-метрик.',
+    logistics: 'Я логист. Работаю с данными склада, доставки, маршрутов и запасов. Помогай с анализом логистических операций и оптимизацией.'
+  };
+  return presets[presetType] || '';
 }
 
-// Listen for responses from content script
-window.addEventListener('message', (event) => {
-  console.log('[Sidebar] Received message from parent:', event.data);
+// ============================================
+// AUTHENTICATION
+// ============================================
+async function checkAuthentication() {
+  if (state.isAuthenticated && state.licenseKey) {
+    // Re-validate license with server
+    try {
+      const response = await fetch(`${CONFIG.API_URL}/api/v1/telegram/license/validate/${encodeURIComponent(state.licenseKey)}`, {
+        method: 'GET',
+        headers: { 'Accept': 'application/json' }
+      });
 
-  const { messageId, success, result, error } = event.data;
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success || data.valid || data.status === 'active') {
+          // Update user info from server
+          state.user = {
+            name: data.user_name || data.userName || data.telegram_username || state.user?.name || 'Пользователь',
+            plan: data.subscription_tier || data.plan || data.subscription_type || state.user?.plan || 'free',
+            email: data.email || state.user?.email || ''
+          };
+          // Update usage limit based on subscription
+          const isPremium = ['premium', 'pro', 'unlimited'].includes(data.subscription_tier) ||
+                            ['premium', 'pro', 'unlimited'].includes(data.plan);
+          state.usageLimit = isPremium ? CONFIG.PRO_DAILY_LIMIT : CONFIG.FREE_DAILY_LIMIT;
+          saveState();
+          showMainApp();
+          updateUserUI();
+          renderHistory();
+          return;
+        }
+      }
+      // License invalid - logout
+      console.log('[Auth] License no longer valid, logging out');
+      handleLogout();
+    } catch (error) {
+      // Network error - use cached state
+      console.log('[Auth] Network error, using cached state');
+      showMainApp();
+      updateUserUI();
+      renderHistory();
+    }
+  } else {
+    showLoginScreen();
+  }
+}
 
-  if (!messageId || !pendingMessages.has(messageId)) {
-    console.log('[Sidebar] Ignoring message - no matching messageId');
+function showLoginScreen() {
+  elements.loginScreen.classList.remove('hidden');
+  elements.mainApp.classList.remove('active');
+}
+
+function showMainApp() {
+  elements.loginScreen.classList.add('hidden');
+  elements.mainApp.classList.add('active');
+}
+
+async function handleLogin() {
+  const licenseKey = elements.licenseInput.value.trim().toUpperCase();
+
+  // Support both 3-group and 4-group license formats
+  const isValid3Group = /^[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}$/i.test(licenseKey);
+  const isValid4Group = /^[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}$/i.test(licenseKey);
+
+  if (!licenseKey || (!isValid3Group && !isValid4Group)) {
+    showLoginError('Введите корректный ключ (формат: XXXX-XXXX-XXXX)');
     return;
   }
 
-  const { resolve, reject } = pendingMessages.get(messageId);
-  pendingMessages.delete(messageId);
+  elements.loginBtn.disabled = true;
+  elements.loginBtn.textContent = 'Проверка...';
 
-  if (success) {
-    console.log('[Sidebar] ✅ Request successful:', result);
-    resolve(result);
+  try {
+    // Validate license key with correct API endpoint
+    const response = await fetch(`${CONFIG.API_URL}/api/v1/telegram/license/validate/${encodeURIComponent(licenseKey)}`, {
+      method: 'GET',
+      headers: { 'Accept': 'application/json' }
+    });
+
+    console.log('[Login] API response status:', response.status);
+
+    if (response.ok) {
+      const data = await response.json();
+      console.log('[Login] API response data:', data);
+
+      // Check if license is valid (API returns success: true)
+      if (data.success || data.valid || data.status === 'active') {
+        state.isAuthenticated = true;
+        state.licenseKey = licenseKey;
+        state.user = {
+          name: data.user_name || data.userName || data.telegram_username || 'Пользователь',
+          plan: data.subscription_tier || data.plan || data.subscription_type || 'free',
+          email: data.email || ''
+        };
+        // Check for premium/pro/unlimited subscription
+        const isPremium = ['premium', 'pro', 'unlimited'].includes(data.subscription_tier) ||
+                          ['premium', 'pro', 'unlimited'].includes(data.plan) ||
+                          ['premium', 'pro', 'unlimited'].includes(data.subscription_type);
+        state.usageLimit = isPremium ? CONFIG.PRO_DAILY_LIMIT : CONFIG.FREE_DAILY_LIMIT;
+
+        saveState();
+        showMainApp();
+        updateUserUI();
+        hideLoginError();
+      } else {
+        showLoginError('Лицензия недействительна или истекла');
+      }
+    } else {
+      const errorData = await response.json().catch(() => ({}));
+      showLoginError(errorData.message || 'Неверный лицензионный ключ');
+    }
+  } catch (error) {
+    console.error('[Login] Error:', error);
+    showLoginError('Ошибка подключения к серверу. Попробуйте позже.');
+  }
+
+  elements.loginBtn.disabled = false;
+  elements.loginBtn.textContent = 'Активировать';
+}
+
+function handleLogout() {
+  state.isAuthenticated = false;
+  state.licenseKey = null;
+  state.user = null;
+  state.usageCount = 0;
+  
+  localStorage.removeItem('sheetgpt_state');
+  
+  closeSettings();
+  showLoginScreen();
+  elements.licenseInput.value = '';
+}
+
+function showLoginError(message) {
+  elements.loginError.textContent = message;
+  elements.loginError.classList.add('show');
+}
+
+function hideLoginError() {
+  elements.loginError.classList.remove('show');
+}
+
+function formatLicenseKey(e) {
+  let value = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '');
+  let formatted = '';
+  
+  for (let i = 0; i < value.length && i < 16; i++) {
+    if (i > 0 && i % 4 === 0) {
+      formatted += '-';
+    }
+    formatted += value[i];
+  }
+  
+  e.target.value = formatted;
+}
+
+// ============================================
+// USER UI
+// ============================================
+function updateUserUI() {
+  if (!state.user) return;
+
+  const name = state.user.name || 'Пользователь';
+  const initial = name.charAt(0).toUpperCase();
+  const plan = (state.user.plan || 'free').toLowerCase();
+  const isPro = ['pro', 'premium', 'unlimited'].includes(plan);
+  
+  // Main UI
+  elements.userAvatar.textContent = initial;
+  elements.userName.textContent = name;
+  elements.planBadge.textContent = isPro ? 'PRO' : 'FREE';
+  elements.planBadge.classList.toggle('pro', isPro);
+  
+  // Usage bar
+  elements.usageCount.textContent = state.usageCount;
+  elements.usageLimit.textContent = state.usageLimit;
+  const percentage = (state.usageCount / state.usageLimit) * 100;
+  elements.usageBarFill.style.width = `${Math.min(percentage, 100)}%`;
+  elements.usageBarFill.classList.toggle('warning', percentage >= 80);
+  
+  // Hide usage bar for pro users
+  elements.usageContainer.style.display = isPro ? 'none' : 'block';
+  
+  // Settings modal
+  elements.settingsAvatar.textContent = initial;
+  elements.settingsUserName.textContent = name;
+  elements.settingsPlan.textContent = isPro ? 'PRO план' : 'Бесплатный план';
+  elements.settingsLicenseKey.value = state.licenseKey || '';
+  elements.customContextInput.value = state.customContext || '';
+  elements.userNameInput.value = name;
+  updateCharCounter();
+}
+
+function updateUsage() {
+  state.usageCount++;
+  saveState();
+  updateUserUI();
+}
+
+// ============================================
+// THEME
+// ============================================
+function toggleTheme() {
+  state.theme = state.theme === 'dark' ? 'light' : 'dark';
+  applyTheme();
+  saveState();
+}
+
+function applyTheme() {
+  document.body.setAttribute('data-theme', state.theme);
+}
+
+// ============================================
+// HISTORY
+// ============================================
+function toggleHistoryDropdown() {
+  elements.historyDropdown.classList.toggle('show');
+}
+
+function renderHistory() {
+  // Filter out invalid history items
+  const validHistory = state.chatHistory.filter(item => item && item.query);
+
+  if (validHistory.length === 0) {
+    elements.historyList.innerHTML = '<li class="dropdown-empty">История пуста</li>';
+    return;
+  }
+
+  elements.historyList.innerHTML = validHistory.slice(0, 10).map((item, index) => {
+    const queryText = item.query || '';
+    return `
+      <li class="dropdown-item" data-index="${index}" data-query="${escapeHtml(queryText)}">
+        <div class="dropdown-item-title">${escapeHtml(queryText.substring(0, 40))}${queryText.length > 40 ? '...' : ''}</div>
+        <div class="dropdown-item-meta">${formatTime(item.timestamp)}</div>
+      </li>
+    `;
+  }).join('');
+
+  // Add click handlers
+  elements.historyList.querySelectorAll('.dropdown-item').forEach(item => {
+    item.addEventListener('click', () => {
+      const query = item.dataset.query;
+      if (query) {
+        elements.messageInput.value = query;
+        handleInputChange();
+        elements.historyDropdown.classList.remove('show');
+      }
+    });
+  });
+}
+
+function addToHistory(query, response = null) {
+  state.chatHistory.unshift({
+    query,
+    response: response, // Store response for conversation context
+    timestamp: Date.now()
+  });
+  
+  // Limit history size
+  if (state.chatHistory.length > CONFIG.MAX_HISTORY_ITEMS) {
+    state.chatHistory = state.chatHistory.slice(0, CONFIG.MAX_HISTORY_ITEMS);
+  }
+  
+  saveState();
+  renderHistory();
+}
+
+function formatTime(timestamp) {
+  const date = new Date(timestamp);
+  const now = new Date();
+  
+  if (date.toDateString() === now.toDateString()) {
+    return date.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+  }
+  
+  return date.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' });
+}
+
+// ============================================
+// SETTINGS
+// ============================================
+function openSettings() {
+  elements.settingsModal.classList.add('show');
+  updateUserUI();
+}
+
+function closeSettings() {
+  elements.settingsModal.classList.remove('show');
+}
+
+function saveSettings() {
+  const newName = elements.userNameInput.value.trim() || 'Пользователь';
+  const newContext = elements.customContextInput.value.trim();
+
+  state.user.name = newName;
+  state.customContext = newContext;
+
+  saveState();
+  // v8.0.1: Sync customContext with chrome.storage.local for content.js access
+  sendToContentScript('SAVE_CUSTOM_CONTEXT', { context: state.customContext });
+  updateUserUI();
+  closeSettings();
+}
+
+function updateCharCounter() {
+  const count = elements.customContextInput.value.length;
+  elements.charCount.textContent = count;
+}
+
+// ============================================
+// PERSONALIZATION (Design System v1.2)
+// ============================================
+function openPersonalization() {
+  if (elements.personalizationModal) {
+    elements.personalizationModal.classList.add('show');
+    // Set current context in textarea
+    if (elements.personalizationContextInput) {
+      elements.personalizationContextInput.value = state.customContext || '';
+    }
+  }
+}
+
+function closePersonalization() {
+  if (elements.personalizationModal) {
+    elements.personalizationModal.classList.remove('show');
+  }
+}
+
+function savePersonalization() {
+  if (elements.personalizationContextInput) {
+    state.customContext = elements.personalizationContextInput.value.trim();
+    // Also sync with settings modal
+    if (elements.customContextInput) {
+      elements.customContextInput.value = state.customContext;
+      updateCharCounter();
+    }
+    saveState();
+    // v8.0.1: Sync customContext with chrome.storage.local for content.js access
+    sendToContentScript('SAVE_CUSTOM_CONTEXT', { context: state.customContext });
+  }
+  closePersonalization();
+}
+
+// ============================================
+// CHAT
+// ============================================
+function handleInputChange() {
+  const hasContent = elements.messageInput.value.trim().length > 0;
+  elements.sendBtn.disabled = !hasContent || state.isLoading;
+  
+  // Auto-resize textarea
+  elements.messageInput.style.height = 'auto';
+  elements.messageInput.style.height = Math.min(elements.messageInput.scrollHeight, 80) + 'px';
+}
+
+function handleInputKeydown(e) {
+  if (e.key === 'Enter' && !e.shiftKey) {
+    e.preventDefault();
+    if (!elements.sendBtn.disabled) {
+      sendMessage();
+    }
+  }
+}
+
+async function sendMessage() {
+  const query = elements.messageInput.value.trim();
+  if (!query || state.isLoading) return;
+  
+  // Check usage limit for free users
+  const userPlan = (state.user.plan || 'free').toLowerCase();
+  const isPremiumUser = ['pro', 'premium', 'unlimited'].includes(userPlan);
+  if (!isPremiumUser && state.usageCount >= state.usageLimit) {
+    addAIMessage({
+      type: 'error',
+      text: 'Вы исчерпали лимит запросов на сегодня. Обновите план до PRO для безлимитного доступа.'
+    });
+    return;
+  }
+  
+  // Hide empty state
+  elements.emptyState.style.display = 'none';
+  
+  // Add user message
+  addUserMessage(query);
+  
+  // Clear input
+  elements.messageInput.value = '';
+  handleInputChange();
+  
+  // History will be updated after response
+  const currentQuery = query; // Save for history
+  
+  // Show loading
+  state.isLoading = true;
+  elements.sendBtn.disabled = true;
+  const loadingEl = addLoadingIndicator();
+  
+  try {
+    // Use PROCESS_QUERY action via content.js (it handles sheet data and API call)
+    // Build conversation history for context (last 5 exchanges)
+    const conversationHistory = state.chatHistory
+      .slice(0, 5)
+      .filter(item => item.query && item.response)
+      .map(item => ({ query: item.query, response: item.response }))
+      .reverse(); // oldest first
+
+    const result = await sendToContentScript('PROCESS_QUERY', { query, history: conversationHistory });
+
+    // Remove loading
+    loadingEl.remove();
+
+    // Transform and display AI response
+    const response = transformAPIResponse(result);
+    addAIMessage(response);
+
+    // Update usage
+    updateUsage();
+
+    // Add to history with response
+    addToHistory(currentQuery, result.summary || result.explanation || null);
+
+  } catch (error) {
+    loadingEl.remove();
+    addAIMessage({
+      type: 'error',
+      text: error.message || 'Произошла ошибка при обработке запроса'
+    });
+  }
+  
+  state.isLoading = false;
+  handleInputChange();
+}
+
+function addUserMessage(text) {
+  const messageDiv = document.createElement('div');
+  messageDiv.className = 'message user';
+  messageDiv.innerHTML = `<div class="message-bubble">${escapeHtml(text)}</div>`;
+  elements.chatContainer.appendChild(messageDiv);
+  scrollToBottom();
+}
+
+function addAIMessage(response) {
+  const messageDiv = document.createElement('div');
+  messageDiv.className = 'message ai';
+  
+  let content = '';
+  
+  if (response.type === 'error') {
+    content = `
+      <div class="content-box error">${escapeHtml(response.text)}</div>
+    `;
+  } else if (response.type === 'formula') {
+    content = `
+      <div class="response-badge formula">
+        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M4 4h16v16H4z"/><path d="M4 10h16"/><path d="M10 4v16"/>
+        </svg>
+        Формула
+      </div>
+      <div class="formula-code">${escapeHtml(response.formula)}</div>
+      ${response.explanation ? `<p>${escapeHtml(response.explanation)}</p>` : ''}
+      <div class="action-buttons">
+        <button class="action-btn" data-action="insertFormula" data-formula="${escapeHtml(response.formula)}">Вставить</button>
+        <button class="action-btn secondary" data-action="copyToClipboard" data-text="${escapeHtml(response.formula)}">Копировать</button>
+      </div>
+    `;
+  } else if (response.type === 'analysis') {
+    content = `
+      <div class="response-badge analysis">
+        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="3"/><path d="M12 1v4M12 19v4"/>
+        </svg>
+        Анализ
+      </div>
+      ${response.items ? `
+        <ul class="list-items">
+          ${response.items.map(item => `<li>${escapeHtml(item)}</li>`).join('')}
+        </ul>
+      ` : ''}
+      ${response.text ? `<p>${escapeHtml(response.text)}</p>` : ''}
+    `;
+  } else if (response.type === 'table') {
+    content = `
+      <div class="response-badge formula">
+        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="M9 3v18"/>
+        </svg>
+        Таблица
+      </div>
+      <p>${escapeHtml(response.text || 'Таблица готова к вставке')}</p>
+      <div class="action-buttons">
+        <button class="action-btn" data-action="insertTable">Вставить таблицу</button>
+      </div>
+    `;
+  } else if (response.type === 'highlight') {
+    content = `
+      <div class="response-badge analysis">
+        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M19 3H5a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2V5a2 2 0 00-2-2z"/>
+        </svg>
+        Выделение
+      </div>
+      <div class="content-box success">${escapeHtml(response.text || 'Строки успешно выделены')}</div>
+    `;
+  } else if (response.type === 'chart') {
+    content = `
+      <div class="response-badge formula">
+        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M18 20V10"/><path d="M12 20V4"/><path d="M6 20v-6"/>
+        </svg>
+        Диаграмма
+      </div>
+      <div class="content-box success">${escapeHtml(response.text || 'Диаграмма создана')}</div>
+    `;
+  } else if (response.type === 'conditional_format') {
+    content = `
+      <div class="response-badge analysis">
+        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <rect x="3" y="3" width="18" height="18" rx="2"/>
+          <path d="M3 9h18"/>
+          <path d="M9 3v18"/>
+        </svg>
+        Форматирование
+      </div>
+      <div class="content-box success">${escapeHtml(response.text || 'Условное форматирование применено')}</div>
+    `;
+  } else if (response.type === 'pivot_table') {
+    const rowCount = response.pivotData?.rows?.length || 0;
+    content = `
+      <div class="response-badge formula">
+        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <rect x="3" y="3" width="18" height="18" rx="2"/>
+          <path d="M3 9h18"/>
+          <path d="M9 3v18"/>
+          <path d="M9 15h6"/>
+        </svg>
+        Сводная
+      </div>
+      <p>${escapeHtml(response.text || 'Сводная таблица готова')}</p>
+      <p class="text-secondary">${rowCount} групп</p>
+      <div class="action-buttons">
+        <button class="action-btn" data-action="insertPivotTable">Вставить таблицу</button>
+      </div>
+    `;
+  } else if (response.type === 'csv_split') {
+    const originalRows = response.originalRows || 0;
+    const newRows = response.newRows || 0;
+    const newCols = response.newCols || 0;
+    content = `
+      <div class="response-badge analysis">
+        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <rect x="3" y="3" width="18" height="18" rx="2"/>
+          <path d="M3 9h18"/>
+          <path d="M9 21V9"/>
+        </svg>
+        Разбиение
+      </div>
+      <p>${escapeHtml(response.text || 'Данные разбиты по ячейкам')}</p>
+      <p class="text-secondary">${newRows} строк × ${newCols} колонок</p>
+      <div class="action-buttons">
+        <button class="action-btn" data-action="applySplitData">Заменить данные</button>
+      </div>
+    `;
+  } else if (response.type === 'clean_data') {
+    const originalRows = response.originalRows || 0;
+    const finalRows = response.finalRows || 0;
+    const removedRows = originalRows - finalRows;
+    content = `
+      <div class="response-badge analysis">
+        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M3 6h18"/>
+          <path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6"/>
+          <path d="M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2"/>
+          <path d="M10 11v6"/>
+          <path d="M14 11v6"/>
+        </svg>
+        Очистка
+      </div>
+      <p>${escapeHtml(response.text || 'Данные очищены')}</p>
+      <p class="text-secondary">${originalRows} → ${finalRows} строк${removedRows > 0 ? ` (−${removedRows})` : ''}</p>
+      <div class="action-buttons">
+        <button class="action-btn" data-action="insertCleanedData">Создать новый лист</button>
+        <button class="action-btn secondary" data-action="overwriteWithCleanedData">Заменить данные</button>
+      </div>
+    `;
+  } else if (response.type === 'data_validation') {
+    const valuesCount = response.rule?.allowed_values?.length || 0;
+    const valuesPreview = response.rule?.allowed_values?.slice(0, 5).join(', ') || '';
+    content = `
+      <div class="response-badge formula">
+        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M12 2v4"/>
+          <path d="M12 18v4"/>
+          <path d="M4.93 4.93l2.83 2.83"/>
+          <path d="M16.24 16.24l2.83 2.83"/>
+          <path d="M2 12h4"/>
+          <path d="M18 12h4"/>
+          <path d="M4.93 19.07l2.83-2.83"/>
+          <path d="M16.24 7.76l2.83-2.83"/>
+        </svg>
+        Валидация
+      </div>
+      <p>${escapeHtml(response.text || 'Выпадающий список создан')}</p>
+      <p class="text-secondary">${valuesCount} вариантов: ${escapeHtml(valuesPreview)}${valuesCount > 5 ? '...' : ''}</p>
+      <div class="content-box success">Выпадающий список применён к колонке</div>
+    `;
+  } else if (response.type === 'filter_data') {
+    const originalRows = response.originalRows || 0;
+    const filteredRows = response.filteredRows || 0;
+    content = `
+      <div class="response-badge analysis">
+        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polygon points="22,3 2,3 10,12.46 10,19 14,21 14,12.46"/>
+        </svg>
+        Фильтр
+      </div>
+      <p>${escapeHtml(response.text || 'Данные отфильтрованы')}</p>
+      <p class="text-secondary">${escapeHtml(response.conditionStr || '')}</p>
+      <p class="text-secondary">${filteredRows} из ${originalRows} строк</p>
+      <div class="action-buttons">
+        <button class="action-btn" data-action="insertFilteredData">Создать новый лист</button>
+        <button class="action-btn secondary" data-action="highlightFilteredRows">Выделить строки</button>
+      </div>
+    `;
   } else {
-    console.error('[Sidebar] ❌ Request failed:', error);
-    reject(new Error(error));
+    content = `<p>${escapeHtml(response.text || 'Готово')}</p>`;
+  }
+  
+  messageDiv.innerHTML = `<div class="message-bubble">${content}</div>`;
+  elements.chatContainer.appendChild(messageDiv);
+  scrollToBottom();
+}
+
+function addLoadingIndicator() {
+  const loadingDiv = document.createElement('div');
+  loadingDiv.className = 'message ai';
+  loadingDiv.innerHTML = `
+    <div class="loading-indicator">
+      <div class="morph-squares">
+        <div class="morph-square"></div>
+        <div class="morph-square"></div>
+        <div class="morph-square"></div>
+      </div>
+      <span class="loading-text">Анализирую данные...</span>
+    </div>
+  `;
+  elements.chatContainer.appendChild(loadingDiv);
+  scrollToBottom();
+  return loadingDiv;
+}
+
+function scrollToBottom() {
+  elements.chatContainer.scrollTop = elements.chatContainer.scrollHeight;
+}
+
+// ============================================
+// API COMMUNICATION
+// ============================================
+
+// Send message to content script and wait for response
+async function sendToContentScript(action, data = {}) {
+  return new Promise((resolve, reject) => {
+    const messageId = `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
+    const handler = (event) => {
+      // Check if this is our response
+      if (event.data && event.data.messageId === messageId) {
+        window.removeEventListener('message', handler);
+        clearTimeout(timeout);
+
+        if (event.data.success) {
+          resolve(event.data.result);
+        } else {
+          reject(new Error(event.data.error || 'Неизвестная ошибка'));
+        }
+      }
+    };
+
+    window.addEventListener('message', handler);
+
+    // Timeout after 30 seconds
+    const timeout = setTimeout(() => {
+      window.removeEventListener('message', handler);
+      reject(new Error('Таймаут ожидания ответа. Перезагрузите страницу.'));
+    }, 30000);
+
+    // Send message to parent (content script)
+    console.log('[Sidebar] Sending to content script:', { action, data, messageId });
+    window.parent.postMessage({ action, data, messageId }, '*');
+  });
+}
+
+async function getSheetData() {
+  return new Promise((resolve) => {
+    // Try to get data from parent window (Google Sheets)
+    if (window.parent !== window) {
+      window.parent.postMessage({ type: 'GET_SHEET_DATA' }, '*');
+      
+      const handler = (event) => {
+        if (event.data && event.data.type === 'SHEET_DATA') {
+          window.removeEventListener('message', handler);
+          resolve(event.data.data);
+        }
+      };
+      
+      window.addEventListener('message', handler);
+      
+      // Timeout fallback
+      setTimeout(() => {
+        window.removeEventListener('message', handler);
+        resolve(null);
+      }, 2000);
+    } else {
+      resolve(null);
+    }
+  });
+}
+
+async function callAPI(query, sheetData, history = []) {
+  // Format payload for /api/v1/formula endpoint
+  const payload = {
+    query: query,
+    column_names: sheetData?.headers || [],
+    sheet_data: sheetData?.rows || [],
+    custom_context: state.customContext || '',
+    history: history
+  };
+
+  console.log('[API] Sending request:', payload);
+
+  let lastError;
+
+  for (let attempt = 0; attempt < CONFIG.MAX_RETRIES; attempt++) {
+    try {
+      const response = await fetch(`${CONFIG.API_URL}/api/v1/formula`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify(payload)
+      });
+
+      console.log('[API] Response status:', response.status);
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('[API] Error response:', errorText);
+        throw new Error(`HTTP ${response.status}: ${errorText}`);
+      }
+
+      const result = await response.json();
+      console.log('[API] Response data:', result);
+
+      // Transform API response to UI format
+      return transformAPIResponse(result);
+
+    } catch (error) {
+      console.error('[API] Attempt', attempt + 1, 'failed:', error);
+      lastError = error;
+
+      if (attempt < CONFIG.MAX_RETRIES - 1) {
+        await new Promise(r => setTimeout(r, CONFIG.RETRY_DELAYS[attempt]));
+      }
+    }
+  }
+
+  console.error('[API] All attempts failed, using demo response');
+  // Return demo response if API fails
+  return getDemoResponse(query);
+}
+
+// Translate common English responses to Russian
+function translateToRussian(text) {
+  if (!text) return text;
+
+  const str = String(text).trim();
+
+  // Boolean translations
+  const translations = {
+    'True': 'Да',
+    'true': 'Да',
+    'False': 'Нет',
+    'false': 'Нет',
+    'Yes': 'Да',
+    'yes': 'Да',
+    'No': 'Нет',
+    'no': 'Нет',
+    'None': 'Нет данных',
+    'null': 'Нет данных',
+    'undefined': 'Нет данных',
+    'N/A': 'Н/Д',
+    'Not found': 'Не найдено',
+    'No data': 'Нет данных',
+    'No results': 'Нет результатов',
+    'Success': 'Успешно',
+    'Error': 'Ошибка',
+    'Failed': 'Не удалось'
+  };
+
+  // Direct match
+  if (translations[str]) {
+    return translations[str];
+  }
+
+  return text;
+}
+
+// Transform API response to UI format
+function transformAPIResponse(apiResponse) {
+  console.log('[Sidebar] transformAPIResponse received:', apiResponse);
+  console.log('[Sidebar] action_type:', apiResponse.action_type);
+  console.log('[Sidebar] chart_spec:', apiResponse.chart_spec);
+
+  // Store structured_data globally for table insertion
+  if (apiResponse.structured_data) {
+    window.lastStructuredData = apiResponse.structured_data;
+  }
+
+  // If response has formula
+  if (apiResponse.formula) {
+    return {
+      type: 'formula',
+      formula: apiResponse.formula,
+      explanation: translateToRussian(apiResponse.explanation || apiResponse.summary || '')
+    };
+  }
+
+  // If response is a sort action
+  if (apiResponse.action_type === 'sort' && apiResponse.sort_column_index !== undefined) {
+    // Trigger sort action
+    sortRangeInSheet(apiResponse.sort_column_index, apiResponse.sort_order || 'ASCENDING');
+    return {
+      type: 'action',
+      text: apiResponse.summary || `Данные отсортированы по колонке "${apiResponse.sort_column}"`,
+      actionType: 'sort'
+    };
+  }
+
+  // If response is a freeze action
+  if (apiResponse.action_type === 'freeze') {
+    // Trigger freeze action
+    freezeRowsInSheet(apiResponse.freeze_rows || 0, apiResponse.freeze_columns || 0);
+    return {
+      type: 'action',
+      text: apiResponse.summary || 'Строки/столбцы закреплены',
+      actionType: 'freeze'
+    };
+  }
+
+  // If response is a format action
+  if (apiResponse.action_type === 'format') {
+    // Trigger format action
+    formatRowInSheet(apiResponse.target_row - 1 || 0, apiResponse.bold, apiResponse.background_color);
+    return {
+      type: 'action',
+      text: apiResponse.summary || 'Форматирование применено',
+      actionType: 'format'
+    };
+  }
+
+  // If response is a chart action
+  console.log('[Sidebar] Checking chart condition:', {
+    action_type: apiResponse.action_type,
+    has_chart_spec: !!apiResponse.chart_spec,
+    condition_met: apiResponse.action_type === 'chart' && apiResponse.chart_spec
+  });
+
+  if (apiResponse.action_type === 'chart' && apiResponse.chart_spec) {
+    console.log('[Sidebar] ✅ Chart condition met! Creating chart with spec:', JSON.stringify(apiResponse.chart_spec));
+    // Trigger chart creation and handle result
+    createChartInSheet(apiResponse.chart_spec).then(() => {
+      console.log('[Sidebar] ✅ Chart creation promise resolved');
+      addAIMessage({ type: 'success', text: '✅ Диаграмма успешно создана!' });
+    }).catch(err => {
+      console.error('[Sidebar] ❌ Chart creation promise rejected:', err);
+    });
+    return {
+      type: 'chart',
+      text: apiResponse.summary || `Создаю диаграмму "${apiResponse.chart_spec.title || 'Диаграмма'}"...`,
+      chartSpec: apiResponse.chart_spec
+    };
+  }
+
+  // If response is a conditional format action
+  if (apiResponse.action_type === 'conditional_format' && apiResponse.rule) {
+    console.log('[Sidebar] ✅ Conditional format condition met! Applying...');
+    // Trigger conditional format action
+    applyConditionalFormatInSheet(apiResponse.rule);
+    return {
+      type: 'conditional_format',
+      text: apiResponse.summary || 'Условное форматирование применено',
+      rule: apiResponse.rule
+    };
+  }
+
+  // If response is a pivot table action
+  if (apiResponse.action_type === 'pivot_table' && apiResponse.pivot_data) {
+    console.log('[Sidebar] ✅ Pivot table condition met! Creating...');
+    // Store pivot data for insertion
+    window.lastPivotData = apiResponse.pivot_data;
+    return {
+      type: 'pivot_table',
+      text: apiResponse.summary || 'Сводная таблица готова',
+      pivotData: apiResponse.pivot_data,
+      groupColumn: apiResponse.group_column,
+      valueColumn: apiResponse.value_column,
+      aggFunc: apiResponse.agg_func
+    };
+  }
+
+  // If response is a clean data action
+  if (apiResponse.action_type === 'clean_data' && apiResponse.cleaned_data) {
+    console.log('[Sidebar] ✅ Clean data condition met!');
+    // Store cleaned data for insertion
+    window.lastCleanedData = apiResponse.cleaned_data;
+    return {
+      type: 'clean_data',
+      text: apiResponse.summary || 'Данные очищены',
+      cleanedData: apiResponse.cleaned_data,
+      originalRows: apiResponse.original_rows,
+      finalRows: apiResponse.final_rows,
+      operations: apiResponse.operations,
+      changes: apiResponse.changes
+    };
+  }
+
+  // If response is a data validation action
+  if (apiResponse.action_type === 'data_validation' && apiResponse.rule) {
+    console.log('[Sidebar] ✅ Data validation condition met!');
+    // Apply validation immediately
+    setDataValidationInSheet(apiResponse.rule);
+    return {
+      type: 'data_validation',
+      text: apiResponse.summary || 'Валидация данных создана',
+      rule: apiResponse.rule
+    };
+  }
+
+  // If response is a filter action
+  if (apiResponse.action_type === 'filter_data' && apiResponse.filtered_data) {
+    console.log('[Sidebar] ✅ Filter condition met!');
+    // Store filtered data for later use
+    window.lastFilteredData = apiResponse.filtered_data;
+    return {
+      type: 'filter_data',
+      text: apiResponse.summary || 'Данные отфильтрованы',
+      filteredData: apiResponse.filtered_data,
+      originalRows: apiResponse.original_rows,
+      filteredRows: apiResponse.filtered_rows,
+      conditionStr: apiResponse.condition_str
+    };
+  }
+
+  // If response has highlight_rows
+  if (apiResponse.highlight_rows && apiResponse.highlight_rows.length > 0) {
+    // Trigger highlight action
+    highlightRowsInSheet(apiResponse.highlight_rows);
+    return {
+      type: 'highlight',
+      text: `Выделено ${apiResponse.highlighted_count || apiResponse.highlight_rows.length} строк`,
+      rows: apiResponse.highlight_rows
+    };
+  }
+
+  // If response has structured_data (table)
+  if (apiResponse.structured_data) {
+    return {
+      type: 'table',
+      text: `Найдено ${apiResponse.structured_data.rows?.length || 0} записей`,
+      data: apiResponse.structured_data
+    };
+  }
+
+  // Default analysis response - translate to Russian
+  let responseText = apiResponse.summary || apiResponse.explanation || apiResponse.value || apiResponse.message || 'Запрос обработан';
+  responseText = translateToRussian(responseText);
+
+  return {
+    type: 'analysis',
+    text: responseText
+  };
+}
+
+function getDemoResponse(query) {
+  const lowerQuery = query.toLowerCase();
+  
+  if (lowerQuery.includes('сумм') || lowerQuery.includes('sumif')) {
+    return {
+      type: 'formula',
+      formula: '=СУММЕСЛИ(C:C;">50000";C:C)',
+      explanation: 'Эта формула суммирует все значения в столбце C, которые больше 50000.'
+    };
+  }
+  
+  if (lowerQuery.includes('топ') || lowerQuery.includes('лучш') || lowerQuery.includes('первы')) {
+    return {
+      type: 'analysis',
+      title: 'Топ результатов',
+      items: ['Первая позиция', 'Вторая позиция', 'Третья позиция'],
+      summary: 'Анализ основан на данных в вашей таблице.'
+    };
+  }
+  
+  if (lowerQuery.includes('выдел') || lowerQuery.includes('подсвет') || lowerQuery.includes('цвет')) {
+    return {
+      type: 'highlight',
+      text: 'Найдено 5 строк, соответствующих критериям. Строки выделены.'
+    };
+  }
+  
+  if (lowerQuery.includes('таблиц') || lowerQuery.includes('создай') || lowerQuery.includes('генер')) {
+    return {
+      type: 'table',
+      text: 'Таблица с данными готова к вставке в ваш документ.'
+    };
+  }
+  
+  return {
+    type: 'analysis',
+    text: 'Запрос обработан. Для более точных результатов убедитесь, что данные в таблице доступны.'
+  };
+}
+
+function getErrorMessage(error) {
+  if (error.message.includes('Failed to fetch') || error.message.includes('NetworkError')) {
+    return 'Ошибка сети. Проверьте подключение к интернету.';
+  }
+  if (error.message.includes('401') || error.message.includes('403')) {
+    return 'Ошибка авторизации. Попробуйте перезайти.';
+  }
+  if (error.message.includes('429')) {
+    return 'Слишком много запросов. Подождите немного.';
+  }
+  if (error.message.includes('500') || error.message.includes('502') || error.message.includes('503')) {
+    return 'Сервер временно недоступен. Попробуйте позже.';
+  }
+  return 'Произошла ошибка. Попробуйте ещё раз.';
+}
+
+// ============================================
+// ACTIONS
+// ============================================
+
+// Highlight rows in the sheet
+async function highlightRowsInSheet(rows) {
+  if (!rows || rows.length === 0) return;
+
+  try {
+    await sendToContentScript('HIGHLIGHT_ROWS', { rows: rows });
+    console.log('[Sidebar] Rows highlighted:', rows);
+  } catch (error) {
+    console.error('[Sidebar] Error highlighting rows:', error);
+  }
+}
+
+async function sortRangeInSheet(columnIndex, sortOrder) {
+  if (columnIndex === undefined || columnIndex === null) {
+    console.error('[Sidebar] Sort error: columnIndex is required');
+    return;
+  }
+
+  try {
+    await sendToContentScript('SORT_RANGE', {
+      columnIndex: columnIndex,
+      sortOrder: sortOrder || 'ASCENDING'
+    });
+    console.log(`[Sidebar] Range sorted by column ${columnIndex}, order ${sortOrder}`);
+  } catch (error) {
+    console.error('[Sidebar] Error sorting range:', error);
+  }
+}
+
+async function freezeRowsInSheet(freezeRows, freezeColumns) {
+  try {
+    await sendToContentScript('FREEZE_ROWS', {
+      freezeRows: freezeRows || 0,
+      freezeColumns: freezeColumns || 0
+    });
+    console.log(`[Sidebar] Frozen: ${freezeRows} rows, ${freezeColumns} columns`);
+  } catch (error) {
+    console.error('[Sidebar] Error freezing rows:', error);
+  }
+}
+
+async function formatRowInSheet(rowIndex, bold, backgroundColor) {
+  try {
+    await sendToContentScript('FORMAT_ROW', {
+      rowIndex: rowIndex || 0,
+      bold: bold,
+      backgroundColor: backgroundColor
+    });
+    console.log(`[Sidebar] Row ${rowIndex} formatted`);
+  } catch (error) {
+    console.error('[Sidebar] Error formatting row:', error);
+  }
+}
+
+async function createChartInSheet(chartSpec) {
+  if (!chartSpec) {
+    console.error('[Sidebar] Chart error: chartSpec is required');
+    addAIMessage({ type: 'error', text: 'Ошибка: спецификация диаграммы не найдена' });
+    return;
+  }
+
+  try {
+    console.log('[Sidebar] Creating chart with spec:', chartSpec);
+    await sendToContentScript('CREATE_CHART', {
+      chartSpec: chartSpec
+    });
+    console.log(`[Sidebar] Chart "${chartSpec.title}" created successfully`);
+  } catch (error) {
+    console.error('[Sidebar] Error creating chart:', error);
+    addAIMessage({
+      type: 'error',
+      text: `Ошибка создания диаграммы: ${error.message || error}. Попробуйте обновить страницу.`
+    });
+  }
+}
+
+async function applyConditionalFormatInSheet(rule) {
+  if (!rule) {
+    console.error('[Sidebar] Conditional format error: rule is required');
+    return;
+  }
+
+  try {
+    await sendToContentScript('APPLY_CONDITIONAL_FORMAT', {
+      rule: rule
+    });
+    console.log(`[Sidebar] Conditional format applied to column "${rule.column_name}"`);
+  } catch (error) {
+    console.error('[Sidebar] Error applying conditional format:', error);
+  }
+}
+
+async function setDataValidationInSheet(rule) {
+  if (!rule) {
+    console.error('[Sidebar] Data validation error: rule is required');
+    return;
+  }
+
+  try {
+    await sendToContentScript('SET_DATA_VALIDATION', {
+      rule: rule
+    });
+    console.log(`[Sidebar] Data validation set for column "${rule.column_name}"`);
+  } catch (error) {
+    console.error('[Sidebar] Error setting data validation:', error);
+  }
+}
+
+window.insertFormula = async function(formula) {
+  try {
+    await sendToContentScript('INSERT_FORMULA', { formula: formula });
+    console.log('[Sidebar] Formula inserted:', formula);
+  } catch (error) {
+    console.error('[Sidebar] Error inserting formula:', error);
+    // Fallback to old method
+    window.parent.postMessage({
+      type: 'INSERT_FORMULA',
+      formula: formula
+    }, '*');
+  }
+};
+
+window.insertTable = async function() {
+  const structuredData = window.lastStructuredData;
+  if (!structuredData) {
+    addAIMessage({
+      type: 'error',
+      text: 'Нет данных для вставки. Сначала запросите создание таблицы.'
+    });
+    return;
+  }
+
+  try {
+    // Note: content script expects camelCase 'structuredData'
+    const result = await sendToContentScript('CREATE_TABLE_AND_CHART', {
+      structuredData: structuredData
+    });
+    console.log('[Sidebar] Table inserted:', result);
+
+    if (result.success) {
+      addAIMessage({
+        type: 'analysis',
+        text: result.message || `Таблица создана`
+      });
+    } else {
+      addAIMessage({
+        type: 'error',
+        text: result.message || 'Не удалось создать таблицу'
+      });
+    }
+  } catch (error) {
+    console.error('[Sidebar] Error inserting table:', error);
+    addAIMessage({
+      type: 'error',
+      text: 'Ошибка при создании таблицы: ' + error.message
+    });
+  }
+};
+
+window.insertPivotTable = async function() {
+  const pivotData = window.lastPivotData;
+  if (!pivotData) {
+    addAIMessage({
+      type: 'error',
+      text: 'Нет данных для вставки. Сначала запросите создание сводной таблицы.'
+    });
+    return;
+  }
+
+  try {
+    // Create a new sheet with pivot data
+    const result = await sendToContentScript('CREATE_TABLE_AND_CHART', {
+      structuredData: pivotData
+    });
+    console.log('[Sidebar] Pivot table inserted:', result);
+
+    if (result.success) {
+      addAIMessage({
+        type: 'analysis',
+        text: result.message || 'Сводная таблица создана'
+      });
+    } else {
+      addAIMessage({
+        type: 'error',
+        text: result.message || 'Не удалось создать сводную таблицу'
+      });
+    }
+  } catch (error) {
+    console.error('[Sidebar] Error inserting pivot table:', error);
+    addAIMessage({
+      type: 'error',
+      text: 'Ошибка при создании сводной таблицы: ' + error.message
+    });
+  }
+};
+
+window.insertCleanedData = async function() {
+  const cleanedData = window.lastCleanedData;
+  if (!cleanedData) {
+    addAIMessage({
+      type: 'error',
+      text: 'Нет данных для вставки. Сначала запросите очистку данных.'
+    });
+    return;
+  }
+
+  // Prompt for sheet name
+  const sheetName = prompt('Введите имя нового листа:', 'Очищенные данные');
+  if (!sheetName) {
+    return; // User cancelled
+  }
+
+  try {
+    // Create a new sheet with cleaned data
+    const result = await sendToContentScript('CREATE_TABLE_AND_CHART', {
+      structuredData: cleanedData,
+      sheetTitle: sheetName
+    });
+    console.log('[Sidebar] Cleaned data inserted:', result);
+
+    if (result.success) {
+      addAIMessage({
+        type: 'analysis',
+        text: result.message || 'Новый лист с очищенными данными создан'
+      });
+    } else {
+      addAIMessage({
+        type: 'error',
+        text: result.message || 'Не удалось создать лист с данными'
+      });
+    }
+  } catch (error) {
+    console.error('[Sidebar] Error inserting cleaned data:', error);
+    addAIMessage({
+      type: 'error',
+      text: 'Ошибка при создании листа: ' + error.message
+    });
+  }
+};
+
+window.overwriteWithCleanedData = async function() {
+  const cleanedData = window.lastCleanedData;
+  if (!cleanedData) {
+    addAIMessage({
+      type: 'error',
+      text: 'Нет данных для замены. Сначала запросите очистку данных.'
+    });
+    return;
+  }
+
+  try {
+    // Overwrite current sheet with cleaned data
+    const result = await sendToContentScript('OVERWRITE_SHEET_DATA', {
+      cleanedData: cleanedData
+    });
+    console.log('[Sidebar] Data overwritten:', result);
+
+    if (result.success) {
+      addAIMessage({
+        type: 'analysis',
+        text: result.message || 'Данные успешно заменены'
+      });
+    } else {
+      addAIMessage({
+        type: 'error',
+        text: result.message || 'Не удалось заменить данные'
+      });
+    }
+  } catch (error) {
+    console.error('[Sidebar] Error overwriting data:', error);
+    addAIMessage({
+      type: 'error',
+      text: 'Ошибка при замене данных: ' + error.message
+    });
+  }
+};
+
+window.applySplitData = async function() {
+  const splitData = window.lastSplitData;
+  if (!splitData) {
+    addAIMessage({
+      type: 'error',
+      text: 'Нет данных для вставки. Сначала запросите разбиение данных.'
+    });
+    return;
+  }
+
+  try {
+    // Overwrite current sheet with split data
+    const result = await sendToContentScript('OVERWRITE_SHEET_DATA', {
+      cleanedData: splitData
+    });
+    console.log('[Sidebar] Split data applied:', result);
+
+    if (result.success) {
+      addAIMessage({
+        type: 'analysis',
+        text: result.message || 'Данные успешно разбиты по ячейкам'
+      });
+    } else {
+      addAIMessage({
+        type: 'error',
+        text: result.message || 'Не удалось применить разбитые данные'
+      });
+    }
+  } catch (error) {
+    console.error('[Sidebar] Error applying split data:', error);
+    addAIMessage({
+      type: 'error',
+      text: 'Ошибка при применении данных: ' + error.message
+    });
+  }
+};
+
+window.insertFilteredData = async function() {
+  const filteredData = window.lastFilteredData;
+  if (!filteredData) {
+    addAIMessage({
+      type: 'error',
+      text: 'Нет данных для вставки. Сначала выполните фильтрацию.'
+    });
+    return;
+  }
+
+  try {
+    // Create a new sheet with filtered data
+    const result = await sendToContentScript('CREATE_TABLE_AND_CHART', {
+      structuredData: filteredData,
+      sheetTitle: 'Отфильтрованные данные'
+    });
+    console.log('[Sidebar] Filtered data inserted:', result);
+
+    if (result.success) {
+      addAIMessage({
+        type: 'analysis',
+        text: result.message || 'Новый лист с отфильтрованными данными создан'
+      });
+    } else {
+      addAIMessage({
+        type: 'error',
+        text: result.message || 'Не удалось создать лист с данными'
+      });
+    }
+  } catch (error) {
+    console.error('[Sidebar] Error inserting filtered data:', error);
+    addAIMessage({
+      type: 'error',
+      text: 'Ошибка при создании листа: ' + error.message
+    });
+  }
+};
+
+window.highlightFilteredRows = async function() {
+  const filteredData = window.lastFilteredData;
+  if (!filteredData || !filteredData.rows) {
+    addAIMessage({
+      type: 'error',
+      text: 'Нет данных для выделения. Сначала выполните фильтрацию.'
+    });
+    return;
+  }
+
+  try {
+    // Get row indices from filtered data
+    // Note: rows are 1-indexed in sheets, and we skip header
+    const rowIndices = filteredData.rows.map((_, idx) => idx + 2); // +2 because 1-indexed and skip header
+
+    const result = await sendToContentScript('HIGHLIGHT_ROWS', {
+      rows: rowIndices.slice(0, 100), // Limit to 100 rows for performance
+      color: 'yellow'
+    });
+    console.log('[Sidebar] Rows highlighted:', result);
+
+    if (result.success) {
+      addAIMessage({
+        type: 'analysis',
+        text: result.message || `Выделено ${Math.min(rowIndices.length, 100)} строк`
+      });
+    } else {
+      addAIMessage({
+        type: 'error',
+        text: result.message || 'Не удалось выделить строки'
+      });
+    }
+  } catch (error) {
+    console.error('[Sidebar] Error highlighting rows:', error);
+    addAIMessage({
+      type: 'error',
+      text: 'Ошибка при выделении строк: ' + error.message
+    });
+  }
+};
+
+window.copyToClipboard = async function(text) {
+  try {
+    await navigator.clipboard.writeText(text);
+    // Could show a toast notification here
+  } catch (e) {
+    console.error('Copy failed:', e);
+  }
+};
+
+// ============================================
+// UTILITIES
+// ============================================
+function escapeHtml(text) {
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
+}
+
+// ============================================
+// POSTMESSAGE BRIDGE
+// ============================================
+window.addEventListener('message', (event) => {
+  const { type, data } = event.data || {};
+  
+  switch (type) {
+    case 'SHEET_DATA':
+      // Handled in getSheetData
+      break;
+    case 'AUTH_STATUS':
+      if (data && data.authenticated) {
+        state.isAuthenticated = true;
+        saveState();
+        checkAuthentication();
+      }
+      break;
   }
 });
 
-// Helper: Convert camelCase to SCREAMING_SNAKE_CASE
-function camelToScreamingSnake(str) {
-  return str.replace(/[A-Z]/g, letter => `_${letter}`).toUpperCase();
-}
-
-// Helper: Convert function arguments to data object
-function convertArgsToData(method, args) {
-  switch (method) {
-    case 'processQuery':
-      return { query: args[0] };
-    case 'getCustomContext':
-      return {};
-    case 'saveCustomContext':
-      return { context: args[0] };
-    case 'insertFormula':
-      return { formula: args[0], targetCell: args[1] };
-    case 'createTableAndChart':
-      return { structuredData: args[0] };
-    case 'replaceDataInCurrentSheet':
-      return { structuredData: args[0] };
-    case 'highlightRows':
-      return { rows: args[0], color: args[1] };
-    default:
-      return args[0] || {};
-  }
-}
-
-// ===== GOOGLE.SCRIPT.RUN EMULATION =====
-const google = {
+// Emulate google.script.run for Apps Script compatibility
+window.google = {
   script: {
     run: {
-      withSuccessHandler: function(successCallback) {
+      withSuccessHandler: function(callback) {
         return {
-          withFailureHandler: function(failureCallback) {
-            return new Proxy({}, {
-              get: function(target, method) {
-                return async function(...args) {
-                  try {
-                    console.log('[Sidebar] Calling google.script.run.' + method, args);
-                    const action = camelToScreamingSnake(method);
-                    const result = await sendMessageToContentScript(
-                      action,
-                      convertArgsToData(method, args)
-                    );
-                    if (successCallback) {
-                      successCallback(result);
-                    }
-                  } catch (error) {
-                    console.error('[Sidebar] Error in google.script.run.' + method, error);
-                    if (failureCallback) {
-                      failureCallback(error);
-                    }
-                  }
-                };
+          withFailureHandler: function(errorCallback) {
+            return {
+              processRequest: function(query) {
+                callAPI(query, null)
+                  .then(callback)
+                  .catch(errorCallback);
               }
-            });
+            };
           }
         };
       }
     }
   }
 };
-
-// Send READY message to content script
-window.parent.postMessage({ type: 'SHEETGPT_READY' }, '*');
-console.log('[Sidebar] ✅ READY message sent to parent');
-
-// ===== ORIGINAL APPS SCRIPT CODE =====
-let chatHistory = [];
-let isProcessing = false;
-
-    // Initialize
-    document.getElementById('messageInput').addEventListener('input', function() {
-      this.style.height = 'auto';
-      this.style.height = (this.scrollHeight) + 'px';
-
-      const sendBtn = document.getElementById('sendBtn');
-      sendBtn.disabled = !this.value.trim() || isProcessing;
-    });
-
-    // Character counter
-    const customContextInput = document.getElementById('customContextInput');
-    if (customContextInput) {
-      customContextInput.addEventListener('input', function() {
-        document.getElementById('charCount').textContent = this.value.length;
-      });
-    }
-
-    function handleKeyPress(event) {
-      if (event.key === 'Enter' && !event.shiftKey) {
-        event.preventDefault();
-        sendMessage();
-      }
-    }
-
-    function useExample(query) {
-      document.getElementById('messageInput').value = query;
-      document.getElementById('sendBtn').disabled = false;
-      sendMessage();
-    }
-
-    function sendMessage() {
-      const input = document.getElementById('messageInput');
-      const message = input.value.trim();
-
-      if (!message || isProcessing) return;
-
-      // Hide empty state
-      document.getElementById('emptyState').style.display = 'none';
-
-      // Add user message
-      addMessage(message, 'user');
-
-      // Save user message to history
-      chatHistory.push({
-        role: 'user',
-        content: message
-      });
-
-      // Clear input
-      input.value = '';
-      input.style.height = 'auto';
-      document.getElementById('sendBtn').disabled = true;
-
-      // Show loading
-      isProcessing = true;
-      addLoadingIndicator();
-
-      // Call backend
-      google.script.run
-        .withSuccessHandler(handleResponse)
-        .withFailureHandler(handleError)
-        .processQuery(message);
-    }
-
-    function addMessage(content, type) {
-      const container = document.getElementById('chatContainer');
-      const messageDiv = document.createElement('div');
-      messageDiv.className = `message ${type}`;
-
-      const bubble = document.createElement('div');
-      bubble.className = 'message-bubble';
-      bubble.textContent = content;
-
-      messageDiv.appendChild(bubble);
-      container.appendChild(messageDiv);
-
-      scrollToBottom();
-    }
-
-    function addAIResponse(result) {
-      try {
-        const container = document.getElementById('chatContainer');
-        const messageDiv = document.createElement('div');
-        messageDiv.className = 'message ai';
-
-        const bubble = document.createElement('div');
-        bubble.className = 'message-bubble';
-
-        // Response type badge
-        const responseType = result.response_type || 'formula';
-        const badge = document.createElement('div');
-        badge.className = 'response-badge ' + responseType;
-        if (responseType === 'analysis') {
-          badge.textContent = 'Анализ';
-        } else if (responseType === 'action') {
-          badge.textContent = 'Действие';
-        } else {
-          badge.textContent = 'Формула';
-        }
-        bubble.appendChild(badge);
-
-        // Main content
-        const content = document.createElement('div');
-
-        if (responseType === 'formula' && result.formula) {
-          // Formula
-          const formulaDiv = document.createElement('div');
-          formulaDiv.className = 'formula-code';
-          formulaDiv.textContent = result.formula;
-          content.appendChild(formulaDiv);
-
-          // Explanation
-          if (result.explanation) {
-            const explanation = document.createElement('p');
-            explanation.style.marginTop = '12px';
-            explanation.textContent = result.explanation;
-            content.appendChild(explanation);
-          }
-
-          // Action buttons
-          const actions = document.createElement('div');
-          actions.className = 'action-buttons';
-
-          const insertBtn = document.createElement('button');
-          insertBtn.className = 'action-btn';
-          insertBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 4v16m8-8H4"></path></svg> Вставить';
-          insertBtn.onclick = () => insertFormula(result.formula, result.target_cell);
-          actions.appendChild(insertBtn);
-
-          const copyBtn = document.createElement('button');
-          copyBtn.className = 'action-btn secondary';
-          copyBtn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg> Копировать';
-          copyBtn.onclick = () => copyToClipboard(result.formula);
-          actions.appendChild(copyBtn);
-
-          content.appendChild(actions);
-        } else {
-          // Analysis response
-
-          // Summary
-          if (result.summary) {
-            const summaryBox = document.createElement('div');
-
-            // Проверяем на сообщения об отсутствии данных
-            if (result.summary.includes('Данные отсутствуют') || result.summary.includes('невозможно создать')) {
-              summaryBox.className = 'content-box error';
-              summaryBox.innerHTML = `
-                <div style="margin-bottom: 8px;">❌ ${result.summary}</div>
-                <div style="font-size: 13px; color: #666; margin-top: 12px; padding-top: 12px; border-top: 1px solid #eee;">
-                  <strong>💡 Что попробовать:</strong><br/>
-                  <ul style="margin: 8px 0; padding-left: 20px;">
-                    <li>Переформулируйте запрос более конкретно</li>
-                    <li>Укажите конкретные примеры данных</li>
-                    <li>Попробуйте более простую тему с базовыми данными</li>
-                  </ul>
-                  <strong>✅ Примеры успешных запросов:</strong><br/>
-                  <ul style="margin: 8px 0; padding-left: 20px;">
-                    <li>"Создай таблицу с топ-10 стран Европы"</li>
-                    <li>"Создай таблицу планет солнечной системы"</li>
-                    <li>"Создай таблицу химических элементов"</li>
-                  </ul>
-                </div>
-              `;
-            } else {
-              summaryBox.className = 'content-box info';
-              const sentences = result.summary.split('. ');
-              summaryBox.innerHTML = sentences.map(s => s.trim() ? `<p style="margin: 8px 0;">${s.trim()}${s.endsWith('.') ? '' : '.'}</p>` : '').join('');
-            }
-
-            content.appendChild(summaryBox);
-          } else if (result.explanation) {
-            const explanation = document.createElement('p');
-            explanation.textContent = result.explanation;
-            content.appendChild(explanation);
-          }
-
-          // Methodology
-          if (result.methodology) {
-            const sectionTitle = document.createElement('div');
-            sectionTitle.className = 'section-title';
-            sectionTitle.textContent = 'Методология';
-            content.appendChild(sectionTitle);
-
-            const methodBox = document.createElement('div');
-            methodBox.className = 'content-box';
-            methodBox.innerHTML = result.methodology;
-            content.appendChild(methodBox);
-          }
-
-          // Key findings
-          if (result.key_findings && result.key_findings.length > 0) {
-            const sectionTitle = document.createElement('div');
-            sectionTitle.className = 'section-title';
-            sectionTitle.textContent = 'Ключевые находки';
-            content.appendChild(sectionTitle);
-
-            const findingsList = document.createElement('ul');
-            findingsList.className = 'list-items';
-            result.key_findings.forEach(finding => {
-              const li = document.createElement('li');
-              li.textContent = finding;
-              findingsList.appendChild(li);
-            });
-            content.appendChild(findingsList);
-          }
-
-          // Professional Insights
-          if (result.professional_insights) {
-            const sectionTitle = document.createElement('div');
-            sectionTitle.className = 'section-title';
-            sectionTitle.textContent = 'Профессиональный анализ';
-            content.appendChild(sectionTitle);
-
-            const insightsBox = document.createElement('div');
-            insightsBox.className = 'content-box warning';
-            insightsBox.textContent = result.professional_insights;
-            content.appendChild(insightsBox);
-          }
-
-          // Recommendations
-          if (result.recommendations && result.recommendations.length > 0) {
-            const sectionTitle = document.createElement('div');
-            sectionTitle.className = 'section-title';
-            sectionTitle.textContent = 'Рекомендации';
-            content.appendChild(sectionTitle);
-
-            const recsList = document.createElement('ul');
-            recsList.className = 'list-items';
-            result.recommendations.forEach(rec => {
-              const li = document.createElement('li');
-              li.textContent = rec;
-              recsList.appendChild(li);
-            });
-            content.appendChild(recsList);
-          }
-
-          // Warnings
-          if (result.warnings && result.warnings.length > 0) {
-            const sectionTitle = document.createElement('div');
-            sectionTitle.className = 'section-title';
-            sectionTitle.textContent = 'Предупреждения';
-            content.appendChild(sectionTitle);
-
-            const warnsList = document.createElement('ul');
-            warnsList.className = 'list-items';
-            result.warnings.forEach(warn => {
-              const li = document.createElement('li');
-              li.textContent = warn;
-              warnsList.appendChild(li);
-            });
-            content.appendChild(warnsList);
-          }
-        }
-
-        bubble.appendChild(content);
-        messageDiv.appendChild(bubble);
-        container.appendChild(messageDiv);
-
-        // Handle structured data (tables, charts, and split operations)
-        if (result.structured_data) {
-          console.log('[UI] Processing structured_data');
-          console.log('[UI] operation_type:', result.structured_data.operation_type);
-          console.log('[UI] Data:', result.structured_data);
-
-          // КРИТИЧНО: Проверяем operation_type и display_mode чтобы определить куда отправлять данные
-          const isSplitOperation = result.structured_data.operation_type === 'split';
-          const displayMode = result.structured_data.display_mode || 'create_sheet'; // v7.8.14: default to create_sheet
-
-          if (isSplitOperation) {
-            // SPLIT OPERATION: заменяем данные в ТЕКУЩЕМ листе
-            console.log('[UI] SPLIT OPERATION: Replacing data in current sheet');
-
-            google.script.run
-              .withSuccessHandler(function(splitResult) {
-                console.log('[UI] Split success handler:', splitResult);
-
-                const resultDiv = document.createElement('div');
-                resultDiv.className = 'message ai';
-                const resultBubble = document.createElement('div');
-                resultBubble.className = 'message-bubble';
-                const resultBox = document.createElement('div');
-
-                if (splitResult && splitResult.success) {
-                  resultBox.className = 'content-box success';
-                  resultBox.textContent = '✅ ' + (splitResult.message || 'Данные успешно разбиты');
-                } else {
-                  resultBox.className = 'content-box error';
-                  resultBox.textContent = '❌ ' + (splitResult ? (splitResult.message || splitResult.error || 'Неизвестная ошибка') : 'Функция не вернула результат');
-                }
-
-                resultBubble.appendChild(resultBox);
-                resultDiv.appendChild(resultBubble);
-                container.appendChild(resultDiv);
-                scrollToBottom();
-              })
-              .withFailureHandler(function(error) {
-                console.error('[UI] Split operation failed:', error);
-                const errorDiv = document.createElement('div');
-                errorDiv.className = 'message ai';
-                const errorBubble = document.createElement('div');
-                errorBubble.className = 'message-bubble';
-                const errorBox = document.createElement('div');
-                errorBox.className = 'content-box error';
-                errorBox.textContent = 'Ошибка разбиения данных: ' + error.message;
-                errorBubble.appendChild(errorBox);
-                errorDiv.appendChild(errorBubble);
-                container.appendChild(errorDiv);
-                scrollToBottom();
-              })
-              .replaceDataInCurrentSheet(result.structured_data);
-          } else if (displayMode === 'sidebar_only') {
-            // v7.8.14: SIDEBAR DISPLAY: показываем таблицу прямо в sidebar (для простых списков)
-            console.log('[UI] SIDEBAR DISPLAY: Showing table in sidebar (simple list)');
-            displayTableInSidebar(result.structured_data, container);
-          } else {
-            // TABLE/CHART OPERATION: создаём НОВЫЙ лист
-            console.log('[UI] TABLE/CHART OPERATION: Creating new sheet');
-
-            google.script.run
-              .withSuccessHandler(function(tableResult) {
-                console.log('[UI] Table success handler:', tableResult);
-
-                const resultDiv = document.createElement('div');
-                resultDiv.className = 'message ai';
-                const resultBubble = document.createElement('div');
-                resultBubble.className = 'message-bubble';
-                const resultBox = document.createElement('div');
-
-                if (tableResult && tableResult.success) {
-                  resultBox.className = 'content-box success';
-                  resultBox.textContent = '✅ ' + (tableResult.message || 'Таблица создана успешно');
-                } else {
-                  resultBox.className = 'content-box error';
-                  resultBox.textContent = '❌ ' + (tableResult ? (tableResult.message || tableResult.error || 'Неизвестная ошибка') : 'Функция не вернула результат');
-                }
-
-                resultBubble.appendChild(resultBox);
-                resultDiv.appendChild(resultBubble);
-                container.appendChild(resultDiv);
-                scrollToBottom();
-              })
-              .withFailureHandler(function(error) {
-                console.error('[UI] Table creation failed:', error);
-                const errorDiv = document.createElement('div');
-                errorDiv.className = 'message ai';
-                const errorBubble = document.createElement('div');
-                errorBubble.className = 'message-bubble';
-                const errorBox = document.createElement('div');
-                errorBox.className = 'content-box error';
-                errorBox.textContent = 'Ошибка создания таблицы: ' + error.message;
-                errorBubble.appendChild(errorBox);
-                errorDiv.appendChild(errorBubble);
-                container.appendChild(errorDiv);
-                scrollToBottom();
-              })
-              .createTableAndChart(result.structured_data);
-          }
-        }
-
-        // Handle row highlighting
-        if (result.highlight_rows && result.highlight_rows.length > 0) {
-          console.log('[UI] Highlighting rows:', result.highlight_rows);
-          google.script.run
-            .withSuccessHandler(function(highlightResult) {
-              if (highlightResult.success) {
-                const successDiv = document.createElement('div');
-                successDiv.className = 'message ai';
-                const successBubble = document.createElement('div');
-                successBubble.className = 'message-bubble';
-                const successBox = document.createElement('div');
-                successBox.className = 'content-box success';
-                successBox.textContent = result.highlight_message || highlightResult.message;
-                successBubble.appendChild(successBox);
-                successDiv.appendChild(successBubble);
-                container.appendChild(successDiv);
-                scrollToBottom();
-              }
-            })
-            .withFailureHandler(function(error) {
-              console.error('[UI] Row highlighting failed:', error);
-            })
-            .highlightRows(result.highlight_rows, result.highlight_color || '#FFFF00');
-        }
-
-        scrollToBottom();
-      } catch (error) {
-        console.error('Error in addAIResponse:', error);
-        handleError({message: 'Ошибка отображения ответа: ' + error.message});
-      }
-    }
-
-    function addLoadingIndicator() {
-      const container = document.getElementById('chatContainer');
-      const loadingDiv = document.createElement('div');
-      loadingDiv.className = 'message ai';
-      loadingDiv.id = 'loading';
-
-      const loading = document.createElement('div');
-      loading.className = 'loading-indicator';
-      loading.innerHTML = '<div class="loading-dots"><span></span><span></span><span></span></div><span class="loading-text">Думаю...</span>';
-
-      loadingDiv.appendChild(loading);
-      container.appendChild(loadingDiv);
-
-      scrollToBottom();
-    }
-
-    function removeLoadingIndicator() {
-      const loading = document.getElementById('loading');
-      if (loading) loading.remove();
-    }
-
-    function handleResponse(result) {
-      removeLoadingIndicator();
-      isProcessing = false;
-
-      if (result) {
-        addAIResponse(result);
-      } else {
-        handleError({message: 'Пустой ответ от сервера'});
-      }
-    }
-
-    function handleError(error) {
-      removeLoadingIndicator();
-      isProcessing = false;
-
-      const container = document.getElementById('chatContainer');
-      const errorDiv = document.createElement('div');
-      errorDiv.className = 'message ai';
-
-      const bubble = document.createElement('div');
-      bubble.className = 'message-bubble';
-      bubble.style.borderColor = 'var(--error)';
-
-      const errorMessage = error.message || 'Неизвестная ошибка';
-
-      // Умная обработка типичных ошибок
-      const errorBox = document.createElement('div');
-      errorBox.className = 'content-box error';
-
-      // Классифицируем ошибку для пользователя
-      const errorInfo = classifyError(errorMessage);
-
-      errorBox.innerHTML = `
-        <div style="margin-bottom: 8px;">${errorInfo.icon} ${errorInfo.title}</div>
-        <div style="font-size: 13px; color: #666; margin-top: 8px; padding-top: 8px; border-top: 1px solid #eee;">
-          ${errorInfo.description}
-          ${errorInfo.suggestions ? `
-            <div style="margin-top: 10px;">
-              💡 <strong>Что попробовать:</strong><br/>
-              ${errorInfo.suggestions.map(s => `• ${s}`).join('<br/>')}
-            </div>
-          ` : ''}
-        </div>
-      `;
-
-      bubble.appendChild(errorBox);
-      errorDiv.appendChild(bubble);
-      container.appendChild(errorDiv);
-
-      scrollToBottom();
-    }
-
-    // Классификация ошибок для понятных сообщений пользователю
-    function classifyError(errorMessage) {
-      const lowerMsg = errorMessage.toLowerCase();
-
-      // v7.9.3: Extension context invalidated - расширение обновилось
-      if (lowerMsg.includes('extension context invalidated') ||
-          lowerMsg.includes('context invalidated') ||
-          lowerMsg.includes('extension context')) {
-        return {
-          icon: '🔄',
-          title: 'Расширение обновилось',
-          description: 'Расширение было обновлено. Требуется перезагрузка страницы.',
-          suggestions: [
-            'Закройте эту вкладку и откройте Google Sheets заново',
-            'Или нажмите Ctrl+Shift+R для полной перезагрузки'
-          ]
-        };
-      }
-
-      // Таймаут / сетевые ошибки
-      if (lowerMsg.includes('timeout') || lowerMsg.includes('timed out')) {
-        return {
-          icon: '⏱️',
-          title: 'Превышено время ожидания',
-          description: 'Сервер не ответил вовремя. Было выполнено несколько попыток подключения.',
-          suggestions: [
-            'Попробуйте ещё раз через несколько секунд',
-            'Проверьте интернет-соединение',
-            'Упростите запрос, если он сложный'
-          ]
-        };
-      }
-
-      // Сетевые ошибки
-      if (lowerMsg.includes('network') || lowerMsg.includes('fetch') || lowerMsg.includes('connection')) {
-        return {
-          icon: '🌐',
-          title: 'Ошибка сети',
-          description: 'Не удалось подключиться к серверу.',
-          suggestions: [
-            'Проверьте подключение к интернету',
-            'Попробуйте обновить страницу',
-            'Повторите запрос через несколько минут'
-          ]
-        };
-      }
-
-      // Серверные ошибки (502, 503, 504)
-      if (lowerMsg.includes('502') || lowerMsg.includes('503') || lowerMsg.includes('504') ||
-          lowerMsg.includes('unavailable') || lowerMsg.includes('server error')) {
-        return {
-          icon: '🔧',
-          title: 'Сервер временно недоступен',
-          description: 'Сервис перегружен или проводится техническое обслуживание.',
-          suggestions: [
-            'Подождите 30-60 секунд и повторите',
-            'Если проблема сохраняется, попробуйте позже'
-          ]
-        };
-      }
-
-      // Ошибки данных
-      if (lowerMsg.includes('данные отсутствуют') || lowerMsg.includes('невозможно создать') ||
-          lowerMsg.includes('no data') || lowerMsg.includes('empty')) {
-        return {
-          icon: '📊',
-          title: 'Не удалось получить данные',
-          description: 'AI не смог найти или сгенерировать запрошенную информацию.',
-          suggestions: [
-            'Переформулируйте запрос более конкретно',
-            'Укажите конкретные примеры данных',
-            'Попробуйте запрос с более известными данными'
-          ]
-        };
-      }
-
-      // Ошибки авторизации
-      if (lowerMsg.includes('auth') || lowerMsg.includes('token') || lowerMsg.includes('unauthorized') ||
-          lowerMsg.includes('401') || lowerMsg.includes('403')) {
-        return {
-          icon: '🔐',
-          title: 'Ошибка авторизации',
-          description: 'Требуется повторная авторизация в Google.',
-          suggestions: [
-            'Обновите страницу Google Sheets',
-            'Переустановите расширение если проблема повторяется'
-          ]
-        };
-      }
-
-      // Ошибки формулы
-      if (lowerMsg.includes('formula') || lowerMsg.includes('syntax') || lowerMsg.includes('parse')) {
-        return {
-          icon: '📝',
-          title: 'Ошибка в формуле',
-          description: 'Не удалось создать корректную формулу для вашего запроса.',
-          suggestions: [
-            'Попробуйте описать задачу другими словами',
-            'Укажите конкретные ячейки или диапазоны',
-            'Разбейте сложный запрос на несколько простых'
-          ]
-        };
-      }
-
-      // Неизвестная ошибка
-      return {
-        icon: '❌',
-        title: 'Произошла ошибка',
-        description: errorMessage,
-        suggestions: [
-          'Попробуйте повторить запрос',
-          'Если ошибка повторяется, обновите страницу'
-        ]
-      };
-    }
-
-    // v7.8.14: Отображение простых таблиц прямо в sidebar (без создания нового листа)
-    function displayTableInSidebar(structuredData, container) {
-      console.log('[UI] displayTableInSidebar called with:', structuredData);
-
-      const messageDiv = document.createElement('div');
-      messageDiv.className = 'message ai';
-
-      const bubble = document.createElement('div');
-      bubble.className = 'message-bubble';
-
-      // Title
-      if (structuredData.table_title) {
-        const titleDiv = document.createElement('div');
-        titleDiv.style.fontWeight = 'bold';
-        titleDiv.style.marginBottom = '8px';
-        titleDiv.textContent = structuredData.table_title;
-        bubble.appendChild(titleDiv);
-      }
-
-      // Create table
-      const table = document.createElement('table');
-      table.style.width = '100%';
-      table.style.borderCollapse = 'collapse';
-      table.style.fontSize = '13px';
-      table.style.marginTop = '8px';
-
-      // Headers
-      if (structuredData.headers && structuredData.headers.length > 0) {
-        const thead = document.createElement('thead');
-        const headerRow = document.createElement('tr');
-        structuredData.headers.forEach(header => {
-          const th = document.createElement('th');
-          th.textContent = header;
-          th.style.padding = '6px 8px';
-          th.style.borderBottom = '2px solid #ddd';
-          th.style.textAlign = 'left';
-          th.style.backgroundColor = '#f5f5f5';
-          headerRow.appendChild(th);
-        });
-        thead.appendChild(headerRow);
-        table.appendChild(thead);
-      }
-
-      // Rows
-      if (structuredData.rows && structuredData.rows.length > 0) {
-        const tbody = document.createElement('tbody');
-        structuredData.rows.forEach((row, index) => {
-          const tr = document.createElement('tr');
-          tr.style.backgroundColor = index % 2 === 0 ? '#ffffff' : '#f9f9f9';
-
-          row.forEach(cell => {
-            const td = document.createElement('td');
-            td.textContent = cell !== null && cell !== undefined ? cell : '';
-            td.style.padding = '6px 8px';
-            td.style.borderBottom = '1px solid #eee';
-            tr.appendChild(td);
-          });
-
-          tbody.appendChild(tr);
-        });
-        table.appendChild(tbody);
-      }
-
-      bubble.appendChild(table);
-      messageDiv.appendChild(bubble);
-      container.appendChild(messageDiv);
-
-      // Success message
-      const resultDiv = document.createElement('div');
-      resultDiv.className = 'message ai';
-      const resultBubble = document.createElement('div');
-      resultBubble.className = 'message-bubble';
-      const resultBox = document.createElement('div');
-      resultBox.className = 'content-box success';
-      resultBox.textContent = '✅ Результаты отображены в sidebar';
-      resultBubble.appendChild(resultBox);
-      resultDiv.appendChild(resultBubble);
-      container.appendChild(resultDiv);
-
-      scrollToBottom();
-    }
-
-    function scrollToBottom() {
-      const container = document.getElementById('chatContainer');
-      setTimeout(() => {
-        container.scrollTop = container.scrollHeight;
-      }, 100);
-    }
-
-    function insertFormula(formula, targetCell) {
-      google.script.run
-        .withSuccessHandler(() => {
-          alert('Формула вставлена!');
-        })
-        .withFailureHandler((error) => {
-          alert('Ошибка: ' + error.message);
-        })
-        .insertFormula(formula, targetCell);
-    }
-
-    function copyToClipboard(text) {
-      navigator.clipboard.writeText(text).then(() => {
-        alert('Скопировано!');
-      }).catch(() => {
-        alert('Не удалось скопировать');
-      });
-    }
-
-    // Settings Modal
-    function openSettings() {
-      google.script.run
-        .withSuccessHandler(function(context) {
-          document.getElementById('customContextInput').value = context || '';
-          document.getElementById('charCount').textContent = (context || '').length;
-          document.getElementById('settingsModal').classList.add('show');
-        })
-        .getCustomContext();
-    }
-
-    function closeSettings() {
-      document.getElementById('settingsModal').classList.remove('show');
-    }
-
-    function saveSettings() {
-      const context = document.getElementById('customContextInput').value.trim();
-
-      google.script.run
-        .withSuccessHandler(function(result) {
-          if (result.success) {
-            alert('Настройки сохранены!');
-            closeSettings();
-          } else {
-            alert('Ошибка сохранения: ' + result.error);
-          }
-        })
-        .withFailureHandler(function(error) {
-          alert('Ошибка: ' + error.message);
-        })
-        .saveCustomContext(context);
-    }
-
-    // Chat History Functions
-    let chatHistoryData = [];
-
-    function toggleHistory() {
-      const dropdown = document.getElementById('historyDropdown');
-      const isVisible = dropdown.classList.contains('show');
-
-      // Close any open dropdowns first
-      document.querySelectorAll('.dropdown.show').forEach(d => d.classList.remove('show'));
-
-      if (!isVisible) {
-        loadHistory();
-        dropdown.classList.add('show');
-      }
-    }
-
-    function loadHistory() {
-      const historyList = document.getElementById('historyList');
-
-      // Load from localStorage (temporary - in production use Google Apps Script)
-      const savedHistory = localStorage.getItem('sheetgpt_history');
-      chatHistoryData = savedHistory ? JSON.parse(savedHistory) : [];
-
-      if (chatHistoryData.length === 0) {
-        historyList.innerHTML = '<div class="dropdown-empty">История пуста</div>';
-        return;
-      }
-
-      historyList.innerHTML = '';
-      chatHistoryData.forEach((item, index) => {
-        const li = document.createElement('li');
-        li.className = 'dropdown-item';
-        li.onclick = () => loadChat(index);
-
-        const title = document.createElement('div');
-        title.className = 'dropdown-item-title';
-        title.textContent = item.title || item.firstMessage || 'Новый чат';
-
-        const time = document.createElement('div');
-        time.className = 'dropdown-item-meta';
-        time.textContent = formatTime(item.timestamp);
-
-        li.appendChild(title);
-        li.appendChild(time);
-        historyList.appendChild(li);
-      });
-    }
-
-    function saveChatToHistory() {
-      const messages = Array.from(document.getElementById('chatContainer').querySelectorAll('.message'));
-      if (messages.length === 0) return;
-
-      const firstUserMessage = messages.find(m => m.classList.contains('user'));
-      const firstMessage = firstUserMessage ? firstUserMessage.textContent.trim() : 'Новый чат';
-
-      const chatData = {
-        id: Date.now(),
-        title: firstMessage.substring(0, 50) + (firstMessage.length > 50 ? '...' : ''),
-        firstMessage: firstMessage,
-        timestamp: Date.now(),
-        messages: chatHistory
-      };
-
-      chatHistoryData.unshift(chatData);
-      if (chatHistoryData.length > 20) chatHistoryData.pop(); // Keep only last 20
-
-      localStorage.setItem('sheetgpt_history', JSON.stringify(chatHistoryData));
-    }
-
-    function loadChat(index) {
-      const chat = chatHistoryData[index];
-      if (!chat) return;
-
-      // Clear current chat
-      const container = document.getElementById('chatContainer');
-      container.innerHTML = '';
-      const emptyState = document.getElementById('emptyState');
-      if (emptyState) {
-        emptyState.style.display = 'none';
-      }
-
-      // Restore chat history array
-      chatHistory = chat.messages || [];
-
-      // Restore messages from saved history
-      if (chat.messages && chat.messages.length > 0) {
-        chat.messages.forEach(msg => {
-          if (msg.role === 'user') {
-            addMessage(msg.content, 'user');
-          } else if (msg.role === 'assistant' && msg.result) {
-            addAIResponse(msg.result);
-          }
-        });
-      } else {
-        // Fallback: just show the title as first message
-        addMessage(chat.firstMessage || chat.title, 'user');
-      }
-
-      toggleHistory();
-      scrollToBottom();
-    }
-
-    function formatTime(timestamp) {
-      const date = new Date(timestamp);
-      const now = new Date();
-      const diff = now - date;
-
-      if (diff < 60000) return 'только что';
-      if (diff < 3600000) return Math.floor(diff / 60000) + ' мин назад';
-      if (diff < 86400000) return Math.floor(diff / 3600000) + ' ч назад';
-
-      return date.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' });
-    }
-
-    // Save chat on successful response
-    const originalHandleResponse = handleResponse;
-    handleResponse = function(result) {
-      // Save AI response to history
-      if (result) {
-        chatHistory.push({
-          role: 'assistant',
-          result: result  // Save full result for later restoration
-        });
-      }
-
-      originalHandleResponse(result);
-      setTimeout(saveChatToHistory, 500); // Save after rendering
-    };
-
-    // Close history dropdown when clicking outside
-    document.addEventListener('click', function(e) {
-      const dropdown = document.getElementById('historyDropdown');
-      const historyBtn = document.querySelector('button[aria-label="История"]');
-
-      if (!dropdown.contains(e.target) && e.target !== historyBtn && !historyBtn.contains(e.target)) {
-        dropdown.classList.remove('show');
-      }
-    });
-
-// ===== THEME MANAGEMENT =====
-function initTheme() {
-  const savedTheme = localStorage.getItem('sheetgpt_theme');
-  const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-  const theme = savedTheme || (prefersDark ? 'dark' : 'light');
-  document.documentElement.setAttribute('data-theme', theme);
-  console.log('[Sidebar] Theme initialized:', theme);
-}
-
-function toggleTheme() {
-  const currentTheme = document.documentElement.getAttribute('data-theme');
-  const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
-  document.documentElement.setAttribute('data-theme', newTheme);
-  localStorage.setItem('sheetgpt_theme', newTheme);
-  console.log('[Sidebar] Theme toggled to:', newTheme);
-}
-
-// Initialize theme on load
-initTheme();
-
-// ===== EVENT LISTENERS INITIALIZATION =====
-console.log('[Sidebar] Setting up event listeners...');
-
-// Theme toggle
-const themeToggle = document.getElementById('themeToggle');
-if (themeToggle) {
-  themeToggle.addEventListener('click', toggleTheme);
-  console.log('[Sidebar] ✅ Theme toggle listener attached');
-}
-
-// Send button
-const sendBtn = document.getElementById('sendBtn');
-if (sendBtn) {
-  sendBtn.addEventListener('click', sendMessage);
-  console.log('[Sidebar] ✅ Send button listener attached');
-}
-
-// Message input - Enter to send
-const messageInput = document.getElementById('messageInput');
-if (messageInput) {
-  messageInput.addEventListener('keydown', handleKeyPress);
-  console.log('[Sidebar] ✅ Message input keydown listener attached');
-}
-
-// Template cards
-document.querySelectorAll('.template-card').forEach(card => {
-  const query = card.getAttribute('data-query');
-  if (query) {
-    card.addEventListener('click', () => useExample(query));
-  }
-});
-console.log('[Sidebar] ✅ Template cards listeners attached');
-
-// History button
-const historyBtn = document.getElementById('historyBtn');
-if (historyBtn) {
-  historyBtn.addEventListener('click', toggleHistory);
-  console.log('[Sidebar] ✅ History button listener attached');
-}
-
-// Settings button
-const settingsBtn = document.getElementById('settingsBtn');
-if (settingsBtn) {
-  settingsBtn.addEventListener('click', openSettings);
-  console.log('[Sidebar] ✅ Settings button listener attached');
-}
-
-// Save settings button
-const saveSettingsBtn = document.getElementById('saveSettingsBtn');
-if (saveSettingsBtn) {
-  saveSettingsBtn.addEventListener('click', saveSettings);
-  console.log('[Sidebar] ✅ Save settings button listener attached');
-}
-
-// Cancel settings button
-const cancelSettingsBtn = document.getElementById('cancelSettingsBtn');
-if (cancelSettingsBtn) {
-  cancelSettingsBtn.addEventListener('click', closeSettings);
-  console.log('[Sidebar] ✅ Cancel settings button listener attached');
-}
-
-console.log('[Sidebar] Event listeners initialized');

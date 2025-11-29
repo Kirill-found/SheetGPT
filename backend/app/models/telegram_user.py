@@ -23,6 +23,9 @@ class TelegramUser(Base):
     # API токен для аутентификации
     api_token = Column(String(64), unique=True, nullable=False, index=True)
 
+    # Лицензионный ключ для Chrome Extension (формат: XXXX-XXXX-XXXX-XXXX)
+    license_key = Column(String(19), unique=True, nullable=True, index=True)
+
     # Подписка и лимиты
     subscription_tier = Column(String(20), default="free")  # free, premium
     is_active = Column(Boolean, default=True)
@@ -45,10 +48,20 @@ class TelegramUser(Base):
         """Генерация уникального API токена"""
         return secrets.token_urlsafe(48)
 
+    @staticmethod
+    def generate_license_key():
+        """Генерация лицензионного ключа формата XXXX-XXXX-XXXX-XXXX"""
+        parts = [secrets.token_hex(2).upper() for _ in range(4)]
+        return '-'.join(parts)
+
     def can_make_query(self) -> bool:
         """Проверка возможности сделать запрос"""
         if not self.is_active:
             return False
+
+        # queries_limit = -1 означает безлимит (независимо от tier)
+        if self.queries_limit == -1:
+            return True
 
         # Premium пользователи имеют безлимит
         if self.subscription_tier == "premium":
@@ -56,11 +69,27 @@ class TelegramUser(Base):
             if self.premium_until:
                 from datetime import datetime, timezone
                 if datetime.now(timezone.utc) > self.premium_until:
-                    return False
+                    # Подписка истекла - понижаем до free
+                    return self.queries_used_today < 10  # default free limit
             return True
 
         # Free пользователи ограничены дневным лимитом
         return self.queries_used_today < self.queries_limit
+
+    def upgrade_to_premium(self, duration_days: int = 365):
+        """Обновление до Premium подписки"""
+        from datetime import datetime, timezone, timedelta
+        self.subscription_tier = "premium"
+        self.queries_limit = -1  # Unlimited
+        self.queries_used_today = 0  # Reset usage
+        self.premium_until = datetime.now(timezone.utc) + timedelta(days=duration_days)
+
+    def downgrade_to_free(self):
+        """Понижение до Free плана"""
+        self.subscription_tier = "free"
+        self.queries_limit = 10
+        self.queries_used_today = 0
+        self.premium_until = None
 
     def increment_usage(self):
         """Увеличение счетчика использования"""
