@@ -257,7 +257,6 @@
       display: inline;
     }
 
-    /* After animation completes, show static */
     .logo.loaded .logo-static {
       display: inline;
     }
@@ -927,41 +926,64 @@
       transform: scale(0.97);
     }
 
-    /* Loading */
+    /* Loading — Morph Squares Animation */
     .loading-indicator {
       display: flex;
+      flex-direction: column;
       align-items: center;
-      gap: var(--space-3);
-      padding: var(--space-4) var(--space-5);
+      gap: var(--space-4);
+      padding: var(--space-6) var(--space-8);
       background: var(--bg-primary);
       border: 1px solid var(--border-light);
       border-radius: var(--radius-xl);
     }
 
-    .loading-dots {
+    .morph-squares {
       display: flex;
-      gap: 4px;
+      gap: 10px;
     }
 
-    .loading-dots span {
-      width: 6px;
-      height: 6px;
-      background: var(--text-muted);
-      border-radius: 50%;
-      animation: loadingPulse 1.4s ease-in-out infinite;
+    .morph-square {
+      width: 18px;
+      height: 18px;
+      background: var(--accent);
+      animation: morphSquare 1.2s ease-in-out infinite;
     }
 
-    .loading-dots span:nth-child(2) { animation-delay: 0.2s; }
-    .loading-dots span:nth-child(3) { animation-delay: 0.4s; }
+    .morph-square:nth-child(1) { animation-delay: 0s; }
+    .morph-square:nth-child(2) { animation-delay: 0.15s; }
+    .morph-square:nth-child(3) { animation-delay: 0.3s; }
 
-    @keyframes loadingPulse {
-      0%, 100% { transform: scale(0.8); opacity: 0.4; }
-      50% { transform: scale(1); opacity: 1; }
+    @keyframes morphSquare {
+      0%, 100% {
+        border-radius: 4px;
+        transform: scale(1) rotate(0deg);
+        opacity: 0.3;
+      }
+      50% {
+        border-radius: 50%;
+        transform: scale(1.25) rotate(180deg);
+        opacity: 1;
+      }
     }
 
     .loading-text {
-      font-size: 13px;
+      font-family: var(--font-mono);
+      font-size: 12px;
       color: var(--text-secondary);
+      letter-spacing: 0.02em;
+    }
+
+    .loading-text::after {
+      content: '';
+      animation: loadingDots 1.5s infinite;
+    }
+
+    @keyframes loadingDots {
+      0%, 20% { content: ''; }
+      40% { content: '.'; }
+      60% { content: '..'; }
+      80%, 100% { content: '...'; }
     }
 
     /* ============================================
@@ -1141,7 +1163,7 @@
     }
 
     /* ============================================
-       MODAL — Settings
+       MODAL — Settings & Personalization
        ============================================ */
     .modal-overlay {
       position: fixed;
@@ -1793,7 +1815,7 @@
           <input type="text" class="modal-input" id="userNameInput" placeholder="Введите ваше имя">
         </div>
 
-        <!-- Personalization (simple, redirect to modal) -->
+        <!-- Personalization -->
         <div class="modal-section">
           <label class="modal-label">Персонализация AI</label>
           <p class="modal-description">
@@ -1962,24 +1984,16 @@
     });
 
     document.getElementById('savePersonalizationBtn').addEventListener('click', () => {
-      // Get selected preset
       const selectedPreset = document.querySelector('.preset-card.selected');
       const presetId = selectedPreset ? selectedPreset.dataset.preset : 'analyst';
-
-      // Get custom context
       const customContext = document.getElementById('personalizationContextInput').value;
-
-      // Save to storage
       const personalization = { preset: presetId, customContext };
       localStorage.setItem('sheetgpt-personalization', JSON.stringify(personalization));
-
-      // Also update the settings modal context if needed
       const settingsContext = document.getElementById('customContextInput');
       if (settingsContext && customContext) {
         settingsContext.value = customContext;
         document.getElementById('charCount').textContent = customContext.length;
       }
-
       document.getElementById('personalizationModal').classList.remove('show');
     });
 
