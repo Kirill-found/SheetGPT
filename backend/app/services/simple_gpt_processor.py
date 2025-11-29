@@ -326,6 +326,18 @@ explanation += f"• Средний чек: {avg:,.0f} руб.
         'мин': 'min', 'min': 'min', 'минимум': 'min'
     }
 
+    # Synonyms for value columns (business terms -> likely column names)
+    VALUE_COLUMN_SYNONYMS = {
+        'продаж': ['сумма', 'сумм', 'выручка', 'revenue', 'sales', 'amount', 'total'],
+        'доход': ['сумма', 'выручка', 'прибыль', 'revenue', 'income'],
+        'выручк': ['сумма', 'продажи', 'revenue', 'sales'],
+        'оборот': ['сумма', 'выручка', 'revenue'],
+        'прибыл': ['прибыль', 'маржа', 'profit', 'margin'],
+        'затрат': ['себестоимость', 'расходы', 'cost', 'expenses'],
+        'расход': ['себестоимость', 'затраты', 'cost', 'expenses'],
+    }
+
+
     # Data cleaning keywords
     CLEAN_KEYWORDS = ['очист', 'clean', 'удали дублик', 'remove duplicate', 'дубликат',
                       'удали пуст', 'remove empty', 'пустые строк', 'empty row',
@@ -922,22 +934,52 @@ explanation += f"• Средний чек: {avg:,.0f} руб.
         if not group_column and categorical_cols:
             group_column = categorical_cols[0]
 
-        # Find value column (numeric mentioned in query or first numeric)
+        # Find value column (numeric mentioned in query or via synonyms)
         value_column = None
+
+        # First, try direct match
         for num in numeric_cols:
             num_lower = num['name'].lower()
             if num_lower in query_lower or num['name'] in query:
                 value_column = num
+                logger.info(f"[SimpleGPT] Found value column by direct match: {num['name']}")
                 break
             for word in num_lower.split():
                 if len(word) > 2 and word in query_lower:
                     value_column = num
+                    logger.info(f"[SimpleGPT] Found value column by word match: {num['name']}")
                     break
             if value_column:
                 break
 
+        # If not found, try synonyms (e.g., "продажи" -> "Сумма")
+        if not value_column:
+            for query_term, synonyms in self.VALUE_COLUMN_SYNONYMS.items():
+                if query_term in query_lower:
+                    # Found a business term in query, look for matching column
+                    for num in numeric_cols:
+                        num_lower = num['name'].lower()
+                        for syn in synonyms:
+                            if syn in num_lower or num_lower in syn:
+                                value_column = num
+                                logger.info(f"[SimpleGPT] Found value column via synonym '{query_term}' -> '{num['name']}'")
+                                break
+                        if value_column:
+                            break
+                    if value_column:
+                        break
+
+        # Fallback to first numeric column (but skip ID columns)
         if not value_column and numeric_cols:
-            value_column = numeric_cols[0]
+            for num in numeric_cols:
+                # Skip columns that look like IDs
+                if num['name'].lower() not in ['id', 'ид', 'номер', 'код', 'index']:
+                    value_column = num
+                    logger.info(f"[SimpleGPT] Using first non-ID numeric column: {num['name']}")
+                    break
+            # If all are ID-like, use first one anyway
+            if not value_column:
+                value_column = numeric_cols[0]
 
         # Detect aggregation function
         agg_func = 'sum'  # Default
