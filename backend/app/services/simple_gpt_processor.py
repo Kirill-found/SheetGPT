@@ -1007,6 +1007,9 @@ explanation += f"• Средний чек: {avg:,.0f} руб.
             return None
         
         logger.info(f"[SimpleGPT] CSV split action detected: {query}")
+        logger.info(f"[SimpleGPT] CSV split - df.columns: {df.columns.tolist()}")
+        logger.info(f"[SimpleGPT] CSV split - df.shape: {df.shape}")
+        logger.info(f"[SimpleGPT] CSV split - df first row: {df.iloc[0].tolist() if len(df) > 0 else 'empty'}")
         
         # Detect delimiter from data
         delimiter = None
