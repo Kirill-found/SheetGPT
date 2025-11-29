@@ -870,10 +870,10 @@ function addLoadingIndicator() {
   loadingDiv.className = 'message ai';
   loadingDiv.innerHTML = `
     <div class="loading-indicator">
-      <div class="loading-dots">
-        <span></span>
-        <span></span>
-        <span></span>
+      <div class="morph-squares">
+        <div class="morph-square"></div>
+        <div class="morph-square"></div>
+        <div class="morph-square"></div>
       </div>
       <span class="loading-text">Анализирую данные...</span>
     </div>
@@ -950,14 +950,14 @@ async function getSheetData() {
   });
 }
 
-async function callAPI(query, sheetData) {
+async function callAPI(query, sheetData, history = []) {
   // Format payload for /api/v1/formula endpoint
   const payload = {
     query: query,
-    response: response, // Store response for conversation context
     column_names: sheetData?.headers || [],
     sheet_data: sheetData?.rows || [],
-    custom_context: state.customContext || ''
+    custom_context: state.customContext || '',
+    history: history
   };
 
   console.log('[API] Sending request:', payload);
