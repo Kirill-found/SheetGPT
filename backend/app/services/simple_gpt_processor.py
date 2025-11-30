@@ -480,6 +480,37 @@ for col, val in min_row.items():
                                     'красным ячейки', 'зелёным ячейки', 'зеленым ячейки',
                                     'пустые значения', 'пустые ячейки', 'желтым пуст', 'жёлтым пуст']
 
+    # Color scale / gradient keywords (MUST be checked BEFORE conditional formatting)
+    COLOR_SCALE_KEYWORDS = ['цветовая шкала', 'color scale', 'градиент', 'gradient',
+                            'тепловая карта', 'heatmap', 'heat map',
+                            'от красного к зелёному', 'от красного к зеленому',
+                            'от зелёного к красному', 'от зеленого к красному',
+                            'шкала цвет', 'раскрась по значени', 'покрась по значени']
+
+    # Color scale presets
+    COLOR_SCALE_PRESETS = {
+        'red_yellow_green': {
+            'min_color': {'red': 0.96, 'green': 0.8, 'blue': 0.8},    # Light red
+            'mid_color': {'red': 1, 'green': 0.95, 'blue': 0.8},       # Light yellow
+            'max_color': {'red': 0.8, 'green': 0.92, 'blue': 0.8}      # Light green
+        },
+        'green_yellow_red': {
+            'min_color': {'red': 0.8, 'green': 0.92, 'blue': 0.8},     # Light green
+            'mid_color': {'red': 1, 'green': 0.95, 'blue': 0.8},       # Light yellow
+            'max_color': {'red': 0.96, 'green': 0.8, 'blue': 0.8}      # Light red
+        },
+        'white_to_blue': {
+            'min_color': {'red': 1, 'green': 1, 'blue': 1},            # White
+            'mid_color': {'red': 0.8, 'green': 0.9, 'blue': 1},        # Light blue
+            'max_color': {'red': 0.4, 'green': 0.6, 'blue': 0.9}       # Blue
+        },
+        'white_to_green': {
+            'min_color': {'red': 1, 'green': 1, 'blue': 1},            # White
+            'mid_color': {'red': 0.85, 'green': 0.95, 'blue': 0.85},   # Light green
+            'max_color': {'red': 0.6, 'green': 0.85, 'blue': 0.6}      # Green
+        }
+    }
+
     # Pivot table / grouping keywords
     PIVOT_KEYWORDS = ['сводн', 'pivot', 'группир', 'group by', 'агрегир', 'итоги по', 'суммы по',
                       'по категори', 'по менеджер', 'по регион', 'по месяц', 'по год',
@@ -2018,6 +2049,104 @@ for col, val in min_row.items():
             logger.error(f"[SimpleGPT] Error filtering data: {e}")
             return None
 
+    def _detect_color_scale_action(self, query: str, column_names: List[str], df: pd.DataFrame) -> Optional[Dict[str, Any]]:
+        """
+        Определяет, является ли запрос командой применения цветовой шкалы (градиента).
+        Примеры:
+        - "цветовая шкала для колонки Сумма"
+        - "градиент от красного к зелёному для Цена"
+        - "тепловая карта по колонке Продажи"
+        """
+        query_lower = query.lower()
+
+        # Check for color scale keywords
+        is_color_scale = any(kw in query_lower for kw in self.COLOR_SCALE_KEYWORDS)
+        if not is_color_scale:
+            return None
+
+        logger.info(f"[SimpleGPT] Color scale action detected: {query}")
+
+        # Find target column
+        target_column = None
+        target_column_index = None
+
+        for idx, col_name in enumerate(column_names):
+            col_lower = col_name.lower()
+            if col_lower in query_lower or col_name in query:
+                target_column = col_name
+                target_column_index = idx
+                break
+            # Partial match
+            for word in col_lower.split():
+                if len(word) > 2 and word in query_lower:
+                    target_column = col_name
+                    target_column_index = idx
+                    break
+            if target_column:
+                break
+
+        # If no column found, try to find first numeric column
+        if not target_column:
+            for idx, col_name in enumerate(column_names):
+                if idx < len(df.columns):
+                    try:
+                        numeric_data = pd.to_numeric(df.iloc[:, idx], errors='coerce')
+                        if numeric_data.notna().sum() / len(numeric_data) > 0.5:
+                            target_column = col_name
+                            target_column_index = idx
+                            logger.info(f"[SimpleGPT] Auto-selected numeric column for color scale: {col_name}")
+                            break
+                    except:
+                        pass
+
+        if not target_column:
+            logger.warning(f"[SimpleGPT] No target column found for color scale")
+            return None
+
+        # Determine color preset based on query
+        preset_name = 'green_yellow_red'  # Default: low=green, high=red (good for costs, expenses)
+
+        if any(kw in query_lower for kw in ['к зелёному', 'к зеленому', 'to green', 'прибыл', 'доход']):
+            preset_name = 'red_yellow_green'  # low=red, high=green (good for profits, revenue)
+        elif any(kw in query_lower for kw in ['синий', 'blue', 'голуб']):
+            preset_name = 'white_to_blue'
+        elif any(kw in query_lower for kw in ['зелён', 'зелен', 'green']):
+            preset_name = 'white_to_green'
+
+        preset = self.COLOR_SCALE_PRESETS[preset_name]
+
+        # Get column stats for the gradient
+        try:
+            col_data = pd.to_numeric(df.iloc[:, target_column_index], errors='coerce')
+            min_val = float(col_data.min())
+            max_val = float(col_data.max())
+            mid_val = float(col_data.median())
+        except:
+            min_val = 0
+            max_val = 100
+            mid_val = 50
+
+        # Build color scale rule
+        rule = {
+            "column_index": target_column_index,
+            "column_name": target_column,
+            "min_color": preset['min_color'],
+            "mid_color": preset['mid_color'],
+            "max_color": preset['max_color'],
+            "min_value": min_val,
+            "mid_value": mid_val,
+            "max_value": max_val,
+            "row_count": len(df)
+        }
+
+        message = f"Цветовая шкала для колонки '{target_column}' ({min_val:.0f} → {max_val:.0f})"
+
+        return {
+            "action_type": "color_scale",
+            "rule": rule,
+            "message": message
+        }
+
     async def process(
         self,
         query: str,
@@ -2100,6 +2229,21 @@ for col, val in min_row.items():
                 logger.info(f"[SimpleGPT] Returning chart result with keys: {list(chart_result.keys())}")
                 logger.info(f"[SimpleGPT] chart_result['chart_spec']: {chart_result.get('chart_spec')}")
                 return chart_result
+
+            # Check for color scale action (BEFORE conditional formatting!)
+            color_scale_action = self._detect_color_scale_action(query, column_names, df)
+            if color_scale_action:
+                elapsed = time.time() - start_time
+                logger.info(f"[SimpleGPT] Returning color scale action: {color_scale_action}")
+                return {
+                    "success": True,
+                    "action_type": "color_scale",
+                    "result_type": "action",
+                    "rule": color_scale_action["rule"],
+                    "summary": color_scale_action["message"],
+                    "processing_time": f"{elapsed:.2f}s",
+                    "processor": "SimpleGPT v1.0 (direct action)"
+                }
 
             # Check for conditional formatting action
             conditional_action = self._detect_conditional_format_action(query, column_names, df)

@@ -371,6 +371,15 @@ async def process_formula(
         else:
             logger.warning(f"[DEBUG] chart_spec NOT found in result!")
 
+        # Add color scale data
+        if "rule" in result and result.get("action_type") == "color_scale":
+            logger.info(f"[DEBUG] Adding color_scale rule: {result['rule']}")
+            response_dict["color_scale_rule"] = result["rule"]
+
+        # Add conditional format rule (for non-color-scale conditional formatting)
+        if "rule" in result and result.get("action_type") == "conditional_format":
+            response_dict["conditional_rule"] = result["rule"]
+
         # v9.0.0: Add hybrid processor metadata
         response_dict["processor_version"] = result.get("processor_version", "9.0.0")
         response_dict["complexity"] = result.get("complexity")

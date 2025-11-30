@@ -885,6 +885,87 @@ async function applyConditionalFormat(spreadsheetId, sheetId, rule) {
 }
 
 /**
+ * Apply color scale (gradient) formatting to a column
+ * This creates a gradient from min to max values in the column
+ * Rule object:
+ *   - column_index: Column to apply gradient to (0-based)
+ *   - min_color: RGB color object for minimum value
+ *   - mid_color: RGB color object for midpoint value
+ *   - max_color: RGB color object for maximum value
+ *   - row_count: Number of data rows (excluding header)
+ */
+async function applyColorScale(spreadsheetId, sheetId, rule) {
+  try {
+    const token = await getAuthToken();
+
+    const { column_index, min_color, mid_color, max_color, row_count } = rule;
+
+    console.log(`[SheetsAPI] 🎨 Applying color scale to column ${column_index}`);
+    console.log(`[SheetsAPI] Colors: min=${JSON.stringify(min_color)}, mid=${JSON.stringify(mid_color)}, max=${JSON.stringify(max_color)}`);
+
+    // Build the gradient rule request
+    const request = {
+      addConditionalFormatRule: {
+        rule: {
+          ranges: [{
+            sheetId: sheetId,
+            startRowIndex: 1, // Skip header row
+            endRowIndex: (row_count || 1000) + 1, // Data rows + header offset
+            startColumnIndex: column_index,
+            endColumnIndex: column_index + 1
+          }],
+          gradientRule: {
+            minpoint: {
+              color: min_color || { red: 0.8, green: 0.92, blue: 0.8 }, // Light green
+              type: 'MIN'
+            },
+            midpoint: {
+              color: mid_color || { red: 1, green: 0.95, blue: 0.8 }, // Light yellow
+              type: 'PERCENTILE',
+              value: '50'
+            },
+            maxpoint: {
+              color: max_color || { red: 0.96, green: 0.8, blue: 0.8 }, // Light red
+              type: 'MAX'
+            }
+          }
+        },
+        index: 0 // Insert at the beginning of the conditional format rules
+      }
+    };
+
+    console.log('[SheetsAPI] Color scale request:', JSON.stringify(request, null, 2));
+
+    const response = await fetch(
+      `${SHEETS_API_BASE}/${spreadsheetId}:batchUpdate`,
+      {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          requests: [request]
+        })
+      }
+    );
+
+    if (!response.ok) {
+      const error = await response.json();
+      console.error('[SheetsAPI] Color scale error:', error);
+      throw new Error(`Sheets API error: ${error.error?.message || response.statusText}`);
+    }
+
+    const result = await response.json();
+    console.log('[SheetsAPI] ✅ Color scale applied:', result);
+    return result;
+  } catch (error) {
+    console.error('[SheetsAPI] Error applying color scale:', error);
+    throw error;
+  }
+}
+
+/**
  * Set data validation (dropdown list) for a column
  */
 async function setDataValidation(spreadsheetId, sheetId, rule) {
@@ -963,6 +1044,7 @@ if (typeof module !== 'undefined' && module.exports) {
     createChart,
     getSheetIdByName,
     applyConditionalFormat,
+    applyColorScale,
     setDataValidation
   };
 }

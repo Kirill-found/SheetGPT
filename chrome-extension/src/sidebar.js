@@ -1186,15 +1186,35 @@ function transformAPIResponse(apiResponse) {
     };
   }
 
+  // If response is a color scale (gradient) action
+  if (apiResponse.action_type === 'color_scale' && (apiResponse.color_scale_rule || apiResponse.rule)) {
+    const rule = apiResponse.color_scale_rule || apiResponse.rule;
+    console.log('[Sidebar] ✅ Color scale condition met! Applying gradient...', rule);
+    // Apply color scale immediately
+    applyColorScaleInSheet(rule).then(() => {
+      console.log('[Sidebar] ✅ Color scale applied successfully');
+      addAIMessage({ type: 'success', text: '✅ Цветовая шкала применена!' });
+    }).catch(err => {
+      console.error('[Sidebar] ❌ Color scale failed:', err);
+      addAIMessage({ type: 'error', text: `Ошибка применения цветовой шкалы: ${err.message}` });
+    });
+    return {
+      type: 'color_scale',
+      text: apiResponse.summary || `Применяю цветовую шкалу для "${rule.column_name}"...`,
+      rule: rule
+    };
+  }
+
   // If response is a conditional format action
-  if (apiResponse.action_type === 'conditional_format' && apiResponse.rule) {
-    console.log('[Sidebar] ✅ Conditional format condition met! Applying...');
+  if (apiResponse.action_type === 'conditional_format' && (apiResponse.conditional_rule || apiResponse.rule)) {
+    const rule = apiResponse.conditional_rule || apiResponse.rule;
+    console.log('[Sidebar] ✅ Conditional format condition met! Applying...', rule);
     // Trigger conditional format action
-    applyConditionalFormatInSheet(apiResponse.rule);
+    applyConditionalFormatInSheet(rule);
     return {
       type: 'conditional_format',
       text: apiResponse.summary || 'Условное форматирование применено',
-      rule: apiResponse.rule
+      rule: rule
     };
   }
 
@@ -1435,6 +1455,25 @@ async function applyConditionalFormatInSheet(rule) {
     console.log(`[Sidebar] Conditional format applied to column "${rule.column_name}"`);
   } catch (error) {
     console.error('[Sidebar] Error applying conditional format:', error);
+  }
+}
+
+async function applyColorScaleInSheet(rule) {
+  if (!rule) {
+    console.error('[Sidebar] Color scale error: rule is required');
+    throw new Error('Rule is required for color scale');
+  }
+
+  try {
+    console.log('[Sidebar] Sending APPLY_COLOR_SCALE to content script:', rule);
+    const response = await sendToContentScript('APPLY_COLOR_SCALE', {
+      rule: rule
+    });
+    console.log(`[Sidebar] Color scale applied to column "${rule.column_name}":`, response);
+    return response;
+  } catch (error) {
+    console.error('[Sidebar] Error applying color scale:', error);
+    throw error;
   }
 }
 

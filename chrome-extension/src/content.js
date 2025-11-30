@@ -530,6 +530,12 @@ window.addEventListener('message', async (event) => {
         result = await applyConditionalFormat(data.rule);
         break;
 
+      case 'APPLY_COLOR_SCALE':
+        console.log('[SheetGPT] 🎨 APPLY_COLOR_SCALE received with rule:', JSON.stringify(data.rule));
+        result = await applyColorScaleInSheet(data.rule);
+        console.log('[SheetGPT] 🎨 APPLY_COLOR_SCALE result:', result);
+        break;
+
       case 'OVERWRITE_SHEET_DATA':
         result = await overwriteSheetData(data.cleanedData);
         break;
@@ -994,6 +1000,32 @@ async function applyConditionalFormat(rule) {
   } catch (error) {
     console.error('[SheetGPT] Error applying conditional format:', error);
     throw new Error(`Ошибка условного форматирования: ${error.message}`);
+  }
+}
+
+async function applyColorScaleInSheet(rule) {
+  console.log('[SheetGPT] Apply color scale:', rule);
+
+  try {
+    const response = await safeSendMessage({
+      action: 'APPLY_COLOR_SCALE',
+      data: {
+        rule: rule
+      }
+    });
+
+    if (!response || !response.success) {
+      throw new Error(response?.error || 'Неизвестная ошибка при применении цветовой шкалы');
+    }
+
+    console.log('[SheetGPT] ✅ Color scale applied via API:', response.result);
+    return {
+      success: true,
+      message: `Цветовая шкала применена к колонке "${rule.column_name}"`
+    };
+  } catch (error) {
+    console.error('[SheetGPT] Error applying color scale:', error);
+    throw new Error(`Ошибка применения цветовой шкалы: ${error.message}`);
   }
 }
 
