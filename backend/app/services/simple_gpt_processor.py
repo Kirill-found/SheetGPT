@@ -540,21 +540,38 @@ for col, val in min_row.items():
                           'highlight', 'mark', 'покрась', 'покрасить', 'раскрась',
                           'отметь', 'отметить', 'пометь', 'пометить']
 
-    # Highlight colors mapping (hex)
+    # Highlight colors mapping (hex) - more variations
     HIGHLIGHT_COLORS = {
-        'красн': '#FF6B6B',
-        'red': '#FF6B6B',
-        'зелен': '#69DB7C',
-        'зелён': '#69DB7C',
-        'green': '#69DB7C',
-        'жёлт': '#FFE066',
-        'желт': '#FFE066',
-        'yellow': '#FFE066',
-        'оранж': '#FFA94D',
-        'orange': '#FFA94D',
-        'синий': '#74C0FC',
-        'blue': '#74C0FC',
+        # Red
+        'красн': '#FF6B6B', 'red': '#FF6B6B',
+        # Green
+        'зелен': '#69DB7C', 'зелён': '#69DB7C', 'green': '#69DB7C',
+        # Yellow
+        'жёлт': '#FFE066', 'желт': '#FFE066', 'yellow': '#FFE066',
+        # Orange
+        'оранж': '#FFA94D', 'orange': '#FFA94D',
+        # Blue
+        'синий': '#74C0FC', 'синим': '#74C0FC', 'blue': '#74C0FC',
+        # Light blue
         'голуб': '#99E9F2',
+        # Purple
+        'фиолет': '#DA77F2', 'purple': '#DA77F2',
+        # Pink
+        'розов': '#F783AC', 'pink': '#F783AC',
+    }
+
+    # Smart color detection by context (status/condition -> color)
+    CONTEXT_COLORS = {
+        # Negative -> red
+        'отмен': '#FF6B6B', 'отказ': '#FF6B6B', 'ошибк': '#FF6B6B',
+        'проблем': '#FF6B6B', 'возврат': '#FF6B6B', 'просроч': '#FF6B6B',
+        # Positive -> green
+        'оплач': '#69DB7C', 'выполн': '#69DB7C', 'доставл': '#69DB7C',
+        'завершен': '#69DB7C', 'успеш': '#69DB7C', 'активн': '#69DB7C',
+        # Pending -> orange
+        'ожидан': '#FFA94D', 'в процесс': '#FFA94D', 'обрабат': '#FFA94D',
+        # VIP -> purple
+        'vip': '#DA77F2', 'важн': '#DA77F2', 'приорит': '#DA77F2',
     }
 
     # Filter keywords
@@ -1665,13 +1682,26 @@ for col, val in min_row.items():
 
         logger.info(f"[SimpleGPT] Highlight action detected: {query}")
 
-        # Detect color from query
-        highlight_color = '#FFFF00'  # Default yellow
+        # Detect color from query - first check explicit colors
+        highlight_color = None
         for color_key, color_hex in self.HIGHLIGHT_COLORS.items():
             if color_key in query_lower:
                 highlight_color = color_hex
-                logger.info(f"[SimpleGPT] Highlight color detected: {color_key} -> {color_hex}")
+                logger.info(f"[SimpleGPT] Highlight color (explicit): {color_key} -> {color_hex}")
                 break
+
+        # If no explicit color, try to detect by context (status words)
+        if not highlight_color:
+            for context_key, color_hex in self.CONTEXT_COLORS.items():
+                if context_key in query_lower:
+                    highlight_color = color_hex
+                    logger.info(f"[SimpleGPT] Highlight color (context): {context_key} -> {color_hex}")
+                    break
+
+        # Default to yellow if nothing matched
+        if not highlight_color:
+            highlight_color = '#FFFF00'
+            logger.info(f"[SimpleGPT] Using default highlight color: yellow")
 
         # Find target column and condition
         target_column = None
