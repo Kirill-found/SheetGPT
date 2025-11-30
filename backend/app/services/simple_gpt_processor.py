@@ -996,24 +996,40 @@ for col, val in min_row.items():
                 color_name = color_kw
                 break
 
-        # Find column mentioned in query
+        # Find column mentioned in query - exact word match first
         target_column = None
         target_column_index = None
 
+        # Split query into words for exact matching
+        query_words = set(query_lower.split())
+
+        logger.info(f"[SimpleGPT] Conditional format: looking for column in query: '{query}', columns: {column_names}")
+
+        # First pass: exact match (column name is a word in query)
         for idx, col_name in enumerate(column_names):
-            col_lower = col_name.lower()
-            if col_lower in query_lower or col_name in query:
+            col_lower = col_name.lower().strip()
+            if len(col_lower) < 2:
+                continue
+            if col_lower in query_words:
                 target_column = col_name
                 target_column_index = idx
+                logger.info(f"[SimpleGPT] Found exact match: column '{col_name}' at index {idx}")
                 break
-            # Partial match
-            for word in col_lower.split():
-                if len(word) > 2 and word in query_lower:
-                    target_column = col_name
-                    target_column_index = idx
+
+        # Second pass: column name is a substring of a query word
+        if not target_column:
+            for idx, col_name in enumerate(column_names):
+                col_lower = col_name.lower().strip()
+                if len(col_lower) < 2:
+                    continue
+                for word in query_words:
+                    if len(word) >= len(col_lower) and (word.startswith(col_lower) or col_lower in word):
+                        target_column = col_name
+                        target_column_index = idx
+                        logger.info(f"[SimpleGPT] Found partial match: column '{col_name}' in word '{word}' at index {idx}")
+                        break
+                if target_column:
                     break
-            if target_column:
-                break
 
         # If no column found, try to find numeric column
         if not target_column:
@@ -2066,24 +2082,43 @@ for col, val in min_row.items():
 
         logger.info(f"[SimpleGPT] Color scale action detected: {query}")
 
-        # Find target column
+        # Find target column - look for exact word match first
         target_column = None
         target_column_index = None
 
+        # Split query into words for exact matching
+        query_words = set(query_lower.split())
+
+        logger.info(f"[SimpleGPT] Looking for column in query: '{query}', columns: {column_names}")
+
+        # First pass: exact match (column name is a word in query)
         for idx, col_name in enumerate(column_names):
-            col_lower = col_name.lower()
-            if col_lower in query_lower or col_name in query:
+            col_lower = col_name.lower().strip()
+            # Skip empty or very short column names
+            if len(col_lower) < 2:
+                continue
+            # Check if column name appears as a word in query
+            if col_lower in query_words:
                 target_column = col_name
                 target_column_index = idx
+                logger.info(f"[SimpleGPT] Found exact match: column '{col_name}' at index {idx}")
                 break
-            # Partial match
-            for word in col_lower.split():
-                if len(word) > 2 and word in query_lower:
-                    target_column = col_name
-                    target_column_index = idx
+
+        # Second pass: column name is a substring of a query word (e.g. "сумма" in "сумму")
+        if not target_column:
+            for idx, col_name in enumerate(column_names):
+                col_lower = col_name.lower().strip()
+                if len(col_lower) < 2:
+                    continue
+                # Check if any query word starts with or contains the column name
+                for word in query_words:
+                    if len(word) >= len(col_lower) and (word.startswith(col_lower) or col_lower in word):
+                        target_column = col_name
+                        target_column_index = idx
+                        logger.info(f"[SimpleGPT] Found partial match: column '{col_name}' in word '{word}' at index {idx}")
+                        break
+                if target_column:
                     break
-            if target_column:
-                break
 
         # If no column found, try to find first numeric column
         if not target_column:

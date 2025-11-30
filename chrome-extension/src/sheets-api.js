@@ -762,12 +762,16 @@ async function getSheetIdByName(spreadsheetId, sheetName) {
     }
 
     const data = await response.json();
+    console.log('[SheetsAPI] 📋 All sheets:', data.sheets?.map(s => ({ title: s.properties.title, sheetId: s.properties.sheetId })));
+
     const sheet = data.sheets?.find(s => s.properties.title === sheetName);
 
     if (!sheet) {
+      console.error(`[SheetsAPI] ❌ Sheet "${sheetName}" not found in sheets list`);
       throw new Error(`Sheet "${sheetName}" not found`);
     }
 
+    console.log(`[SheetsAPI] ✅ Found sheet "${sheetName}" with ID: ${sheet.properties.sheetId}`);
     return sheet.properties.sheetId;
   } catch (error) {
     console.error('[SheetsAPI] Error getting sheet ID:', error);
@@ -898,9 +902,11 @@ async function applyColorScale(spreadsheetId, sheetId, rule) {
   try {
     const token = await getAuthToken();
 
+    console.log('[SheetsAPI] 🎨 applyColorScale called with rule:', JSON.stringify(rule, null, 2));
+
     const { column_index, min_color, mid_color, max_color, row_count } = rule;
 
-    console.log(`[SheetsAPI] 🎨 Applying color scale to column ${column_index}`);
+    console.log(`[SheetsAPI] 🎨 Applying color scale to column ${column_index} (type: ${typeof column_index})`);
     console.log(`[SheetsAPI] Colors: min=${JSON.stringify(min_color)}, mid=${JSON.stringify(mid_color)}, max=${JSON.stringify(max_color)}`);
 
     // Build the gradient rule request
@@ -957,7 +963,8 @@ async function applyColorScale(spreadsheetId, sheetId, rule) {
     }
 
     const result = await response.json();
-    console.log('[SheetsAPI] ✅ Color scale applied:', result);
+    console.log('[SheetsAPI] ✅ Color scale applied:', JSON.stringify(result, null, 2));
+    console.log('[SheetsAPI] 📋 Replies:', result.replies);
     return result;
   } catch (error) {
     console.error('[SheetsAPI] Error applying color scale:', error);
