@@ -178,8 +178,85 @@ class SimpleGPTProcessor:
 - "сколько" -> число + контекст + доля от общего
 - "почему?" -> глубокий анализ причин с данными и рекомендациями
 - "топ N" -> рейтинг + анализ лидеров + выводы
+- "максимальный/минимальный заказ" -> найти строку с max/min значением и показать детали
+- "количество по городам/менеджерам" -> группировка с подсчётом
 
 ПРИМЕРЫ:
+
+Запрос: "Топ 5 товаров по сумме"
+```python
+# Группируем по товарам и суммируем
+product_col = None
+sum_col = None
+for col in df.columns:
+    col_lower = col.lower()
+    if any(x in col_lower for x in ['товар', 'product', 'название', 'name', 'наименование']):
+        product_col = col
+    if any(x in col_lower for x in ['сумм', 'sum', 'total', 'amount']):
+        sum_col = col
+
+if product_col and sum_col:
+    top5 = df.groupby(product_col)[sum_col].sum().sort_values(ascending=False).head(5)
+    result = top5.to_dict()
+    explanation = f"**🏆 Топ 5 товаров по сумме:**\n\n"
+    for i, (name, val) in enumerate(top5.items(), 1):
+        explanation += f"{i}. {name}: {val:,.0f} руб.\n"
+    total = top5.sum()
+    explanation += f"\n💰 Итого топ-5: {total:,.0f} руб."
+else:
+    result = "Не найдены колонки с товарами и суммами"
+    explanation = result
+```
+
+Запрос: "Количество заказов по городам" или "Сколько заказов в каждом городе"
+```python
+# Находим колонку с городами
+city_col = None
+for col in df.columns:
+    col_lower = col.lower()
+    if any(x in col_lower for x in ['город', 'city', 'регион', 'region', 'локац']):
+        city_col = col
+        break
+
+if city_col:
+    city_counts = df[city_col].value_counts().sort_values(ascending=False)
+    result = city_counts.to_dict()
+    explanation = f"**📍 Количество заказов по городам:**\n\n"
+    for city, count in city_counts.head(10).items():
+        explanation += f"• {city}: {count}\n"
+    if len(city_counts) > 10:
+        explanation += f"• ...и ещё {len(city_counts) - 10} городов\n"
+    explanation += f"\n📊 Всего городов: {len(city_counts)}"
+else:
+    result = "Колонка с городами не найдена"
+    explanation = result
+```
+
+Запрос: "Продажи по менеджерам" или "Сумма по менеджерам"
+```python
+# Находим колонку с менеджерами
+manager_col = None
+sum_col = None
+for col in df.columns:
+    col_lower = col.lower()
+    if any(x in col_lower for x in ['менеджер', 'manager', 'продавец', 'seller', 'сотрудник']):
+        manager_col = col
+    if any(x in col_lower for x in ['сумм', 'sum', 'total', 'amount']):
+        sum_col = col
+
+if manager_col and sum_col:
+    sales = df.groupby(manager_col)[sum_col].sum().sort_values(ascending=False)
+    result = sales.to_dict()
+    explanation = f"**📊 Продажи по менеджерам:**\n\n"
+    for manager, total in sales.items():
+        pct = (total / sales.sum()) * 100
+        explanation += f"• {manager}: {total:,.0f} руб. ({pct:.1f}%)\n"
+    explanation += f"\n💰 Общая сумма: {sales.sum():,.0f} руб."
+else:
+    result = "Не найдены колонки с менеджерами и суммами"
+    explanation = result
+```
+
 
 Запрос: "Какой менеджер самый продуктивный"
 ```python
@@ -243,6 +320,74 @@ explanation += f"• Общая сумма: {total:,.0f} руб.
 "
 explanation += f"• Средний чек: {avg:,.0f} руб.
 "
+```
+
+Запрос: "Максимальный заказ" или "Какой самый крупный заказ"
+```python
+# Находим строку с максимальной суммой
+sum_col = 'Сумма'  # Определи название колонки с суммой автоматически
+if sum_col not in df.columns:
+    # Ищем колонку с суммой по названию
+    for col in df.columns:
+        if any(x in col.lower() for x in ['сумм', 'sum', 'total', 'amount', 'цена', 'price']):
+            sum_col = col
+            break
+
+numeric_col = pd.to_numeric(df[sum_col], errors='coerce')
+max_idx = numeric_col.idxmax()
+max_row = df.loc[max_idx]
+max_value = numeric_col.max()
+
+# Найти название товара/продукта
+product_col = None
+for col in df.columns:
+    if any(x in col.lower() for x in ['товар', 'product', 'название', 'name', 'наименование']):
+        product_col = col
+        break
+
+product_name = max_row[product_col] if product_col else "N/A"
+
+result = {"max_value": max_value, "product": product_name, "row": max_row.to_dict()}
+explanation = f"**💰 Максимальный заказ: {max_value:,.0f} руб.**\n\n"
+explanation += f"📦 Товар: {product_name}\n"
+explanation += f"📊 Детали заказа:\n"
+for col, val in max_row.items():
+    if pd.notna(val) and str(val).strip():
+        explanation += f"• {col}: {val}\n"
+```
+
+Запрос: "Минимальный заказ" или "Какой самый маленький заказ"
+```python
+# Находим строку с минимальной суммой
+sum_col = 'Сумма'
+if sum_col not in df.columns:
+    for col in df.columns:
+        if any(x in col.lower() for x in ['сумм', 'sum', 'total', 'amount', 'цена', 'price']):
+            sum_col = col
+            break
+
+numeric_col = pd.to_numeric(df[sum_col], errors='coerce')
+# Фильтруем NaN и нули
+valid_mask = (numeric_col > 0) & numeric_col.notna()
+min_idx = numeric_col[valid_mask].idxmin()
+min_row = df.loc[min_idx]
+min_value = numeric_col[valid_mask].min()
+
+product_col = None
+for col in df.columns:
+    if any(x in col.lower() for x in ['товар', 'product', 'название', 'name', 'наименование']):
+        product_col = col
+        break
+
+product_name = min_row[product_col] if product_col else "N/A"
+
+result = {"min_value": min_value, "product": product_name, "row": min_row.to_dict()}
+explanation = f"**💰 Минимальный заказ: {min_value:,.0f} руб.**\n\n"
+explanation += f"📦 Товар: {product_name}\n"
+explanation += f"📊 Детали заказа:\n"
+for col, val in min_row.items():
+    if pd.notna(val) and str(val).strip():
+        explanation += f"• {col}: {val}\n"
 ```
 
 Возвращай ТОЛЬКО код внутри ```python ... ```
@@ -366,6 +511,28 @@ explanation += f"• Средний чек: {avg:,.0f} руб.
     VALIDATION_KEYWORDS = ['валидац', 'validation', 'выпадающ', 'dropdown', 'список',
                            'ограничь', 'restrict', 'допустим',
                            'разрешённ', 'allowed', 'выбор из', 'select from']
+
+    # Highlight keywords - MUST be checked BEFORE filter keywords
+    HIGHLIGHT_KEYWORDS = ['выдели', 'выделить', 'подсвети', 'подсветить', 'подсветь',
+                          'highlight', 'mark', 'покрась', 'покрасить', 'раскрась',
+                          'отметь', 'отметить', 'пометь', 'пометить']
+
+    # Highlight colors mapping (hex)
+    HIGHLIGHT_COLORS = {
+        'красн': '#FF6B6B',
+        'red': '#FF6B6B',
+        'зелен': '#69DB7C',
+        'зелён': '#69DB7C',
+        'green': '#69DB7C',
+        'жёлт': '#FFE066',
+        'желт': '#FFE066',
+        'yellow': '#FFE066',
+        'оранж': '#FFA94D',
+        'orange': '#FFA94D',
+        'синий': '#74C0FC',
+        'blue': '#74C0FC',
+        'голуб': '#99E9F2',
+    }
 
     # Filter keywords
     FILTER_KEYWORDS = ['фильтр', 'filter', 'отфильтр', 'покажи только', 'show only',
@@ -1458,6 +1625,167 @@ explanation += f"• Средний чек: {avg:,.0f} руб.
             "message": message
         }
 
+    def _detect_highlight_action(self, query: str, column_names: List[str], df: pd.DataFrame) -> Optional[Dict[str, Any]]:
+        """
+        Определяет, является ли запрос командой выделения строк цветом.
+        Примеры:
+        - "выдели строки где Сумма > 100000"
+        - "подсветь красным отменённые заказы"
+        - "отметь зелёным оплаченные"
+        """
+        query_lower = query.lower()
+
+        # Check for highlight keywords FIRST
+        is_highlight = any(kw in query_lower for kw in self.HIGHLIGHT_KEYWORDS)
+        if not is_highlight:
+            return None
+
+        logger.info(f"[SimpleGPT] Highlight action detected: {query}")
+
+        # Detect color from query
+        highlight_color = '#FFFF00'  # Default yellow
+        for color_key, color_hex in self.HIGHLIGHT_COLORS.items():
+            if color_key in query_lower:
+                highlight_color = color_hex
+                logger.info(f"[SimpleGPT] Highlight color detected: {color_key} -> {color_hex}")
+                break
+
+        # Find target column and condition
+        target_column = None
+        target_column_index = None
+        filter_value = None
+        operator = '=='
+
+        # Look for column mentions
+        for idx, col_name in enumerate(column_names):
+            col_lower = col_name.lower()
+            if col_lower in query_lower or col_name in query:
+                target_column = col_name
+                target_column_index = idx
+                break
+            # Partial match
+            for word in col_lower.split():
+                if len(word) > 2 and word in query_lower:
+                    target_column = col_name
+                    target_column_index = idx
+                    break
+            if target_column:
+                break
+
+        # Detect operator
+        for op, patterns in self.FILTER_OPERATORS.items():
+            for pattern in patterns:
+                if pattern in query_lower:
+                    operator = op
+                    break
+            if operator != '==':
+                break
+
+        # Extract value
+        import re
+        if operator not in ['empty', 'not_empty']:
+            # Try to extract numeric value
+            number_match = re.search(r'(\d+(?:[.,]\d+)?)', query_lower)
+            if number_match:
+                filter_value = float(number_match.group(1).replace(',', '.'))
+            else:
+                # Try to find text value (e.g., status names)
+                status_words = ['оплачен', 'отменен', 'отменён', 'доставлен', 'возврат', 'активн',
+                                'неактивн', 'завершен', 'завершён', 'выполнен', 'ожидан', 'vip']
+                for status in status_words:
+                    if status in query_lower:
+                        filter_value = status
+                        operator = 'contains'
+                        break
+
+        # Execute filter to find rows
+        try:
+            if target_column is None:
+                # Try to find by status-like column
+                for idx, col in enumerate(column_names):
+                    col_lower = col.lower()
+                    if any(x in col_lower for x in ['статус', 'status', 'состоян']):
+                        target_column = col
+                        target_column_index = idx
+                        break
+
+            if target_column is None:
+                logger.warning(f"[SimpleGPT] No target column found for highlight")
+                return None
+
+            filtered_df = df.copy()
+            col = filtered_df.columns[target_column_index]
+
+            if operator == 'empty':
+                mask = filtered_df[col].isna() | (filtered_df[col] == '')
+            elif operator == 'not_empty':
+                mask = filtered_df[col].notna() & (filtered_df[col] != '')
+            elif operator == 'contains' and filter_value:
+                mask = filtered_df[col].astype(str).str.lower().str.contains(str(filter_value).lower(), na=False)
+            elif filter_value is not None:
+                try:
+                    numeric_val = float(filter_value) if isinstance(filter_value, (int, float, str)) and str(filter_value).replace('.', '').replace('-', '').isdigit() else None
+                    if numeric_val is not None:
+                        col_numeric = pd.to_numeric(filtered_df[col], errors='coerce')
+                        if operator == '>':
+                            mask = col_numeric > numeric_val
+                        elif operator == '<':
+                            mask = col_numeric < numeric_val
+                        elif operator == '>=':
+                            mask = col_numeric >= numeric_val
+                        elif operator == '<=':
+                            mask = col_numeric <= numeric_val
+                        elif operator == '!=':
+                            mask = col_numeric != numeric_val
+                        else:
+                            mask = col_numeric == numeric_val
+                    else:
+                        str_col = filtered_df[col].astype(str).str.lower()
+                        str_val = str(filter_value).lower()
+                        if operator == '!=':
+                            mask = str_col != str_val
+                        else:
+                            mask = str_col == str_val
+                except:
+                    str_col = filtered_df[col].astype(str).str.lower()
+                    str_val = str(filter_value).lower()
+                    mask = str_col.str.contains(str_val, na=False)
+            else:
+                logger.warning(f"[SimpleGPT] No filter condition for highlight")
+                return None
+
+            # Get row indices (1-indexed for spreadsheet)
+            highlight_rows = [i + 2 for i in filtered_df[mask].index.tolist()]  # +2 for header + 1-indexed
+
+            if not highlight_rows:
+                logger.warning(f"[SimpleGPT] No rows matched highlight condition")
+                return None
+
+            # Build condition string
+            op_display = {
+                '==': '=', '!=': '≠', '>': '>', '<': '<', '>=': '≥', '<=': '≤',
+                'contains': 'содержит', 'empty': 'пусто', 'not_empty': 'не пусто'
+            }
+            if operator in ['empty', 'not_empty']:
+                condition_str = f"{target_column} {op_display.get(operator, operator)}"
+            else:
+                condition_str = f"{target_column} {op_display.get(operator, operator)} {filter_value}"
+
+            message = f"Выделено {len(highlight_rows)} строк где {condition_str}"
+
+            return {
+                "action_type": "highlight",
+                "highlight_rows": highlight_rows,
+                "highlight_color": highlight_color,
+                "highlight_count": len(highlight_rows),
+                "condition_str": condition_str,
+                "message": message
+            }
+
+        except Exception as e:
+            logger.error(f"[SimpleGPT] Error detecting highlight rows: {e}")
+            return None
+
     def _detect_filter_action(self, query: str, column_names: List[str], df: pd.DataFrame) -> Optional[Dict[str, Any]]:
         """
         Определяет, является ли запрос командой фильтрации данных.
@@ -1804,6 +2132,24 @@ explanation += f"• Средний чек: {avg:,.0f} руб.
                     "result_type": "action",
                     "rule": validation_action["rule"],
                     "summary": validation_action["message"],
+                    "processing_time": f"{elapsed:.2f}s",
+                    "processor": "SimpleGPT v1.0 (direct action)"
+                }
+
+            # Check for highlight action BEFORE filter (to handle "выдели где..." queries)
+            highlight_action = self._detect_highlight_action(query, column_names, df)
+            if highlight_action:
+                elapsed = time.time() - start_time
+                logger.info(f"[SimpleGPT] Returning highlight action: {highlight_action}")
+                return {
+                    "success": True,
+                    "action_type": "highlight",
+                    "result_type": "action",
+                    "highlight_rows": highlight_action["highlight_rows"],
+                    "highlight_color": highlight_action["highlight_color"],
+                    "highlight_count": highlight_action["highlight_count"],
+                    "highlight_message": highlight_action["message"],
+                    "summary": highlight_action["message"],
                     "processing_time": f"{elapsed:.2f}s",
                     "processor": "SimpleGPT v1.0 (direct action)"
                 }
