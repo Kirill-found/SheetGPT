@@ -1029,8 +1029,8 @@ for col, val in min_row.items():
                         pass
 
         # Detect condition type and value
-        condition_type = "GREATER_THAN"  # Default
-        condition_value = None
+        condition_type = "NUMBER_GREATER"  # Default - must match sheets-api.js expected types
+        condition_value = 0  # Default: highlight values > 0
 
         # Patterns for conditions
         import re
