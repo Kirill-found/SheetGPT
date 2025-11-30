@@ -198,11 +198,15 @@ for col in df.columns:
 if product_col and sum_col:
     top5 = df.groupby(product_col)[sum_col].sum().sort_values(ascending=False).head(5)
     result = top5.to_dict()
-    explanation = f"**🏆 Топ 5 товаров по сумме:**\n\n"
+    explanation = f"**🏆 Топ 5 товаров по сумме:**
+
+"
     for i, (name, val) in enumerate(top5.items(), 1):
-        explanation += f"{i}. {name}: {val:,.0f} руб.\n"
+        explanation += f"{i}. {name}: {val:,.0f} руб.
+"
     total = top5.sum()
-    explanation += f"\n💰 Итого топ-5: {total:,.0f} руб."
+    explanation += f"
+💰 Итого топ-5: {total:,.0f} руб."
 else:
     result = "Не найдены колонки с товарами и суммами"
     explanation = result
@@ -221,12 +225,17 @@ for col in df.columns:
 if city_col:
     city_counts = df[city_col].value_counts().sort_values(ascending=False)
     result = city_counts.to_dict()
-    explanation = f"**📍 Количество заказов по городам:**\n\n"
+    explanation = f"**📍 Количество заказов по городам:**
+
+"
     for city, count in city_counts.head(10).items():
-        explanation += f"• {city}: {count}\n"
+        explanation += f"• {city}: {count}
+"
     if len(city_counts) > 10:
-        explanation += f"• ...и ещё {len(city_counts) - 10} городов\n"
-    explanation += f"\n📊 Всего городов: {len(city_counts)}"
+        explanation += f"• ...и ещё {len(city_counts) - 10} городов
+"
+    explanation += f"
+📊 Всего городов: {len(city_counts)}"
 else:
     result = "Колонка с городами не найдена"
     explanation = result
@@ -247,11 +256,15 @@ for col in df.columns:
 if manager_col and sum_col:
     sales = df.groupby(manager_col)[sum_col].sum().sort_values(ascending=False)
     result = sales.to_dict()
-    explanation = f"**📊 Продажи по менеджерам:**\n\n"
+    explanation = f"**📊 Продажи по менеджерам:**
+
+"
     for manager, total in sales.items():
         pct = (total / sales.sum()) * 100
-        explanation += f"• {manager}: {total:,.0f} руб. ({pct:.1f}%)\n"
-    explanation += f"\n💰 Общая сумма: {sales.sum():,.0f} руб."
+        explanation += f"• {manager}: {total:,.0f} руб. ({pct:.1f}%)
+"
+    explanation += f"
+💰 Общая сумма: {sales.sum():,.0f} руб."
 else:
     result = "Не найдены колонки с менеджерами и суммами"
     explanation = result
@@ -348,12 +361,17 @@ for col in df.columns:
 product_name = max_row[product_col] if product_col else "N/A"
 
 result = {"max_value": max_value, "product": product_name, "row": max_row.to_dict()}
-explanation = f"**💰 Максимальный заказ: {max_value:,.0f} руб.**\n\n"
-explanation += f"📦 Товар: {product_name}\n"
-explanation += f"📊 Детали заказа:\n"
+explanation = f"**💰 Максимальный заказ: {max_value:,.0f} руб.**
+
+"
+explanation += f"📦 Товар: {product_name}
+"
+explanation += f"📊 Детали заказа:
+"
 for col, val in max_row.items():
     if pd.notna(val) and str(val).strip():
-        explanation += f"• {col}: {val}\n"
+        explanation += f"• {col}: {val}
+"
 ```
 
 Запрос: "Минимальный заказ" или "Какой самый маленький заказ"
@@ -382,12 +400,17 @@ for col in df.columns:
 product_name = min_row[product_col] if product_col else "N/A"
 
 result = {"min_value": min_value, "product": product_name, "row": min_row.to_dict()}
-explanation = f"**💰 Минимальный заказ: {min_value:,.0f} руб.**\n\n"
-explanation += f"📦 Товар: {product_name}\n"
-explanation += f"📊 Детали заказа:\n"
+explanation = f"**💰 Минимальный заказ: {min_value:,.0f} руб.**
+
+"
+explanation += f"📦 Товар: {product_name}
+"
+explanation += f"📊 Детали заказа:
+"
 for col, val in min_row.items():
     if pd.notna(val) and str(val).strip():
-        explanation += f"• {col}: {val}\n"
+        explanation += f"• {col}: {val}
+"
 ```
 
 Возвращай ТОЛЬКО код внутри ```python ... ```
