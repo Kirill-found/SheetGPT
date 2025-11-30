@@ -50,6 +50,9 @@ class FormulaResponse(BaseModel):
     group_column: Optional[str] = Field(None, description="Колонка группировки")
     value_column: Optional[str] = Field(None, description="Колонка значений")
     agg_func: Optional[str] = Field(None, description="Функция агрегации (sum, mean, count...)")
+    # Color scale / conditional formatting fields
+    color_scale_rule: Optional[dict] = Field(None, description="Правило цветовой шкалы (градиента)")
+    conditional_rule: Optional[dict] = Field(None, description="Правило условного форматирования")
     # Processor metadata
     processor_version: Optional[str] = Field(None, description="Версия процессора")
     complexity: Optional[str] = Field(None, description="Сложность запроса")
