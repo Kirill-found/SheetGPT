@@ -464,7 +464,7 @@ async def validate_license_key(
             user.queries_limit = 10
             await db.commit()
 
-    logger.info(f"License valid: {license_key} for user {user.telegram_user_id}")
+    logger.info(f"License valid: {license_key} for user {user.telegram_user_id}, used={user.queries_used_today}/{user.queries_limit}")
     return LicenseResponse(
         success=True,
         license_key=license_key,
