@@ -66,8 +66,18 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           result = await handleConditionalFormat(sender.tab.id, sender.tab.url, data);
           break;
 
+        case 'APPLY_COLOR_SCALE':
+          console.log('[Background] 🎨 APPLY_COLOR_SCALE received:', data);
+          result = await handleColorScale(sender.tab.id, sender.tab.url, data);
+          break;
+
         case 'SET_DATA_VALIDATION':
           result = await handleSetDataValidation(sender.tab.id, sender.tab.url, data);
+          break;
+
+        case 'CONVERT_TO_NUMBERS':
+          console.log('[Background] 🔢 CONVERT_TO_NUMBERS received:', data);
+          result = await handleConvertToNumbers(sender.tab.id, sender.tab.url, data);
           break;
 
         case 'CHECK_AUTH':
@@ -418,6 +428,40 @@ async function handleConditionalFormat(tabId, tabUrl, data) {
 }
 
 /**
+ * Apply color scale (gradient) formatting to Google Sheet
+ */
+async function handleColorScale(tabId, tabUrl, data) {
+  console.log('[Background] 🎨 Applying color scale:', data);
+
+  const spreadsheetId = getSpreadsheetIdFromUrl(tabUrl);
+  if (!spreadsheetId) {
+    throw new Error('Not a valid Google Sheets URL');
+  }
+
+  const { rule } = data;
+
+  if (!rule) {
+    throw new Error('Color scale rule is required');
+  }
+
+  // Get saved sheet name from storage
+  const storageKey = `sheetName_${spreadsheetId}`;
+  const storageData = await chrome.storage.local.get(storageKey);
+  const sheetName = storageData[storageKey] || 'Лист1';
+
+  console.log(`[Background] Using sheet name "${sheetName}" for color scale`);
+
+  // Get sheet ID
+  const sheetId = await getSheetIdByName(spreadsheetId, sheetName);
+
+  // Apply color scale
+  const result = await applyColorScale(spreadsheetId, sheetId, rule);
+
+  console.log('[Background] ✅ Color scale applied:', result);
+  return result;
+}
+
+/**
  * Set data validation (dropdown list) for a column
  */
 async function handleSetDataValidation(tabId, tabUrl, data) {
@@ -448,6 +492,37 @@ async function handleSetDataValidation(tabId, tabUrl, data) {
   const result = await setDataValidation(spreadsheetId, sheetId, rule);
 
   console.log('[Background] ✅ Data validation set:', result);
+  return result;
+}
+
+/**
+ * Convert column from text to numbers
+ */
+async function handleConvertToNumbers(tabId, tabUrl, data) {
+  console.log('[Background] 🔢 Converting column to numbers:', data);
+
+  const spreadsheetId = getSpreadsheetIdFromUrl(tabUrl);
+  if (!spreadsheetId) {
+    throw new Error('Not a valid Google Sheets URL');
+  }
+
+  const { columnIndex, rowCount } = data;
+
+  if (columnIndex === undefined) {
+    throw new Error('Column index is required');
+  }
+
+  // Get saved sheet name from storage
+  const storageKey = `sheetName_${spreadsheetId}`;
+  const storageData = await chrome.storage.local.get(storageKey);
+  const sheetName = storageData[storageKey] || 'Лист1';
+
+  console.log(`[Background] Using sheet name "${sheetName}" for number conversion`);
+
+  // Convert column
+  const result = await convertColumnToNumbers(spreadsheetId, sheetName, columnIndex, rowCount || 1000);
+
+  console.log('[Background] ✅ Column converted to numbers:', result);
   return result;
 }
 

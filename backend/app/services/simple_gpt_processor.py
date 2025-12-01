@@ -178,8 +178,98 @@ class SimpleGPTProcessor:
 - "сколько" -> число + контекст + доля от общего
 - "почему?" -> глубокий анализ причин с данными и рекомендациями
 - "топ N" -> рейтинг + анализ лидеров + выводы
+- "максимальный/минимальный заказ" -> найти строку с max/min значением и показать детали
+- "количество по городам/менеджерам" -> группировка с подсчётом
 
 ПРИМЕРЫ:
+
+Запрос: "Топ 5 товаров по сумме"
+```python
+# Группируем по товарам и суммируем
+product_col = None
+sum_col = None
+for col in df.columns:
+    col_lower = col.lower()
+    if any(x in col_lower for x in ['товар', 'product', 'название', 'name', 'наименование']):
+        product_col = col
+    if any(x in col_lower for x in ['сумм', 'sum', 'total', 'amount']):
+        sum_col = col
+
+if product_col and sum_col:
+    top5 = df.groupby(product_col)[sum_col].sum().sort_values(ascending=False).head(5)
+    result = top5.to_dict()
+    explanation = f"**🏆 Топ 5 товаров по сумме:**
+
+"
+    for i, (name, val) in enumerate(top5.items(), 1):
+        explanation += f"{i}. {name}: {val:,.0f} руб.
+"
+    total = top5.sum()
+    explanation += f"
+💰 Итого топ-5: {total:,.0f} руб."
+else:
+    result = "Не найдены колонки с товарами и суммами"
+    explanation = result
+```
+
+Запрос: "Количество заказов по городам" или "Сколько заказов в каждом городе"
+```python
+# Находим колонку с городами
+city_col = None
+for col in df.columns:
+    col_lower = col.lower()
+    if any(x in col_lower for x in ['город', 'city', 'регион', 'region', 'локац']):
+        city_col = col
+        break
+
+if city_col:
+    city_counts = df[city_col].value_counts().sort_values(ascending=False)
+    result = city_counts.to_dict()
+    explanation = f"**📍 Количество заказов по городам:**
+
+"
+    for city, count in city_counts.head(10).items():
+        explanation += f"• {city}: {count}
+"
+    if len(city_counts) > 10:
+        explanation += f"• ...и ещё {len(city_counts) - 10} городов
+"
+    explanation += f"
+📊 Всего городов: {len(city_counts)}"
+else:
+    result = "Колонка с городами не найдена"
+    explanation = result
+```
+
+Запрос: "Продажи по менеджерам" или "Сумма по менеджерам"
+```python
+# Находим колонку с менеджерами
+manager_col = None
+sum_col = None
+for col in df.columns:
+    col_lower = col.lower()
+    if any(x in col_lower for x in ['менеджер', 'manager', 'продавец', 'seller', 'сотрудник']):
+        manager_col = col
+    if any(x in col_lower for x in ['сумм', 'sum', 'total', 'amount']):
+        sum_col = col
+
+if manager_col and sum_col:
+    sales = df.groupby(manager_col)[sum_col].sum().sort_values(ascending=False)
+    result = sales.to_dict()
+    explanation = f"**📊 Продажи по менеджерам:**
+
+"
+    for manager, total in sales.items():
+        pct = (total / sales.sum()) * 100
+        explanation += f"• {manager}: {total:,.0f} руб. ({pct:.1f}%)
+"
+    explanation += f"
+💰 Общая сумма: {sales.sum():,.0f} руб."
+else:
+    result = "Не найдены колонки с менеджерами и суммами"
+    explanation = result
+```
+
 
 Запрос: "Какой менеджер самый продуктивный"
 ```python
@@ -242,6 +332,84 @@ explanation += "📋 Детали:
 explanation += f"• Общая сумма: {total:,.0f} руб.
 "
 explanation += f"• Средний чек: {avg:,.0f} руб.
+"
+```
+
+Запрос: "Максимальный заказ" или "Какой самый крупный заказ"
+```python
+# Находим строку с максимальной суммой
+sum_col = 'Сумма'  # Определи название колонки с суммой автоматически
+if sum_col not in df.columns:
+    # Ищем колонку с суммой по названию
+    for col in df.columns:
+        if any(x in col.lower() for x in ['сумм', 'sum', 'total', 'amount', 'цена', 'price']):
+            sum_col = col
+            break
+
+numeric_col = pd.to_numeric(df[sum_col], errors='coerce')
+max_idx = numeric_col.idxmax()
+max_row = df.loc[max_idx]
+max_value = numeric_col.max()
+
+# Найти название товара/продукта
+product_col = None
+for col in df.columns:
+    if any(x in col.lower() for x in ['товар', 'product', 'название', 'name', 'наименование']):
+        product_col = col
+        break
+
+product_name = max_row[product_col] if product_col else "N/A"
+
+result = {"max_value": max_value, "product": product_name, "row": max_row.to_dict()}
+explanation = f"**💰 Максимальный заказ: {max_value:,.0f} руб.**
+
+"
+explanation += f"📦 Товар: {product_name}
+"
+explanation += f"📊 Детали заказа:
+"
+for col, val in max_row.items():
+    if pd.notna(val) and str(val).strip():
+        explanation += f"• {col}: {val}
+"
+```
+
+Запрос: "Минимальный заказ" или "Какой самый маленький заказ"
+```python
+# Находим строку с минимальной суммой
+sum_col = 'Сумма'
+if sum_col not in df.columns:
+    for col in df.columns:
+        if any(x in col.lower() for x in ['сумм', 'sum', 'total', 'amount', 'цена', 'price']):
+            sum_col = col
+            break
+
+numeric_col = pd.to_numeric(df[sum_col], errors='coerce')
+# Фильтруем NaN и нули
+valid_mask = (numeric_col > 0) & numeric_col.notna()
+min_idx = numeric_col[valid_mask].idxmin()
+min_row = df.loc[min_idx]
+min_value = numeric_col[valid_mask].min()
+
+product_col = None
+for col in df.columns:
+    if any(x in col.lower() for x in ['товар', 'product', 'название', 'name', 'наименование']):
+        product_col = col
+        break
+
+product_name = min_row[product_col] if product_col else "N/A"
+
+result = {"min_value": min_value, "product": product_name, "row": min_row.to_dict()}
+explanation = f"**💰 Минимальный заказ: {min_value:,.0f} руб.**
+
+"
+explanation += f"📦 Товар: {product_name}
+"
+explanation += f"📊 Детали заказа:
+"
+for col, val in min_row.items():
+    if pd.notna(val) and str(val).strip():
+        explanation += f"• {col}: {val}
 "
 ```
 
@@ -312,6 +480,45 @@ explanation += f"• Средний чек: {avg:,.0f} руб.
                                     'красным ячейки', 'зелёным ячейки', 'зеленым ячейки',
                                     'пустые значения', 'пустые ячейки', 'желтым пуст', 'жёлтым пуст']
 
+    # Color scale / gradient keywords (MUST be checked BEFORE conditional formatting)
+    COLOR_SCALE_KEYWORDS = ['цветовая шкала', 'color scale', 'градиент', 'gradient',
+                            'тепловая карта', 'heatmap', 'heat map',
+                            'от красного к зелёному', 'от красного к зеленому',
+                            'от зелёного к красному', 'от зеленого к красному',
+                            'шкала цвет', 'раскрась по значени', 'покрась по значени']
+
+    # Convert to numbers keywords
+    CONVERT_TO_NUMBERS_KEYWORDS = ['преобразуй в числ', 'преобразовать в числ', 'конвертируй в числ',
+                                    'конвертировать в числ', 'сделай числ', 'формат числ',
+                                    'из текста в числ', 'текст в числ', 'convert to number',
+                                    'to number format', 'числовой формат', 'на числовой',
+                                    'в числовой', 'измени формат', 'сменить формат',
+                                    'текстовой формат на', 'текстовый формат на']
+
+    # Color scale presets
+    COLOR_SCALE_PRESETS = {
+        'red_yellow_green': {
+            'min_color': {'red': 0.96, 'green': 0.8, 'blue': 0.8},    # Light red
+            'mid_color': {'red': 1, 'green': 0.95, 'blue': 0.8},       # Light yellow
+            'max_color': {'red': 0.8, 'green': 0.92, 'blue': 0.8}      # Light green
+        },
+        'green_yellow_red': {
+            'min_color': {'red': 0.8, 'green': 0.92, 'blue': 0.8},     # Light green
+            'mid_color': {'red': 1, 'green': 0.95, 'blue': 0.8},       # Light yellow
+            'max_color': {'red': 0.96, 'green': 0.8, 'blue': 0.8}      # Light red
+        },
+        'white_to_blue': {
+            'min_color': {'red': 1, 'green': 1, 'blue': 1},            # White
+            'mid_color': {'red': 0.8, 'green': 0.9, 'blue': 1},        # Light blue
+            'max_color': {'red': 0.4, 'green': 0.6, 'blue': 0.9}       # Blue
+        },
+        'white_to_green': {
+            'min_color': {'red': 1, 'green': 1, 'blue': 1},            # White
+            'mid_color': {'red': 0.85, 'green': 0.95, 'blue': 0.85},   # Light green
+            'max_color': {'red': 0.6, 'green': 0.85, 'blue': 0.6}      # Green
+        }
+    }
+
     # Pivot table / grouping keywords
     PIVOT_KEYWORDS = ['сводн', 'pivot', 'группир', 'group by', 'агрегир', 'итоги по', 'суммы по',
                       'по категори', 'по менеджер', 'по регион', 'по месяц', 'по год',
@@ -366,6 +573,45 @@ explanation += f"• Средний чек: {avg:,.0f} руб.
     VALIDATION_KEYWORDS = ['валидац', 'validation', 'выпадающ', 'dropdown', 'список',
                            'ограничь', 'restrict', 'допустим',
                            'разрешённ', 'allowed', 'выбор из', 'select from']
+
+    # Highlight keywords - MUST be checked BEFORE filter keywords
+    HIGHLIGHT_KEYWORDS = ['выдели', 'выделить', 'подсвети', 'подсветить', 'подсветь',
+                          'highlight', 'mark', 'покрась', 'покрасить', 'раскрась',
+                          'отметь', 'отметить', 'пометь', 'пометить']
+
+    # Highlight colors mapping (hex) - more variations
+    HIGHLIGHT_COLORS = {
+        # Red
+        'красн': '#FF6B6B', 'red': '#FF6B6B',
+        # Green
+        'зелен': '#69DB7C', 'зелён': '#69DB7C', 'green': '#69DB7C',
+        # Yellow
+        'жёлт': '#FFE066', 'желт': '#FFE066', 'yellow': '#FFE066',
+        # Orange
+        'оранж': '#FFA94D', 'orange': '#FFA94D',
+        # Blue
+        'синий': '#74C0FC', 'синим': '#74C0FC', 'blue': '#74C0FC',
+        # Light blue
+        'голуб': '#99E9F2',
+        # Purple
+        'фиолет': '#DA77F2', 'purple': '#DA77F2',
+        # Pink
+        'розов': '#F783AC', 'pink': '#F783AC',
+    }
+
+    # Smart color detection by context (status/condition -> color)
+    CONTEXT_COLORS = {
+        # Negative -> red
+        'отмен': '#FF6B6B', 'отказ': '#FF6B6B', 'ошибк': '#FF6B6B',
+        'проблем': '#FF6B6B', 'возврат': '#FF6B6B', 'просроч': '#FF6B6B',
+        # Positive -> green
+        'оплач': '#69DB7C', 'выполн': '#69DB7C', 'доставл': '#69DB7C',
+        'завершен': '#69DB7C', 'успеш': '#69DB7C', 'активн': '#69DB7C',
+        # Pending -> orange
+        'ожидан': '#FFA94D', 'в процесс': '#FFA94D', 'обрабат': '#FFA94D',
+        # VIP -> purple
+        'vip': '#DA77F2', 'важн': '#DA77F2', 'приорит': '#DA77F2',
+    }
 
     # Filter keywords
     FILTER_KEYWORDS = ['фильтр', 'filter', 'отфильтр', 'покажи только', 'show only',
@@ -758,24 +1004,40 @@ explanation += f"• Средний чек: {avg:,.0f} руб.
                 color_name = color_kw
                 break
 
-        # Find column mentioned in query
+        # Find column mentioned in query - exact word match first
         target_column = None
         target_column_index = None
 
+        # Split query into words for exact matching
+        query_words = set(query_lower.split())
+
+        logger.info(f"[SimpleGPT] Conditional format: looking for column in query: '{query}', columns: {column_names}")
+
+        # First pass: exact match (column name is a word in query)
         for idx, col_name in enumerate(column_names):
-            col_lower = col_name.lower()
-            if col_lower in query_lower or col_name in query:
+            col_lower = col_name.lower().strip()
+            if len(col_lower) < 2:
+                continue
+            if col_lower in query_words:
                 target_column = col_name
                 target_column_index = idx
+                logger.info(f"[SimpleGPT] Found exact match: column '{col_name}' at index {idx}")
                 break
-            # Partial match
-            for word in col_lower.split():
-                if len(word) > 2 and word in query_lower:
-                    target_column = col_name
-                    target_column_index = idx
+
+        # Second pass: column name is a substring of a query word
+        if not target_column:
+            for idx, col_name in enumerate(column_names):
+                col_lower = col_name.lower().strip()
+                if len(col_lower) < 2:
+                    continue
+                for word in query_words:
+                    if len(word) >= len(col_lower) and (word.startswith(col_lower) or col_lower in word):
+                        target_column = col_name
+                        target_column_index = idx
+                        logger.info(f"[SimpleGPT] Found partial match: column '{col_name}' in word '{word}' at index {idx}")
+                        break
+                if target_column:
                     break
-            if target_column:
-                break
 
         # If no column found, try to find numeric column
         if not target_column:
@@ -791,8 +1053,8 @@ explanation += f"• Средний чек: {avg:,.0f} руб.
                         pass
 
         # Detect condition type and value
-        condition_type = "GREATER_THAN"  # Default
-        condition_value = None
+        condition_type = "NUMBER_GREATER"  # Default - must match sheets-api.js expected types
+        condition_value = 0  # Default: highlight values > 0
 
         # Patterns for conditions
         import re
@@ -1458,6 +1720,180 @@ explanation += f"• Средний чек: {avg:,.0f} руб.
             "message": message
         }
 
+    def _detect_highlight_action(self, query: str, column_names: List[str], df: pd.DataFrame) -> Optional[Dict[str, Any]]:
+        """
+        Определяет, является ли запрос командой выделения строк цветом.
+        Примеры:
+        - "выдели строки где Сумма > 100000"
+        - "подсветь красным отменённые заказы"
+        - "отметь зелёным оплаченные"
+        """
+        query_lower = query.lower()
+
+        # Check for highlight keywords FIRST
+        is_highlight = any(kw in query_lower for kw in self.HIGHLIGHT_KEYWORDS)
+        if not is_highlight:
+            return None
+
+        logger.info(f"[SimpleGPT] Highlight action detected: {query}")
+
+        # Detect color from query - first check explicit colors
+        highlight_color = None
+        for color_key, color_hex in self.HIGHLIGHT_COLORS.items():
+            if color_key in query_lower:
+                highlight_color = color_hex
+                logger.info(f"[SimpleGPT] Highlight color (explicit): {color_key} -> {color_hex}")
+                break
+
+        # If no explicit color, try to detect by context (status words)
+        if not highlight_color:
+            for context_key, color_hex in self.CONTEXT_COLORS.items():
+                if context_key in query_lower:
+                    highlight_color = color_hex
+                    logger.info(f"[SimpleGPT] Highlight color (context): {context_key} -> {color_hex}")
+                    break
+
+        # Default to yellow if nothing matched
+        if not highlight_color:
+            highlight_color = '#FFFF00'
+            logger.info(f"[SimpleGPT] Using default highlight color: yellow")
+
+        # Find target column and condition
+        target_column = None
+        target_column_index = None
+        filter_value = None
+        operator = '=='
+
+        # Look for column mentions
+        for idx, col_name in enumerate(column_names):
+            col_lower = col_name.lower()
+            if col_lower in query_lower or col_name in query:
+                target_column = col_name
+                target_column_index = idx
+                break
+            # Partial match
+            for word in col_lower.split():
+                if len(word) > 2 and word in query_lower:
+                    target_column = col_name
+                    target_column_index = idx
+                    break
+            if target_column:
+                break
+
+        # Detect operator
+        for op, patterns in self.FILTER_OPERATORS.items():
+            for pattern in patterns:
+                if pattern in query_lower:
+                    operator = op
+                    break
+            if operator != '==':
+                break
+
+        # Extract value
+        import re
+        if operator not in ['empty', 'not_empty']:
+            # Try to extract numeric value
+            number_match = re.search(r'(\d+(?:[.,]\d+)?)', query_lower)
+            if number_match:
+                filter_value = float(number_match.group(1).replace(',', '.'))
+            else:
+                # Try to find text value (e.g., status names)
+                status_words = ['оплачен', 'отменен', 'отменён', 'доставлен', 'возврат', 'активн',
+                                'неактивн', 'завершен', 'завершён', 'выполнен', 'ожидан', 'vip']
+                for status in status_words:
+                    if status in query_lower:
+                        filter_value = status
+                        operator = 'contains'
+                        break
+
+        # Execute filter to find rows
+        try:
+            if target_column is None:
+                # Try to find by status-like column
+                for idx, col in enumerate(column_names):
+                    col_lower = col.lower()
+                    if any(x in col_lower for x in ['статус', 'status', 'состоян']):
+                        target_column = col
+                        target_column_index = idx
+                        break
+
+            if target_column is None:
+                logger.warning(f"[SimpleGPT] No target column found for highlight")
+                return None
+
+            filtered_df = df.copy()
+            col = filtered_df.columns[target_column_index]
+
+            if operator == 'empty':
+                mask = filtered_df[col].isna() | (filtered_df[col] == '')
+            elif operator == 'not_empty':
+                mask = filtered_df[col].notna() & (filtered_df[col] != '')
+            elif operator == 'contains' and filter_value:
+                mask = filtered_df[col].astype(str).str.lower().str.contains(str(filter_value).lower(), na=False)
+            elif filter_value is not None:
+                try:
+                    numeric_val = float(filter_value) if isinstance(filter_value, (int, float, str)) and str(filter_value).replace('.', '').replace('-', '').isdigit() else None
+                    if numeric_val is not None:
+                        col_numeric = pd.to_numeric(filtered_df[col], errors='coerce')
+                        if operator == '>':
+                            mask = col_numeric > numeric_val
+                        elif operator == '<':
+                            mask = col_numeric < numeric_val
+                        elif operator == '>=':
+                            mask = col_numeric >= numeric_val
+                        elif operator == '<=':
+                            mask = col_numeric <= numeric_val
+                        elif operator == '!=':
+                            mask = col_numeric != numeric_val
+                        else:
+                            mask = col_numeric == numeric_val
+                    else:
+                        str_col = filtered_df[col].astype(str).str.lower()
+                        str_val = str(filter_value).lower()
+                        if operator == '!=':
+                            mask = str_col != str_val
+                        else:
+                            mask = str_col == str_val
+                except:
+                    str_col = filtered_df[col].astype(str).str.lower()
+                    str_val = str(filter_value).lower()
+                    mask = str_col.str.contains(str_val, na=False)
+            else:
+                logger.warning(f"[SimpleGPT] No filter condition for highlight")
+                return None
+
+            # Get row indices (1-indexed for spreadsheet)
+            highlight_rows = [i + 2 for i in filtered_df[mask].index.tolist()]  # +2 for header + 1-indexed
+
+            if not highlight_rows:
+                logger.warning(f"[SimpleGPT] No rows matched highlight condition")
+                return None
+
+            # Build condition string
+            op_display = {
+                '==': '=', '!=': '≠', '>': '>', '<': '<', '>=': '≥', '<=': '≤',
+                'contains': 'содержит', 'empty': 'пусто', 'not_empty': 'не пусто'
+            }
+            if operator in ['empty', 'not_empty']:
+                condition_str = f"{target_column} {op_display.get(operator, operator)}"
+            else:
+                condition_str = f"{target_column} {op_display.get(operator, operator)} {filter_value}"
+
+            message = f"Выделено {len(highlight_rows)} строк где {condition_str}"
+
+            return {
+                "action_type": "highlight",
+                "highlight_rows": highlight_rows,
+                "highlight_color": highlight_color,
+                "highlight_count": len(highlight_rows),
+                "condition_str": condition_str,
+                "message": message
+            }
+
+        except Exception as e:
+            logger.error(f"[SimpleGPT] Error detecting highlight rows: {e}")
+            return None
+
     def _detect_filter_action(self, query: str, column_names: List[str], df: pd.DataFrame) -> Optional[Dict[str, Any]]:
         """
         Определяет, является ли запрос командой фильтрации данных.
@@ -1637,6 +2073,187 @@ explanation += f"• Средний чек: {avg:,.0f} руб.
             logger.error(f"[SimpleGPT] Error filtering data: {e}")
             return None
 
+    def _detect_convert_to_numbers_action(self, query: str, column_names: List[str], df: pd.DataFrame) -> Optional[Dict[str, Any]]:
+        """
+        Определяет, является ли запрос командой конвертации колонки в числа.
+        Примеры:
+        - "преобразуй колонку Сумма в числа"
+        - "конвертируй в числовой формат колонку Цена"
+        """
+        query_lower = query.lower()
+
+        # Check for convert to numbers keywords
+        is_convert = any(kw in query_lower for kw in self.CONVERT_TO_NUMBERS_KEYWORDS)
+        if not is_convert:
+            return None
+
+        logger.info(f"[SimpleGPT] Convert to numbers action detected: {query}")
+
+        # Find target column
+        target_column = None
+        target_column_index = None
+
+        query_words = set(query_lower.split())
+
+        # First pass: exact match
+        for idx, col_name in enumerate(column_names):
+            col_lower = col_name.lower().strip()
+            if len(col_lower) < 2:
+                continue
+            if col_lower in query_words:
+                target_column = col_name
+                target_column_index = idx
+                break
+
+        # Second pass: partial match
+        if not target_column:
+            for idx, col_name in enumerate(column_names):
+                col_lower = col_name.lower().strip()
+                if len(col_lower) < 2:
+                    continue
+                for word in query_words:
+                    if len(word) >= len(col_lower) and (word.startswith(col_lower) or col_lower in word):
+                        target_column = col_name
+                        target_column_index = idx
+                        break
+                if target_column:
+                    break
+
+        if not target_column:
+            logger.warning(f"[SimpleGPT] No target column found for convert to numbers")
+            return None
+
+        rule = {
+            "column_index": target_column_index,
+            "column_name": target_column,
+            "row_count": len(df)
+        }
+
+        message = f"Преобразую колонку '{target_column}' в числа"
+
+        return {
+            "action_type": "convert_to_numbers",
+            "rule": rule,
+            "message": message
+        }
+
+    def _detect_color_scale_action(self, query: str, column_names: List[str], df: pd.DataFrame) -> Optional[Dict[str, Any]]:
+        """
+        Определяет, является ли запрос командой применения цветовой шкалы (градиента).
+        Примеры:
+        - "цветовая шкала для колонки Сумма"
+        - "градиент от красного к зелёному для Цена"
+        - "тепловая карта по колонке Продажи"
+        """
+        query_lower = query.lower()
+
+        # Check for color scale keywords
+        is_color_scale = any(kw in query_lower for kw in self.COLOR_SCALE_KEYWORDS)
+        if not is_color_scale:
+            return None
+
+        logger.info(f"[SimpleGPT] Color scale action detected: {query}")
+
+        # Find target column - look for exact word match first
+        target_column = None
+        target_column_index = None
+
+        # Split query into words for exact matching
+        query_words = set(query_lower.split())
+
+        logger.info(f"[SimpleGPT] Looking for column in query: '{query}', columns: {column_names}")
+
+        # First pass: exact match (column name is a word in query)
+        for idx, col_name in enumerate(column_names):
+            col_lower = col_name.lower().strip()
+            # Skip empty or very short column names
+            if len(col_lower) < 2:
+                continue
+            # Check if column name appears as a word in query
+            if col_lower in query_words:
+                target_column = col_name
+                target_column_index = idx
+                logger.info(f"[SimpleGPT] Found exact match: column '{col_name}' at index {idx}")
+                break
+
+        # Second pass: column name is a substring of a query word (e.g. "сумма" in "сумму")
+        if not target_column:
+            for idx, col_name in enumerate(column_names):
+                col_lower = col_name.lower().strip()
+                if len(col_lower) < 2:
+                    continue
+                # Check if any query word starts with or contains the column name
+                for word in query_words:
+                    if len(word) >= len(col_lower) and (word.startswith(col_lower) or col_lower in word):
+                        target_column = col_name
+                        target_column_index = idx
+                        logger.info(f"[SimpleGPT] Found partial match: column '{col_name}' in word '{word}' at index {idx}")
+                        break
+                if target_column:
+                    break
+
+        # If no column found, try to find first numeric column
+        if not target_column:
+            for idx, col_name in enumerate(column_names):
+                if idx < len(df.columns):
+                    try:
+                        numeric_data = pd.to_numeric(df.iloc[:, idx], errors='coerce')
+                        if numeric_data.notna().sum() / len(numeric_data) > 0.5:
+                            target_column = col_name
+                            target_column_index = idx
+                            logger.info(f"[SimpleGPT] Auto-selected numeric column for color scale: {col_name}")
+                            break
+                    except:
+                        pass
+
+        if not target_column:
+            logger.warning(f"[SimpleGPT] No target column found for color scale")
+            return None
+
+        # Determine color preset based on query
+        preset_name = 'green_yellow_red'  # Default: low=green, high=red (good for costs, expenses)
+
+        if any(kw in query_lower for kw in ['к зелёному', 'к зеленому', 'to green', 'прибыл', 'доход']):
+            preset_name = 'red_yellow_green'  # low=red, high=green (good for profits, revenue)
+        elif any(kw in query_lower for kw in ['синий', 'blue', 'голуб']):
+            preset_name = 'white_to_blue'
+        elif any(kw in query_lower for kw in ['зелён', 'зелен', 'green']):
+            preset_name = 'white_to_green'
+
+        preset = self.COLOR_SCALE_PRESETS[preset_name]
+
+        # Get column stats for the gradient
+        try:
+            col_data = pd.to_numeric(df.iloc[:, target_column_index], errors='coerce')
+            min_val = float(col_data.min())
+            max_val = float(col_data.max())
+            mid_val = float(col_data.median())
+        except:
+            min_val = 0
+            max_val = 100
+            mid_val = 50
+
+        # Build color scale rule
+        rule = {
+            "column_index": target_column_index,
+            "column_name": target_column,
+            "min_color": preset['min_color'],
+            "mid_color": preset['mid_color'],
+            "max_color": preset['max_color'],
+            "min_value": min_val,
+            "mid_value": mid_val,
+            "max_value": max_val,
+            "row_count": len(df)
+        }
+
+        message = f"Цветовая шкала для колонки '{target_column}' ({min_val:.0f} → {max_val:.0f})"
+
+        return {
+            "action_type": "color_scale",
+            "rule": rule,
+            "message": message
+        }
+
     async def process(
         self,
         query: str,
@@ -1719,6 +2336,36 @@ explanation += f"• Средний чек: {avg:,.0f} руб.
                 logger.info(f"[SimpleGPT] Returning chart result with keys: {list(chart_result.keys())}")
                 logger.info(f"[SimpleGPT] chart_result['chart_spec']: {chart_result.get('chart_spec')}")
                 return chart_result
+
+            # Check for convert to numbers action
+            convert_action = self._detect_convert_to_numbers_action(query, column_names, df)
+            if convert_action:
+                elapsed = time.time() - start_time
+                logger.info(f"[SimpleGPT] Returning convert to numbers action: {convert_action}")
+                return {
+                    "success": True,
+                    "action_type": "convert_to_numbers",
+                    "result_type": "action",
+                    "rule": convert_action["rule"],
+                    "summary": convert_action["message"],
+                    "processing_time": f"{elapsed:.2f}s",
+                    "processor": "SimpleGPT v1.0 (direct action)"
+                }
+
+            # Check for color scale action (BEFORE conditional formatting!)
+            color_scale_action = self._detect_color_scale_action(query, column_names, df)
+            if color_scale_action:
+                elapsed = time.time() - start_time
+                logger.info(f"[SimpleGPT] Returning color scale action: {color_scale_action}")
+                return {
+                    "success": True,
+                    "action_type": "color_scale",
+                    "result_type": "action",
+                    "rule": color_scale_action["rule"],
+                    "summary": color_scale_action["message"],
+                    "processing_time": f"{elapsed:.2f}s",
+                    "processor": "SimpleGPT v1.0 (direct action)"
+                }
 
             # Check for conditional formatting action
             conditional_action = self._detect_conditional_format_action(query, column_names, df)
@@ -1804,6 +2451,24 @@ explanation += f"• Средний чек: {avg:,.0f} руб.
                     "result_type": "action",
                     "rule": validation_action["rule"],
                     "summary": validation_action["message"],
+                    "processing_time": f"{elapsed:.2f}s",
+                    "processor": "SimpleGPT v1.0 (direct action)"
+                }
+
+            # Check for highlight action BEFORE filter (to handle "выдели где..." queries)
+            highlight_action = self._detect_highlight_action(query, column_names, df)
+            if highlight_action:
+                elapsed = time.time() - start_time
+                logger.info(f"[SimpleGPT] Returning highlight action: {highlight_action}")
+                return {
+                    "success": True,
+                    "action_type": "highlight",
+                    "result_type": "action",
+                    "highlight_rows": highlight_action["highlight_rows"],
+                    "highlight_color": highlight_action["highlight_color"],
+                    "highlight_count": highlight_action["highlight_count"],
+                    "highlight_message": highlight_action["message"],
+                    "summary": highlight_action["message"],
                     "processing_time": f"{elapsed:.2f}s",
                     "processor": "SimpleGPT v1.0 (direct action)"
                 }
@@ -1913,7 +2578,8 @@ explanation += f"• Средний чек: {avg:,.0f} руб.
                     "display_mode": "sidebar_only" if len(formatted_result) <= 20 else "create_sheet"
                 }
             elif result_type == "list" and isinstance(formatted_result, list):
-                response["key_findings"] = formatted_result
+                # Convert all items to strings for schema validation
+                response["key_findings"] = [str(item) for item in formatted_result]
 
             return response
 

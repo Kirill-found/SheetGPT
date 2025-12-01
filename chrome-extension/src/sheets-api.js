@@ -215,7 +215,7 @@ async function writeSheetData(spreadsheetId, sheetName, data, startCell = 'A1') 
     const range = `${sheetName}!${startCell}`;
 
     const response = await fetch(
-      `${SHEETS_API_BASE}/${spreadsheetId}/values/${encodeURIComponent(range)}?valueInputOption=RAW`,
+      `${SHEETS_API_BASE}/${spreadsheetId}/values/${encodeURIComponent(range)}?valueInputOption=USER_ENTERED`,
       {
         method: 'PUT',
         headers: {
@@ -252,7 +252,7 @@ async function appendSheetData(spreadsheetId, sheetName, data) {
     const range = `${sheetName}!A1`;
 
     const response = await fetch(
-      `${SHEETS_API_BASE}/${spreadsheetId}/values/${encodeURIComponent(range)}:append?valueInputOption=RAW`,
+      `${SHEETS_API_BASE}/${spreadsheetId}/values/${encodeURIComponent(range)}:append?valueInputOption=USER_ENTERED`,
       {
         method: 'POST',
         headers: {
@@ -762,12 +762,16 @@ async function getSheetIdByName(spreadsheetId, sheetName) {
     }
 
     const data = await response.json();
+    console.log('[SheetsAPI] 📋 All sheets:', data.sheets?.map(s => ({ title: s.properties.title, sheetId: s.properties.sheetId })));
+
     const sheet = data.sheets?.find(s => s.properties.title === sheetName);
 
     if (!sheet) {
+      console.error(`[SheetsAPI] ❌ Sheet "${sheetName}" not found in sheets list`);
       throw new Error(`Sheet "${sheetName}" not found`);
     }
 
+    console.log(`[SheetsAPI] ✅ Found sheet "${sheetName}" with ID: ${sheet.properties.sheetId}`);
     return sheet.properties.sheetId;
   } catch (error) {
     console.error('[SheetsAPI] Error getting sheet ID:', error);
@@ -885,6 +889,111 @@ async function applyConditionalFormat(spreadsheetId, sheetId, rule) {
 }
 
 /**
+ * Apply color scale (gradient) formatting to a column
+ * This creates a gradient from min to max values in the column
+ * Rule object:
+ *   - column_index: Column to apply gradient to (0-based)
+ *   - min_color: RGB color object for minimum value
+ *   - mid_color: RGB color object for midpoint value
+ *   - max_color: RGB color object for maximum value
+ *   - row_count: Number of data rows (excluding header)
+ */
+async function applyColorScale(spreadsheetId, sheetId, rule) {
+  try {
+    const token = await getAuthToken();
+
+    console.log('[SheetsAPI] 🎨 applyColorScale called with rule:', JSON.stringify(rule, null, 2));
+
+    const { column_index, min_color, mid_color, max_color, row_count } = rule;
+
+    console.log(`[SheetsAPI] 🎨 Applying color scale to column ${column_index} (type: ${typeof column_index})`);
+    console.log(`[SheetsAPI] Colors: min=${JSON.stringify(min_color)}, mid=${JSON.stringify(mid_color)}, max=${JSON.stringify(max_color)}`);
+
+    // Build gradient rule with proper color format (alpha required!)
+    const gradientRule = {
+      minpoint: {
+        color: {
+          red: min_color?.red || 0.0,
+          green: min_color?.green || 1.0,
+          blue: min_color?.blue || 0.0,
+          alpha: 1.0
+        },
+        type: 'MIN'
+      },
+      maxpoint: {
+        color: {
+          red: max_color?.red || 1.0,
+          green: max_color?.green || 0.0,
+          blue: max_color?.blue || 0.0,
+          alpha: 1.0
+        },
+        type: 'MAX'
+      }
+    };
+
+    // Add midpoint if provided
+    if (mid_color) {
+      gradientRule.midpoint = {
+        color: {
+          red: mid_color.red,
+          green: mid_color.green,
+          blue: mid_color.blue,
+          alpha: 1.0
+        },
+        type: 'PERCENTILE',
+        value: '50'
+      };
+    }
+
+    const request = {
+      addConditionalFormatRule: {
+        rule: {
+          ranges: [{
+            sheetId: sheetId,
+            startRowIndex: 1,
+            endRowIndex: (row_count || 1000) + 1,
+            startColumnIndex: column_index,
+            endColumnIndex: column_index + 1
+          }],
+          gradientRule: gradientRule
+        },
+        index: 0
+      }
+    };
+
+    console.log('[SheetsAPI] Color scale request:', JSON.stringify(request, null, 2));
+
+    const response = await fetch(
+      `${SHEETS_API_BASE}/${spreadsheetId}:batchUpdate`,
+      {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          requests: [request]
+        })
+      }
+    );
+
+    if (!response.ok) {
+      const error = await response.json();
+      console.error('[SheetsAPI] Color scale error:', error);
+      throw new Error(`Sheets API error: ${error.error?.message || response.statusText}`);
+    }
+
+    const result = await response.json();
+    console.log('[SheetsAPI] ✅ Color scale applied:', JSON.stringify(result, null, 2));
+    console.log('[SheetsAPI] 📋 Replies:', result.replies);
+    return result;
+  } catch (error) {
+    console.error('[SheetsAPI] Error applying color scale:', error);
+    throw error;
+  }
+}
+
+/**
  * Set data validation (dropdown list) for a column
  */
 async function setDataValidation(spreadsheetId, sheetId, rule) {
@@ -946,6 +1055,88 @@ async function setDataValidation(spreadsheetId, sheetId, rule) {
   }
 }
 
+/**
+ * Convert text column to numbers
+ * Reads values, converts to numbers, writes back
+ */
+async function convertColumnToNumbers(spreadsheetId, sheetName, columnIndex, rowCount) {
+  try {
+    const token = await getAuthToken();
+
+    // Get column letter (A, B, C, ...)
+    const columnLetter = String.fromCharCode(65 + columnIndex);
+    const range = `${sheetName}!${columnLetter}2:${columnLetter}${rowCount + 1}`;
+
+    console.log(`[SheetsAPI] 🔢 Converting column ${columnLetter} to numbers, range: ${range}`);
+
+    // Read current values
+    const readResponse = await fetch(
+      `${SHEETS_API_BASE}/${spreadsheetId}/values/${encodeURIComponent(range)}`,
+      {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      }
+    );
+
+    if (!readResponse.ok) {
+      const error = await readResponse.json();
+      throw new Error(`Read error: ${error.error?.message || readResponse.statusText}`);
+    }
+
+    const data = await readResponse.json();
+    const values = data.values || [];
+
+    console.log(`[SheetsAPI] 📖 Read ${values.length} values from column ${columnLetter}`);
+
+    // Convert to numbers
+    const convertedValues = values.map(row => {
+      if (!row || !row[0]) return [null];
+      const val = row[0];
+      // Remove spaces, replace comma with dot, parse as number
+      const cleanVal = String(val).replace(/\s/g, '').replace(',', '.');
+      const num = parseFloat(cleanVal);
+      return [isNaN(num) ? val : num];
+    });
+
+    console.log(`[SheetsAPI] 🔄 Converted values sample:`, convertedValues.slice(0, 3));
+
+    // Write back as numbers
+    const writeResponse = await fetch(
+      `${SHEETS_API_BASE}/${spreadsheetId}/values/${encodeURIComponent(range)}?valueInputOption=USER_ENTERED`,
+      {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          range: range,
+          values: convertedValues
+        })
+      }
+    );
+
+    if (!writeResponse.ok) {
+      const error = await writeResponse.json();
+      throw new Error(`Write error: ${error.error?.message || writeResponse.statusText}`);
+    }
+
+    const result = await writeResponse.json();
+    console.log(`[SheetsAPI] ✅ Column ${columnLetter} converted to numbers:`, result);
+
+    return {
+      success: true,
+      updatedCells: result.updatedCells,
+      column: columnLetter
+    };
+  } catch (error) {
+    console.error('[SheetsAPI] Error converting column to numbers:', error);
+    throw error;
+  }
+}
+
 // Export functions
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = {
@@ -963,6 +1154,8 @@ if (typeof module !== 'undefined' && module.exports) {
     createChart,
     getSheetIdByName,
     applyConditionalFormat,
-    setDataValidation
+    applyColorScale,
+    setDataValidation,
+    convertColumnToNumbers
   };
 }

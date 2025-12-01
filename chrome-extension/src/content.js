@@ -481,7 +481,7 @@ window.addEventListener('message', async (event) => {
 
     switch (action) {
       case 'PROCESS_QUERY':
-        result = await processQuery(data.query, data.history);
+        result = await processQuery(data.query, data.history, data.licenseKey);
         break;
 
       case 'GET_CUSTOM_CONTEXT':
@@ -530,12 +530,24 @@ window.addEventListener('message', async (event) => {
         result = await applyConditionalFormat(data.rule);
         break;
 
+      case 'APPLY_COLOR_SCALE':
+        console.log('[SheetGPT] 🎨 APPLY_COLOR_SCALE received with rule:', JSON.stringify(data.rule));
+        result = await applyColorScaleInSheet(data.rule);
+        console.log('[SheetGPT] 🎨 APPLY_COLOR_SCALE result:', result);
+        break;
+
       case 'OVERWRITE_SHEET_DATA':
         result = await overwriteSheetData(data.cleanedData);
         break;
 
       case 'SET_DATA_VALIDATION':
         result = await setDataValidationInSheet(data.rule);
+        break;
+
+      case 'CONVERT_TO_NUMBERS':
+        console.log('[SheetGPT] 🔢 CONVERT_TO_NUMBERS received:', data);
+        result = await convertColumnToNumbersInSheet(data.columnIndex, data.columnName, data.rowCount);
+        console.log('[SheetGPT] 🔢 CONVERT_TO_NUMBERS result:', result);
         break;
 
       default:
@@ -584,7 +596,7 @@ const API_URLS = {
 
 // ===== API HANDLERS =====
 
-async function processQuery(query, history = []) {
+async function processQuery(query, history = [], licenseKey = null) {
   console.log('[SheetGPT] Processing query:', query);
   console.log('[SheetGPT] API Mode:', API_MODE, '| URL:', API_URLS[API_MODE]);
 
@@ -609,12 +621,20 @@ async function processQuery(query, history = []) {
     }
   }
 
-  // Call SheetGPT API
+  // Call SheetGPT API (v9.1.0: with license key for subscription enforcement)
+  const headers = {
+    'Content-Type': 'application/json',
+  };
+
+  // Add license key header if available
+  if (licenseKey) {
+    headers['X-License-Key'] = licenseKey;
+    console.log('[SheetGPT] Sending request with license key');
+  }
+
   const response = await fetch(API_URLS[API_MODE], {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
+    headers: headers,
     body: JSON.stringify({
       query: query,
       column_names: sheetData.headers,
@@ -625,6 +645,11 @@ async function processQuery(query, history = []) {
   });
 
   if (!response.ok) {
+    // v9.1.0: Handle rate limit (429) specially
+    if (response.status === 429) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.detail?.message || 'Дневной лимит запросов исчерпан. Обновите план до PRO.');
+    }
     throw new Error(`HTTP ${response.status}: ${response.statusText}`);
   }
 
@@ -997,6 +1022,32 @@ async function applyConditionalFormat(rule) {
   }
 }
 
+async function applyColorScaleInSheet(rule) {
+  console.log('[SheetGPT] Apply color scale:', rule);
+
+  try {
+    const response = await safeSendMessage({
+      action: 'APPLY_COLOR_SCALE',
+      data: {
+        rule: rule
+      }
+    });
+
+    if (!response || !response.success) {
+      throw new Error(response?.error || 'Неизвестная ошибка при применении цветовой шкалы');
+    }
+
+    console.log('[SheetGPT] ✅ Color scale applied via API:', response.result);
+    return {
+      success: true,
+      message: `Цветовая шкала применена к колонке "${rule.column_name}"`
+    };
+  } catch (error) {
+    console.error('[SheetGPT] Error applying color scale:', error);
+    throw new Error(`Ошибка применения цветовой шкалы: ${error.message}`);
+  }
+}
+
 async function overwriteSheetData(cleanedData) {
   console.log('[SheetGPT] Overwrite sheet with cleaned data:', cleanedData);
 
@@ -1060,6 +1111,33 @@ async function setDataValidationInSheet(rule) {
   } catch (error) {
     console.error('[SheetGPT] Error setting data validation:', error);
     throw new Error(`Ошибка создания валидации: ${error.message}`);
+  }
+}
+
+async function convertColumnToNumbersInSheet(columnIndex, columnName, rowCount) {
+  console.log('[SheetGPT] 🔢 Converting column to numbers:', columnIndex, columnName);
+
+  try {
+    const response = await safeSendMessage({
+      action: 'CONVERT_TO_NUMBERS',
+      data: {
+        columnIndex: columnIndex,
+        rowCount: rowCount || 1000
+      }
+    });
+
+    if (!response || !response.success) {
+      throw new Error(response?.error || 'Неизвестная ошибка');
+    }
+
+    console.log('[SheetGPT] ✅ Column converted to numbers:', response.result);
+    return {
+      success: true,
+      message: `Колонка "${columnName}" преобразована в числа`
+    };
+  } catch (error) {
+    console.error('[SheetGPT] Error converting to numbers:', error);
+    throw new Error(`Ошибка преобразования: ${error.message}`);
   }
 }
 

@@ -366,6 +366,7 @@ class LicenseResponse(BaseModel):
     queries_used_today: Optional[int] = None
     queries_limit: Optional[int] = None
     total_queries: Optional[int] = None
+    premium_until: Optional[datetime] = None  # v9.1.0: Premium subscription expiration
 
 
 @router.post("/license/generate", response_model=LicenseResponse)
@@ -455,6 +456,14 @@ async def validate_license_key(
             message="License key is inactive"
         )
 
+    # v9.1.0: Check premium expiration
+    if user.subscription_tier == "premium" and user.premium_until:
+        if datetime.now(timezone.utc) > user.premium_until:
+            logger.info(f"Premium expired for user {user.telegram_user_id}")
+            user.subscription_tier = "free"
+            user.queries_limit = 10
+            await db.commit()
+
     logger.info(f"License valid: {license_key} for user {user.telegram_user_id}")
     return LicenseResponse(
         success=True,
@@ -466,7 +475,8 @@ async def validate_license_key(
         first_name=user.first_name,
         queries_used_today=user.queries_used_today,
         queries_limit=user.queries_limit,
-        total_queries=user.total_queries
+        total_queries=user.total_queries,
+        premium_until=user.premium_until
     )
 
 
@@ -507,6 +517,13 @@ async def activate_license(
             message="License key is inactive"
         )
 
+    # v9.1.0: Check premium expiration
+    if user.subscription_tier == "premium" and user.premium_until:
+        if datetime.now(timezone.utc) > user.premium_until:
+            user.subscription_tier = "free"
+            user.queries_limit = 10
+            await db.commit()
+
     logger.info(f"License activated: {license_key} for user {user.telegram_user_id}")
     return LicenseResponse(
         success=True,
@@ -518,7 +535,8 @@ async def activate_license(
         first_name=user.first_name,
         queries_used_today=user.queries_used_today,
         queries_limit=user.queries_limit,
-        total_queries=user.total_queries
+        total_queries=user.total_queries,
+        premium_until=user.premium_until
     )
 
 
