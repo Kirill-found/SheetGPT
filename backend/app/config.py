@@ -38,6 +38,7 @@ class Settings(BaseSettings):
     # Telegram Bot
     TELEGRAM_BOT_TOKEN: str = ""
     TELEGRAM_ADMIN_ID: int = 517682186
+    TELEGRAM_ADMIN_BOT_TOKEN: str = "8472527828:AAHXB30EtficnooQnNsOLrJqhoE6yotSZaE"
 
     class Config:
         env_file = ".env"

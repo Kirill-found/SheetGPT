@@ -46,6 +46,7 @@ CHROME_EXTENSION_URL = "https://chrome.google.com/webstore/detail/sheetgpt"  # T
 INSTALLATION_GUIDE_URL = "https://docs.google.com/document/d/YOUR_DOC_ID"  # TODO: заменить на реальную
 # Support - users can write directly to admin via /support command
 ADMIN_TELEGRAM_ID = 517682186  # Kirill - main admin
+ADMIN_BOT_TOKEN = "8472527828:AAHXB30EtficnooQnNsOLrJqhoE6yotSZaE"  # Separate admin bot
 
 
 class SheetGPTBot:
@@ -276,12 +277,14 @@ SheetGPT работает как расширение для Google Chrome, ко
                     )
                     db_user = result.scalar_one_or_none()
 
+                    is_new_user = False
                     if db_user:
                         # Генерируем новый ключ
                         license_key = TelegramUser.generate_license_key()
                         db_user.license_key = license_key
                     else:
                         # Создаём нового пользователя с ключом
+                        is_new_user = True
                         license_key = TelegramUser.generate_license_key()
                         db_user = TelegramUser(
                             telegram_user_id=user_id,
@@ -293,6 +296,23 @@ SheetGPT работает как расширение для Google Chrome, ко
                         session.add(db_user)
 
                     await session.commit()
+
+                    # Notify admin about new user
+                    if is_new_user:
+                        try:
+                            from telegram import Bot
+                            admin_bot = Bot(token=ADMIN_BOT_TOKEN)
+                            notify_text = f"🆕 **Новый пользователь!**\n\n"
+                            notify_text += f"👤 {user.first_name or 'N/A'} @{user.username or 'N/A'}\n"
+                            notify_text += f"🔑 `{license_key}`\n"
+                            notify_text += f"🆔 `{user_id}`"
+                            await admin_bot.send_message(
+                                chat_id=ADMIN_TELEGRAM_ID,
+                                text=notify_text,
+                                parse_mode='Markdown'
+                            )
+                        except Exception as e:
+                            logger.warning(f"Could not notify admin: {e}")
 
                     text = f"""
 🔑 **Твой лицензионный ключ**
@@ -953,8 +973,11 @@ SheetGPT работает как расширение для Google Chrome, ко
 Ответить: `/reply {user.id} <текст>`
 """
         try:
-            await context.bot.send_message(
-                chat_id=self.admin_id,
+            # Send to admin bot
+            from telegram import Bot
+            admin_bot = Bot(token=ADMIN_BOT_TOKEN)
+            await admin_bot.send_message(
+                chat_id=ADMIN_TELEGRAM_ID,
                 text=admin_text,
                 parse_mode='Markdown'
             )
