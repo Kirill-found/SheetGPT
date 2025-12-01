@@ -79,28 +79,37 @@ class SimpleGPTProcessor:
 
 КРИТИЧНО - ФОРМАТ explanation:
 - ПЕРВАЯ СТРОКА = ПРЯМОЙ ОТВЕТ на вопрос (кто, сколько, что)
-- Используй ПРОБЕЛЫ между словами и значениями
-- Числа отдельно от текста: "1,417,500 руб." НЕ "1417500руб"
+- КАЖДАЯ метрика на ОДНОЙ строке в формате "Label: Value"
+- НИКОГДА не разделяй label и value на разные строки!
+- Числа с пробелами: "1,417,500 руб." НЕ "1417500руб"
 - Скобки с пробелами: "(14 сделок)" НЕ "(14сделок)"
-- Разделяй данные: "Иванов — 1,417,500 руб." НЕ "Иванов1417500"
-- Каждый пункт на НОВОЙ строке
-- Используй • для списков, цифры для рейтингов
+
+ПРАВИЛЬНО:
+Лидер: Иванов
+Сумма: 1,417,500 руб. (14 сделок)
+Доля: 34.1%
+Вывод: Иванов лидирует по продажам
+
+НЕПРАВИЛЬНО (так делать НЕЛЬЗЯ):
+Лидер
+Иванов
+Сумма
+1,417,500 руб.
 
 ШАБЛОНЫ explanation (БЕЗ MARKDOWN, БЕЗ ЭМОДЗИ):
 
 1. Для "кто лучший/самый продуктивный":
-explanation = '''Самый продуктивный: Иванов
-Сумма: 1,417,500 руб.
-Сделок: 14
+explanation = '''Лидер: Иванов
+Сумма: 1,417,500 руб. (14 сделок)
 Средний чек: 101,250 руб.
+Доля от общего: 42%
+Отрыв от 2-го: +311,010 руб. (+28%)
 
 Рейтинг:
-1. Иванов — 1,417,500 руб.
-2. Петров — 1,106,490 руб.
-3. Сидорова — 859,000 руб.
+1. Иванов: 1,417,500 руб.
+2. Петров: 1,106,490 руб.
+3. Сидорова: 859,000 руб.
 
-Доля от общего: 42%
-Отрыв от 2-го: +311,010 руб.
 Вывод: Иванов лидирует за счёт крупных сделок'''
 
 2. Для СРАВНЕНИЯ:
@@ -226,21 +235,21 @@ leader_share = (leader_sum / total) * 100
 
 result = leader
 
-# Формируем ЧЁТКИЙ ответ БЕЗ markdown
-explanation = f"Самый продуктивный: {leader}\n"
-explanation += f"Сумма: {leader_sum:,.0f} руб.\n"
-explanation += f"Сделок: {leader_count:.0f}\n"
-explanation += f"Средний чек: {leader_avg:,.0f} руб.\n\n"
-explanation += "Рейтинг:\n"
-for i, (name, row) in enumerate(sales.head(5).iterrows(), 1):
-    explanation += f"{i}. {name} — {row['sum']:,.0f} руб.\n"
-explanation += f"\nДоля от общего: {leader_share:.1f}%\n"
+# КРИТИЧНО: Каждая метрика на ОДНОЙ строке в формате "Label: Value"
+explanation = "Лидер: " + str(leader) + "\n"
+explanation = explanation + "Сумма: " + "{:,.0f}".format(leader_sum) + " руб. (" + str(int(leader_count)) + " сделок)\n"
+explanation = explanation + "Средний чек: " + "{:,.0f}".format(leader_avg) + " руб.\n"
+explanation = explanation + "Доля от общего: " + "{:.1f}".format(leader_share) + "%\n"
 if len(sales) > 1:
     second_sum = sales.iloc[1]['sum']
     gap = leader_sum - second_sum
     gap_pct = (gap / second_sum) * 100
-    explanation += f"Отрыв от 2-го: +{gap:,.0f} руб. (+{gap_pct:.0f}%)\n"
-explanation += f"\nВывод: {leader} лидирует по объёму продаж"
+    explanation = explanation + "Отрыв от 2-го: +" + "{:,.0f}".format(gap) + " руб. (+" + "{:.0f}".format(gap_pct) + "%)\n"
+explanation = explanation + "\n"
+explanation = explanation + "Рейтинг:\n"
+for i, (name, row) in enumerate(sales.head(5).iterrows(), 1):
+    explanation = explanation + str(i) + ". " + str(name) + ": " + "{:,.0f}".format(row['sum']) + " руб.\n"
+explanation = explanation + "\nВывод: " + str(leader) + " лидирует по объёму продаж"
 ```
 
 Запрос: "почему?" (после вопроса о продуктивности)

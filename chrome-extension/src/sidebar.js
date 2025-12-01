@@ -109,16 +109,24 @@ function parseResponseContent(text) {
     lines = cleaned.split(/[•·]\s+/).filter(l => l.trim());
   }
 
-  for (const line of lines) {
-    const trimmed = line.trim();
-    // Skip section headers (lines ending with : alone)
+  // v9.2.3: Track pending header for combining with next line value
+  let pendingHeader = null;
+
+  for (let i = 0; i < lines.length; i++) {
+    const trimmed = lines[i].trim();
+
+    // Check if this is a standalone header (ends with : alone)
     if (trimmed.endsWith(':') && trimmed.length < 50) {
-      result.items.push(trimmed);
+      // Save header to potentially combine with next line
+      pendingHeader = trimmed.slice(0, -1).trim();
       continue;
     }
+
     // Check if numeric metric (contains : and number)
     const numericMatch = trimmed.match(/^([^:]+):\s*([0-9.,\s]+(?:руб|₽|%|шт)?\.?)\s*(?:\(([^)]+)\))?/i);
     if (numericMatch) {
+      // Clear pending header since we found a proper metric
+      pendingHeader = null;
       result.metrics.push({
         label: numericMatch[1].trim(),
         value: numericMatch[2].trim(),
@@ -129,15 +137,43 @@ function parseResponseContent(text) {
     else {
       const textMatch = trimmed.match(/^([^:]{2,25}):\s+(.+)$/);
       if (textMatch && !trimmed.includes('http')) {
+        // Clear pending header since we found a proper metric
+        pendingHeader = null;
         result.metrics.push({
           label: textMatch[1].trim(),
           value: textMatch[2].trim(),
           subtext: null
         });
-      } else if (trimmed.length > 0) {
+      }
+      // v9.2.3: Try to combine pending header with this line as value
+      else if (pendingHeader && trimmed.length > 0) {
+        // Check if this looks like a value (number with units, percentage, or name)
+        const valueMatch = trimmed.match(/^([0-9.,\s]+(?:руб|₽|%|шт)?\.?)\s*(?:\(([^)]+)\))?$/i);
+        if (valueMatch) {
+          result.metrics.push({
+            label: pendingHeader,
+            value: valueMatch[1].trim(),
+            subtext: valueMatch[2] ? valueMatch[2].trim() : null
+          });
+        } else {
+          // Treat as text value (like a name)
+          result.metrics.push({
+            label: pendingHeader,
+            value: trimmed,
+            subtext: null
+          });
+        }
+        pendingHeader = null;
+      }
+      else if (trimmed.length > 0) {
         result.items.push(trimmed);
       }
     }
+  }
+
+  // Handle orphaned pending header
+  if (pendingHeader) {
+    result.items.push(pendingHeader + ':');
   }
 
   // If nothing found, split into paragraphs
