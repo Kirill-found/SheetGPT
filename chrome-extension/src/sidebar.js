@@ -349,7 +349,12 @@ function loadState() {
     const savedState = localStorage.getItem('sheetgpt_state');
     if (savedState) {
       const parsed = JSON.parse(savedState);
-      Object.assign(state, parsed);
+      // v10.1: Don't load usage from localStorage - always get from server
+      const { usageCount, usageLimit, ...safeState } = parsed;
+      Object.assign(state, safeState);
+      state.usageCount = 0;  // Will be set by checkAuthentication()
+      state.usageLimit = 10; // Default, will be set by checkAuthentication()
+      console.log('[LoadState] Ignoring cached usage, will sync from server');
     }
     
     // Load chat history separately
@@ -372,9 +377,8 @@ function saveState() {
       user: state.user,
       licenseKey: state.licenseKey,
       theme: state.theme,
-      customContext: state.customContext,
-      usageCount: state.usageCount,
-      usageLimit: state.usageLimit
+      customContext: state.customContext
+      // v10.1: usageCount/usageLimit NOT saved - always from server
     };
     localStorage.setItem('sheetgpt_state', JSON.stringify(stateToSave));
     localStorage.setItem('sheetgpt_history', JSON.stringify(state.chatHistory.slice(0, CONFIG.MAX_HISTORY_ITEMS)));
@@ -561,8 +565,10 @@ async function checkAuthentication() {
           }
 
           // Sync usage from server
+          console.log('[Auth] ====== SERVER USAGE SYNC ======');
           console.log('[Auth] Server response:', JSON.stringify(data));
           console.log('[Auth] queries_used_today from server:', data.queries_used_today);
+          console.log('[Auth] queries_limit from server:', data.queries_limit);
           if (data.queries_used_today !== undefined) {
             state.usageCount = data.queries_used_today;
             console.log('[Auth] Updated usageCount to:', state.usageCount);
