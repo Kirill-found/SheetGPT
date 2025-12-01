@@ -284,7 +284,9 @@ async def process_formula(
         
         for col in df.columns:
             if should_skip_convert(col):
-                logger.info(f"[AUTO-CONVERT] ⏭️ '{col}' → skipped (looks like ID/phone/code)")
+                # v9.2.2: FORCE phone/ID columns to STRING to prevent any calculations
+                df[col] = df[col].astype(str)
+                logger.info(f"[AUTO-CONVERT] 🔒 '{col}' → FORCED to string (phone/ID/code)")
                 continue
             converted = pd.to_numeric(df[col], errors='coerce')
             if converted.notna().sum() > len(df) * 0.5:
@@ -311,7 +313,9 @@ async def process_formula(
             # Auto-convert numeric columns in reference (skip phones, IDs, etc.)
             for col in reference_df.columns:
                 if should_skip_convert(col):
-                    logger.info(f"[AUTO-CONVERT] ⏭️ ref:'{col}' → skipped")
+                    # v9.2.2: FORCE to string in reference too
+                    reference_df[col] = reference_df[col].astype(str)
+                    logger.info(f"[AUTO-CONVERT] 🔒 ref:'{col}' → FORCED to string")
                     continue
                 converted = pd.to_numeric(reference_df[col], errors='coerce')
                 if converted.notna().sum() > len(reference_df) * 0.5:
