@@ -482,9 +482,18 @@ class SheetGPTAdminBot:
 
     def run(self):
         """Запуск бота"""
-        logger.info("Starting SheetGPT Admin Bot...")
-
-        self._init_db()
+        import traceback
+        logger.info("=== Starting SheetGPT Admin Bot ===")
+        logger.info(f"Token: {self.token[:20]}...")
+        logger.info(f"Database URL set: {bool(self.database_url)}")
+        
+        try:
+            self._init_db()
+            logger.info("DB init done")
+        except Exception as e:
+            logger.error(f"DB init failed: {e}")
+            logger.error(traceback.format_exc())
+            return
 
         self.application = Application.builder().token(self.token).build()
 
@@ -500,8 +509,13 @@ class SheetGPTAdminBot:
         # Текстовые сообщения (для ответов)
         self.application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, self.handle_message))
 
-        logger.info("Admin Bot is running...")
-        self.application.run_polling(allowed_updates=Update.ALL_TYPES, stop_signals=None)
+        logger.info("Admin Bot starting polling...")
+        try:
+            self.application.run_polling(allowed_updates=Update.ALL_TYPES, stop_signals=None)
+        except Exception as e:
+            logger.error(f"Admin bot polling error: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
 
 
 def main():

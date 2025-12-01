@@ -57,8 +57,11 @@ def start_telegram_bot():
 
 def start_admin_bot():
     """Запуск Admin бота в отдельном потоке"""
+    import traceback
+    logger.info("=== ADMIN BOT THREAD STARTED ===")
     try:
         from app.admin_bot import SheetGPTAdminBot
+        logger.info("Admin bot import OK")
 
         admin_token = "8472527828:AAHXB30EtficnooQnNsOLrJqhoE6yotSZaE"
         main_token = settings.TELEGRAM_BOT_TOKEN
@@ -81,6 +84,7 @@ def start_admin_bot():
         bot.run()
     except Exception as e:
         logger.error(f"Failed to start Admin bot: {e}")
+        logger.error(traceback.format_exc())
 
 @app.on_event("startup")
 async def startup_event():
