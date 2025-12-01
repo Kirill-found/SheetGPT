@@ -481,7 +481,7 @@ window.addEventListener('message', async (event) => {
 
     switch (action) {
       case 'PROCESS_QUERY':
-        result = await processQuery(data.query, data.history);
+        result = await processQuery(data.query, data.history, data.licenseKey);
         break;
 
       case 'GET_CUSTOM_CONTEXT':
@@ -596,7 +596,7 @@ const API_URLS = {
 
 // ===== API HANDLERS =====
 
-async function processQuery(query, history = []) {
+async function processQuery(query, history = [], licenseKey = null) {
   console.log('[SheetGPT] Processing query:', query);
   console.log('[SheetGPT] API Mode:', API_MODE, '| URL:', API_URLS[API_MODE]);
 
@@ -621,12 +621,20 @@ async function processQuery(query, history = []) {
     }
   }
 
-  // Call SheetGPT API
+  // Call SheetGPT API (v9.1.0: with license key for subscription enforcement)
+  const headers = {
+    'Content-Type': 'application/json',
+  };
+
+  // Add license key header if available
+  if (licenseKey) {
+    headers['X-License-Key'] = licenseKey;
+    console.log('[SheetGPT] Sending request with license key');
+  }
+
   const response = await fetch(API_URLS[API_MODE], {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
+    headers: headers,
     body: JSON.stringify({
       query: query,
       column_names: sheetData.headers,
@@ -637,6 +645,11 @@ async function processQuery(query, history = []) {
   });
 
   if (!response.ok) {
+    // v9.1.0: Handle rate limit (429) specially
+    if (response.status === 429) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.detail?.message || 'Дневной лимит запросов исчерпан. Обновите план до PRO.');
+    }
     throw new Error(`HTTP ${response.status}: ${response.statusText}`);
   }
 

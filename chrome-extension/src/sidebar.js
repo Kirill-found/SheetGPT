@@ -27,7 +27,8 @@ const state = {
   chatHistory: [],
   usageCount: 0,
   usageLimit: CONFIG.FREE_DAILY_LIMIT,
-  isLoading: false
+  isLoading: false,
+  premiumUntil: null  // v9.1.0: Premium subscription expiration date
 };
 // ============================================
 // TEXT FORMATTING UTILITIES (v9.1.0)
@@ -384,10 +385,29 @@ async function checkAuthentication() {
             plan: data.subscription_tier || data.plan || data.subscription_type || state.user?.plan || 'free',
             email: data.email || state.user?.email || ''
           };
-          // Update usage limit based on subscription
-          const isPremium = ['premium', 'pro', 'unlimited'].includes(data.subscription_tier) ||
-                            ['premium', 'pro', 'unlimited'].includes(data.plan);
-          state.usageLimit = isPremium ? CONFIG.PRO_DAILY_LIMIT : CONFIG.FREE_DAILY_LIMIT;
+          // v9.1.0: Check premium expiration
+          let isPremium = ['premium', 'pro', 'unlimited'].includes(data.subscription_tier) ||
+                          ['premium', 'pro', 'unlimited'].includes(data.plan);
+
+          // Check if premium has expired
+          if (isPremium && data.premium_until) {
+            const premiumUntil = new Date(data.premium_until);
+            if (new Date() > premiumUntil) {
+              console.log('[Sidebar] Premium subscription expired');
+              isPremium = false;
+            }
+            state.premiumUntil = data.premium_until;
+          }
+
+          // Sync usage from server
+          if (data.queries_used_today !== undefined) {
+            state.usageCount = data.queries_used_today;
+          }
+          if (data.queries_limit !== undefined && data.queries_limit > 0) {
+            state.usageLimit = data.queries_limit;
+          } else {
+            state.usageLimit = isPremium ? CONFIG.PRO_DAILY_LIMIT : CONFIG.FREE_DAILY_LIMIT;
+          }
           saveState();
           showMainApp();
           updateUserUI();
@@ -457,11 +477,30 @@ async function handleLogin() {
           plan: data.subscription_tier || data.plan || data.subscription_type || 'free',
           email: data.email || ''
         };
-        // Check for premium/pro/unlimited subscription
-        const isPremium = ['premium', 'pro', 'unlimited'].includes(data.subscription_tier) ||
-                          ['premium', 'pro', 'unlimited'].includes(data.plan) ||
-                          ['premium', 'pro', 'unlimited'].includes(data.subscription_type);
-        state.usageLimit = isPremium ? CONFIG.PRO_DAILY_LIMIT : CONFIG.FREE_DAILY_LIMIT;
+        // v9.1.0: Check for premium/pro/unlimited subscription with expiration
+        let isPremium = ['premium', 'pro', 'unlimited'].includes(data.subscription_tier) ||
+                        ['premium', 'pro', 'unlimited'].includes(data.plan) ||
+                        ['premium', 'pro', 'unlimited'].includes(data.subscription_type);
+
+        // Check premium expiration
+        if (isPremium && data.premium_until) {
+          const premiumUntil = new Date(data.premium_until);
+          if (new Date() > premiumUntil) {
+            console.log('[Sidebar] Premium subscription expired');
+            isPremium = false;
+          }
+          state.premiumUntil = data.premium_until;
+        }
+
+        // Sync usage from server
+        if (data.queries_used_today !== undefined) {
+          state.usageCount = data.queries_used_today;
+        }
+        if (data.queries_limit !== undefined && data.queries_limit > 0) {
+          state.usageLimit = data.queries_limit;
+        } else {
+          state.usageLimit = isPremium ? CONFIG.PRO_DAILY_LIMIT : CONFIG.FREE_DAILY_LIMIT;
+        }
 
         saveState();
         showMainApp();
@@ -778,8 +817,17 @@ async function sendMessage() {
     const response = transformAPIResponse(result);
     addAIMessage(response);
 
-    // Update usage
-    updateUsage();
+    // v9.1.0: Sync usage from server response
+    if (result._usage) {
+      state.usageCount = result._usage.queries_used || state.usageCount + 1;
+      state.usageLimit = result._usage.queries_limit || state.usageLimit;
+      saveState();
+      updateUserUI();
+      console.log('[Sidebar] Usage synced from server:', result._usage);
+    } else {
+      // Fallback to local increment
+      updateUsage();
+    }
 
     // Add to history with response
     addToHistory(currentQuery, result.summary || result.explanation || null);

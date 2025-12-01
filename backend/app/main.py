@@ -31,7 +31,7 @@ from app.schemas.responses import FormulaResponse
 from app.config import settings
 from app.api.telegram import router as telegram_router
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 import os
 import threading
 
@@ -45,7 +45,7 @@ logger = logging.getLogger(__name__)
 # Create FastAPI app with VERSION 9.0.0 - Hybrid Intelligence Architecture
 app = FastAPI(
     title="SheetGPT API",
-    version="9.0.0",  # v9.0.0: Hybrid Intelligence - Schema-aware + Smart Classification + Self-Correction
+    version="9.1.0",  # v9.0.0: Hybrid Intelligence - Schema-aware + Smart Classification + Self-Correction
     description="AI-powered spreadsheet assistant with Hybrid Intelligence: Schema-aware processing, Smart query classification (SIMPLE/MEDIUM/COMPLEX), Self-correction loop. Expected 98-99% accuracy."
 )
 
@@ -127,7 +127,7 @@ async def root():
     """Health check endpoint"""
     return {
         "name": "SheetGPT API",
-        "version": "9.0.0",  # v9.0.0: Hybrid Intelligence Architecture
+        "version": "9.1.0",  # v9.0.0: Hybrid Intelligence Architecture
         "status": "operational",
         "engine": "Hybrid Intelligence Processor",
         "features": {
@@ -152,7 +152,7 @@ async def health_check():
     """Detailed health check"""
     return {
         "status": "healthy",
-        "version": "9.0.0",
+        "version": "9.1.0",
         "service": "SheetGPT API",
         "timestamp": datetime.now().isoformat(),
         "checks": {
@@ -169,7 +169,8 @@ async def health_check():
 @app.post("/api/v1/formula", response_model=FormulaResponse)
 async def process_formula(
     request: FormulaRequest,
-    x_api_token: Optional[str] = Header(None, alias="X-API-Token")
+    x_api_token: Optional[str] = Header(None, alias="X-API-Token"),
+    x_license_key: Optional[str] = Header(None, alias="X-License-Key")
 ):
     """
     Main endpoint v9.0.0 - Hybrid Intelligence Architecture
@@ -206,24 +207,59 @@ async def process_formula(
 
         df = pd.DataFrame(padded_data, columns=request.column_names)
 
-        # v7.9.1: Count query usage if API token provided
-        if x_api_token:
+        # v9.1.0: Check subscription limits BEFORE processing
+        user_info = None
+        if x_license_key or x_api_token:
             try:
                 from app.core.database import AsyncSessionLocal
                 from sqlalchemy import select
                 from app.models.telegram_user import TelegramUser
                 async with AsyncSessionLocal() as db:
-                    result = await db.execute(
-                        select(TelegramUser).where(TelegramUser.api_token == x_api_token)
-                    )
-                    user = result.scalar_one_or_none()
+                    user = None
+                    if x_license_key:
+                        result = await db.execute(
+                            select(TelegramUser).where(TelegramUser.license_key == x_license_key.strip().upper())
+                        )
+                        user = result.scalar_one_or_none()
+                    if not user and x_api_token:
+                        result = await db.execute(
+                            select(TelegramUser).where(TelegramUser.api_token == x_api_token)
+                        )
+                        user = result.scalar_one_or_none()
+
                     if user:
-                        user.queries_used_today += 1
-                        user.total_queries += 1
-                        await db.commit()
-                        logger.info(f"[USAGE] User {user.telegram_user_id}: {user.queries_used_today}/{user.queries_limit}")
+                        # Check premium expiration
+                        if user.subscription_tier == "premium" and user.premium_until:
+                            if datetime.now(timezone.utc) > user.premium_until:
+                                logger.info(f"[SUBSCRIPTION] Premium expired for user {user.telegram_user_id}")
+                                user.subscription_tier = "free"
+                                user.queries_limit = 10
+                                await db.commit()
+
+                        # Check if can make query
+                        if not user.can_make_query():
+                            logger.warning(f"[LIMIT] User {user.telegram_user_id} exceeded limit: {user.queries_used_today}/{user.queries_limit}")
+                            raise HTTPException(
+                                status_code=429,
+                                detail={
+                                    "error": "daily_limit_exceeded",
+                                    "message": f"Дневной лимит исчерпан ({user.queries_used_today}/{user.queries_limit}). Обновите план до PRO.",
+                                    "queries_used": user.queries_used_today,
+                                    "queries_limit": user.queries_limit
+                                }
+                            )
+
+                        user_info = {
+                            "user_id": user.telegram_user_id,
+                            "tier": user.subscription_tier,
+                            "used": user.queries_used_today,
+                            "limit": user.queries_limit
+                        }
+                        logger.info(f"[AUTH] User {user.telegram_user_id} (tier: {user.subscription_tier}, used: {user.queries_used_today}/{user.queries_limit})")
+            except HTTPException:
+                raise
             except Exception as e:
-                logger.warning(f"[USAGE] Failed to count query: {e}")
+                logger.warning(f"[AUTH] Error checking limits: {e}")
 
         # v9.0.0: Schema-aware processing handles type conversion automatically
         # Auto-convert numeric columns (Google Sheets returns everything as strings)
@@ -396,6 +432,41 @@ async def process_formula(
         response_dict["python_executed"] = result.get("python_executed", False)
         response_dict["function_used"] = result.get("function_used")
         response_dict["parameters"] = result.get("parameters")
+
+        # v9.1.0: Increment usage after successful processing
+        if x_license_key or x_api_token:
+            try:
+                from app.core.database import AsyncSessionLocal
+                from sqlalchemy import select
+                from app.models.telegram_user import TelegramUser
+                async with AsyncSessionLocal() as db:
+                    user = None
+                    if x_license_key:
+                        result = await db.execute(
+                            select(TelegramUser).where(TelegramUser.license_key == x_license_key.strip().upper())
+                        )
+                        user = result.scalar_one_or_none()
+                    if not user and x_api_token:
+                        result = await db.execute(
+                            select(TelegramUser).where(TelegramUser.api_token == x_api_token)
+                        )
+                        user = result.scalar_one_or_none()
+
+                    if user:
+                        user.queries_used_today += 1
+                        user.total_queries += 1
+                        user.last_query_at = datetime.now(timezone.utc)
+                        await db.commit()
+
+                        # Add usage info to response
+                        response_dict["_usage"] = {
+                            "queries_used": user.queries_used_today,
+                            "queries_limit": user.queries_limit,
+                            "queries_remaining": -1 if user.queries_limit == -1 else max(0, user.queries_limit - user.queries_used_today)
+                        }
+                        logger.info(f"[USAGE] User {user.telegram_user_id}: {user.queries_used_today}/{user.queries_limit}")
+            except Exception as e:
+                logger.warning(f"[USAGE] Failed to increment: {e}")
 
         logger.info("[COMPLETE] Response sent successfully")
         logger.info("="*60)
