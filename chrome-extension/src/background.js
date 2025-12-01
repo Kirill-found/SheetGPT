@@ -132,17 +132,44 @@ async function handleGetSheetData(tabId, tabUrl) {
   }
 
   try {
-    // v7.5.6 FIX: Определяем активный лист пользователя
-    console.log('[Background] 🎯 Getting ACTIVE sheet name...');
-    const activeSheetName = await withTimeout(
+    // v9.2.1: Get all sheet names from API first (more reliable than DOM scraping)
+    console.log('[Background] 📋 Getting all sheet names from API...');
+    const allSheetNames = await withTimeout(
+      getAllSheetNames(spreadsheetId),
+      5000,
+      'Get all sheet names'
+    );
+    console.log('[Background] Available sheets:', allSheetNames);
+
+    // Get active sheet name from DOM
+    console.log('[Background] 🎯 Getting ACTIVE sheet name from DOM...');
+    const domSheetName = await withTimeout(
       getActiveSheetName(tabId),
       5000,
       'Get active sheet name'
     );
+    console.log(`[Background] DOM sheet name: "${domSheetName}"`);
+
+    // Find matching sheet name from API (exact or partial match)
+    let activeSheetName = allSheetNames.find(s => s === domSheetName);
+    if (!activeSheetName) {
+      // Try case-insensitive match
+      activeSheetName = allSheetNames.find(s => s.toLowerCase() === domSheetName.toLowerCase());
+    }
+    if (!activeSheetName) {
+      // Try partial match
+      activeSheetName = allSheetNames.find(s => s.includes(domSheetName) || domSheetName.includes(s));
+    }
+    if (!activeSheetName && allSheetNames.length > 0) {
+      // Fallback to first sheet
+      activeSheetName = allSheetNames[0];
+      console.log(`[Background] ⚠️ Using fallback sheet: "${activeSheetName}"`);
+    }
+    
     console.log(`[Background] ✅ Active sheet: "${activeSheetName}"`);
 
-    // Читаем данные ТОЛЬКО из активного листа
-    console.log(`[Background] 📖 Reading data from ACTIVE sheet: "${activeSheetName}"...`);
+    // Читаем данные из активного листа
+    console.log(`[Background] 📖 Reading data from sheet: "${activeSheetName}"...`);
     const data = await withTimeout(
       readSheetData(spreadsheetId, activeSheetName),
       8000,
