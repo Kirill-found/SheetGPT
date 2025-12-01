@@ -2618,7 +2618,11 @@ for col, val in min_row.items():
             # Validate code safety
             is_safe, safety_error = self._validate_code_safety(code)
             if not is_safe:
-                previous_error = f"Небезопасный код: {safety_error}"
+                # Give more specific hint for syntax errors
+                if "unterminated string" in safety_error.lower() or "string literal" in safety_error.lower():
+                    previous_error = f"SYNTAX ERROR: {safety_error}. DO NOT use triple quotes! Use: explanation = 'text' + 'more text'"
+                else:
+                    previous_error = f"Небезопасный код: {safety_error}"
                 continue
 
             # Execute code
