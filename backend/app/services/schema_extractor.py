@@ -31,6 +31,17 @@ class SchemaExtractor:
     MAX_UNIQUE_VALUES = 10  # Макс. уникальных значений для категории
     MAX_SAMPLE_VALUES = 5   # Макс. примеров значений
 
+    # v9.2.1: Patterns for phone/ID columns that should NOT be treated as numbers
+    ID_PHONE_PATTERNS = [
+        'телефон', 'phone', 'тел', 'mobile', 'моб', 'сотовый',
+        'id', 'код', 'code', 'артикул', 'sku', 'article',
+        'инн', 'огрн', 'кпп', 'снилс', 'паспорт', 'passport',
+        'индекс', 'zip', 'postal',
+        'номер', 'number', 'num', '№',
+        'счет', 'счёт', 'account', 'card', 'карт',
+        'серия', 'series',
+    ]
+
     def extract_schema(self, df: pd.DataFrame) -> Dict[str, Any]:
         """
         Извлекает полную схему DataFrame.
@@ -82,6 +93,13 @@ class SchemaExtractor:
             "null_count": int(series.isna().sum())
         }
 
+        # v9.2.1: Check if column is phone/ID FIRST (before type detection)
+        if self._is_phone_or_id_column(column):
+            col_schema["type"] = "text_id"  # Special type - DO NOT use in calculations
+            col_schema["is_phone_or_id"] = True
+            col_schema.update(self._extract_text_stats(series))
+            return col_schema
+
         # Определяем тип данных
         col_type = self._detect_column_type(series)
         col_schema["type"] = col_type
@@ -99,6 +117,14 @@ class SchemaExtractor:
             col_schema.update(self._extract_text_stats(series))
 
         return col_schema
+
+    def _is_phone_or_id_column(self, column_name: str) -> bool:
+        """Check if column should be treated as text-only (phone, ID, code, etc.)."""
+        col_lower = column_name.lower()
+        for pattern in self.ID_PHONE_PATTERNS:
+            if pattern in col_lower:
+                return True
+        return False
 
     def _detect_column_type(self, series: pd.Series) -> str:
         """
@@ -285,6 +311,10 @@ class SchemaExtractor:
         """Форматирует одну колонку для промпта."""
         name = col["name"]
         col_type = col["type"]
+
+        # v9.2.1: Special handling for phone/ID columns
+        if col_type == "text_id":
+            return f'"{name}" (⚠️ ТЕКСТ-ID, НЕ ЧИСЛОВАЯ КОЛОНКА! Не использовать в вычислениях!)'
 
         if col_type == "numeric":
             if col.get("is_integer"):
