@@ -2699,7 +2699,7 @@ for col, val in min_row.items():
         """v9.3.2: Convert triple quotes to regular strings."""
         import re
         def conv(m):
-            s = m.group(1)
+            s = m.group(1) or ''
             s = s.replace(chr(92), chr(92)+chr(92))
             s = s.replace(chr(10), chr(92)+'n')
             s = s.replace(chr(34), chr(92)+chr(34))
