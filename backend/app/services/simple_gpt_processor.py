@@ -2699,12 +2699,21 @@ for col, val in min_row.items():
             return "OK"  # Default to OK if validation fails
 
     def _fix_code_syntax(self, code: str) -> str:
-        """v9.3.3: Aggressive triple quote removal."""
-        # Replace ALL triple quotes with single quotes
-        triple_double = chr(34) * 3  # """
-        triple_single = chr(39) * 3  # '''
-        code = code.replace(triple_double, chr(34))
-        code = code.replace(triple_single, chr(39))
+        """v9.3.4: Convert multiline strings to escaped single-line."""
+        import re
+        def fix_ml(m):
+            s = m.group(1)
+            s = s.replace(chr(92), chr(92)+chr(92))
+            s = s.replace(chr(10), chr(92)+'n')
+            s = s.replace(chr(13), '')
+            s = s.replace(chr(34), chr(92)+chr(34))
+            return chr(34) + s + chr(34)
+        tq_d = chr(34)*3
+        tq_s = chr(39)*3
+        code = re.sub(tq_d + '(.*?)' + tq_d, fix_ml, code, flags=re.DOTALL)
+        code = re.sub(tq_s + '(.*?)' + tq_s, fix_ml, code, flags=re.DOTALL)
+        if tq_d in code: code = code.replace(tq_d, chr(34))
+        if tq_s in code: code = code.replace(tq_s, chr(39))
         return code
 
     def _validate_code_safety(self, code: str) -> tuple:
