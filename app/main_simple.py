@@ -52,6 +52,35 @@ def start_telegram_bot():
         logger.error(f"Failed to start Telegram bot: {e}")
 
 
+
+
+def start_admin_bot():
+    """Запуск Admin бота в отдельном потоке"""
+    try:
+        from app.admin_bot import SheetGPTAdminBot
+
+        admin_token = "8472527828:AAHXB30EtficnooQnNsOLrJqhoE6yotSZaE"
+        main_token = settings.TELEGRAM_BOT_TOKEN
+        database_url = settings.DATABASE_URL
+
+        if not main_token:
+            logger.warning("Main bot token not set - admin bot disabled")
+            return
+
+        if not database_url:
+            logger.warning("DATABASE_URL not set - admin bot disabled")
+            return
+
+        logger.info("Starting Admin bot...")
+        bot = SheetGPTAdminBot(
+            token=admin_token,
+            main_bot_token=main_token,
+            database_url=database_url
+        )
+        bot.run()
+    except Exception as e:
+        logger.error(f"Failed to start Admin bot: {e}")
+
 @app.on_event("startup")
 async def startup_event():
     """Инициализация при запуске"""
@@ -66,6 +95,12 @@ async def startup_event():
         print("Telegram bot started in background thread")
     else:
         print("Telegram bot disabled (no token)")
+    # Запускаем Admin бота в отдельном потоке
+    if settings.TELEGRAM_BOT_TOKEN and settings.DATABASE_URL:
+        admin_thread = threading.Thread(target=start_admin_bot, daemon=True)
+        admin_thread.start()
+        print("Admin bot started in background thread")
+
 
 
 @app.get("/", tags=["root"])
