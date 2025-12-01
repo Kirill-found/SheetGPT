@@ -2696,26 +2696,12 @@ for col, val in min_row.items():
             return "OK"  # Default to OK if validation fails
 
     def _fix_code_syntax(self, code: str) -> str:
-        """v9.3.2: Convert triple quotes to regular strings."""
-        import re
-        def conv(m):
-            s = m.group(1) or ''
-            s = s.replace(chr(92), chr(92)+chr(92))
-            s = s.replace(chr(10), chr(92)+'n')
-            s = s.replace(chr(34), chr(92)+chr(34))
-            return chr(34) + s + chr(34)
-        # Replace closed triple quotes
-        code = re.sub(r'"""(.*?)"""', conv, code, flags=re.DOTALL)
-        code = re.sub(r"'"+"''"+"(.*?)"+chr(39)+chr(39)+chr(39), conv, code, flags=re.DOTALL)
-        # Close unclosed ones
-        triple_d = chr(34)*3
-        triple_s = chr(39)*3
-        if code.count(triple_d) % 2 == 1:
-            code += triple_d
-            print("[SimpleGPT] Fixed: closed triple-double quotes")
-        if code.count(triple_s) % 2 == 1:
-            code += triple_s
-            print("[SimpleGPT] Fixed: closed triple-single quotes")
+        """v9.3.3: Aggressive triple quote removal."""
+        # Replace ALL triple quotes with single quotes
+        triple_double = chr(34) * 3  # """
+        triple_single = chr(39) * 3  # '''
+        code = code.replace(triple_double, chr(34))
+        code = code.replace(triple_single, chr(39))
         return code
 
     def _validate_code_safety(self, code: str) -> tuple:
