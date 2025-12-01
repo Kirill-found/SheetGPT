@@ -291,9 +291,11 @@ async def process_formula(
 
 
         # v10.0.1: Handle processing errors gracefully (don't throw 422)
-        if not result.get("success", True):
+        # v9.1.1: Errors do NOT count towards usage limit
+        is_error = not result.get("success", True) or result.get("response_type") == "error"
+        if is_error:
             error_msg = result.get("error", "Не удалось обработать запрос")
-            logger.warning(f"[PROCESSOR ERROR] {error_msg}")
+            logger.warning(f"[PROCESSOR ERROR] {error_msg} - NOT counting towards usage")
             # Return a friendly error response instead of 422
             return {
                 "formula": None,
@@ -310,7 +312,8 @@ async def process_formula(
                 "parameters": None,
                 "error": error_msg,
                 "processing_time": result.get("processing_time", "0s"),
-                "processor_version": "10.0.1"
+                "processor_version": "10.0.1",
+                "_error_not_counted": True
             }
 
         logger.info(f"[SUCCESS] SimpleGPT processing completed")
