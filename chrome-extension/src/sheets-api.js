@@ -6,6 +6,29 @@
 const SHEETS_API_BASE = 'https://sheets.googleapis.com/v4/spreadsheets';
 
 /**
+ * v9.2.2: Sanitize values to prevent phone numbers being interpreted as formulas
+ * Phone numbers like +7-901-111-1111 get calculated as 7-901-111-1111 = -2116
+ * Prefix with apostrophe to force text interpretation
+ */
+function sanitizeValuesForSheets(data) {
+  if (!Array.isArray(data)) return data;
+
+  // Pattern for phone-like values that start with + and contain digits/dashes
+  const phonePattern = /^\+[\d\s\-\(\)]+$/;
+
+  return data.map(row => {
+    if (!Array.isArray(row)) return row;
+    return row.map(cell => {
+      if (typeof cell === 'string' && phonePattern.test(cell.trim())) {
+        console.log('[SheetsAPI] 📞 Sanitizing phone value:', cell);
+        return "'" + cell;  // Prefix with apostrophe to force text
+      }
+      return cell;
+    });
+  });
+}
+
+/**
  * Get OAuth token for Google Sheets API
  * v7.9.4: Added token refresh and better error handling
  */
@@ -225,7 +248,7 @@ async function writeSheetData(spreadsheetId, sheetName, data, startCell = 'A1') 
         },
         body: JSON.stringify({
           range: range,
-          values: data
+          values: sanitizeValuesForSheets(data)  // v9.2.2: Sanitize phone numbers
         })
       }
     );
@@ -262,7 +285,7 @@ async function appendSheetData(spreadsheetId, sheetName, data) {
         },
         body: JSON.stringify({
           range: range,
-          values: data
+          values: sanitizeValuesForSheets(data)  // v9.2.2: Sanitize phone numbers
         })
       }
     );
