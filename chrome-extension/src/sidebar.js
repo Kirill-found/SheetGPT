@@ -102,16 +102,32 @@ function parseResponseContent(text) {
 
   for (const line of lines) {
     const trimmed = line.trim();
-    // Check if metric (contains : and number)
-    const metricMatch = trimmed.match(/^([^:]+):\s*([0-9.,\s]+(?:руб|₽|%|шт)?\.?)\s*(?:\(([^)]+)\))?/i);
-    if (metricMatch) {
-      result.metrics.push({
-        label: metricMatch[1].trim(),
-        value: metricMatch[2].trim(),
-        subtext: metricMatch[3] ? metricMatch[3].trim() : null
-      });
-    } else if (trimmed.length > 0) {
+    // Skip section headers (lines ending with : alone)
+    if (trimmed.endsWith(':') && trimmed.length < 50) {
       result.items.push(trimmed);
+      continue;
+    }
+    // Check if numeric metric (contains : and number)
+    const numericMatch = trimmed.match(/^([^:]+):\s*([0-9.,\s]+(?:руб|₽|%|шт)?\.?)\s*(?:\(([^)]+)\))?/i);
+    if (numericMatch) {
+      result.metrics.push({
+        label: numericMatch[1].trim(),
+        value: numericMatch[2].trim(),
+        subtext: numericMatch[3] ? numericMatch[3].trim() : null
+      });
+    }
+    // v9.2.2: Also match text key-value pairs like "Лидер: Иванов"
+    else {
+      const textMatch = trimmed.match(/^([^:]{2,25}):\s+(.+)$/);
+      if (textMatch && !trimmed.includes('http')) {
+        result.metrics.push({
+          label: textMatch[1].trim(),
+          value: textMatch[2].trim(),
+          subtext: null
+        });
+      } else if (trimmed.length > 0) {
+        result.items.push(trimmed);
+      }
     }
   }
 
