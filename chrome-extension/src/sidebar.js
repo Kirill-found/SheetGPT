@@ -566,8 +566,11 @@ async function checkAuthentication() {
           }
 
           // Sync usage from server
+          console.log('[Auth] Server response:', JSON.stringify(data));
+          console.log('[Auth] queries_used_today from server:', data.queries_used_today);
           if (data.queries_used_today !== undefined) {
             state.usageCount = data.queries_used_today;
+            console.log('[Auth] Updated usageCount to:', state.usageCount);
           }
           if (data.queries_limit !== undefined && data.queries_limit > 0) {
             state.usageLimit = data.queries_limit;
@@ -1398,7 +1401,12 @@ async function callAPI(query, sheetData, history = []) {
         method: 'POST',
         headers: (() => {
         const h = { 'Content-Type': 'application/json', 'Accept': 'application/json' };
-        if (state.licenseKey) h['X-License-Key'] = state.licenseKey;
+        if (state.licenseKey) {
+          h['X-License-Key'] = state.licenseKey;
+          console.log('[API] Sending X-License-Key:', state.licenseKey);
+        } else {
+          console.warn('[API] No license key available!');
+        }
         return h;
       })(),
         body: JSON.stringify(payload)
@@ -1418,8 +1426,12 @@ async function callAPI(query, sheetData, history = []) {
       // Transform API response to UI format
       // v9.3.1: Preserve _usage for tracking
       const transformed = transformAPIResponse(result);
+      console.log('[API] Raw result._usage:', result._usage);
       if (result._usage) {
         transformed._usage = result._usage;
+        console.log('[API] _usage attached to response');
+      } else {
+        console.warn('[API] No _usage in response - server may not be tracking!');
       }
       return transformed;
 
