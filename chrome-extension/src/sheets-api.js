@@ -159,7 +159,9 @@ async function getAllSheetNames(spreadsheetId) {
 async function readSheetData(spreadsheetId, sheetName, range = 'A1:Z500', _retryCount = 0) {
   try {
     const token = await getAuthToken(_retryCount > 0); // Force refresh on retry
-    const fullRange = `${sheetName}!${range}`;
+    // v9.2.0: Wrap sheet name in quotes for special characters (Cyrillic, spaces, etc.)
+    const quotedSheetName = `'${sheetName.replace(/'/g, "''")}'`;
+    const fullRange = `${quotedSheetName}!${range}`;
 
     console.log(`[SheetsAPI] Reading range: ${fullRange}${_retryCount > 0 ? ' (retry #' + _retryCount + ')' : ''}`);
 
