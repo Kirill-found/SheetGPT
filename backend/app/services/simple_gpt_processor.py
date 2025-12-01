@@ -86,61 +86,43 @@ class SimpleGPTProcessor:
 - Каждый пункт на НОВОЙ строке
 - Используй • для списков, цифры для рейтингов
 
-ШАБЛОНЫ explanation (СТРОГО СЛЕДУЙ ФОРМАТУ, БЕЗ ЭМОДЗИ):
+ШАБЛОНЫ explanation (БЕЗ MARKDOWN, БЕЗ ЭМОДЗИ):
 
-1. Для "кто лучший/самый продуктивный" (рейтинг):
-explanation = '''**Самый продуктивный: Иванов**
-Общая сумма: 1,417,500 руб. (14 сделок, ср. чек 101,250 руб.)
+1. Для "кто лучший/самый продуктивный":
+explanation = '''Самый продуктивный: Иванов
+Сумма: 1,417,500 руб.
+Сделок: 14
+Средний чек: 101,250 руб.
 
-**Полный рейтинг:**
-1. Иванов — 1,417,500 руб. (14 сделок)
-2. Петров — 1,106,490 руб. (13 сделок)
-3. Сидорова — 859,000 руб. (12 сделок)
+Рейтинг:
+1. Иванов — 1,417,500 руб.
+2. Петров — 1,106,490 руб.
+3. Сидорова — 859,000 руб.
 
-**Анализ лидера:**
-• Доля от общего: 42%
-• Отрыв от 2-го места: +311,010 руб. (+28%)
-• Средний чек выше среднего на 15%
+Доля от общего: 42%
+Отрыв от 2-го: +311,010 руб.
+Вывод: Иванов лидирует за счёт крупных сделок'''
 
-**Вывод:** Иванов лидирует за счёт крупных сделок'''
+2. Для СРАВНЕНИЯ:
+explanation = '''Сравнение: Январь vs Февраль
 
-2. Для СРАВНЕНИЯ периодов/категорий:
-explanation = '''**Сравнение: Январь vs Февраль**
+Январь: 500,000 руб.
+Февраль: 650,000 руб.
+Рост: +150,000 руб. (+30%)
 
-**Основные показатели:**
-• Январь: 500,000 руб. (25 операций)
-• Февраль: 650,000 руб. (30 операций)
-
-**Динамика:**
-• Рост выручки: +150,000 руб. (+30%)
-• Рост операций: +5 (+20%)
-
-**Вывод:** Февраль показал значительный рост'''
+Вывод: Февраль показал рост'''
 
 3. Для "сколько/какая сумма":
-explanation = '''**Результат: 1,500,000 руб.**
+explanation = '''Результат: 1,500,000 руб.
+Записей: 45 из 50
+Доля от общего: 35%'''
 
-**Расчёт:**
-• Учтено записей: 45 из 50
-• Метод: сумма по колонке "Продажи"
-
-**Контекст:**
-• Это 35% от общей выручки
-• Средний показатель: 33,333 руб.
-
-**Интерпретация:** Хороший результат, выше среднего на 12%'''
-
-ВАЖНО - НЕ ДОПУСКАЙ ОШИБОК:
-НЕПРАВИЛЬНО: "Ивановчек 101,250"
-ПРАВИЛЬНО: "Иванов — чек: 101,250 руб."
-
-НЕПРАВИЛЬНО: "1417500руб.(14сделок)"
-ПРАВИЛЬНО: "1,417,500 руб. (14 сделок)"
-
-НЕПРАВИЛЬНО: Лидер + список без имени
-ПРАВИЛЬНО: **Самый продуктивный: Иванов** — 1,417,500 руб.
-
-НЕ ИСПОЛЬЗУЙ ЭМОДЗИ В ОТВЕТАХ!
+ФОРМАТ (КРИТИЧНО):
+- НЕ используй ** или * (markdown)
+- НЕ используй # для заголовков
+- Формат метрики: "Название: значение"
+- Числа с разделителем тысяч: 1,417,500
+- Пустая строка между блоками
 
 ПЕРВАЯ СТРОКА explanation ВСЕГДА ОТВЕЧАЕТ НА ВОПРОС НАПРЯМУЮ!
 
@@ -161,7 +143,7 @@ for col in df.columns:
 if product_col and sum_col:
     top5 = df.groupby(product_col)[sum_col].sum().sort_values(ascending=False).head(5)
     result = top5.to_dict()
-    explanation = f"**Топ 5 товаров по сумме:**\n\n"
+    explanation = f"Топ 5 товаров по сумме:\n\n"
     for i, (name, val) in enumerate(top5.items(), 1):
         explanation += f"{i}. {name}: {val:,.0f} руб.\n"
     total = top5.sum()
@@ -184,7 +166,7 @@ for col in df.columns:
 if city_col:
     city_counts = df[city_col].value_counts().sort_values(ascending=False)
     result = city_counts.to_dict()
-    explanation = f"**Количество заказов по городам:**\n\n"
+    explanation = f"Количество заказов по городам:\n\n"
     for city, count in city_counts.head(10).items():
         explanation += f"• {city}: {count}\n"
     if len(city_counts) > 10:
@@ -210,7 +192,7 @@ for col in df.columns:
 if manager_col and sum_col:
     sales = df.groupby(manager_col)[sum_col].sum().sort_values(ascending=False)
     result = sales.to_dict()
-    explanation = f"**Продажи по менеджерам:**\n\n"
+    explanation = f"Продажи по менеджерам:\n\n"
     for manager, total in sales.items():
         pct = (total / sales.sum()) * 100
         explanation += f"• {manager}: {total:,.0f} руб. ({pct:.1f}%)\n"
@@ -244,20 +226,21 @@ leader_share = (leader_sum / total) * 100
 
 result = leader
 
-# Формируем ЧЁТКИЙ ответ с правильным форматированием
-explanation = f"**Самый продуктивный: {leader}**\n"
-explanation += f"Общая сумма: {leader_sum:,.0f} руб. ({leader_count:.0f} сделок, ср. чек {leader_avg:,.0f} руб.)\n\n"
-explanation += "**Полный рейтинг:**\n"
+# Формируем ЧЁТКИЙ ответ БЕЗ markdown
+explanation = f"Самый продуктивный: {leader}\n"
+explanation += f"Сумма: {leader_sum:,.0f} руб.\n"
+explanation += f"Сделок: {leader_count:.0f}\n"
+explanation += f"Средний чек: {leader_avg:,.0f} руб.\n\n"
+explanation += "Рейтинг:\n"
 for i, (name, row) in enumerate(sales.head(5).iterrows(), 1):
-    explanation += f"{i}. {name} — {row['sum']:,.0f} руб. ({row['count']:.0f} сделок)\n"
-explanation += f"\n**Анализ лидера:**\n"
-explanation += f"• Доля от общего: {leader_share:.1f}%\n"
+    explanation += f"{i}. {name} — {row['sum']:,.0f} руб.\n"
+explanation += f"\nДоля от общего: {leader_share:.1f}%\n"
 if len(sales) > 1:
     second_sum = sales.iloc[1]['sum']
     gap = leader_sum - second_sum
     gap_pct = (gap / second_sum) * 100
-    explanation += f"• Отрыв от 2-го места: +{gap:,.0f} руб. (+{gap_pct:.0f}%)\n"
-explanation += f"\n**Вывод:** {leader} лидирует по объёму продаж"
+    explanation += f"Отрыв от 2-го: +{gap:,.0f} руб. (+{gap_pct:.0f}%)\n"
+explanation += f"\nВывод: {leader} лидирует по объёму продаж"
 ```
 
 Запрос: "почему?" (после вопроса о продуктивности)
@@ -268,7 +251,7 @@ leader = sales.index[0]
 leader_sum = sales.iloc[0]
 leader_count = counts[leader]
 second = sales.index[1] if len(sales) > 1 else None
-explanation = f"**{leader} лидирует** потому что:
+explanation = f"{leader} лидирует потому что:
 
 "
 explanation += "Ключевые факты:\n"
@@ -288,7 +271,7 @@ ivanov = df[df['Менеджер'].str.contains('Иванов', case=False, na=F
 result = len(ivanov)
 total = ivanov['Сумма'].sum()
 avg = ivanov['Сумма'].mean()
-explanation = f"**{result} продаж**
+explanation = f"Продаж: {result}
 
 "
 explanation += "Детали:\n"
@@ -323,7 +306,7 @@ for col in df.columns:
 product_name = max_row[product_col] if product_col else "N/A"
 
 result = {"max_value": max_value, "product": product_name, "row": max_row.to_dict()}
-explanation = f"**Максимальный заказ: {max_value:,.0f} руб.**\n\n"
+explanation = f"Максимальный заказ: {max_value:,.0f} руб.\n\n"
 explanation += f"Товар: {product_name}\n"
 explanation += f"Детали заказа:\n"
 for col, val in max_row.items():
@@ -358,7 +341,7 @@ for col in df.columns:
 product_name = min_row[product_col] if product_col else "N/A"
 
 result = {"min_value": min_value, "product": product_name, "row": min_row.to_dict()}
-explanation = f"**Минимальный заказ: {min_value:,.0f} руб.**\n\n"
+explanation = f"Минимальный заказ: {min_value:,.0f} руб.\n\n"
 explanation += f"Товар: {product_name}\n"
 explanation += f"Детали заказа:\n"
 for col, val in min_row.items():
@@ -1332,7 +1315,7 @@ for col, val in min_row.items():
                 'rows': rows
             }
             
-            message = f"""**Данные разбиты по ячейкам**
+            message = f"""Данные разбиты по ячейкам
 
 Результат:
 • Колонок: {len(headers)}
