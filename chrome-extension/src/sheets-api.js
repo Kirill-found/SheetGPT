@@ -909,34 +909,55 @@ async function applyColorScale(spreadsheetId, sheetId, rule) {
     console.log(`[SheetsAPI] 🎨 Applying color scale to column ${column_index} (type: ${typeof column_index})`);
     console.log(`[SheetsAPI] Colors: min=${JSON.stringify(min_color)}, mid=${JSON.stringify(mid_color)}, max=${JSON.stringify(max_color)}`);
 
-    // Build the gradient rule request
+    // Build gradient rule with proper color format (alpha required!)
+    const gradientRule = {
+      minpoint: {
+        color: {
+          red: min_color?.red || 0.0,
+          green: min_color?.green || 1.0,
+          blue: min_color?.blue || 0.0,
+          alpha: 1.0
+        },
+        type: 'MIN'
+      },
+      maxpoint: {
+        color: {
+          red: max_color?.red || 1.0,
+          green: max_color?.green || 0.0,
+          blue: max_color?.blue || 0.0,
+          alpha: 1.0
+        },
+        type: 'MAX'
+      }
+    };
+
+    // Add midpoint if provided
+    if (mid_color) {
+      gradientRule.midpoint = {
+        color: {
+          red: mid_color.red,
+          green: mid_color.green,
+          blue: mid_color.blue,
+          alpha: 1.0
+        },
+        type: 'PERCENTILE',
+        value: '50'
+      };
+    }
+
     const request = {
       addConditionalFormatRule: {
         rule: {
           ranges: [{
             sheetId: sheetId,
-            startRowIndex: 1, // Skip header row
-            endRowIndex: (row_count || 1000) + 1, // Data rows + header offset
+            startRowIndex: 1,
+            endRowIndex: (row_count || 1000) + 1,
             startColumnIndex: column_index,
             endColumnIndex: column_index + 1
           }],
-          gradientRule: {
-            minpoint: {
-              color: min_color || { red: 0.8, green: 0.92, blue: 0.8 }, // Light green
-              type: 'MIN'
-            },
-            midpoint: {
-              color: mid_color || { red: 1, green: 0.95, blue: 0.8 }, // Light yellow
-              type: 'PERCENTILE',
-              value: '50'
-            },
-            maxpoint: {
-              color: max_color || { red: 0.96, green: 0.8, blue: 0.8 }, // Light red
-              type: 'MAX'
-            }
-          }
+          gradientRule: gradientRule
         },
-        index: 0 // Insert at the beginning of the conditional format rules
+        index: 0
       }
     };
 
