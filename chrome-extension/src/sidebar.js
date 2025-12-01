@@ -1416,7 +1416,12 @@ async function callAPI(query, sheetData, history = []) {
       console.log('[API] Response data:', result);
 
       // Transform API response to UI format
-      return transformAPIResponse(result);
+      // v9.3.1: Preserve _usage for tracking
+      const transformed = transformAPIResponse(result);
+      if (result._usage) {
+        transformed._usage = result._usage;
+      }
+      return transformed;
 
     } catch (error) {
       console.error('[API] Attempt', attempt + 1, 'failed:', error);
