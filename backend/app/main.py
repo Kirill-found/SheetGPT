@@ -263,7 +263,29 @@ async def process_formula(
 
         # v9.0.0: Schema-aware processing handles type conversion automatically
         # Auto-convert numeric columns (Google Sheets returns everything as strings)
+        # v9.2.1: Skip columns that should stay as text (phones, IDs, codes, etc.)
+        SKIP_CONVERT_PATTERNS = [
+            'телефон', 'phone', 'тел', 'mobile', 'моб',
+            'id', 'код', 'code', 'артикул', 'sku', 'article',
+            'инн', 'огрн', 'кпп', 'снилс', 'паспорт', 'passport',
+            'индекс', 'zip', 'postal',
+            'номер', 'number', 'num', '№',
+            'счет', 'счёт', 'account', 'card', 'карт',
+            'серия', 'series',
+        ]
+        
+        def should_skip_convert(col_name: str) -> bool:
+            """Check if column should NOT be converted to numeric."""
+            col_lower = col_name.lower()
+            for pattern in SKIP_CONVERT_PATTERNS:
+                if pattern in col_lower:
+                    return True
+            return False
+        
         for col in df.columns:
+            if should_skip_convert(col):
+                logger.info(f"[AUTO-CONVERT] ⏭️ '{col}' → skipped (looks like ID/phone/code)")
+                continue
             converted = pd.to_numeric(df[col], errors='coerce')
             if converted.notna().sum() > len(df) * 0.5:
                 df[col] = converted
@@ -286,8 +308,11 @@ async def process_formula(
             
             reference_df = pd.DataFrame(ref_padded_data, columns=request.reference_sheet_headers)
             
-            # Auto-convert numeric columns in reference
+            # Auto-convert numeric columns in reference (skip phones, IDs, etc.)
             for col in reference_df.columns:
+                if should_skip_convert(col):
+                    logger.info(f"[AUTO-CONVERT] ⏭️ ref:'{col}' → skipped")
+                    continue
                 converted = pd.to_numeric(reference_df[col], errors='coerce')
                 if converted.notna().sum() > len(reference_df) * 0.5:
                     reference_df[col] = converted
