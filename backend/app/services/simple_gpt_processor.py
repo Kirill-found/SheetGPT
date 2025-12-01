@@ -249,9 +249,7 @@ leader = sales.index[0]
 leader_sum = sales.iloc[0]
 leader_count = counts[leader]
 second = sales.index[1] if len(sales) > 1 else None
-explanation = f"{leader} лидирует потому что:
-
-"
+explanation = f"{leader} лидирует потому что:\n\n"
 explanation += "Ключевые факты:\n"
 explanation += f"• Общая сумма продаж: {leader_sum:,.0f} руб.\n"
 explanation += f"• Количество сделок: {leader_count}\n"
@@ -269,13 +267,10 @@ ivanov = df[df['Менеджер'].str.contains('Иванов', case=False, na=F
 result = len(ivanov)
 total = ivanov['Сумма'].sum()
 avg = ivanov['Сумма'].mean()
-explanation = f"Продаж: {result}
-
-"
+explanation = f"Продаж: {result}\n\n"
 explanation += "Детали:\n"
 explanation += f"• Общая сумма: {total:,.0f} руб.\n"
-explanation += f"• Средний чек: {avg:,.0f} руб.
-"
+explanation += f"• Средний чек: {avg:,.0f} руб.\n"
 ```
 
 Запрос: "Максимальный заказ" или "Какой самый крупный заказ"
@@ -309,8 +304,7 @@ explanation += f"Товар: {product_name}\n"
 explanation += f"Детали заказа:\n"
 for col, val in max_row.items():
     if pd.notna(val) and str(val).strip():
-        explanation += f"• {col}: {val}
-"
+        explanation += f"• {col}: {val}\n"
 ```
 
 Запрос: "Минимальный заказ" или "Какой самый маленький заказ"
@@ -344,8 +338,7 @@ explanation += f"Товар: {product_name}\n"
 explanation += f"Детали заказа:\n"
 for col, val in min_row.items():
     if pd.notna(val) and str(val).strip():
-        explanation += f"• {col}: {val}
-"
+        explanation += f"• {col}: {val}\n"
 ```
 
 Возвращай ТОЛЬКО код внутри ```python ... ```
@@ -2699,27 +2692,78 @@ for col, val in min_row.items():
             return "OK"  # Default to OK if validation fails
 
     def _fix_code_syntax(self, code: str) -> str:
+        """Fix syntax issues: triple quotes and regular strings with embedded newlines."""
         import re
-        tq_d = chr(34)*3
-        tq_s = chr(39)*3
+
+        logger.debug(f"[FIX_SYNTAX] Input code length: {len(code)}")
+
+        # Step 1: Fix closed triple quotes - replace with single quotes + escaped content
+        tq_d = chr(34)*3  # triple double quote
+        tq_s = chr(39)*3  # triple single quote
+
         def fix_closed(m):
             s = m.group(1)
-            s = s.replace(chr(92), chr(92)+chr(92))
-            s = s.replace(chr(10), chr(92)+chr(110))
-            s = s.replace(chr(13), chr(32))
-            s = s.replace(chr(34), chr(92)+chr(34))
+            s = s.replace(chr(92), chr(92)+chr(92))  # backslash -> double backslash
+            s = s.replace(chr(10), chr(92)+chr(110))  # newline -> backslash-n
+            s = s.replace(chr(13), chr(32))  # carriage return -> space
+            s = s.replace(chr(34), chr(92)+chr(34))  # double quote -> escaped
             return chr(34) + s + chr(34)
-        code = re.sub(tq_d + chr(40)+chr(46)+chr(42)+chr(63)+chr(41) + tq_d, fix_closed, code, flags=re.DOTALL)
-        code = re.sub(tq_s + chr(40)+chr(46)+chr(42)+chr(63)+chr(41) + tq_s, fix_closed, code, flags=re.DOTALL)
+
+        # Match closed triple quotes and replace
+        code = re.sub(tq_d + r'(.*?)' + tq_d, fix_closed, code, flags=re.DOTALL)
+        code = re.sub(tq_s + r'(.*?)' + tq_s, fix_closed, code, flags=re.DOTALL)
+
+        # Step 2: Handle unclosed triple quotes - remove to end of line
         while tq_d in code:
             i = code.find(tq_d)
             j = code.find(chr(10), i)
-            code = code[:i] + chr(34)+chr(34) + (code[j:] if j>0 else chr(32))
+            code = code[:i] + chr(34)+chr(34) + (code[j:] if j > 0 else chr(32))
         while tq_s in code:
             i = code.find(tq_s)
             j = code.find(chr(10), i)
-            code = code[:i] + chr(39)+chr(39) + (code[j:] if j>0 else chr(32))
-        return code
+            code = code[:i] + chr(39)+chr(39) + (code[j:] if j > 0 else chr(32))
+
+        # Step 3: Fix regular strings with embedded newlines
+        lines = code.split(chr(10))
+        fixed_lines = []
+        pending_line = None
+        pending_quote = None
+
+        for line in lines:
+            if pending_line is not None:
+                if pending_quote in line:
+                    close_idx = line.find(pending_quote)
+                    merged = pending_line + chr(92) + chr(110) + line[:close_idx].replace(pending_quote, chr(92)+pending_quote) + pending_quote + line[close_idx+1:]
+                    fixed_lines.append(merged)
+                    pending_line = None
+                    pending_quote = None
+                else:
+                    pending_line = pending_line + chr(92) + chr(110) + line.replace(chr(92), chr(92)+chr(92))
+            else:
+                temp = line.replace(chr(92)+chr(34), chr(88)+chr(88)).replace(chr(92)+chr(39), chr(88)+chr(88))
+                dq_count = temp.count(chr(34))
+                sq_count = temp.count(chr(39))
+                eq_f_dq = chr(61)+chr(32)+chr(102)+chr(34)
+                eq_dq = chr(61)+chr(32)+chr(34)
+                eq_fdq = chr(61)+chr(102)+chr(34)
+                eq_f_sq = chr(61)+chr(32)+chr(102)+chr(39)
+                eq_sq = chr(61)+chr(32)+chr(39)
+                eq_fsq = chr(61)+chr(102)+chr(39)
+                if dq_count % 2 == 1 and (eq_f_dq in line or eq_dq in line or eq_fdq in line):
+                    pending_line = line
+                    pending_quote = chr(34)
+                elif sq_count % 2 == 1 and (eq_f_sq in line or eq_sq in line or eq_fsq in line):
+                    pending_line = line
+                    pending_quote = chr(39)
+                else:
+                    fixed_lines.append(line)
+
+        if pending_line is not None:
+            fixed_lines.append(pending_line + pending_quote)
+
+        result = chr(10).join(fixed_lines)
+        logger.debug(f"[FIX_SYNTAX] Output code length: {len(result)}")
+        return result
 
     def _validate_code_safety(self, code: str) -> tuple:
         """Проверяет безопасность кода."""
