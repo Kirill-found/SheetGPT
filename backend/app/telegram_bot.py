@@ -286,7 +286,8 @@ SheetGPT работает как расширение для Google Chrome, ко
                             telegram_user_id=user_id,
                             username=user.username,
                             first_name=user.first_name,
-                            license_key=license_key
+                            license_key=license_key,
+                            api_token=TelegramUser.generate_api_token()
                         )
                         session.add(db_user)
 
