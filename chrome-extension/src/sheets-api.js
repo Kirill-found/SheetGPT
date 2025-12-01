@@ -215,7 +215,7 @@ async function writeSheetData(spreadsheetId, sheetName, data, startCell = 'A1') 
     const range = `${sheetName}!${startCell}`;
 
     const response = await fetch(
-      `${SHEETS_API_BASE}/${spreadsheetId}/values/${encodeURIComponent(range)}?valueInputOption=RAW`,
+      `${SHEETS_API_BASE}/${spreadsheetId}/values/${encodeURIComponent(range)}?valueInputOption=USER_ENTERED`,
       {
         method: 'PUT',
         headers: {
@@ -252,7 +252,7 @@ async function appendSheetData(spreadsheetId, sheetName, data) {
     const range = `${sheetName}!A1`;
 
     const response = await fetch(
-      `${SHEETS_API_BASE}/${spreadsheetId}/values/${encodeURIComponent(range)}:append?valueInputOption=RAW`,
+      `${SHEETS_API_BASE}/${spreadsheetId}/values/${encodeURIComponent(range)}:append?valueInputOption=USER_ENTERED`,
       {
         method: 'POST',
         headers: {
@@ -1104,7 +1104,7 @@ async function convertColumnToNumbers(spreadsheetId, sheetName, columnIndex, row
 
     // Write back as numbers
     const writeResponse = await fetch(
-      `${SHEETS_API_BASE}/${spreadsheetId}/values/${encodeURIComponent(range)}?valueInputOption=RAW`,
+      `${SHEETS_API_BASE}/${spreadsheetId}/values/${encodeURIComponent(range)}?valueInputOption=USER_ENTERED`,
       {
         method: 'PUT',
         headers: {
