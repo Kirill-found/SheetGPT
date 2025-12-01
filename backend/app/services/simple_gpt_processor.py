@@ -2261,7 +2261,9 @@ for col, val in min_row.items():
         df: pd.DataFrame,
         column_names: List[str],
         custom_context: Optional[str] = None,
-        history: List[Dict[str, Any]] = None
+        history: List[Dict[str, Any]] = None,
+        reference_df: pd.DataFrame = None,
+        reference_sheet_name: Optional[str] = None
     ) -> Dict[str, Any]:
         """
         Главный метод обработки запроса.
@@ -2501,6 +2503,23 @@ for col, val in min_row.items():
             schema = self.schema_extractor.extract_schema(df)
             schema_prompt = self.schema_extractor.schema_to_prompt(schema)
             logger.info(f"[SimpleGPT] Schema: {schema['column_count']} cols, {schema['row_count']} rows")
+            
+            # v9.2.0: Add reference sheet schema if provided
+            if reference_df is not None:
+                ref_schema = self.schema_extractor.extract_schema(reference_df)
+                ref_prompt = self.schema_extractor.schema_to_prompt(ref_schema)
+                ref_name = reference_sheet_name or "reference_df"
+                schema_prompt += f"""
+
+ДОПОЛНИТЕЛЬНЫЙ СПРАВОЧНИК (reference_df) - лист "{ref_name}":
+{ref_prompt}
+
+ВАЖНО для VLOOKUP:
+- Основные данные в `df`, справочные в `reference_df`
+- Для поиска используй: df.merge(reference_df, left_on='колонка_df', right_on='колонка_ref', how='left')
+- Или: reference_df[reference_df['ключ'] == искомое_значение]['результат'].values[0]
+"""
+                logger.info(f"[SimpleGPT] Reference sheet added: {ref_name}, {ref_schema['row_count']} rows")
 
             # 2. Generate and execute code (with retries)
             result = await self._generate_and_execute(
@@ -2508,7 +2527,8 @@ for col, val in min_row.items():
                 df=df,
                 schema_prompt=schema_prompt,
                 custom_context=custom_context,
-                history=history
+                history=history,
+                reference_df=reference_df
             )
 
             if not result["success"]:
@@ -2526,7 +2546,8 @@ for col, val in min_row.items():
                     schema_prompt=schema_prompt,
                     custom_context=custom_context,
                     history=history,
-                    clarification="Предыдущий результат не соответствовал запросу. Убедись что возвращаешь правильный тип данных: список для 'какие', число для 'сколько', DataFrame для 'покажи'."
+                    clarification="Предыдущий результат не соответствовал запросу. Убедись что возвращаешь правильный тип данных: список для 'какие', число для 'сколько', DataFrame для 'покажи'.",
+                    reference_df=reference_df
                 )
 
             # 4. Format response
@@ -2597,7 +2618,8 @@ for col, val in min_row.items():
         custom_context: Optional[str] = None,
         history: List[Dict[str, Any]] = None,
         clarification: Optional[str] = None,
-        previous_error: Optional[str] = None
+        previous_error: Optional[str] = None,
+        reference_df: pd.DataFrame = None
     ) -> Dict[str, Any]:
         """Генерирует и выполняет код с retry."""
 
@@ -2627,7 +2649,7 @@ for col, val in min_row.items():
 
             # Execute code
             try:
-                exec_result = self._execute_code(code, df)
+                exec_result = self._execute_code(code, df, reference_df)
                 return {"success": True, "result": exec_result['result'], "explanation": exec_result.get('explanation', ''), "code": code}
             except Exception as e:
                 previous_error = f"{type(e).__name__}: {str(e)}"
@@ -2772,7 +2794,7 @@ for col, val in min_row.items():
 
         return True, None
 
-    def _execute_code(self, code: str, df: pd.DataFrame) -> dict:
+    def _execute_code(self, code: str, df: pd.DataFrame, reference_df: pd.DataFrame = None) -> dict:
         """Выполняет код в sandbox. Возвращает dict с result и explanation."""
 
         # Create safe namespace
@@ -2787,6 +2809,10 @@ for col, val in min_row.items():
             're': __import__('re'),
             'math': __import__('math'),
         }
+        
+        # v9.2.0: Add reference_df for cross-sheet VLOOKUP
+        if reference_df is not None:
+            namespace['reference_df'] = reference_df.copy()
 
         exec(code, namespace)
 

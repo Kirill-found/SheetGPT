@@ -14,6 +14,11 @@ class FormulaRequest(BaseModel):
     conversation_id: Optional[str] = Field(None, max_length=100, description="ID разговора для поддержки контекстных запросов")
     custom_context: Optional[str] = Field(None, max_length=2000, description="Персонализированная роль AI (например, 'Ты финансовый директор...')")
 
+    # v9.2.0: Cross-sheet VLOOKUP support
+    reference_sheet_name: Optional[str] = Field(None, max_length=100, description="Имя листа-источника для VLOOKUP")
+    reference_sheet_headers: Optional[List[str]] = Field(None, description="Заголовки референсного листа")
+    reference_sheet_data: Optional[List[List[Any]]] = Field(None, description="Данные референсного листа")
+
     @field_validator('query')
     @classmethod
     def validate_query(cls, v: str) -> str:

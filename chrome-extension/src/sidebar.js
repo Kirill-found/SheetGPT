@@ -48,6 +48,50 @@ function cleanResponseText(text) {
   return cleaned;
 }
 
+// ============================================
+// CROSS-SHEET VLOOKUP SUPPORT (v9.2.0)
+// ============================================
+
+function detectCrossSheetQuery(query) {
+  const lowerQuery = query.toLowerCase();
+  const patterns = [
+    /(?:из|с|from)\s+(?:листа|sheet|таблицы)\s+["'«]?([^"'»,]+)["'»]?/i,
+    /(?:впр|vlookup)\s+(?:из|from|с)\s+["'«]?([^"'»,]+)["'»]?/i,
+    /(?:по|в|in)\s+(?:листе|листу|sheet)\s+["'«]?([^"'»,]+)["'»]?/i,
+  ];
+  for (const pattern of patterns) {
+    const match = query.match(pattern);
+    if (match && match[1]) {
+      return { sheetName: match[1].trim() };
+    }
+  }
+  const refKeywords = ['прайс', 'справочник', 'каталог', 'price', 'catalog', 'reference'];
+  for (const keyword of refKeywords) {
+    if (lowerQuery.includes(keyword)) {
+      return { sheetName: keyword };
+    }
+  }
+  return null;
+}
+
+async function getReferenceSheetData(sheetNameHint) {
+  return new Promise((resolve, reject) => {
+    chrome.runtime.sendMessage(
+      { action: 'GET_REFERENCE_SHEET_DATA', sheetNameHint: sheetNameHint },
+      (response) => {
+        if (chrome.runtime.lastError) {
+          reject(new Error(chrome.runtime.lastError.message));
+        } else if (response && response.success) {
+          resolve({ name: response.sheetName, headers: response.headers, data: response.data });
+        } else {
+          reject(new Error(response?.error || 'Failed to get reference sheet'));
+        }
+      }
+    );
+  });
+}
+
+
 function parseResponseContent(text) {
   if (!text) return { paragraphs: [], metrics: [], items: [] };
   const cleaned = cleanResponseText(text);
@@ -808,7 +852,26 @@ async function sendMessage() {
       .map(item => ({ query: item.query, response: item.response }))
       .reverse(); // oldest first
 
-    const result = await sendToContentScript('PROCESS_QUERY', { query, history: conversationHistory });
+    // v9.2.0: Detect and handle cross-sheet VLOOKUP
+    let referenceSheet = null;
+    const crossSheetPattern = detectCrossSheetQuery(query);
+    
+    if (crossSheetPattern) {
+      console.log('[Sidebar] Cross-sheet query detected:', crossSheetPattern);
+      try {
+        // Get reference sheet data from background
+        referenceSheet = await getReferenceSheetData(crossSheetPattern.sheetName);
+        console.log('[Sidebar] Reference sheet loaded:', referenceSheet?.name, referenceSheet?.headers?.length, 'cols');
+      } catch (e) {
+        console.warn('[Sidebar] Could not load reference sheet:', e);
+      }
+    }
+    
+    const result = await sendToContentScript('PROCESS_QUERY', { 
+      query, 
+      history: conversationHistory,
+      referenceSheet: referenceSheet
+    });
 
     // Remove loading
     loadingEl.remove();

@@ -481,7 +481,7 @@ window.addEventListener('message', async (event) => {
 
     switch (action) {
       case 'PROCESS_QUERY':
-        result = await processQuery(data.query, data.history, data.licenseKey);
+        result = await processQuery(data.query, data.history, data.licenseKey, data.referenceSheet);
         break;
 
       case 'GET_CUSTOM_CONTEXT':
@@ -596,9 +596,12 @@ const API_URLS = {
 
 // ===== API HANDLERS =====
 
-async function processQuery(query, history = [], licenseKey = null) {
+async function processQuery(query, history = [], licenseKey = null, referenceSheet = null) {
   console.log('[SheetGPT] Processing query:', query);
   console.log('[SheetGPT] API Mode:', API_MODE, '| URL:', API_URLS[API_MODE]);
+  if (referenceSheet) {
+    console.log('[SheetGPT] Reference sheet provided:', referenceSheet.name);
+  }
 
   // v7.9.4: Check context before any operations
   if (!isExtensionContextValid()) {
@@ -640,7 +643,11 @@ async function processQuery(query, history = [], licenseKey = null) {
       column_names: sheetData.headers,
       sheet_data: sheetData.data,
       custom_context: customContext || null,
-      history: history || []
+      history: history || [],
+      // v9.2.0: Cross-sheet VLOOKUP support
+      reference_sheet_name: referenceSheet?.name || null,
+      reference_sheet_headers: referenceSheet?.headers || null,
+      reference_sheet_data: referenceSheet?.data || null
     })
   });
 

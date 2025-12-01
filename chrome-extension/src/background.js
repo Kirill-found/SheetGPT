@@ -80,6 +80,11 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           result = await handleConvertToNumbers(sender.tab.id, sender.tab.url, data);
           break;
 
+        case 'GET_REFERENCE_SHEET_DATA':
+          console.log('[Background] 📋 GET_REFERENCE_SHEET_DATA received:', message.sheetNameHint);
+          result = await handleGetReferenceSheetData(sender.tab?.id, sender.tab?.url, message.sheetNameHint);
+          break;
+
         case 'CHECK_AUTH':
           result = await checkAuth();
           break;

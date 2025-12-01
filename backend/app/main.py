@@ -269,6 +269,29 @@ async def process_formula(
                 df[col] = converted
                 logger.info(f"[AUTO-CONVERT] ✅ '{col}' → numeric")
 
+        # v9.2.0: Create reference DataFrame for cross-sheet VLOOKUP
+        reference_df = None
+        if request.reference_sheet_data and request.reference_sheet_headers:
+            logger.info(f"[VLOOKUP] Reference sheet: {request.reference_sheet_name}")
+            logger.info(f"[VLOOKUP] Reference headers: {request.reference_sheet_headers}")
+            logger.info(f"[VLOOKUP] Reference rows: {len(request.reference_sheet_data)}")
+            
+            # Pad reference data rows
+            ref_num_cols = len(request.reference_sheet_headers)
+            ref_padded_data = []
+            for row in request.reference_sheet_data:
+                if len(row) < ref_num_cols:
+                    row = list(row) + [None] * (ref_num_cols - len(row))
+                ref_padded_data.append(row[:ref_num_cols])
+            
+            reference_df = pd.DataFrame(ref_padded_data, columns=request.reference_sheet_headers)
+            
+            # Auto-convert numeric columns in reference
+            for col in reference_df.columns:
+                converted = pd.to_numeric(reference_df[col], errors='coerce')
+                if converted.notna().sum() > len(reference_df) * 0.5:
+                    reference_df[col] = converted
+
         # v10.0.0: Use SimpleGPT Processor (no patterns, full GPT)
         processor = get_simple_gpt_processor()
         result = await processor.process(
@@ -276,7 +299,9 @@ async def process_formula(
             df=df,
             column_names=request.column_names,
             custom_context=request.custom_context,
-            history=request.history or []
+            history=request.history or [],
+            reference_df=reference_df,
+            reference_sheet_name=request.reference_sheet_name
         )
 
         # DEBUG: Log full result immediately after processor
