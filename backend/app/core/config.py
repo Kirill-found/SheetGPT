@@ -43,7 +43,7 @@ class Settings(BaseSettings):
 
     # Telegram Bot
     TELEGRAM_BOT_TOKEN: str = ""
-    TELEGRAM_ADMIN_ID: int = 0  # Твой Telegram ID для админских команд
+    TELEGRAM_ADMIN_ID: int = 517682186  # Твой Telegram ID для админских команд
 
     class Config:
         env_file = ".env"

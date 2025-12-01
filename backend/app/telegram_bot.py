@@ -44,7 +44,8 @@ WAITING_REVIEW_RATING, WAITING_REVIEW_TEXT, WAITING_SUPPORT_MESSAGE = range(3)
 # Ссылки (можно вынести в config)
 CHROME_EXTENSION_URL = "https://chrome.google.com/webstore/detail/sheetgpt"  # TODO: заменить на реальную
 INSTALLATION_GUIDE_URL = "https://docs.google.com/document/d/YOUR_DOC_ID"  # TODO: заменить на реальную
-SUPPORT_CHAT_URL = "https://t.me/sheetgpt_support"  # TODO: создать чат поддержки
+# Support - users can write directly to admin via /support command
+ADMIN_TELEGRAM_ID = 517682186  # Kirill - main admin
 
 
 class SheetGPTBot:
@@ -470,7 +471,7 @@ SheetGPT работает как расширение для Google Chrome, ко
 👇 Для оплаты напиши в поддержку:
 """
         keyboard = [
-            [InlineKeyboardButton("💬 Написать в поддержку", url=SUPPORT_CHAT_URL)],
+            [InlineKeyboardButton("💬 Написать в поддержку (/support)", callback_data="support_write")],
             [InlineKeyboardButton("« Назад", callback_data="menu_subscription")]
         ]
         await query.edit_message_text(
@@ -493,7 +494,7 @@ SheetGPT работает как расширение для Google Chrome, ко
 Для отмены напиши в поддержку.
 """
         keyboard = [
-            [InlineKeyboardButton("💬 Написать в поддержку", url=SUPPORT_CHAT_URL)],
+            [InlineKeyboardButton("💬 Написать в поддержку (/support)", callback_data="support_write")],
             [InlineKeyboardButton("« Назад", callback_data="menu_subscription")]
         ]
         await query.edit_message_text(
@@ -522,7 +523,7 @@ SheetGPT работает как расширение для Google Chrome, ко
 👇 Выбери способ связи:
 """
         keyboard = [
-            [InlineKeyboardButton("💬 Открыть чат поддержки", url=SUPPORT_CHAT_URL)],
+            [InlineKeyboardButton("💬 Написать в поддержку (/support)", callback_data="support_write")],
             [InlineKeyboardButton("📖 Читать FAQ", url=INSTALLATION_GUIDE_URL)],
             [InlineKeyboardButton("« Назад в меню", callback_data="menu_back")]
         ]
@@ -659,6 +660,10 @@ SheetGPT работает как расширение для Google Chrome, ко
 
     async def handle_message(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Обработка текстовых сообщений"""
+        # Check for support message first
+        if await self.handle_support_message(update, context):
+            return
+
         # Сначала проверяем, ждём ли мы текст отзыва
         if context.user_data.get('waiting_review_text'):
             await self.handle_review_text(update, context)
@@ -697,6 +702,274 @@ SheetGPT работает как расширение для Google Chrome, ко
 """
         await update.message.reply_text(stats_text, parse_mode='Markdown')
 
+
+    # ==================== ADMIN COMMANDS ====================
+
+    async def admin_users(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Команда /users - список пользователей (только для админа)"""
+        if update.effective_user.id != self.admin_id:
+            await update.message.reply_text("⛔ Только для администратора")
+            return
+
+        async with self.async_session_factory() as session:
+            from app.models.telegram_user import TelegramUser
+            result = await session.execute(select(TelegramUser).order_by(TelegramUser.created_at.desc()).limit(20))
+            users = result.scalars().all()
+
+            if not users:
+                await update.message.reply_text("Пользователей пока нет")
+                return
+
+            text = "👥 **Последние 20 пользователей:**\n\n"
+            for u in users:
+                tier_emoji = "⭐" if u.subscription_tier == "premium" else "🆓"
+                text += f"{tier_emoji} `{u.license_key}` - {u.first_name or 'N/A'} (@{u.username or 'N/A'})\n"
+                text += f"   📊 {u.queries_used_today}/{u.queries_limit} запросов\n\n"
+
+            await update.message.reply_text(text, parse_mode='Markdown')
+
+    async def admin_user_info(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Команда /user <license_key> - инфо о пользователе"""
+        if update.effective_user.id != self.admin_id:
+            await update.message.reply_text("⛔ Только для администратора")
+            return
+
+        if not context.args:
+            await update.message.reply_text("Использование: /user <license_key>")
+            return
+
+        license_key = context.args[0].strip().upper()
+
+        async with self.async_session_factory() as session:
+            from app.models.telegram_user import TelegramUser
+            result = await session.execute(
+                select(TelegramUser).where(TelegramUser.license_key == license_key)
+            )
+            user = result.scalar_one_or_none()
+
+            if not user:
+                await update.message.reply_text(f"❌ Пользователь с ключом `{license_key}` не найден", parse_mode='Markdown')
+                return
+
+            tier_emoji = "⭐ PRO" if user.subscription_tier == "premium" else "🆓 Free"
+            premium_info = ""
+            if user.premium_until:
+                premium_info = f"\n📅 PRO до: {user.premium_until.strftime('%Y-%m-%d')}"
+
+            text = f"""
+👤 **Информация о пользователе**
+
+🔑 Ключ: `{user.license_key}`
+👤 Имя: {user.first_name or 'N/A'}
+📧 Username: @{user.username or 'N/A'}
+🆔 Telegram ID: `{user.telegram_user_id}`
+
+💳 Тариф: {tier_emoji}{premium_info}
+📊 Использовано: {user.queries_used_today}/{user.queries_limit}
+📈 Всего запросов: {user.total_queries}
+
+📅 Регистрация: {user.created_at.strftime('%Y-%m-%d %H:%M') if user.created_at else 'N/A'}
+🕐 Последний запрос: {user.last_query_at.strftime('%Y-%m-%d %H:%M') if user.last_query_at else 'Никогда'}
+"""
+            keyboard = [
+                [InlineKeyboardButton("⭐ Выдать PRO", callback_data=f"admin_grant_{user.license_key}"),
+                 InlineKeyboardButton("❌ Забрать PRO", callback_data=f"admin_revoke_{user.license_key}")],
+                [InlineKeyboardButton("🔄 Сбросить счётчик", callback_data=f"admin_reset_{user.license_key}")]
+            ]
+            await update.message.reply_text(text, parse_mode='Markdown', reply_markup=InlineKeyboardMarkup(keyboard))
+
+    async def admin_grant(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Команда /grant <license_key> [days] - выдать PRO"""
+        if update.effective_user.id != self.admin_id:
+            await update.message.reply_text("⛔ Только для администратора")
+            return
+
+        if not context.args:
+            await update.message.reply_text("Использование: /grant <license_key> [days=365]")
+            return
+
+        license_key = context.args[0].strip().upper()
+        days = int(context.args[1]) if len(context.args) > 1 else 365
+
+        async with self.async_session_factory() as session:
+            from app.models.telegram_user import TelegramUser
+            from datetime import timedelta, timezone
+            result = await session.execute(
+                select(TelegramUser).where(TelegramUser.license_key == license_key)
+            )
+            user = result.scalar_one_or_none()
+
+            if not user:
+                await update.message.reply_text(f"❌ Пользователь `{license_key}` не найден", parse_mode='Markdown')
+                return
+
+            user.subscription_tier = "premium"
+            user.queries_limit = -1
+            user.premium_until = datetime.now(timezone.utc) + timedelta(days=days)
+            await session.commit()
+
+            await update.message.reply_text(
+                f"✅ **PRO выдан!**\n\n"
+                f"👤 {user.first_name} (@{user.username})\n"
+                f"🔑 `{license_key}`\n"
+                f"📅 Активен до: {user.premium_until.strftime('%Y-%m-%d')}",
+                parse_mode='Markdown'
+            )
+
+            # Уведомить пользователя
+            try:
+                await context.bot.send_message(
+                    chat_id=user.telegram_user_id,
+                    text=f"🎉 **Поздравляем!**\n\nВам активирована подписка **PRO** до {user.premium_until.strftime('%Y-%m-%d')}!\n\n✨ Теперь у вас безлимитные запросы!",
+                    parse_mode='Markdown'
+                )
+            except Exception as e:
+                logger.warning(f"Could not notify user: {e}")
+
+    async def admin_revoke(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Команда /revoke <license_key> - забрать PRO"""
+        if update.effective_user.id != self.admin_id:
+            await update.message.reply_text("⛔ Только для администратора")
+            return
+
+        if not context.args:
+            await update.message.reply_text("Использование: /revoke <license_key>")
+            return
+
+        license_key = context.args[0].strip().upper()
+
+        async with self.async_session_factory() as session:
+            from app.models.telegram_user import TelegramUser
+            result = await session.execute(
+                select(TelegramUser).where(TelegramUser.license_key == license_key)
+            )
+            user = result.scalar_one_or_none()
+
+            if not user:
+                await update.message.reply_text(f"❌ Пользователь `{license_key}` не найден", parse_mode='Markdown')
+                return
+
+            user.subscription_tier = "free"
+            user.queries_limit = 10
+            user.premium_until = None
+            await session.commit()
+
+            await update.message.reply_text(
+                f"✅ **PRO отозван**\n\n"
+                f"👤 {user.first_name} (@{user.username})\n"
+                f"🔑 `{license_key}`\n"
+                f"📊 Теперь: Free (10 запросов)",
+                parse_mode='Markdown'
+            )
+
+    async def admin_reply(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Команда /reply <user_id> <text> - ответить пользователю"""
+        if update.effective_user.id != self.admin_id:
+            await update.message.reply_text("⛔ Только для администратора")
+            return
+
+        if len(context.args) < 2:
+            await update.message.reply_text("Использование: /reply <user_id> <текст сообщения>")
+            return
+
+        user_id = int(context.args[0])
+        message_text = ' '.join(context.args[1:])
+
+        try:
+            await context.bot.send_message(
+                chat_id=user_id,
+                text=f"💬 **Ответ от поддержки:**\n\n{message_text}",
+                parse_mode='Markdown'
+            )
+            await update.message.reply_text(f"✅ Сообщение отправлено пользователю {user_id}")
+        except Exception as e:
+            await update.message.reply_text(f"❌ Ошибка отправки: {e}")
+
+    async def admin_callback(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Обработка админских callback-кнопок"""
+        query = update.callback_query
+        await query.answer()
+
+        if query.from_user.id != self.admin_id:
+            return
+
+        data = query.data
+
+        if data.startswith("admin_grant_"):
+            license_key = data.replace("admin_grant_", "")
+            context.args = [license_key]
+            await self.admin_grant(update, context)
+        elif data.startswith("admin_revoke_"):
+            license_key = data.replace("admin_revoke_", "")
+            context.args = [license_key]
+            await self.admin_revoke(update, context)
+        elif data.startswith("admin_reset_"):
+            license_key = data.replace("admin_reset_", "")
+            await self._reset_user_usage(query, license_key)
+
+    async def _reset_user_usage(self, query, license_key: str):
+        """Сброс счётчика использования"""
+        async with self.async_session_factory() as session:
+            from app.models.telegram_user import TelegramUser
+            result = await session.execute(
+                select(TelegramUser).where(TelegramUser.license_key == license_key)
+            )
+            user = result.scalar_one_or_none()
+            if user:
+                user.queries_used_today = 0
+                await session.commit()
+                await query.edit_message_text(f"✅ Счётчик сброшен для `{license_key}`", parse_mode='Markdown')
+
+    # ==================== SUPPORT SYSTEM ====================
+
+    async def support_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Команда /support - написать в поддержку"""
+        await update.message.reply_text(
+            "💬 **Поддержка SheetGPT**\n\n"
+            "Напиши своё сообщение, и я передам его администратору.\n"
+            "Для отправки просто напиши текст:",
+            parse_mode='Markdown'
+        )
+        context.user_data['waiting_support'] = True
+
+    async def handle_support_message(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Обработка сообщения в поддержку"""
+        if not context.user_data.get('waiting_support'):
+            return False
+
+        user = update.effective_user
+        message = update.message.text
+
+        # Отправляем админу
+        admin_text = f"""
+📩 **Новое сообщение в поддержку**
+
+👤 От: {user.first_name} (@{user.username or 'N/A'})
+🆔 ID: `{user.id}`
+
+💬 Сообщение:
+{message}
+
+Ответить: `/reply {user.id} <текст>`
+"""
+        try:
+            await context.bot.send_message(
+                chat_id=self.admin_id,
+                text=admin_text,
+                parse_mode='Markdown'
+            )
+            await update.message.reply_text(
+                "✅ Сообщение отправлено!\n\nМы ответим вам в ближайшее время.",
+                parse_mode='Markdown'
+            )
+        except Exception as e:
+            logger.error(f"Failed to send support message: {e}")
+            await update.message.reply_text("❌ Ошибка отправки. Попробуйте позже.")
+
+        context.user_data['waiting_support'] = False
+        return True
+
+
     def run(self):
         """Запуск бота"""
         logger.info("Starting SheetGPT Telegram Bot v2.0...")
@@ -710,9 +983,18 @@ SheetGPT работает как расширение для Google Chrome, ко
         # Регистрируем обработчики
         self.application.add_handler(CommandHandler("start", self.start))
         self.application.add_handler(CommandHandler("help", self.help_command))
-        self.application.add_handler(CommandHandler("stats", self.admin_stats))
+        self.application.add_handler(CommandHandler("support", self.support_command))
 
-        # Обработчик callback-кнопок
+        # Админские команды
+        self.application.add_handler(CommandHandler("stats", self.admin_stats))
+        self.application.add_handler(CommandHandler("users", self.admin_users))
+        self.application.add_handler(CommandHandler("user", self.admin_user_info))
+        self.application.add_handler(CommandHandler("grant", self.admin_grant))
+        self.application.add_handler(CommandHandler("revoke", self.admin_revoke))
+        self.application.add_handler(CommandHandler("reply", self.admin_reply))
+
+        # Обработчик callback-кнопок (админские + обычные)
+        self.application.add_handler(CallbackQueryHandler(self.admin_callback, pattern="^admin_"))
         self.application.add_handler(CallbackQueryHandler(self.menu_callback))
 
         # Обработчик текстовых сообщений
