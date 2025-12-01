@@ -2576,7 +2576,8 @@ for col, val in min_row.items():
                     "display_mode": "sidebar_only" if len(formatted_result) <= 20 else "create_sheet"
                 }
             elif result_type == "list" and isinstance(formatted_result, list):
-                response["key_findings"] = formatted_result
+                # Convert all items to strings for schema validation
+                response["key_findings"] = [str(item) for item in formatted_result]
 
             return response
 
