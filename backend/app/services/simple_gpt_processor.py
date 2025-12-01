@@ -2699,21 +2699,26 @@ for col, val in min_row.items():
             return "OK"  # Default to OK if validation fails
 
     def _fix_code_syntax(self, code: str) -> str:
-        """v9.3.4: Convert multiline strings to escaped single-line."""
         import re
-        def fix_ml(m):
-            s = m.group(1)
-            s = s.replace(chr(92), chr(92)+chr(92))
-            s = s.replace(chr(10), chr(92)+'n')
-            s = s.replace(chr(13), '')
-            s = s.replace(chr(34), chr(92)+chr(34))
-            return chr(34) + s + chr(34)
         tq_d = chr(34)*3
         tq_s = chr(39)*3
-        code = re.sub(tq_d + '(.*?)' + tq_d, fix_ml, code, flags=re.DOTALL)
-        code = re.sub(tq_s + '(.*?)' + tq_s, fix_ml, code, flags=re.DOTALL)
-        if tq_d in code: code = code.replace(tq_d, chr(34))
-        if tq_s in code: code = code.replace(tq_s, chr(39))
+        def fix_closed(m):
+            s = m.group(1)
+            s = s.replace(chr(92), chr(92)+chr(92))
+            s = s.replace(chr(10), chr(92)+chr(110))
+            s = s.replace(chr(13), chr(32))
+            s = s.replace(chr(34), chr(92)+chr(34))
+            return chr(34) + s + chr(34)
+        code = re.sub(tq_d + chr(40)+chr(46)+chr(42)+chr(63)+chr(41) + tq_d, fix_closed, code, flags=re.DOTALL)
+        code = re.sub(tq_s + chr(40)+chr(46)+chr(42)+chr(63)+chr(41) + tq_s, fix_closed, code, flags=re.DOTALL)
+        while tq_d in code:
+            i = code.find(tq_d)
+            j = code.find(chr(10), i)
+            code = code[:i] + chr(34)+chr(34) + (code[j:] if j>0 else chr(32))
+        while tq_s in code:
+            i = code.find(tq_s)
+            j = code.find(chr(10), i)
+            code = code[:i] + chr(39)+chr(39) + (code[j:] if j>0 else chr(32))
         return code
 
     def _validate_code_safety(self, code: str) -> tuple:
