@@ -97,6 +97,103 @@ async function getReferenceSheetData(sheetNameHint) {
 }
 
 
+
+
+// v9.3.0: Умный парсер для структурированных ответов
+function formatAnalysisResponse(text) {
+  if (!text) return '';
+
+  // Очистка текста от эмодзи и лишних символов
+  let cleaned = text
+    .replace(/[\u{1F300}-\u{1F9FF}]|[\u{2600}-\u{26FF}]|[\u{2700}-\u{27BF}]|[\u{1F600}-\u{1F64F}]|[\u{1F680}-\u{1F6FF}]|[\u{1F1E0}-\u{1F1FF}]/gu, '')
+    .replace(/≡/g, '')
+    .replace(/\*\*([^*]+)\*\*/g, '$1')
+    .replace(/\*([^*]+)\*/g, '$1')
+    .trim();
+
+  const lines = cleaned.split(/\n/).map(l => l.trim()).filter(l => l);
+  let html = '';
+  let dataRows = [];
+  let headerText = '';
+  let conclusionText = '';
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    if (/^(АНАЛИЗ|Лидер|Вывод|Итог|Рейтинг):?$/i.test(line)) continue;
+
+    if (i === 0 || /^(Самый|Лидер|Победитель|Лучший|Худший|Топ)/i.test(line)) {
+      if (line.includes('—') || line.includes(':') || line.includes('-')) {
+        headerText = line;
+      } else if (!headerText) {
+        headerText = line;
+      }
+      continue;
+    }
+
+    const rankMatch = line.match(/^(\d+)[.\)]\s*([^—\-:]+)[—\-:]\s*(.+)$/);
+    if (rankMatch) {
+      dataRows.push({ label: rankMatch[2].trim(), value: rankMatch[3].trim() });
+      continue;
+    }
+
+    const metricMatch = line.match(/^([^:]+?):\s*(.+)$/);
+    if (metricMatch) {
+      const label = metricMatch[1].trim();
+      const value = metricMatch[2].trim();
+      if (value && !/^(Рейтинг|Вывод|Итог|Анализ)$/i.test(label)) {
+        // Fix concatenated words like "Ивановчек" -> "ср. чек"
+        const fixedValue = value.replace(/(\d)чек/gi, '$1 чек').replace(/срчек/gi, 'ср. чек').replace(/(\d)руб/gi, '$1 руб');
+        dataRows.push({ label, value: fixedValue });
+      }
+      continue;
+    }
+
+    if (/^(Вывод|Итог|Заключение)[:\s]/i.test(line)) {
+      const match = line.match(/^(?:Вывод|Итог|Заключение)[:\s]*(.+)$/i);
+      if (match && match[1]) conclusionText = match[1].trim();
+      continue;
+    }
+
+    if (line.startsWith('•') || line.startsWith('·') || line.startsWith('-')) {
+      const cleanLine = line.replace(/^[•·\-]\s*/, '').trim();
+      const bulletMetric = cleanLine.match(/^([^:]+?):\s*(.+)$/);
+      if (bulletMetric) {
+        dataRows.push({ label: bulletMetric[1].trim(), value: bulletMetric[2].trim() });
+      } else if (cleanLine.length > 3) {
+        dataRows.push({ label: cleanLine, value: '' });
+      }
+      continue;
+    }
+  }
+
+  // Render HTML
+  if (headerText) {
+    html += '<div style="font-weight: 600; font-size: 14px; margin-bottom: 12px;">' + escapeHtml(headerText) + '</div>';
+  }
+
+  if (dataRows.length > 0) {
+    html += '<div class="data-block">';
+    for (const row of dataRows) {
+      if (row.value) {
+        html += '<div class="data-row"><span class="data-label">' + escapeHtml(row.label) + '</span><span class="data-value">' + escapeHtml(row.value) + '</span></div>';
+      } else {
+        html += '<div style="padding: 4px 0; font-size: 13px;">' + escapeHtml(row.label) + '</div>';
+      }
+    }
+    html += '</div>';
+  }
+
+  if (conclusionText) {
+    html += '<div style="margin-top: 12px; padding: 8px 12px; background: var(--accent-subtle); border-left: 3px solid var(--accent); border-radius: 0 8px 8px 0; font-size: 13px;">' + escapeHtml(conclusionText) + '</div>';
+  }
+
+  if (!html) {
+    html = '<p>' + escapeHtml(cleaned) + '</p>';
+  }
+
+  return html;
+}
+
 function parseResponseContent(text) {
   if (!text) return { paragraphs: [], metrics: [], items: [] };
   // v9.2.2: Preserve newlines for better structure parsing
@@ -978,51 +1075,14 @@ function addAIMessage(response) {
 
   // Analysis response
   else if (response.type === 'analysis') {
-    const parsed = parseResponseContent(response.text);
-
+    // v9.3.0: Use formatAnalysisResponse for structured display
     content = `
       <div class="response-type">
         <svg viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
         Анализ
       </div>
+      <div class="response-content">${formatAnalysisResponse(response.text)}</div>
     `;
-
-    // Render metrics as data block
-    if (parsed.metrics.length > 0) {
-      content += `<div class="data-block">`;
-      for (const metric of parsed.metrics) {
-        content += `
-          <div class="data-row">
-            <span class="data-label">${escapeHtml(metric.label)}</span>
-            <span class="data-value">${escapeHtml(metric.value)}${metric.subtext ? ` <small style="color: var(--text-muted); font-weight: 400;">(${escapeHtml(metric.subtext)})</small>` : ''}</span>
-          </div>
-        `;
-      }
-      content += `</div>`;
-    }
-
-    // Render items as paragraphs
-    if (parsed.items.length > 0) {
-      content += `<div class="response-content">`;
-      for (const item of parsed.items) {
-        content += `<p>${escapeHtml(item)}</p>`;
-      }
-      content += `</div>`;
-    }
-
-    // Render paragraphs
-    if (parsed.paragraphs.length > 0) {
-      content += `<div class="response-content">`;
-      for (const para of parsed.paragraphs) {
-        content += `<p>${escapeHtml(para)}</p>`;
-      }
-      content += `</div>`;
-    }
-
-    // Fallback
-    if (parsed.metrics.length === 0 && parsed.items.length === 0 && parsed.paragraphs.length === 0) {
-      content += `<div class="response-content"><p>${escapeHtml(cleanResponseText(response.text))}</p></div>`;
-    }
   }
 
   // Table response
