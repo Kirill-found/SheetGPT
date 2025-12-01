@@ -34,7 +34,7 @@ const state = {
 // TEXT FORMATTING UTILITIES (v9.1.0)
 // ============================================
 
-function cleanResponseText(text) {
+function cleanResponseText(text, preserveNewlines = false) {
   if (!text) return '';
   // Remove emoji
   let cleaned = text.replace(/[\u{1F300}-\u{1F9FF}]|[\u{2600}-\u{26FF}]|[\u{2700}-\u{27BF}]|[\u{1F600}-\u{1F64F}]|[\u{1F680}-\u{1F6FF}]|[\u{1F1E0}-\u{1F1FF}]/gu, '');
@@ -43,9 +43,14 @@ function cleanResponseText(text) {
   cleaned = cleaned.replace(/\*([^*]+)\*/g, '$1');
   cleaned = cleaned.replace(/__([^_]+)__/g, '$1');
   cleaned = cleaned.replace(/_([^_]+)_/g, '$1');
-  // Clean whitespace
-  cleaned = cleaned.replace(/\s+/g, ' ').trim();
-  return cleaned;
+  // Clean whitespace (v9.2.2: optionally preserve newlines)
+  if (preserveNewlines) {
+    cleaned = cleaned.replace(/[^\S\n]+/g, ' ');
+    cleaned = cleaned.replace(/\n{3,}/g, '\n\n');
+  } else {
+    cleaned = cleaned.replace(/\s+/g, ' ');
+  }
+  return cleaned.trim();
 }
 
 // ============================================
@@ -94,11 +99,15 @@ async function getReferenceSheetData(sheetNameHint) {
 
 function parseResponseContent(text) {
   if (!text) return { paragraphs: [], metrics: [], items: [] };
-  const cleaned = cleanResponseText(text);
+  // v9.2.2: Preserve newlines for better structure parsing
+  const cleaned = cleanResponseText(text, true);
   const result = { paragraphs: [], metrics: [], items: [] };
 
-  // Split by bullet points
-  const lines = cleaned.split(/[•·\-]\s+/).filter(l => l.trim());
+  // v9.2.2: Split by newlines first, then by bullet points
+  let lines = cleaned.split(/\n/).filter(l => l.trim());
+  if (lines.length <= 1) {
+    lines = cleaned.split(/[•·]\s+/).filter(l => l.trim());
+  }
 
   for (const line of lines) {
     const trimmed = line.trim();
