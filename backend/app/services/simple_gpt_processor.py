@@ -2736,23 +2736,19 @@ for col, val in min_row.items():
 
     def _fix_code_syntax(self, code: str) -> str:
         """Попытка исправить частые синтаксические ошибки."""
-        fixed = code
-
         # Count triple quotes
-        tq_double = fixed.count('"""')
-        tq_single = fixed.count("'" + "'" + "'")
-
+        tq_double = code.count('"""')
+        tq_single = code.count("'''")
+        
         if tq_double % 2 == 1:
-            fixed += '
-"""'
+            code = code + chr(10) + '"' * 3
             logger.info("[SimpleGPT] Fixed: added closing triple-double quotes")
-
+        
         if tq_single % 2 == 1:
-            fixed += "
-" + "'" + "'" + "'"
+            code = code + chr(10) + "'" * 3
             logger.info("[SimpleGPT] Fixed: added closing triple-single quotes")
-
-        return fixed
+        
+        return code
 
     def _validate_code_safety(self, code: str) -> tuple:
         """Проверяет безопасность кода."""
