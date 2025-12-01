@@ -490,7 +490,8 @@ async def process_formula(
         response_dict["function_used"] = result.get("function_used")
         response_dict["parameters"] = result.get("parameters")
 
-        # v9.1.0: Increment usage after successful processing
+        # v9.3.1: Increment usage after successful processing
+        logger.info(f"[USAGE] Headers - License: {x_license_key[:12] + '...' if x_license_key else 'None'}")
         if x_license_key or x_api_token:
             try:
                 from app.core.database import AsyncSessionLocal
@@ -499,21 +500,26 @@ async def process_formula(
                 async with AsyncSessionLocal() as db:
                     user = None
                     if x_license_key:
-                        result = await db.execute(
-                            select(TelegramUser).where(TelegramUser.license_key == x_license_key.strip().upper())
+                        license_upper = x_license_key.strip().upper()
+                        logger.info(f"[USAGE] Looking up license: {license_upper}")
+                        db_result = await db.execute(
+                            select(TelegramUser).where(TelegramUser.license_key == license_upper)
                         )
-                        user = result.scalar_one_or_none()
+                        user = db_result.scalar_one_or_none()
+                        logger.info(f"[USAGE] User found: {user.telegram_user_id if user else 'NOT FOUND'}")
                     if not user and x_api_token:
-                        result = await db.execute(
+                        db_result = await db.execute(
                             select(TelegramUser).where(TelegramUser.api_token == x_api_token)
                         )
-                        user = result.scalar_one_or_none()
+                        user = db_result.scalar_one_or_none()
 
                     if user:
+                        old_used = user.queries_used_today
                         user.queries_used_today += 1
                         user.total_queries += 1
                         user.last_query_at = datetime.now(timezone.utc)
                         await db.commit()
+                        logger.info(f"[USAGE] Incremented {old_used} -> {user.queries_used_today}")
 
                         # Add usage info to response
                         response_dict["_usage"] = {
@@ -522,8 +528,12 @@ async def process_formula(
                             "queries_remaining": -1 if user.queries_limit == -1 else max(0, user.queries_limit - user.queries_used_today)
                         }
                         logger.info(f"[USAGE] User {user.telegram_user_id}: {user.queries_used_today}/{user.queries_limit}")
+                    else:
+                        logger.warning(f"[USAGE] User NOT found for license/token")
             except Exception as e:
-                logger.warning(f"[USAGE] Failed to increment: {e}")
+                logger.error(f"[USAGE] Failed to increment: {e}", exc_info=True)
+        else:
+            logger.warning("[USAGE] No license key provided - usage not tracked")
 
         logger.info("[COMPLETE] Response sent successfully")
         logger.info("="*60)
