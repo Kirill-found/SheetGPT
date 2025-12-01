@@ -11,7 +11,7 @@ class Settings(BaseSettings):
     VERSION: str = "1.0.0"
 
     # База данных
-    DATABASE_URL: str
+    DATABASE_URL: str = ""
 
     # AI API ключи
     GEMINI_API_KEY: str
