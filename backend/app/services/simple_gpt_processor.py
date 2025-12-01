@@ -2571,6 +2571,9 @@ for col, val in min_row.items():
             if not code:
                 return {"success": False, "error": "Не удалось сгенерировать код"}
 
+            # v9.3.3: Fix syntax BEFORE validation
+            code = self._fix_code_syntax(code)
+
             # Validate code safety
             is_safe, safety_error = self._validate_code_safety(code)
             if not is_safe:
