@@ -1461,22 +1461,23 @@
 
     .preset-grid {
       display: grid;
-      grid-template-columns: repeat(3, 1fr);
+      grid-template-columns: repeat(2, 1fr);
       gap: var(--space-2);
     }
 
     .preset-card {
       display: flex;
-      flex-direction: column;
+      flex-direction: row;
       align-items: center;
-      gap: var(--space-2);
+      gap: var(--space-3);
       padding: var(--space-3);
       background: var(--bg-secondary);
       border: 2px solid transparent;
-      border-radius: var(--radius-lg);
+      border-radius: var(--radius-md);
       cursor: pointer;
       transition: all var(--duration-fast) var(--ease-out);
-      text-align: center;
+      text-align: left;
+      min-height: 64px;
     }
 
     .preset-card:hover {
@@ -1489,10 +1490,10 @@
     }
 
     .preset-icon {
-      width: 40px;
-      height: 40px;
+      width: 36px;
+      height: 36px;
       background: var(--bg-tertiary);
-      border-radius: var(--radius-md);
+      border-radius: var(--radius-sm);
       display: flex;
       align-items: center;
       justify-content: center;
@@ -1507,8 +1508,8 @@
     }
 
     .preset-icon svg {
-      width: 20px;
-      height: 20px;
+      width: 18px;
+      height: 18px;
       stroke: currentColor;
       fill: none;
       stroke-width: 1.5;
@@ -1517,15 +1518,19 @@
     }
 
     .preset-info {
-      width: 100%;
+      flex: 1;
+      min-width: 0;
     }
 
     .preset-name {
       font-family: var(--font-sans);
-      font-size: 12px;
+      font-size: 13px;
       font-weight: 600;
       color: var(--text-primary);
       margin-bottom: 1px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
 
     .preset-desc {
@@ -2008,10 +2013,26 @@
     });
 
     // Preset card selection
+    const presetPrompts = {
+      analyst: `Я аналитик данных. Работаю с KPI, метриками, трендами и визуализацией. Помогай строить сводные таблицы, выявлять аномалии, рассчитывать статистику и делать выводы на основе данных.`,
+      accountant: `Я бухгалтер. Работаю с финансовой отчётностью, расчётами налогов, сверками и балансами. Помогай с формулами для расчёта НДС, прибыли, амортизации и формированием отчётов.`,
+      marketer: `Я маркетолог. Работаю с данными рекламных кампаний, конверсий, ROI и воронок продаж. Помогай анализировать эффективность каналов, считать CAC, LTV и оптимизировать бюджеты.`,
+      sales: `Я менеджер по продажам. Работаю с CRM-данными, сделками, планами и клиентской базой. Помогай отслеживать воронку, считать конверсии этапов, прогнозировать выполнение плана.`,
+      hr: `Я HR-специалист. Работаю с данными сотрудников, зарплатами, отпусками и наймом. Помогай анализировать текучку, считать ФОТ, формировать отчёты по персоналу.`,
+      logistics: `Я логист. Работаю с данными склада, доставки, маршрутов и запасов. Помогай анализировать оборачиваемость, оптимизировать остатки, отслеживать сроки поставок.`
+    };
+
     document.querySelectorAll('.preset-card').forEach(card => {
       card.addEventListener('click', () => {
         document.querySelectorAll('.preset-card').forEach(c => c.classList.remove('selected'));
         card.classList.add('selected');
+        
+        // Подставляем промпт роли в textarea
+        const presetId = card.dataset.preset;
+        const textarea = document.getElementById('personalizationContextInput');
+        if (presetId && presetPrompts[presetId]) {
+          textarea.value = presetPrompts[presetId];
+        }
       });
     });
 
@@ -2032,10 +2053,16 @@
           const presetCard = document.querySelector(`.preset-card[data-preset="${preset}"]`);
           if (presetCard) presetCard.classList.add('selected');
         }
+        // Загружаем сохранённый контекст или дефолтный промпт роли
         if (customContext) {
           document.getElementById('personalizationContextInput').value = customContext;
+        } else if (preset && presetPrompts[preset]) {
+          document.getElementById('personalizationContextInput').value = presetPrompts[preset];
         }
       } catch (e) {}
+    } else {
+      // Первый запуск — подставляем промпт для Аналитика (выбран по умолчанию)
+      document.getElementById('personalizationContextInput').value = presetPrompts.analyst;
     }
   </script>
 </body>
