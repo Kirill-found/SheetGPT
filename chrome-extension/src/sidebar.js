@@ -29,6 +29,67 @@ const state = {
   usageLimit: CONFIG.FREE_DAILY_LIMIT,
   isLoading: false
 };
+// ============================================
+// TEXT FORMATTING UTILITIES (v9.1.0)
+// ============================================
+
+function cleanResponseText(text) {
+  if (!text) return '';
+  // Remove emoji
+  let cleaned = text.replace(/[\u{1F300}-\u{1F9FF}]|[\u{2600}-\u{26FF}]|[\u{2700}-\u{27BF}]|[\u{1F600}-\u{1F64F}]|[\u{1F680}-\u{1F6FF}]|[\u{1F1E0}-\u{1F1FF}]/gu, '');
+  // Remove markdown bold/italic
+  cleaned = cleaned.replace(/\*\*([^*]+)\*\*/g, '$1');
+  cleaned = cleaned.replace(/\*([^*]+)\*/g, '$1');
+  cleaned = cleaned.replace(/__([^_]+)__/g, '$1');
+  cleaned = cleaned.replace(/_([^_]+)_/g, '$1');
+  // Clean whitespace
+  cleaned = cleaned.replace(/\s+/g, ' ').trim();
+  return cleaned;
+}
+
+function parseResponseContent(text) {
+  if (!text) return { paragraphs: [], metrics: [], items: [] };
+  const cleaned = cleanResponseText(text);
+  const result = { paragraphs: [], metrics: [], items: [] };
+
+  // Split by bullet points
+  const lines = cleaned.split(/[•·\-]\s+/).filter(l => l.trim());
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+    // Check if metric (contains : and number)
+    const metricMatch = trimmed.match(/^([^:]+):\s*([0-9.,\s]+(?:руб|₽|%|шт)?\.?)\s*(?:\(([^)]+)\))?/i);
+    if (metricMatch) {
+      result.metrics.push({
+        label: metricMatch[1].trim(),
+        value: metricMatch[2].trim(),
+        subtext: metricMatch[3] ? metricMatch[3].trim() : null
+      });
+    } else if (trimmed.length > 0) {
+      result.items.push(trimmed);
+    }
+  }
+
+  // If nothing found, split into paragraphs
+  if (result.metrics.length === 0 && result.items.length === 0) {
+    const sentences = cleaned.split(/(?<=[.!?])\s+/);
+    let currentParagraph = '';
+    for (const sentence of sentences) {
+      currentParagraph += sentence + ' ';
+      if (currentParagraph.split(/[.!?]/).length > 3) {
+        result.paragraphs.push(currentParagraph.trim());
+        currentParagraph = '';
+      }
+    }
+    if (currentParagraph.trim()) {
+      result.paragraphs.push(currentParagraph.trim());
+    }
+  }
+
+  return result;
+}
+
+
 
 // ============================================
 // DOM ELEMENTS
@@ -746,190 +807,292 @@ function addUserMessage(text) {
 function addAIMessage(response) {
   const messageDiv = document.createElement('div');
   messageDiv.className = 'message ai';
-  
+
   let content = '';
-  
+
+  // Error response
   if (response.type === 'error') {
     content = `
-      <div class="content-box error">${escapeHtml(response.text)}</div>
-    `;
-  } else if (response.type === 'formula') {
-    content = `
-      <div class="response-badge formula">
-        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M4 4h16v16H4z"/><path d="M4 10h16"/><path d="M10 4v16"/>
+      <div class="status-box error">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="10"/>
+          <line x1="15" y1="9" x2="9" y2="15"/>
+          <line x1="9" y1="9" x2="15" y2="15"/>
         </svg>
+        <span>${escapeHtml(cleanResponseText(response.text))}</span>
+      </div>
+    `;
+  }
+
+  // Formula response
+  else if (response.type === 'formula') {
+    content = `
+      <div class="response-type">
+        <svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="M9 3v18"/></svg>
         Формула
       </div>
-      <div class="formula-code">${escapeHtml(response.formula)}</div>
-      ${response.explanation ? `<p>${escapeHtml(response.explanation)}</p>` : ''}
+      <div class="formula-block">${escapeHtml(response.formula)}</div>
+      ${response.explanation ? `<div class="response-content"><p>${escapeHtml(cleanResponseText(response.explanation))}</p></div>` : ''}
       <div class="action-buttons">
         <button class="action-btn" data-action="insertFormula" data-formula="${escapeHtml(response.formula)}">Вставить</button>
         <button class="action-btn secondary" data-action="copyToClipboard" data-text="${escapeHtml(response.formula)}">Копировать</button>
       </div>
     `;
-  } else if (response.type === 'analysis') {
+  }
+
+  // Analysis response
+  else if (response.type === 'analysis') {
+    const parsed = parseResponseContent(response.text);
+
     content = `
-      <div class="response-badge analysis">
-        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <circle cx="12" cy="12" r="3"/><path d="M12 1v4M12 19v4"/>
-        </svg>
+      <div class="response-type">
+        <svg viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
         Анализ
       </div>
-      ${response.items ? `
-        <ul class="list-items">
-          ${response.items.map(item => `<li>${escapeHtml(item)}</li>`).join('')}
-        </ul>
-      ` : ''}
-      ${response.text ? `<p>${escapeHtml(response.text)}</p>` : ''}
     `;
-  } else if (response.type === 'table') {
+
+    // Render metrics as data block
+    if (parsed.metrics.length > 0) {
+      content += `<div class="data-block">`;
+      for (const metric of parsed.metrics) {
+        content += `
+          <div class="data-row">
+            <span class="data-label">${escapeHtml(metric.label)}</span>
+            <span class="data-value">${escapeHtml(metric.value)}${metric.subtext ? ` <small style="color: var(--text-muted); font-weight: 400;">(${escapeHtml(metric.subtext)})</small>` : ''}</span>
+          </div>
+        `;
+      }
+      content += `</div>`;
+    }
+
+    // Render items as paragraphs
+    if (parsed.items.length > 0) {
+      content += `<div class="response-content">`;
+      for (const item of parsed.items) {
+        content += `<p>${escapeHtml(item)}</p>`;
+      }
+      content += `</div>`;
+    }
+
+    // Render paragraphs
+    if (parsed.paragraphs.length > 0) {
+      content += `<div class="response-content">`;
+      for (const para of parsed.paragraphs) {
+        content += `<p>${escapeHtml(para)}</p>`;
+      }
+      content += `</div>`;
+    }
+
+    // Fallback
+    if (parsed.metrics.length === 0 && parsed.items.length === 0 && parsed.paragraphs.length === 0) {
+      content += `<div class="response-content"><p>${escapeHtml(cleanResponseText(response.text))}</p></div>`;
+    }
+  }
+
+  // Table response
+  else if (response.type === 'table') {
+    const rowCount = response.data?.rows?.length || 0;
     content = `
-      <div class="response-badge formula">
-        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="M9 3v18"/>
-        </svg>
+      <div class="response-type">
+        <svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="M9 3v18"/></svg>
         Таблица
       </div>
-      <p>${escapeHtml(response.text || 'Таблица готова к вставке')}</p>
+      <div class="response-content">
+        <p>${escapeHtml(cleanResponseText(response.text) || 'Таблица готова к вставке')}</p>
+      </div>
+      <div class="summary-box">${rowCount} записей</div>
       <div class="action-buttons">
         <button class="action-btn" data-action="insertTable">Вставить таблицу</button>
       </div>
     `;
-  } else if (response.type === 'highlight') {
+  }
+
+  // Highlight response
+  else if (response.type === 'highlight') {
     content = `
-      <div class="response-badge analysis">
-        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M19 3H5a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2V5a2 2 0 00-2-2z"/>
-        </svg>
+      <div class="response-type">
+        <svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="M3 15h18"/></svg>
         Выделение
       </div>
-      <div class="content-box success">${escapeHtml(response.text || 'Строки успешно выделены')}</div>
-    `;
-  } else if (response.type === 'chart') {
-    content = `
-      <div class="response-badge formula">
-        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M18 20V10"/><path d="M12 20V4"/><path d="M6 20v-6"/>
+      <div class="status-box success">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+          <polyline points="22 4 12 14.01 9 11.01"/>
         </svg>
+        <span>${escapeHtml(cleanResponseText(response.text) || 'Строки выделены')}</span>
+      </div>
+    `;
+  }
+
+  // Chart response
+  else if (response.type === 'chart') {
+    content = `
+      <div class="response-type">
+        <svg viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
         Диаграмма
       </div>
-      <div class="content-box success">${escapeHtml(response.text || 'Диаграмма создана')}</div>
-    `;
-  } else if (response.type === 'conditional_format') {
-    content = `
-      <div class="response-badge analysis">
-        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <rect x="3" y="3" width="18" height="18" rx="2"/>
-          <path d="M3 9h18"/>
-          <path d="M9 3v18"/>
+      <div class="status-box success">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+          <polyline points="22 4 12 14.01 9 11.01"/>
         </svg>
+        <span>${escapeHtml(cleanResponseText(response.text) || 'Диаграмма создана')}</span>
+      </div>
+    `;
+  }
+
+  // Conditional format / Color scale
+  else if (response.type === 'conditional_format' || response.type === 'color_scale') {
+    content = `
+      <div class="response-type">
+        <svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="M9 3v18"/></svg>
         Форматирование
       </div>
-      <div class="content-box success">${escapeHtml(response.text || 'Условное форматирование применено')}</div>
+      <div class="status-box success">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+          <polyline points="22 4 12 14.01 9 11.01"/>
+        </svg>
+        <span>${escapeHtml(cleanResponseText(response.text) || 'Форматирование применено')}</span>
+      </div>
     `;
-  } else if (response.type === 'pivot_table') {
+  }
+
+  // Pivot table response
+  else if (response.type === 'pivot_table') {
     const rowCount = response.pivotData?.rows?.length || 0;
     content = `
-      <div class="response-badge formula">
-        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <rect x="3" y="3" width="18" height="18" rx="2"/>
-          <path d="M3 9h18"/>
-          <path d="M9 3v18"/>
-          <path d="M9 15h6"/>
-        </svg>
-        Сводная
+      <div class="response-type">
+        <svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="M9 3v18"/><path d="M9 15h6"/></svg>
+        Сводная таблица
       </div>
-      <p>${escapeHtml(response.text || 'Сводная таблица готова')}</p>
-      <p class="text-secondary">${rowCount} групп</p>
+      <div class="response-content">
+        <p>${escapeHtml(cleanResponseText(response.text) || 'Сводная таблица готова')}</p>
+      </div>
+      <div class="summary-box">${rowCount} групп</div>
       <div class="action-buttons">
         <button class="action-btn" data-action="insertPivotTable">Вставить таблицу</button>
       </div>
     `;
-  } else if (response.type === 'csv_split') {
-    const originalRows = response.originalRows || 0;
+  }
+
+  // CSV split
+  else if (response.type === 'csv_split') {
     const newRows = response.newRows || 0;
     const newCols = response.newCols || 0;
     content = `
-      <div class="response-badge analysis">
-        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <rect x="3" y="3" width="18" height="18" rx="2"/>
-          <path d="M3 9h18"/>
-          <path d="M9 21V9"/>
-        </svg>
+      <div class="response-type">
+        <svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="M9 21V9"/></svg>
         Разбиение
       </div>
-      <p>${escapeHtml(response.text || 'Данные разбиты по ячейкам')}</p>
-      <p class="text-secondary">${newRows} строк × ${newCols} колонок</p>
+      <div class="response-content">
+        <p>${escapeHtml(cleanResponseText(response.text) || 'Данные разбиты')}</p>
+      </div>
+      <div class="summary-box">${newRows} строк x ${newCols} колонок</div>
       <div class="action-buttons">
         <button class="action-btn" data-action="applySplitData">Заменить данные</button>
       </div>
     `;
-  } else if (response.type === 'clean_data') {
+  }
+
+  // Clean data response
+  else if (response.type === 'clean_data') {
     const originalRows = response.originalRows || 0;
     const finalRows = response.finalRows || 0;
     const removedRows = originalRows - finalRows;
+
     content = `
-      <div class="response-badge analysis">
-        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M3 6h18"/>
-          <path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6"/>
-          <path d="M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2"/>
-          <path d="M10 11v6"/>
-          <path d="M14 11v6"/>
-        </svg>
-        Очистка
+      <div class="response-type">
+        <svg viewBox="0 0 24 24"><path d="M3 6h18"/><path d="M19 6v14a2 2 0 01-2 2H7a2 2 0 01-2-2V6"/><path d="M8 6V4a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>
+        Очистка данных
       </div>
-      <p>${escapeHtml(response.text || 'Данные очищены')}</p>
-      <p class="text-secondary">${originalRows} → ${finalRows} строк${removedRows > 0 ? ` (−${removedRows})` : ''}</p>
+      <div class="response-content">
+        <p>${escapeHtml(cleanResponseText(response.text) || 'Данные очищены')}</p>
+      </div>
+      <div class="data-block">
+        <div class="data-row">
+          <span class="data-label">Было строк</span>
+          <span class="data-value">${originalRows}</span>
+        </div>
+        <div class="data-row">
+          <span class="data-label">Стало строк</span>
+          <span class="data-value">${finalRows}</span>
+        </div>
+        ${removedRows > 0 ? `
+        <div class="data-row">
+          <span class="data-label">Удалено</span>
+          <span class="data-value" style="color: var(--error);">-${removedRows}</span>
+        </div>
+        ` : ''}
+      </div>
       <div class="action-buttons">
-        <button class="action-btn" data-action="insertCleanedData">Создать новый лист</button>
-        <button class="action-btn secondary" data-action="overwriteWithCleanedData">Заменить данные</button>
+        <button class="action-btn" data-action="insertCleanedData">Новый лист</button>
+        <button class="action-btn secondary" data-action="overwriteWithCleanedData">Заменить</button>
       </div>
     `;
-  } else if (response.type === 'data_validation') {
-    const valuesCount = response.rule?.allowed_values?.length || 0;
-    const valuesPreview = response.rule?.allowed_values?.slice(0, 5).join(', ') || '';
-    content = `
-      <div class="response-badge formula">
-        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <path d="M12 2v4"/>
-          <path d="M12 18v4"/>
-          <path d="M4.93 4.93l2.83 2.83"/>
-          <path d="M16.24 16.24l2.83 2.83"/>
-          <path d="M2 12h4"/>
-          <path d="M18 12h4"/>
-          <path d="M4.93 19.07l2.83-2.83"/>
-          <path d="M16.24 7.76l2.83-2.83"/>
-        </svg>
-        Валидация
-      </div>
-      <p>${escapeHtml(response.text || 'Выпадающий список создан')}</p>
-      <p class="text-secondary">${valuesCount} вариантов: ${escapeHtml(valuesPreview)}${valuesCount > 5 ? '...' : ''}</p>
-      <div class="content-box success">Выпадающий список применён к колонке</div>
-    `;
-  } else if (response.type === 'filter_data') {
+  }
+
+  // Filter response
+  else if (response.type === 'filter_data') {
     const originalRows = response.originalRows || 0;
     const filteredRows = response.filteredRows || 0;
+
     content = `
-      <div class="response-badge analysis">
-        <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-          <polygon points="22,3 2,3 10,12.46 10,19 14,21 14,12.46"/>
-        </svg>
-        Фильтр
+      <div class="response-type">
+        <svg viewBox="0 0 24 24"><polygon points="22,3 2,3 10,12.46 10,19 14,21 14,12.46"/></svg>
+        Фильтрация
       </div>
-      <p>${escapeHtml(response.text || 'Данные отфильтрованы')}</p>
-      <p class="text-secondary">${escapeHtml(response.conditionStr || '')}</p>
-      <p class="text-secondary">${filteredRows} из ${originalRows} строк</p>
+      <div class="response-content">
+        <p>${escapeHtml(cleanResponseText(response.text) || 'Данные отфильтрованы')}</p>
+      </div>
+      ${response.conditionStr ? `<div class="summary-box">${escapeHtml(response.conditionStr)}</div>` : ''}
+      <div class="data-block">
+        <div class="data-row">
+          <span class="data-label">Найдено</span>
+          <span class="data-value">${filteredRows} из ${originalRows}</span>
+        </div>
+      </div>
       <div class="action-buttons">
-        <button class="action-btn" data-action="insertFilteredData">Создать новый лист</button>
-        <button class="action-btn secondary" data-action="highlightFilteredRows">Выделить строки</button>
+        <button class="action-btn" data-action="insertFilteredData">Новый лист</button>
+        <button class="action-btn secondary" data-action="highlightFilteredRows">Выделить</button>
       </div>
     `;
-  } else {
-    content = `<p>${escapeHtml(response.text || 'Готово')}</p>`;
   }
-  
+
+  // Data validation
+  else if (response.type === 'data_validation') {
+    const valuesCount = response.rule?.allowed_values?.length || 0;
+    content = `
+      <div class="response-type">
+        <svg viewBox="0 0 24 24"><path d="M12 2v4"/><path d="M12 18v4"/><path d="M4.93 4.93l2.83 2.83"/><path d="M16.24 16.24l2.83 2.83"/><path d="M2 12h4"/><path d="M18 12h4"/></svg>
+        Валидация
+      </div>
+      <div class="response-content">
+        <p>${escapeHtml(cleanResponseText(response.text) || 'Выпадающий список создан')}</p>
+      </div>
+      <div class="summary-box">${valuesCount} вариантов</div>
+    `;
+  }
+
+  // Success/Action message
+  else if (response.type === 'success' || response.type === 'action') {
+    content = `
+      <div class="status-box success">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
+          <polyline points="22 4 12 14.01 9 11.01"/>
+        </svg>
+        <span>${escapeHtml(cleanResponseText(response.text))}</span>
+      </div>
+    `;
+  }
+
+  // Default fallback
+  else {
+    const cleaned = cleanResponseText(response.text || 'Готово');
+    content = `<div class="response-content"><p>${escapeHtml(cleaned)}</p></div>`;
+  }
+
   messageDiv.innerHTML = `<div class="message-bubble">${content}</div>`;
   elements.chatContainer.appendChild(messageDiv);
   scrollToBottom();
@@ -940,12 +1103,11 @@ function addLoadingIndicator() {
   loadingDiv.className = 'message ai';
   loadingDiv.innerHTML = `
     <div class="loading-indicator">
-      <div class="morph-squares">
-        <div class="morph-square"></div>
-        <div class="morph-square"></div>
-        <div class="morph-square"></div>
+      <div class="loading-dots">
+        <div class="loading-dot"></div>
+        <div class="loading-dot"></div>
+        <div class="loading-dot"></div>
       </div>
-      <span class="loading-text">Анализирую данные...</span>
     </div>
   `;
   elements.chatContainer.appendChild(loadingDiv);
