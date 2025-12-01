@@ -1055,6 +1055,88 @@ async function setDataValidation(spreadsheetId, sheetId, rule) {
   }
 }
 
+/**
+ * Convert text column to numbers
+ * Reads values, converts to numbers, writes back
+ */
+async function convertColumnToNumbers(spreadsheetId, sheetName, columnIndex, rowCount) {
+  try {
+    const token = await getAuthToken();
+
+    // Get column letter (A, B, C, ...)
+    const columnLetter = String.fromCharCode(65 + columnIndex);
+    const range = `${sheetName}!${columnLetter}2:${columnLetter}${rowCount + 1}`;
+
+    console.log(`[SheetsAPI] 🔢 Converting column ${columnLetter} to numbers, range: ${range}`);
+
+    // Read current values
+    const readResponse = await fetch(
+      `${SHEETS_API_BASE}/${spreadsheetId}/values/${encodeURIComponent(range)}`,
+      {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      }
+    );
+
+    if (!readResponse.ok) {
+      const error = await readResponse.json();
+      throw new Error(`Read error: ${error.error?.message || readResponse.statusText}`);
+    }
+
+    const data = await readResponse.json();
+    const values = data.values || [];
+
+    console.log(`[SheetsAPI] 📖 Read ${values.length} values from column ${columnLetter}`);
+
+    // Convert to numbers
+    const convertedValues = values.map(row => {
+      if (!row || !row[0]) return [null];
+      const val = row[0];
+      // Remove spaces, replace comma with dot, parse as number
+      const cleanVal = String(val).replace(/\s/g, '').replace(',', '.');
+      const num = parseFloat(cleanVal);
+      return [isNaN(num) ? val : num];
+    });
+
+    console.log(`[SheetsAPI] 🔄 Converted values sample:`, convertedValues.slice(0, 3));
+
+    // Write back as numbers
+    const writeResponse = await fetch(
+      `${SHEETS_API_BASE}/${spreadsheetId}/values/${encodeURIComponent(range)}?valueInputOption=RAW`,
+      {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          range: range,
+          values: convertedValues
+        })
+      }
+    );
+
+    if (!writeResponse.ok) {
+      const error = await writeResponse.json();
+      throw new Error(`Write error: ${error.error?.message || writeResponse.statusText}`);
+    }
+
+    const result = await writeResponse.json();
+    console.log(`[SheetsAPI] ✅ Column ${columnLetter} converted to numbers:`, result);
+
+    return {
+      success: true,
+      updatedCells: result.updatedCells,
+      column: columnLetter
+    };
+  } catch (error) {
+    console.error('[SheetsAPI] Error converting column to numbers:', error);
+    throw error;
+  }
+}
+
 // Export functions
 if (typeof module !== 'undefined' && module.exports) {
   module.exports = {
@@ -1073,6 +1155,7 @@ if (typeof module !== 'undefined' && module.exports) {
     getSheetIdByName,
     applyConditionalFormat,
     applyColorScale,
-    setDataValidation
+    setDataValidation,
+    convertColumnToNumbers
   };
 }

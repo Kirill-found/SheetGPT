@@ -75,6 +75,11 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           result = await handleSetDataValidation(sender.tab.id, sender.tab.url, data);
           break;
 
+        case 'CONVERT_TO_NUMBERS':
+          console.log('[Background] 🔢 CONVERT_TO_NUMBERS received:', data);
+          result = await handleConvertToNumbers(sender.tab.id, sender.tab.url, data);
+          break;
+
         case 'CHECK_AUTH':
           result = await checkAuth();
           break;
@@ -487,6 +492,37 @@ async function handleSetDataValidation(tabId, tabUrl, data) {
   const result = await setDataValidation(spreadsheetId, sheetId, rule);
 
   console.log('[Background] ✅ Data validation set:', result);
+  return result;
+}
+
+/**
+ * Convert column from text to numbers
+ */
+async function handleConvertToNumbers(tabId, tabUrl, data) {
+  console.log('[Background] 🔢 Converting column to numbers:', data);
+
+  const spreadsheetId = getSpreadsheetIdFromUrl(tabUrl);
+  if (!spreadsheetId) {
+    throw new Error('Not a valid Google Sheets URL');
+  }
+
+  const { columnIndex, rowCount } = data;
+
+  if (columnIndex === undefined) {
+    throw new Error('Column index is required');
+  }
+
+  // Get saved sheet name from storage
+  const storageKey = `sheetName_${spreadsheetId}`;
+  const storageData = await chrome.storage.local.get(storageKey);
+  const sheetName = storageData[storageKey] || 'Лист1';
+
+  console.log(`[Background] Using sheet name "${sheetName}" for number conversion`);
+
+  // Convert column
+  const result = await convertColumnToNumbers(spreadsheetId, sheetName, columnIndex, rowCount || 1000);
+
+  console.log('[Background] ✅ Column converted to numbers:', result);
   return result;
 }
 

@@ -487,6 +487,12 @@ for col, val in min_row.items():
                             'от зелёного к красному', 'от зеленого к красному',
                             'шкала цвет', 'раскрась по значени', 'покрась по значени']
 
+    # Convert to numbers keywords
+    CONVERT_TO_NUMBERS_KEYWORDS = ['преобразуй в числ', 'преобразовать в числ', 'конвертируй в числ',
+                                    'конвертировать в числ', 'сделай числ', 'формат числ',
+                                    'из текста в числ', 'текст в числ', 'convert to number',
+                                    'to number format', 'числовой формат']
+
     # Color scale presets
     COLOR_SCALE_PRESETS = {
         'red_yellow_green': {
@@ -2065,6 +2071,70 @@ for col, val in min_row.items():
             logger.error(f"[SimpleGPT] Error filtering data: {e}")
             return None
 
+    def _detect_convert_to_numbers_action(self, query: str, column_names: List[str], df: pd.DataFrame) -> Optional[Dict[str, Any]]:
+        """
+        Определяет, является ли запрос командой конвертации колонки в числа.
+        Примеры:
+        - "преобразуй колонку Сумма в числа"
+        - "конвертируй в числовой формат колонку Цена"
+        """
+        query_lower = query.lower()
+
+        # Check for convert to numbers keywords
+        is_convert = any(kw in query_lower for kw in self.CONVERT_TO_NUMBERS_KEYWORDS)
+        if not is_convert:
+            return None
+
+        logger.info(f"[SimpleGPT] Convert to numbers action detected: {query}")
+
+        # Find target column
+        target_column = None
+        target_column_index = None
+
+        query_words = set(query_lower.split())
+
+        # First pass: exact match
+        for idx, col_name in enumerate(column_names):
+            col_lower = col_name.lower().strip()
+            if len(col_lower) < 2:
+                continue
+            if col_lower in query_words:
+                target_column = col_name
+                target_column_index = idx
+                break
+
+        # Second pass: partial match
+        if not target_column:
+            for idx, col_name in enumerate(column_names):
+                col_lower = col_name.lower().strip()
+                if len(col_lower) < 2:
+                    continue
+                for word in query_words:
+                    if len(word) >= len(col_lower) and (word.startswith(col_lower) or col_lower in word):
+                        target_column = col_name
+                        target_column_index = idx
+                        break
+                if target_column:
+                    break
+
+        if not target_column:
+            logger.warning(f"[SimpleGPT] No target column found for convert to numbers")
+            return None
+
+        rule = {
+            "column_index": target_column_index,
+            "column_name": target_column,
+            "row_count": len(df)
+        }
+
+        message = f"Преобразую колонку '{target_column}' в числа"
+
+        return {
+            "action_type": "convert_to_numbers",
+            "rule": rule,
+            "message": message
+        }
+
     def _detect_color_scale_action(self, query: str, column_names: List[str], df: pd.DataFrame) -> Optional[Dict[str, Any]]:
         """
         Определяет, является ли запрос командой применения цветовой шкалы (градиента).
@@ -2264,6 +2334,21 @@ for col, val in min_row.items():
                 logger.info(f"[SimpleGPT] Returning chart result with keys: {list(chart_result.keys())}")
                 logger.info(f"[SimpleGPT] chart_result['chart_spec']: {chart_result.get('chart_spec')}")
                 return chart_result
+
+            # Check for convert to numbers action
+            convert_action = self._detect_convert_to_numbers_action(query, column_names, df)
+            if convert_action:
+                elapsed = time.time() - start_time
+                logger.info(f"[SimpleGPT] Returning convert to numbers action: {convert_action}")
+                return {
+                    "success": True,
+                    "action_type": "convert_to_numbers",
+                    "result_type": "action",
+                    "rule": convert_action["rule"],
+                    "summary": convert_action["message"],
+                    "processing_time": f"{elapsed:.2f}s",
+                    "processor": "SimpleGPT v1.0 (direct action)"
+                }
 
             # Check for color scale action (BEFORE conditional formatting!)
             color_scale_action = self._detect_color_scale_action(query, column_names, df)

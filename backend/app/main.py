@@ -380,6 +380,10 @@ async def process_formula(
         if "rule" in result and result.get("action_type") == "conditional_format":
             response_dict["conditional_rule"] = result["rule"]
 
+        # Add convert to numbers rule
+        if "rule" in result and result.get("action_type") == "convert_to_numbers":
+            response_dict["convert_rule"] = result["rule"]
+
         # v9.0.0: Add hybrid processor metadata
         response_dict["processor_version"] = result.get("processor_version", "9.0.0")
         response_dict["complexity"] = result.get("complexity")

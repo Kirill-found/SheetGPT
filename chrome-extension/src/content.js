@@ -544,6 +544,12 @@ window.addEventListener('message', async (event) => {
         result = await setDataValidationInSheet(data.rule);
         break;
 
+      case 'CONVERT_TO_NUMBERS':
+        console.log('[SheetGPT] 🔢 CONVERT_TO_NUMBERS received:', data);
+        result = await convertColumnToNumbersInSheet(data.columnIndex, data.columnName, data.rowCount);
+        console.log('[SheetGPT] 🔢 CONVERT_TO_NUMBERS result:', result);
+        break;
+
       default:
         throw new Error(`Unknown action: ${action}`);
     }
@@ -1092,6 +1098,33 @@ async function setDataValidationInSheet(rule) {
   } catch (error) {
     console.error('[SheetGPT] Error setting data validation:', error);
     throw new Error(`Ошибка создания валидации: ${error.message}`);
+  }
+}
+
+async function convertColumnToNumbersInSheet(columnIndex, columnName, rowCount) {
+  console.log('[SheetGPT] 🔢 Converting column to numbers:', columnIndex, columnName);
+
+  try {
+    const response = await safeSendMessage({
+      action: 'CONVERT_TO_NUMBERS',
+      data: {
+        columnIndex: columnIndex,
+        rowCount: rowCount || 1000
+      }
+    });
+
+    if (!response || !response.success) {
+      throw new Error(response?.error || 'Неизвестная ошибка');
+    }
+
+    console.log('[SheetGPT] ✅ Column converted to numbers:', response.result);
+    return {
+      success: true,
+      message: `Колонка "${columnName}" преобразована в числа`
+    };
+  } catch (error) {
+    console.error('[SheetGPT] Error converting to numbers:', error);
+    throw new Error(`Ошибка преобразования: ${error.message}`);
   }
 }
 

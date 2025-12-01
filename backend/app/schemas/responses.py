@@ -53,6 +53,7 @@ class FormulaResponse(BaseModel):
     # Color scale / conditional formatting fields
     color_scale_rule: Optional[dict] = Field(None, description="Правило цветовой шкалы (градиента)")
     conditional_rule: Optional[dict] = Field(None, description="Правило условного форматирования")
+    convert_rule: Optional[dict] = Field(None, description="Правило конвертации колонки в числа")
     # Processor metadata
     processor_version: Optional[str] = Field(None, description="Версия процессора")
     complexity: Optional[str] = Field(None, description="Сложность запроса")

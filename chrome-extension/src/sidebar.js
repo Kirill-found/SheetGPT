@@ -1218,6 +1218,24 @@ function transformAPIResponse(apiResponse) {
     };
   }
 
+  // If response is a convert to numbers action
+  if (apiResponse.action_type === 'convert_to_numbers' && apiResponse.convert_rule) {
+    const rule = apiResponse.convert_rule;
+    console.log('[Sidebar] ✅ Convert to numbers condition met! Converting...', rule);
+    convertColumnToNumbersInSheet(rule).then(() => {
+      console.log('[Sidebar] ✅ Column converted to numbers');
+      addAIMessage({ type: 'success', text: `✅ Колонка "${rule.column_name}" преобразована в числа!` });
+    }).catch(err => {
+      console.error('[Sidebar] ❌ Convert to numbers failed:', err);
+      addAIMessage({ type: 'error', text: `Ошибка преобразования: ${err.message}` });
+    });
+    return {
+      type: 'convert_to_numbers',
+      text: apiResponse.summary || `Преобразую колонку "${rule.column_name}" в числа...`,
+      rule: rule
+    };
+  }
+
   // If response is a pivot table action
   if (apiResponse.action_type === 'pivot_table' && apiResponse.pivot_data) {
     console.log('[Sidebar] ✅ Pivot table condition met! Creating...');
@@ -1473,6 +1491,27 @@ async function applyColorScaleInSheet(rule) {
     return response;
   } catch (error) {
     console.error('[Sidebar] Error applying color scale:', error);
+    throw error;
+  }
+}
+
+async function convertColumnToNumbersInSheet(rule) {
+  if (!rule) {
+    console.error('[Sidebar] Convert to numbers error: rule is required');
+    throw new Error('Rule is required for convert to numbers');
+  }
+
+  try {
+    console.log('[Sidebar] Sending CONVERT_TO_NUMBERS to content script:', rule);
+    const response = await sendToContentScript('CONVERT_TO_NUMBERS', {
+      columnIndex: rule.column_index,
+      columnName: rule.column_name,
+      rowCount: rule.row_count
+    });
+    console.log(`[Sidebar] Column "${rule.column_name}" converted to numbers:`, response);
+    return response;
+  } catch (error) {
+    console.error('[Sidebar] Error converting to numbers:', error);
     throw error;
   }
 }
