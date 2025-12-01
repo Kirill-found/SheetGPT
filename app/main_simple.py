@@ -101,15 +101,15 @@ async def startup_event():
     else:
         print("Telegram bot disabled (no token)")
     # Запускаем Admin бота в отдельном потоке
-    print(f"DEBUG: TELEGRAM_BOT_TOKEN set: {bool(settings.TELEGRAM_BOT_TOKEN)}")
-    print(f"DEBUG: DATABASE_URL set: {bool(settings.DATABASE_URL)}")
-    print(f"DEBUG: DATABASE_URL value: {settings.DATABASE_URL[:30] if settings.DATABASE_URL else 'EMPTY'}...")
+    logger.info(f"DEBUG: TELEGRAM_BOT_TOKEN set: {bool(settings.TELEGRAM_BOT_TOKEN)}")
+    logger.info(f"DEBUG: DATABASE_URL set: {bool(settings.DATABASE_URL)}")
+    logger.info(f"DEBUG: DATABASE_URL value: {settings.DATABASE_URL[:30] if settings.DATABASE_URL else 'EMPTY'}...")
     if settings.TELEGRAM_BOT_TOKEN and settings.DATABASE_URL:
         admin_thread = threading.Thread(target=start_admin_bot, daemon=True)
         admin_thread.start()
         print("Admin bot started in background thread")
     else:
-        print("Admin bot DISABLED - missing token or database_url")
+        logger.info("Admin bot DISABLED - missing token or database_url")
 
 
 
