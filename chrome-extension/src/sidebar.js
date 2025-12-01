@@ -358,13 +358,8 @@ function loadState() {
       state.chatHistory = JSON.parse(savedHistory);
     }
     
-    // Check if it's a new day - reset usage
-    const lastUsageDate = localStorage.getItem('sheetgpt_usage_date');
-    const today = new Date().toDateString();
-    if (lastUsageDate !== today) {
-      state.usageCount = 0;
-      localStorage.setItem('sheetgpt_usage_date', today);
-    }
+    // v10.0: Server is source of truth for usage
+    console.log('[LoadState] Loaded usageCount:', state.usageCount);
   } catch (e) {
     console.error('Error loading state:', e);
   }
