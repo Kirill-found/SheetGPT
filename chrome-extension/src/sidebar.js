@@ -993,11 +993,13 @@ async function sendMessage() {
       }
     }
     
-    const result = await sendToContentScript('PROCESS_QUERY', { 
-      query, 
+    const result = await sendToContentScript('PROCESS_QUERY', {
+      query,
       history: conversationHistory,
-      referenceSheet: referenceSheet
+      referenceSheet: referenceSheet,
+      licenseKey: state.licenseKey  // v10.2: CRITICAL - pass license for usage tracking!
     });
+    console.log('[Sidebar] Sent PROCESS_QUERY with licenseKey:', state.licenseKey ? 'YES' : 'NO');
 
     // Remove loading
     loadingEl.remove();
