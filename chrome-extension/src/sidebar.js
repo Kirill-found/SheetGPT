@@ -1396,10 +1396,11 @@ async function callAPI(query, sheetData, history = []) {
     try {
       const response = await fetch(`${CONFIG.API_URL}/api/v1/formula`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json'
-        },
+        headers: (() => {
+        const h = { 'Content-Type': 'application/json', 'Accept': 'application/json' };
+        if (state.licenseKey) h['X-License-Key'] = state.licenseKey;
+        return h;
+      })(),
         body: JSON.stringify(payload)
       });
 
