@@ -1,12 +1,12 @@
 FROM python:3.11-slim
 
 # CRITICAL: Change this on EVERY deployment to force rebuild
-ARG CACHEBUST=20251118-0210-EMPTY-DATA-FIX-v7.3.1
-RUN echo "CACHE BUST: $CACHEBUST - Building v7.3.1 - Fix empty data detection for frontend"
-# v7.3.1: Improved empty data detection - handles [[]], [[], []], etc. from frontend
+ARG CACHEBUST=20251202-1015-SUPPORT-BOT-v9.2.0
+RUN echo "CACHE BUST: $CACHEBUST - Building v9.2.0 - Support bot with payments"
+# v9.2.0: Support bot with payment flow - handles [[]], [[], []], etc. from frontend
 
-LABEL version="7.3.1"
-LABEL description="SheetGPT API v7.3.1 - Improved empty data detection for AI table generation"
+LABEL version="9.2.0"
+LABEL description="SheetGPT API v9.2.0 - Support bot with payment flow"
 
 WORKDIR /app
 
@@ -16,7 +16,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 # CACHE BUST: Force copy layer to rebuild
 # CRITICAL: This RUN must be AFTER requirements but BEFORE COPY to break Docker cache
-RUN echo "CACHEBUST: 20251118-0210-v7.3.1-EMPTY-DATA-FIX - $(date)"
+RUN echo "CACHEBUST: 20251202-1015-v9.2.0-SUPPORT-BOT - $(date)"
 
 # Copy application
 COPY backend/ .
