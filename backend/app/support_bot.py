@@ -118,16 +118,9 @@ class SheetGPTSupportBot:
 • Приоритетная обработка
 • Все функции доступны
 • Поддержка 24/7
-
-**💎 PRO Годовой** - 2499₽/год (экономия 40%)
-• Всё из PRO
-• 12 месяцев по цене 8
-
-Выберите план:
 """
         keyboard = [
-            [InlineKeyboardButton("⭐ PRO на месяц - 299₽", callback_data="buy_pro_month")],
-            [InlineKeyboardButton("💎 PRO на год - 2499₽", callback_data="buy_pro_year")],
+            [InlineKeyboardButton("⭐ Купить PRO - 299₽", callback_data="buy_pro_month")],
             [InlineKeyboardButton("« Назад", callback_data="back_main")],
         ]
 
@@ -145,18 +138,13 @@ class SheetGPTSupportBot:
         text = """
 💳 **Купить PRO подписку**
 
-Выберите период подписки:
-
-⭐ **PRO на месяц** - 299₽
+⭐ **PRO** - 299₽/месяц
 • Безлимитные запросы на 30 дней
-
-💎 **PRO на год** - 2499₽
-• Безлимитные запросы на 365 дней
-• Экономия 40%!
+• Приоритетная обработка
+• Все функции доступны
 """
         keyboard = [
-            [InlineKeyboardButton("⭐ Месяц - 299₽", callback_data="buy_pro_month")],
-            [InlineKeyboardButton("💎 Год - 2499₽", callback_data="buy_pro_year")],
+            [InlineKeyboardButton("⭐ Оплатить 299₽", callback_data="buy_pro_month")],
             [InlineKeyboardButton("« Назад", callback_data="back_main")],
         ]
 
@@ -173,14 +161,9 @@ class SheetGPTSupportBot:
 
         user = update.effective_user
 
-        if period == "month":
-            price = 299
-            days = 30
-            title = "PRO подписка (месяц)"
-        else:  # year
-            price = 2499
-            days = 365
-            title = "PRO подписка (год)"
+        price = 299
+        days = 30
+        title = "PRO подписка"
 
         # Если есть payment_token - используем Telegram Payments
         if self.payment_token:
@@ -708,8 +691,6 @@ _Ответьте на это сообщение, чтобы отправить 
             await self.show_prices(update, context)
         elif data == "buy_pro_month":
             await self.process_buy(update, context, "month")
-        elif data == "buy_pro_year":
-            await self.process_buy(update, context, "year")
         elif data.startswith("paid_"):
             days = int(data.replace("paid_", ""))
             await self.user_paid(update, context, days)
