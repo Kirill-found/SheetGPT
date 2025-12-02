@@ -477,9 +477,68 @@ _Ответьте на это сообщение, чтобы отправить 
             await update.message.reply_text(f"❌ Ошибка: {e}")
 
     async def handle_photo(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """Обработка фотографий (для подтверждения оплаты)"""
+        """Обработка фотографий"""
+        user = update.effective_user
+        
+        # Ожидаем вопрос в поддержку
+        if context.user_data.get('waiting_question'):
+            await self.forward_question_to_admin(update, context)
+            return
+        
+        # Ожидаем подтверждение оплаты
         if context.user_data.get('waiting_payment_proof'):
             await self.forward_payment_proof(update, context)
+            return
+        
+        # Если это админ и это reply - пересылаем пользователю
+        if user.id == ADMIN_TELEGRAM_ID and update.message.reply_to_message:
+            await self.admin_reply_media(update, context)
+            return
+
+    async def handle_media(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Обработка документов, видео, голосовых и др."""
+        user = update.effective_user
+        
+        # Ожидаем вопрос в поддержку
+        if context.user_data.get('waiting_question'):
+            await self.forward_question_to_admin(update, context)
+            return
+        
+        # Ожидаем подтверждение оплаты
+        if context.user_data.get('waiting_payment_proof'):
+            await self.forward_payment_proof(update, context)
+            return
+        
+        # Если это админ и это reply - пересылаем пользователю
+        if user.id == ADMIN_TELEGRAM_ID and update.message.reply_to_message:
+            await self.admin_reply_media(update, context)
+            return
+
+    async def admin_reply_media(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Админ отвечает медиа-файлом"""
+        reply_msg = update.message.reply_to_message
+        
+        # Извлекаем user_id из сообщения
+        import re
+        match = re.search(r'🆔\s*(?:ID:?\s*)?(\d+)', reply_msg.text or reply_msg.caption or '')
+        if not match:
+            await update.message.reply_text("❌ Не удалось найти ID пользователя в сообщении")
+            return
+        
+        user_id = int(match.group(1))
+        
+        try:
+            # Сначала отправляем текст "Ответ от поддержки"
+            await self.application.bot.send_message(
+                chat_id=user_id,
+                text="💬 **Ответ от поддержки:**",
+                parse_mode='Markdown'
+            )
+            # Затем пересылаем медиа
+            await update.message.forward(chat_id=user_id)
+            await update.message.reply_text("✅ Ответ отправлен!")
+        except Exception as e:
+            await update.message.reply_text(f"❌ Ошибка: {e}")
 
     # ==================== АДМИН ФУНКЦИИ ====================
 
@@ -728,8 +787,14 @@ _Ответьте на это сообщение, чтобы отправить 
         # Текстовые сообщения
         self.application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, self.handle_message))
 
-        # Фото (для подтверждения оплаты)
+        # Фото
         self.application.add_handler(MessageHandler(filters.PHOTO, self.handle_photo))
+        
+        # Документы, видео, голосовые и др.
+        self.application.add_handler(MessageHandler(
+            filters.Document.ALL | filters.VIDEO | filters.VOICE | filters.VIDEO_NOTE | filters.AUDIO,
+            self.handle_media
+        ))
 
         # Создаём event loop для потока (важно при запуске в thread)
         import asyncio
