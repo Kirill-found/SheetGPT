@@ -2,11 +2,11 @@ FROM python:3.11-slim
 
 # ============ FORCE FULL REBUILD ============
 # Change this timestamp to bust ALL cache layers
-ENV FORCE_REBUILD="2025-12-02-10:25:00-v9.2.0-SUPPORT-BOT"
+ENV FORCE_REBUILD="2025-12-02-11:00:00-v9.2.1-FIX-ADMIN-REPLY"
 RUN echo "=== FULL REBUILD: $FORCE_REBUILD ===" && date
 
-LABEL version="9.2.0"
-LABEL description="SheetGPT API v9.2.0 - Support bot"
+LABEL version="9.2.1"
+LABEL description="SheetGPT API v9.2.1 - Fix admin reply regex"
 
 WORKDIR /app
 

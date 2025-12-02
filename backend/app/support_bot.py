@@ -459,7 +459,7 @@ _Ответьте на это сообщение, чтобы отправить 
 
         # Извлекаем user_id из сообщения
         import re
-        match = re.search(r'🆔.*?`(\d+)`', reply_msg.text or '')
+        match = re.search(r'🆔\s*(?:ID:?\s*)?(\d+)', reply_msg.text or '')
         if not match:
             await update.message.reply_text("❌ Не удалось найти ID пользователя в сообщении")
             return
