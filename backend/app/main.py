@@ -45,7 +45,7 @@ logger = logging.getLogger(__name__)
 # Create FastAPI app with VERSION 9.0.0 - Hybrid Intelligence Architecture
 app = FastAPI(
     title="SheetGPT API",
-    version="9.1.0",  # v9.0.0: Hybrid Intelligence - Schema-aware + Smart Classification + Self-Correction
+    version="9.2.0",  # v9.0.0: Hybrid Intelligence - Schema-aware + Smart Classification + Self-Correction
     description="AI-powered spreadsheet assistant with Hybrid Intelligence: Schema-aware processing, Smart query classification (SIMPLE/MEDIUM/COMPLEX), Self-correction loop. Expected 98-99% accuracy."
 )
 
