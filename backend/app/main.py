@@ -82,6 +82,34 @@ def start_telegram_bot():
         logger.error(f"Failed to start Telegram bot: {e}")
 
 
+def start_support_bot():
+    """Запуск Admin бота в отдельном потоке для поддержки"""
+    try:
+        from app.support_bot import SheetGPTSupportBot
+
+        admin_token = settings.TELEGRAM_ADMIN_BOT_TOKEN
+        main_bot_token = settings.TELEGRAM_BOT_TOKEN
+        database_url = settings.DATABASE_URL
+
+        if not admin_token:
+            logger.warning("TELEGRAM_ADMIN_BOT_TOKEN not set - support bot disabled")
+            return
+
+        if not main_bot_token:
+            logger.warning("TELEGRAM_BOT_TOKEN not set - support bot cannot reply to users")
+            return
+
+        logger.info(f"Starting Support bot (db: {'YES' if database_url else 'NO'})")
+        bot = SheetGPTSupportBot(
+            token=admin_token,
+            main_bot_token=main_bot_token,
+            database_url=database_url
+        )
+        bot.run()
+    except Exception as e:
+        logger.error(f"Failed to start Support bot: {e}")
+
+
 @app.on_event("startup")
 async def startup_event():
     """Log startup information"""
@@ -120,6 +148,14 @@ async def startup_event():
         logger.info("Telegram bot started in background thread")
     else:
         logger.info("Telegram bot disabled (no token)")
+
+    # Запускаем Admin бота для поддержки в отдельном потоке
+    if settings.TELEGRAM_ADMIN_BOT_TOKEN:
+        admin_thread = threading.Thread(target=start_support_bot, daemon=True)
+        admin_thread.start()
+        logger.info("Support bot started in background thread")
+    else:
+        logger.info("Support bot disabled (no token)")
 
 
 @app.get("/")

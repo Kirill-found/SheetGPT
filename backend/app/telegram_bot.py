@@ -83,7 +83,7 @@ class SheetGPTBot:
             [InlineKeyboardButton("📖 Инструкция по установке", callback_data="menu_guide")],
             [InlineKeyboardButton("🔑 Лицензионный ключ", callback_data="menu_license")],
             [InlineKeyboardButton("💳 Подписка", callback_data="menu_subscription")],
-            [InlineKeyboardButton("🆘 Поддержка", callback_data="menu_support")],
+            [InlineKeyboardButton("🆘 Поддержка / Оплата", url="https://t.me/sheetgpt_supportBot")],
             [InlineKeyboardButton("⭐ Отзывы", callback_data="menu_reviews")],
         ]
         return InlineKeyboardMarkup(keyboard)
