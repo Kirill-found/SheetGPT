@@ -374,23 +374,26 @@ class SheetGPTSupportBot:
         )
 
     async def forward_question_to_admin(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """Переслать вопрос админу"""
+        """Переслать вопрос админу (текст или медиа)"""
         user = update.effective_user
-        message = update.message.text
-
+        msg = update.message
+        
         context.user_data['waiting_question'] = False
-
-        # Отправляем админу
+        
+        # Определяем тип контента
+        has_media = msg.photo or msg.document or msg.video or msg.voice or msg.video_note or msg.audio
+        text_content = msg.caption if has_media else msg.text
+        
+        # Отправляем админу заголовок
         admin_text = f"""
 📩 **Новый вопрос в поддержку**
 
 👤 От: {user.first_name} (@{user.username or 'N/A'})
 🆔 ID: `{user.id}`
 
-💬 Вопрос:
-{message}
+💬 Сообщение: {text_content or '[Без текста]'}
 
-_Ответьте на это сообщение, чтобы отправить ответ пользователю_
+_Ответьте reply-ем на это сообщение_
 """
         try:
             await self.application.bot.send_message(
@@ -398,15 +401,20 @@ _Ответьте на это сообщение, чтобы отправить 
                 text=admin_text,
                 parse_mode='Markdown'
             )
-            await update.message.reply_text(
-                "✅ Ваш вопрос отправлен!\n\nМы ответим в ближайшее время.",
+            
+            # Если есть медиа - пересылаем оригинальное сообщение
+            if has_media:
+                await msg.forward(chat_id=ADMIN_TELEGRAM_ID)
+            
+            await msg.reply_text(
+                "✅ Ваш вопрос отправлен!" + chr(10) + chr(10) + "Мы ответим в ближайшее время.",
                 reply_markup=InlineKeyboardMarkup([
                     [InlineKeyboardButton("🏠 Главное меню", callback_data="back_main")]
                 ])
             )
         except Exception as e:
             logger.error(f"Failed to forward question: {e}")
-            await update.message.reply_text("❌ Ошибка отправки. Попробуйте позже.")
+            await msg.reply_text("❌ Ошибка отправки. Попробуйте позже.")
 
     async def forward_payment_proof(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Переслать подтверждение оплаты админу"""
