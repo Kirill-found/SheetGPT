@@ -750,6 +750,11 @@ _Ответьте на это сообщение, чтобы отправить 
         # Фото (для подтверждения оплаты)
         self.application.add_handler(MessageHandler(filters.PHOTO, self.handle_photo))
 
+        # Создаём event loop для потока (важно при запуске в thread)
+        import asyncio
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+
         logger.info("Support Bot is running...")
         self.application.run_polling(allowed_updates=Update.ALL_TYPES, stop_signals=None)
 
