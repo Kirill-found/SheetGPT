@@ -2477,6 +2477,10 @@ for col, val in min_row.items():
                     reference_df=reference_df
                 )
 
+                # Check retry result
+                if not result.get("success"):
+                    return self._create_error_response(result.get("error", "Validation failed after retry"), time.time() - start_time)
+
             # 4. Format response
             elapsed = time.time() - start_time
             formatted_result = self._format_result(result["result"])
@@ -2534,8 +2538,9 @@ for col, val in min_row.items():
 
         except Exception as e:
             elapsed = time.time() - start_time
-            logger.error(f"[SimpleGPT] Error: {str(e)}")
-            return self._create_error_response(str(e), elapsed)
+            error_msg = f"{type(e).__name__}: {str(e)}" if str(e) else type(e).__name__
+            logger.error(f"[SimpleGPT] Error: {error_msg}", exc_info=True)
+            return self._create_error_response(error_msg, elapsed)
 
     async def _generate_and_execute(
         self,
