@@ -34,6 +34,7 @@ import logging
 from datetime import datetime, timezone
 import os
 import threading
+import math
 
 # Configure logging
 logging.basicConfig(
@@ -60,6 +61,19 @@ app.add_middleware(
 
 # Include Telegram API router
 app.include_router(telegram_router)
+
+
+def sanitize_for_json(obj):
+    """Recursively replace NaN/Infinity with None for JSON serialization."""
+    if isinstance(obj, dict):
+        return {k: sanitize_for_json(v) for k, v in obj.items()}
+    elif isinstance(obj, list):
+        return [sanitize_for_json(item) for item in obj]
+    elif isinstance(obj, float):
+        if math.isnan(obj) or math.isinf(obj):
+            return None
+        return obj
+    return obj
 
 
 def start_telegram_bot():
@@ -574,7 +588,8 @@ async def process_formula(
         logger.info("[COMPLETE] Response sent successfully")
         logger.info("="*60)
 
-        return response_dict
+        # Sanitize NaN/Infinity values before JSON serialization
+        return sanitize_for_json(response_dict)
 
     except ValueError as e:
         # Ошибки валидации данных
