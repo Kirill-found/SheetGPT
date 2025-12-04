@@ -58,6 +58,7 @@ function cleanResponseText(text, preserveNewlines = false) {
 // ============================================
 
 function detectCrossSheetQuery(query) {
+  console.log('[Sidebar] 🔍 detectCrossSheetQuery:', query);
   const lowerQuery = query.toLowerCase();
   // Patterns to extract sheet name: quoted text OR single word
   const patterns = [
@@ -68,9 +69,11 @@ function detectCrossSheetQuery(query) {
     /(?:по|в|in)\s+(?:листе|листу|sheet)\s+["'«]([^"'»]+)["'»]/i,
     /(?:по|в|in)\s+(?:листе|листу|sheet)\s+([^\s,]+)/i,
   ];
-  for (const pattern of patterns) {
+  for (let i = 0; i < patterns.length; i++) {
+    const pattern = patterns[i];
     const match = query.match(pattern);
     if (match && match[1]) {
+      console.log('[Sidebar] ✅ Pattern matched! Sheet name:', match[1].trim());
       return { sheetName: match[1].trim() };
     }
   }
@@ -78,9 +81,11 @@ function detectCrossSheetQuery(query) {
   const refKeywords = ['прайс', 'справочник', 'каталог', 'price', 'catalog', 'reference'];
   for (const keyword of refKeywords) {
     if (lowerQuery.includes(keyword)) {
+      console.log('[Sidebar] ✅ Keyword matched:', keyword);
       return { sheetName: keyword };
     }
   }
+  console.log('[Sidebar] ❌ No cross-sheet pattern detected');
   return null;
 }
 
@@ -1686,6 +1691,29 @@ function transformAPIResponse(apiResponse) {
       type: 'highlight',
       text: `Выделено ${apiResponse.highlighted_count || apiResponse.highlight_rows.length} строк`,
       rows: apiResponse.highlight_rows
+    };
+  }
+
+
+  // If response is a write_data action (VLOOKUP result)
+  if (apiResponse.action_type === 'write_data' && apiResponse.write_data) {
+    console.log('[Sidebar] ✅ Write data condition met! Writing to sheet...');
+    // Write data to current sheet immediately
+    const dataToWrite = {
+      headers: apiResponse.write_headers,
+      data: apiResponse.write_data
+    };
+    overwriteSheetData(dataToWrite).then(() => {
+      console.log('[Sidebar] ✅ Data written to sheet successfully');
+      addAIMessage({ type: 'success', text: apiResponse.summary || '✅ Данные успешно записаны в таблицу!' });
+    }).catch(err => {
+      console.error('[Sidebar] ❌ Write data failed:', err);
+      addAIMessage({ type: 'error', text: `Ошибка записи данных: ${err.message}` });
+    });
+    return {
+      type: 'write_data',
+      text: apiResponse.summary || 'Записываю данные в таблицу...',
+      dataWritten: true
     };
   }
 

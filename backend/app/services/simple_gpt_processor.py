@@ -2524,12 +2524,24 @@ for col, val in min_row.items():
             # Add structured_data for tables/lists (only if NOT highlight query)
             if not is_highlight_query and result_type == "table" and isinstance(formatted_result, list):
                 # Extract headers from first row keys (rows are dicts from DataFrame)
-                headers = list(formatted_result[0].keys()) if formatted_result else []
-                response["structured_data"] = {
-                    "headers": headers,
-                    "rows": formatted_result,
-                    "display_mode": "sidebar_only" if len(formatted_result) <= 20 else "create_sheet"
-                }
+                # v9.3.2: For VLOOKUP (with reference_df), write directly to sheet
+                if reference_df is not None:
+                    # VLOOKUP result - convert to DataFrame and write to sheet
+                    vlookup_df = pd.DataFrame(formatted_result)
+                    response["action_type"] = "write_data"
+                    response["write_data"] = vlookup_df.values.tolist()
+                    response["write_headers"] = headers
+                    response["summary"] = f"✅ Данные из листа \"{reference_sheet_name or 'справочник'}\" подтянуты ({len(formatted_result)} строк)"
+                    logger.info(f"[SimpleGPT] VLOOKUP result: {len(formatted_result)} rows, writing to sheet")
+                else:
+                    # Regular table - show in sidebar or create new sheet
+                    response["structured_data"] = {
+                        "headers": headers,
+                        "rows": formatted_result,
+                        "display_mode": "sidebar_only" if len(formatted_result) <= 20 else "create_sheet"
+                    }
+            if not is_highlight_query and result_type == "table" and isinstance(formatted_result, list):
+                # Extract headers from first row keys (rows are dicts from DataFrame)
             elif result_type == "list" and isinstance(formatted_result, list):
                 # Convert all items to strings for schema validation
                 response["key_findings"] = [str(item) for item in formatted_result]
