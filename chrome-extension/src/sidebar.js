@@ -96,9 +96,11 @@ async function getReferenceSheetData(sheetNameHint) {
       (response) => {
         if (chrome.runtime.lastError) {
           reject(new Error(chrome.runtime.lastError.message));
-        } else if (response && response.success) {
-          resolve({ name: response.sheetName, headers: response.headers, data: response.data });
+        } else if (response && response.success && response.result) {
+          console.log('[Sidebar] 📦 getReferenceSheetData result:', response.result);
+          resolve({ name: response.result.sheetName, headers: response.result.headers, data: response.result.data });
         } else {
+          console.error('[Sidebar] getReferenceSheetData failed:', response);
           reject(new Error(response?.error || 'Failed to get reference sheet'));
         }
       }
