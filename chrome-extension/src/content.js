@@ -774,21 +774,30 @@ async function createTableAndChart(structuredData) {
       throw new Error('Converted values array is empty');
     }
 
-    // Generate sheet title
-    const timestamp = new Date().toLocaleString('ru-RU', {
-      day: '2-digit',
-      month: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit'
-    }).replace(/[,\s:]/g, '_');
-    const sheetTitle = `SheetGPT_${timestamp}`;
+    // Get spreadsheet ID and active sheet name
+    const match = window.location.href.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
+    if (!match) {
+      throw new Error('Could not get spreadsheet ID from URL');
+    }
+    const spreadsheetId = match[1];
 
-    // Create new sheet with data (v7.9.4: use safeSendMessage)
+    const storageKey = `sheetName_${spreadsheetId}`;
+    const storage = await chrome.storage.local.get([storageKey]);
+    const sheetName = storage[storageKey];
+    if (!sheetName) {
+      throw new Error('Could not get active sheet name. Try refreshing the page.');
+    }
+
+    console.log('[SheetGPT] Writing table to current sheet:', sheetName);
+
+    // Write to current sheet instead of creating new one
     const response = await safeSendMessage({
-      action: 'CREATE_NEW_SHEET',
+      action: 'WRITE_SHEET_DATA',
       data: {
-        sheetTitle,
-        values
+        sheetName: sheetName,
+        values: values,
+        startCell: 'A1',
+        mode: 'overwrite'
       }
     });
 
@@ -799,7 +808,7 @@ async function createTableAndChart(structuredData) {
     console.log('[SheetGPT] ✅ Table created:', response.result);
     return {
       success: true,
-      message: `Таблица создана на листе "${sheetTitle}" (${response.result.rowsWritten} строк)`
+      message: `Данные вставлены в лист "${sheetName}" (${response.result.rowsWritten} строк)`
     };
   } catch (error) {
     console.error('[SheetGPT] Error creating table:', error);
