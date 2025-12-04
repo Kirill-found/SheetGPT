@@ -1003,6 +1003,7 @@ async function sendMessage() {
       }
     }
     
+    console.log('[Sidebar] 🚀 Sending PROCESS_QUERY with referenceSheet:', referenceSheet);
     const result = await sendToContentScript('PROCESS_QUERY', {
       query,
       history: conversationHistory,
@@ -1010,6 +1011,7 @@ async function sendMessage() {
       licenseKey: state.licenseKey  // v10.2: CRITICAL - pass license for usage tracking!
     });
     console.log('[Sidebar] Sent PROCESS_QUERY with licenseKey:', state.licenseKey ? 'YES' : 'NO');
+    console.log('[Sidebar] referenceSheet in data:', referenceSheet ? 'YES' : 'NO');
 
     // Remove loading
     loadingEl.remove();

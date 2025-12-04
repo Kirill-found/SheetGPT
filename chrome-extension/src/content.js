@@ -599,8 +599,11 @@ const API_URLS = {
 async function processQuery(query, history = [], licenseKey = null, referenceSheet = null) {
   console.log('[SheetGPT] Processing query:', query);
   console.log('[SheetGPT] API Mode:', API_MODE, '| URL:', API_URLS[API_MODE]);
+  console.log('[SheetGPT] 🔍 referenceSheet param:', referenceSheet);
   if (referenceSheet) {
-    console.log('[SheetGPT] Reference sheet provided:', referenceSheet.name);
+    console.log('[SheetGPT] ✅ Reference sheet:', referenceSheet.name, 'with', referenceSheet.headers?.length, 'cols');
+  } else {
+    console.log('[SheetGPT] ❌ No reference sheet');
   }
 
   // v7.9.4: Check context before any operations
