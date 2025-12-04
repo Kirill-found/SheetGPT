@@ -59,10 +59,14 @@ function cleanResponseText(text, preserveNewlines = false) {
 
 function detectCrossSheetQuery(query) {
   const lowerQuery = query.toLowerCase();
+  // Patterns to extract sheet name: quoted text OR single word
   const patterns = [
-    /(?:из|с|from)\s+(?:листа|sheet|таблицы)\s+["'«]?([^"'»,]+)["'»]?/i,
-    /(?:впр|vlookup)\s+(?:из|from|с)\s+["'«]?([^"'»,]+)["'»]?/i,
-    /(?:по|в|in)\s+(?:листе|листу|sheet)\s+["'«]?([^"'»,]+)["'»]?/i,
+    /(?:из|с|from)\s+(?:листа|sheet|таблицы)\s+["'«]([^"'»]+)["'»]/i,  // With quotes
+    /(?:из|с|from)\s+(?:листа|sheet|таблицы)\s+([^\s,]+)/i,             // Single word
+    /(?:впр|vlookup)\s+(?:из|from|с)\s+["'«]([^"'»]+)["'»]/i,
+    /(?:впр|vlookup)\s+(?:из|from|с)\s+([^\s,]+)/i,
+    /(?:по|в|in)\s+(?:листе|листу|sheet)\s+["'«]([^"'»]+)["'»]/i,
+    /(?:по|в|in)\s+(?:листе|листу|sheet)\s+([^\s,]+)/i,
   ];
   for (const pattern of patterns) {
     const match = query.match(pattern);
@@ -70,6 +74,7 @@ function detectCrossSheetQuery(query) {
       return { sheetName: match[1].trim() };
     }
   }
+  // Fallback: check for reference keywords in query
   const refKeywords = ['прайс', 'справочник', 'каталог', 'price', 'catalog', 'reference'];
   for (const keyword of refKeywords) {
     if (lowerQuery.includes(keyword)) {
