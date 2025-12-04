@@ -2523,8 +2523,8 @@ for col, val in min_row.items():
 
             # Add structured_data for tables/lists (only if NOT highlight query)
             # Debug logging
-            logger.info(f"[SimpleGPT] DEBUG - result type: {type(result["result"])}, formatted_result type: {type(formatted_result)}")
-            logger.info(f"[SimpleGPT] DEBUG - formatted_result length: {len(formatted_result) if isinstance(formatted_result, list) else "N/A"}")
+            logger.info(f"[SimpleGPT] DEBUG - result type: {type(result['result'])}, formatted_result type: {type(formatted_result)}")
+            logger.info(f"[SimpleGPT] DEBUG - formatted_result length: {len(formatted_result) if isinstance(formatted_result, list) else 'N/A'}")
             if isinstance(formatted_result, list) and len(formatted_result) > 0:
                 logger.info(f"[SimpleGPT] DEBUG - first element type: {type(formatted_result[0])}, value: {formatted_result[0]}")
             # Check if result is a table (list of dicts) - independent of result_type
