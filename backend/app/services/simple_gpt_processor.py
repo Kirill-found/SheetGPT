@@ -2522,8 +2522,10 @@ for col, val in min_row.items():
                     logger.info(f"[SimpleGPT] Generated highlight_rows: {highlight_rows[:10]}... (total: {len(highlight_rows)})")
 
             # Add structured_data for tables/lists (only if NOT highlight query)
-            logger.info(f"[SimpleGPT] Checking write_data: is_highlight={is_highlight_query}, result_type={result_type}, is_list={isinstance(formatted_result, list)}, has_ref_df={reference_df is not None}")
-            if not is_highlight_query and result_type == "table" and isinstance(formatted_result, list):
+            # Check if result is a table (list of dicts) - independent of result_type
+            is_table = isinstance(formatted_result, list) and len(formatted_result) > 0 and isinstance(formatted_result[0], dict)
+            logger.info(f"[SimpleGPT] Checking write_data: is_highlight={is_highlight_query}, result_type={result_type}, is_table={is_table}, has_ref_df={reference_df is not None}")
+            if not is_highlight_query and is_table:
                 # Extract headers from first row keys (rows are dicts from DataFrame)
                 headers = list(formatted_result[0].keys()) if formatted_result else []
                 logger.info(f"[SimpleGPT] Table result detected, headers: {headers}")
