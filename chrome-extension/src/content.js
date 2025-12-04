@@ -1087,6 +1087,23 @@ async function overwriteSheetData(cleanedData) {
       throw new Error('Invalid cleaned data format');
     }
 
+    // Get spreadsheet ID from URL
+    const match = window.location.href.match(//spreadsheets/d/([a-zA-Z0-9-_]+)/);
+    if (!match) {
+      throw new Error('Could not get spreadsheet ID from URL');
+    }
+    const spreadsheetId = match[1];
+
+    // Get active sheet name from storage
+    const storageKey = `sheetName_${spreadsheetId}`;
+    const storage = await chrome.storage.local.get([storageKey]);
+    const sheetName = storage[storageKey];
+    if (!sheetName) {
+      throw new Error('Could not get active sheet name. Try refreshing the page.');
+    }
+
+    console.log('[SheetGPT] Writing to sheet:', sheetName);
+
     // Convert to 2D array
     const values = convertStructuredDataToValues(cleanedData);
 
@@ -1094,6 +1111,7 @@ async function overwriteSheetData(cleanedData) {
     const response = await safeSendMessage({
       action: 'WRITE_SHEET_DATA',
       data: {
+        sheetName: sheetName,
         values: values,
         startCell: 'A1',
         mode: 'overwrite'
