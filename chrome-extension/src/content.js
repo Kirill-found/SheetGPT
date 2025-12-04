@@ -1088,7 +1088,8 @@ async function overwriteSheetData(cleanedData) {
     }
 
     // Get spreadsheet ID from URL
-    const match = window.location.href.match(//spreadsheets/d/([a-zA-Z0-9-_]+)/);
+    const match = window.location.href.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
+
     if (!match) {
       throw new Error('Could not get spreadsheet ID from URL');
     }
