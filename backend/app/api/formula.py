@@ -206,6 +206,10 @@ async def generate_formula(request: FormulaRequest):
 
         response_type = result.get("response_type", result.get("type", "formula"))
 
+        # Debug logging for VLOOKUP
+        logger.info(f"[Formula API] Result keys: {list(result.keys())}")
+        logger.info(f"[Formula API] action_type: {result.get('action_type')}, write_data present: {'write_data' in result}")
+
         if response_type == "analysis" or response_type == "question":
             response_data = FormulaResponse(
                 formula=None,
