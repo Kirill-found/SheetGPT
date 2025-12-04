@@ -201,6 +201,86 @@ async function handleGetSheetData(tabId, tabUrl) {
 }
 
 /**
+ * Get reference sheet data for VLOOKUP (v9.2.0)
+ * Finds sheet by name hint and returns its data
+ */
+async function handleGetReferenceSheetData(tabId, tabUrl, sheetNameHint) {
+  console.log('[Background] Getting reference sheet data, hint:', sheetNameHint);
+
+  const spreadsheetId = getSpreadsheetIdFromUrl(tabUrl);
+  if (!spreadsheetId) {
+    throw new Error('Not a valid Google Sheets URL');
+  }
+
+  try {
+    // Get all sheet names from API
+    console.log('[Background] 📋 Getting all sheet names...');
+    const allSheetNames = await withTimeout(
+      getAllSheetNames(spreadsheetId),
+      5000,
+      'Get all sheet names'
+    );
+    console.log('[Background] Available sheets:', allSheetNames);
+
+    // Find matching sheet by hint
+    let targetSheetName = null;
+    const lowerHint = sheetNameHint.toLowerCase();
+
+    // 1. Exact match (case-insensitive)
+    targetSheetName = allSheetNames.find(s => s.toLowerCase() === lowerHint);
+
+    // 2. Contains match (case-insensitive)
+    if (!targetSheetName) {
+      targetSheetName = allSheetNames.find(s =>
+        s.toLowerCase().includes(lowerHint) || lowerHint.includes(s.toLowerCase())
+      );
+    }
+
+    // 3. Keyword match (прайс, справочник, price, etc.)
+    if (!targetSheetName) {
+      const refKeywords = ['прайс', 'справочник', 'каталог', 'price', 'catalog', 'reference', 'lookup'];
+      targetSheetName = allSheetNames.find(s => {
+        const lowerName = s.toLowerCase();
+        return refKeywords.some(keyword => lowerName.includes(keyword));
+      });
+    }
+
+    if (!targetSheetName) {
+      throw new Error(`Could not find reference sheet matching "${sheetNameHint}". Available: ${allSheetNames.join(', ')}`);
+    }
+
+    console.log(`[Background] ✅ Found reference sheet: "${targetSheetName}"`);
+
+    // Read data from reference sheet
+    console.log(`[Background] 📖 Reading reference data from "${targetSheetName}"...`);
+    const data = await withTimeout(
+      readSheetData(spreadsheetId, targetSheetName),
+      8000,
+      `Read reference sheet "${targetSheetName}"`
+    );
+
+    if (!data.headers || data.headers.length === 0 || !data.data || data.data.length === 0) {
+      throw new Error(`Reference sheet "${targetSheetName}" is empty or has no data`);
+    }
+
+    console.log(`[Background] ✅ Got reference data from "${targetSheetName}":`, {
+      headers: data.headers,
+      rows: data.data.length
+    });
+
+    return {
+      sheetName: targetSheetName,
+      headers: data.headers,
+      data: data.data
+    };
+
+  } catch (error) {
+    console.error('[Background] ❌ Error getting reference sheet data:', error);
+    throw error;
+  }
+}
+
+/**
  * Write data to Google Sheet
  */
 async function handleWriteSheetData(tabId, tabUrl, data) {

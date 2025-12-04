@@ -118,16 +118,9 @@ class SheetGPTSupportBot:
 • Приоритетная обработка
 • Все функции доступны
 • Поддержка 24/7
-
-**💎 PRO Годовой** - 2499₽/год (экономия 40%)
-• Всё из PRO
-• 12 месяцев по цене 8
-
-Выберите план:
 """
         keyboard = [
-            [InlineKeyboardButton("⭐ PRO на месяц - 299₽", callback_data="buy_pro_month")],
-            [InlineKeyboardButton("💎 PRO на год - 2499₽", callback_data="buy_pro_year")],
+            [InlineKeyboardButton("⭐ Купить PRO - 299₽", callback_data="buy_pro_month")],
             [InlineKeyboardButton("« Назад", callback_data="back_main")],
         ]
 
@@ -145,18 +138,13 @@ class SheetGPTSupportBot:
         text = """
 💳 **Купить PRO подписку**
 
-Выберите период подписки:
-
-⭐ **PRO на месяц** - 299₽
+⭐ **PRO** - 299₽/месяц
 • Безлимитные запросы на 30 дней
-
-💎 **PRO на год** - 2499₽
-• Безлимитные запросы на 365 дней
-• Экономия 40%!
+• Приоритетная обработка
+• Все функции доступны
 """
         keyboard = [
-            [InlineKeyboardButton("⭐ Месяц - 299₽", callback_data="buy_pro_month")],
-            [InlineKeyboardButton("💎 Год - 2499₽", callback_data="buy_pro_year")],
+            [InlineKeyboardButton("⭐ Оплатить 299₽", callback_data="buy_pro_month")],
             [InlineKeyboardButton("« Назад", callback_data="back_main")],
         ]
 
@@ -173,14 +161,9 @@ class SheetGPTSupportBot:
 
         user = update.effective_user
 
-        if period == "month":
-            price = 299
-            days = 30
-            title = "PRO подписка (месяц)"
-        else:  # year
-            price = 2499
-            days = 365
-            title = "PRO подписка (год)"
+        price = 299
+        days = 30
+        title = "PRO подписка"
 
         # Если есть payment_token - используем Telegram Payments
         if self.payment_token:
@@ -391,23 +374,26 @@ class SheetGPTSupportBot:
         )
 
     async def forward_question_to_admin(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """Переслать вопрос админу"""
+        """Переслать вопрос админу (текст или медиа)"""
         user = update.effective_user
-        message = update.message.text
-
+        msg = update.message
+        
         context.user_data['waiting_question'] = False
-
-        # Отправляем админу
+        
+        # Определяем тип контента
+        has_media = msg.photo or msg.document or msg.video or msg.voice or msg.video_note or msg.audio
+        text_content = msg.caption if has_media else msg.text
+        
+        # Отправляем админу заголовок
         admin_text = f"""
 📩 **Новый вопрос в поддержку**
 
 👤 От: {user.first_name} (@{user.username or 'N/A'})
 🆔 ID: `{user.id}`
 
-💬 Вопрос:
-{message}
+💬 Сообщение: {text_content or '[Без текста]'}
 
-_Ответьте на это сообщение, чтобы отправить ответ пользователю_
+_Ответьте reply-ем на это сообщение_
 """
         try:
             await self.application.bot.send_message(
@@ -415,15 +401,20 @@ _Ответьте на это сообщение, чтобы отправить 
                 text=admin_text,
                 parse_mode='Markdown'
             )
-            await update.message.reply_text(
-                "✅ Ваш вопрос отправлен!\n\nМы ответим в ближайшее время.",
+            
+            # Если есть медиа - пересылаем оригинальное сообщение
+            if has_media:
+                await msg.forward(chat_id=ADMIN_TELEGRAM_ID)
+            
+            await msg.reply_text(
+                "✅ Ваш вопрос отправлен!" + chr(10) + chr(10) + "Мы ответим в ближайшее время.",
                 reply_markup=InlineKeyboardMarkup([
                     [InlineKeyboardButton("🏠 Главное меню", callback_data="back_main")]
                 ])
             )
         except Exception as e:
             logger.error(f"Failed to forward question: {e}")
-            await update.message.reply_text("❌ Ошибка отправки. Попробуйте позже.")
+            await msg.reply_text("❌ Ошибка отправки. Попробуйте позже.")
 
     async def forward_payment_proof(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Переслать подтверждение оплаты админу"""
@@ -476,7 +467,7 @@ _Ответьте на это сообщение, чтобы отправить 
 
         # Извлекаем user_id из сообщения
         import re
-        match = re.search(r'🆔.*?`(\d+)`', reply_msg.text or '')
+        match = re.search(r'🆔\s*(?:ID:?\s*)?(\d+)', reply_msg.text or '')
         if not match:
             await update.message.reply_text("❌ Не удалось найти ID пользователя в сообщении")
             return
@@ -494,9 +485,68 @@ _Ответьте на это сообщение, чтобы отправить 
             await update.message.reply_text(f"❌ Ошибка: {e}")
 
     async def handle_photo(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """Обработка фотографий (для подтверждения оплаты)"""
+        """Обработка фотографий"""
+        user = update.effective_user
+        
+        # Ожидаем вопрос в поддержку
+        if context.user_data.get('waiting_question'):
+            await self.forward_question_to_admin(update, context)
+            return
+        
+        # Ожидаем подтверждение оплаты
         if context.user_data.get('waiting_payment_proof'):
             await self.forward_payment_proof(update, context)
+            return
+        
+        # Если это админ и это reply - пересылаем пользователю
+        if user.id == ADMIN_TELEGRAM_ID and update.message.reply_to_message:
+            await self.admin_reply_media(update, context)
+            return
+
+    async def handle_media(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Обработка документов, видео, голосовых и др."""
+        user = update.effective_user
+        
+        # Ожидаем вопрос в поддержку
+        if context.user_data.get('waiting_question'):
+            await self.forward_question_to_admin(update, context)
+            return
+        
+        # Ожидаем подтверждение оплаты
+        if context.user_data.get('waiting_payment_proof'):
+            await self.forward_payment_proof(update, context)
+            return
+        
+        # Если это админ и это reply - пересылаем пользователю
+        if user.id == ADMIN_TELEGRAM_ID and update.message.reply_to_message:
+            await self.admin_reply_media(update, context)
+            return
+
+    async def admin_reply_media(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Админ отвечает медиа-файлом"""
+        reply_msg = update.message.reply_to_message
+        
+        # Извлекаем user_id из сообщения
+        import re
+        match = re.search(r'🆔\s*(?:ID:?\s*)?(\d+)', reply_msg.text or reply_msg.caption or '')
+        if not match:
+            await update.message.reply_text("❌ Не удалось найти ID пользователя в сообщении")
+            return
+        
+        user_id = int(match.group(1))
+        
+        try:
+            # Сначала отправляем текст "Ответ от поддержки"
+            await self.application.bot.send_message(
+                chat_id=user_id,
+                text="💬 **Ответ от поддержки:**",
+                parse_mode='Markdown'
+            )
+            # Затем пересылаем медиа
+            await update.message.forward(chat_id=user_id)
+            await update.message.reply_text("✅ Ответ отправлен!")
+        except Exception as e:
+            await update.message.reply_text(f"❌ Ошибка: {e}")
 
     # ==================== АДМИН ФУНКЦИИ ====================
 
@@ -708,8 +758,6 @@ _Ответьте на это сообщение, чтобы отправить 
             await self.show_prices(update, context)
         elif data == "buy_pro_month":
             await self.process_buy(update, context, "month")
-        elif data == "buy_pro_year":
-            await self.process_buy(update, context, "year")
         elif data.startswith("paid_"):
             days = int(data.replace("paid_", ""))
             await self.user_paid(update, context, days)
@@ -747,8 +795,19 @@ _Ответьте на это сообщение, чтобы отправить 
         # Текстовые сообщения
         self.application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, self.handle_message))
 
-        # Фото (для подтверждения оплаты)
+        # Фото
         self.application.add_handler(MessageHandler(filters.PHOTO, self.handle_photo))
+        
+        # Документы, видео, голосовые и др.
+        self.application.add_handler(MessageHandler(
+            filters.Document.ALL | filters.VIDEO | filters.VOICE | filters.VIDEO_NOTE | filters.AUDIO,
+            self.handle_media
+        ))
+
+        # Создаём event loop для потока (важно при запуске в thread)
+        import asyncio
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
 
         logger.info("Support Bot is running...")
         self.application.run_polling(allowed_updates=Update.ALL_TYPES, stop_signals=None)

@@ -206,6 +206,10 @@ async def generate_formula(request: FormulaRequest):
 
         response_type = result.get("response_type", result.get("type", "formula"))
 
+        # Debug logging for VLOOKUP
+        logger.info(f"[Formula API] Result keys: {list(result.keys())}")
+        logger.info(f"[Formula API] action_type: {result.get('action_type')}, write_data present: {'write_data' in result}")
+
         if response_type == "analysis" or response_type == "question":
             response_data = FormulaResponse(
                 formula=None,
@@ -226,6 +230,13 @@ async def generate_formula(request: FormulaRequest):
                 response_dict["highlight_rows"] = result["highlight_rows"]
                 response_dict["highlight_color"] = result.get("highlight_color", "#FFFF00")
                 response_dict["highlight_message"] = result.get("highlight_message", "Строки выделены")
+            # v9.3.2: VLOOKUP write_data fields
+            if "action_type" in result:
+                response_dict["action_type"] = result["action_type"]
+            if "write_data" in result:
+                response_dict["write_data"] = result["write_data"]
+            if "write_headers" in result:
+                response_dict["write_headers"] = result["write_headers"]
             if result.get("conversation_id"):
                 response_dict["conversation_id"] = result["conversation_id"]
             return response_dict

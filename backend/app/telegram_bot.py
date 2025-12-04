@@ -429,7 +429,7 @@ SheetGPT работает как расширение для Google Chrome, ко
             text = f"""
 💳 **Подписка**
 
-✅ У тебя активная подписка **Premium**
+✅ У тебя активная подписка **PRO**
 
 📅 Действует до: {premium_date}
 📊 Всего запросов: {total_queries}
@@ -461,10 +461,10 @@ SheetGPT работает как расширение для Google Chrome, ко
 📈 Осталось запросов: **{remaining}**
 📊 Всего запросов: {total_queries}
 
-Хочешь больше? Переходи на Premium!
+Хочешь больше? Переходи на PRO!
 """
             keyboard = [
-                [InlineKeyboardButton("⭐ Получить Unlimited", callback_data="sub_plans")],
+                [InlineKeyboardButton("⭐ Получить PRO", callback_data="sub_plans")],
                 [InlineKeyboardButton("« Назад в меню", callback_data="menu_back")]
             ]
 
@@ -491,7 +491,7 @@ SheetGPT работает как расширение для Google Chrome, ко
 👇 Для оплаты напиши в поддержку:
 """
         keyboard = [
-            [InlineKeyboardButton("💬 Написать в поддержку (/support)", callback_data="support_write")],
+            [InlineKeyboardButton("💬 Написать в поддержку", url="https://t.me/sheetgpt_supportBot")],
             [InlineKeyboardButton("« Назад", callback_data="menu_subscription")]
         ]
         await query.edit_message_text(
@@ -514,7 +514,7 @@ SheetGPT работает как расширение для Google Chrome, ко
 Для отмены напиши в поддержку.
 """
         keyboard = [
-            [InlineKeyboardButton("💬 Написать в поддержку (/support)", callback_data="support_write")],
+            [InlineKeyboardButton("💬 Написать в поддержку", url="https://t.me/sheetgpt_supportBot")],
             [InlineKeyboardButton("« Назад", callback_data="menu_subscription")]
         ]
         await query.edit_message_text(
@@ -543,7 +543,7 @@ SheetGPT работает как расширение для Google Chrome, ко
 👇 Выбери способ связи:
 """
         keyboard = [
-            [InlineKeyboardButton("💬 Написать в поддержку (/support)", callback_data="support_write")],
+            [InlineKeyboardButton("💬 Написать в поддержку", url="https://t.me/sheetgpt_supportBot")],
             [InlineKeyboardButton("📖 Читать FAQ", url=INSTALLATION_GUIDE_URL)],
             [InlineKeyboardButton("« Назад в меню", callback_data="menu_back")]
         ]

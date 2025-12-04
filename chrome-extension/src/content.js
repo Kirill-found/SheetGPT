@@ -467,6 +467,27 @@ window.addEventListener('message', async (event) => {
     return;
   }
 
+  // Handle OVERWRITE_SHEET_DATA message from sidebar (VLOOKUP results)
+  if (event.data && event.data.type === 'OVERWRITE_SHEET_DATA') {
+    console.log('[SheetGPT] 📝 Overwriting sheet data:', event.data.data);
+    try {
+      await overwriteSheetData(event.data.data);
+      event.source.postMessage({
+        type: 'OVERWRITE_SHEET_DATA_RESPONSE',
+        success: true
+      }, event.origin);
+      console.log('[SheetGPT] ✅ Sheet data overwritten successfully');
+    } catch (e) {
+      console.error('[SheetGPT] ❌ Failed to overwrite sheet data:', e);
+      event.source.postMessage({
+        type: 'OVERWRITE_SHEET_DATA_RESPONSE',
+        success: false,
+        error: e.message
+      }, event.origin);
+    }
+    return;
+  }
+
   // Verify it's a message from our sidebar (has our message structure)
   if (!event.data || typeof event.data !== 'object' || !event.data.action || !event.data.messageId) {
     console.log('[SheetGPT] Ignoring message - not from sidebar (missing action or messageId)');
@@ -599,8 +620,11 @@ const API_URLS = {
 async function processQuery(query, history = [], licenseKey = null, referenceSheet = null) {
   console.log('[SheetGPT] Processing query:', query);
   console.log('[SheetGPT] API Mode:', API_MODE, '| URL:', API_URLS[API_MODE]);
+  console.log('[SheetGPT] 🔍 referenceSheet param:', referenceSheet);
   if (referenceSheet) {
-    console.log('[SheetGPT] Reference sheet provided:', referenceSheet.name);
+    console.log('[SheetGPT] ✅ Reference sheet:', referenceSheet.name, 'with', referenceSheet.headers?.length, 'cols');
+  } else {
+    console.log('[SheetGPT] ❌ No reference sheet');
   }
 
   // v7.9.4: Check context before any operations
@@ -750,21 +774,30 @@ async function createTableAndChart(structuredData) {
       throw new Error('Converted values array is empty');
     }
 
-    // Generate sheet title
-    const timestamp = new Date().toLocaleString('ru-RU', {
-      day: '2-digit',
-      month: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit'
-    }).replace(/[,\s:]/g, '_');
-    const sheetTitle = `SheetGPT_${timestamp}`;
+    // Get spreadsheet ID and active sheet name
+    const match = window.location.href.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
+    if (!match) {
+      throw new Error('Could not get spreadsheet ID from URL');
+    }
+    const spreadsheetId = match[1];
 
-    // Create new sheet with data (v7.9.4: use safeSendMessage)
+    const storageKey = `sheetName_${spreadsheetId}`;
+    const storage = await chrome.storage.local.get([storageKey]);
+    const sheetName = storage[storageKey];
+    if (!sheetName) {
+      throw new Error('Could not get active sheet name. Try refreshing the page.');
+    }
+
+    console.log('[SheetGPT] Writing table to current sheet:', sheetName);
+
+    // Write to current sheet instead of creating new one
     const response = await safeSendMessage({
-      action: 'CREATE_NEW_SHEET',
+      action: 'WRITE_SHEET_DATA',
       data: {
-        sheetTitle,
-        values
+        sheetName: sheetName,
+        values: values,
+        startCell: 'A1',
+        mode: 'overwrite'
       }
     });
 
@@ -775,7 +808,7 @@ async function createTableAndChart(structuredData) {
     console.log('[SheetGPT] ✅ Table created:', response.result);
     return {
       success: true,
-      message: `Таблица создана на листе "${sheetTitle}" (${response.result.rowsWritten} строк)`
+      message: `Данные вставлены в лист "${sheetName}" (${response.result.rowsWritten} строк)`
     };
   } catch (error) {
     console.error('[SheetGPT] Error creating table:', error);
@@ -1063,6 +1096,24 @@ async function overwriteSheetData(cleanedData) {
       throw new Error('Invalid cleaned data format');
     }
 
+    // Get spreadsheet ID from URL
+    const match = window.location.href.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
+
+    if (!match) {
+      throw new Error('Could not get spreadsheet ID from URL');
+    }
+    const spreadsheetId = match[1];
+
+    // Get active sheet name from storage
+    const storageKey = `sheetName_${spreadsheetId}`;
+    const storage = await chrome.storage.local.get([storageKey]);
+    const sheetName = storage[storageKey];
+    if (!sheetName) {
+      throw new Error('Could not get active sheet name. Try refreshing the page.');
+    }
+
+    console.log('[SheetGPT] Writing to sheet:', sheetName);
+
     // Convert to 2D array
     const values = convertStructuredDataToValues(cleanedData);
 
@@ -1070,6 +1121,7 @@ async function overwriteSheetData(cleanedData) {
     const response = await safeSendMessage({
       action: 'WRITE_SHEET_DATA',
       data: {
+        sheetName: sheetName,
         values: values,
         startCell: 'A1',
         mode: 'overwrite'

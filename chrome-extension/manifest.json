@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "SheetGPT AI Assistant",
-  "version": "9.0.0",
+  "version": "9.4.0",
   "description": "AI-powered assistant for Google Sheets - analyze data, create tables, generate insights",
   "default_locale": "ru",
   "permissions": [
@@ -26,9 +26,15 @@
   },
   "content_scripts": [
     {
-      "matches": ["https://docs.google.com/spreadsheets/*"],
-      "js": ["src/content.js"],
-      "css": ["styles/sidebar.css"],
+      "matches": [
+        "https://docs.google.com/spreadsheets/*"
+      ],
+      "js": [
+        "src/content.js"
+      ],
+      "css": [
+        "styles/sidebar.css"
+      ],
       "run_at": "document_idle"
     }
   ],
@@ -47,8 +53,13 @@
   },
   "web_accessible_resources": [
     {
-      "resources": ["src/sidebar.html", "src/sidebar.js"],
-      "matches": ["https://docs.google.com/*"]
+      "resources": [
+        "src/sidebar.html",
+        "src/sidebar.js"
+      ],
+      "matches": [
+        "https://docs.google.com/*"
+      ]
     }
   ]
 }

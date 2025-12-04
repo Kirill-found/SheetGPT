@@ -58,24 +58,34 @@ function cleanResponseText(text, preserveNewlines = false) {
 // ============================================
 
 function detectCrossSheetQuery(query) {
+  console.log('[Sidebar] 🔍 detectCrossSheetQuery:', query);
   const lowerQuery = query.toLowerCase();
+  // Patterns to extract sheet name: quoted text OR single word
   const patterns = [
-    /(?:из|с|from)\s+(?:листа|sheet|таблицы)\s+["'«]?([^"'»,]+)["'»]?/i,
-    /(?:впр|vlookup)\s+(?:из|from|с)\s+["'«]?([^"'»,]+)["'»]?/i,
-    /(?:по|в|in)\s+(?:листе|листу|sheet)\s+["'«]?([^"'»,]+)["'»]?/i,
+    /(?:из|с|from)\s+(?:листа|sheet|таблицы)\s+["'«]([^"'»]+)["'»]/i,  // With quotes
+    /(?:из|с|from)\s+(?:листа|sheet|таблицы)\s+([^\s,]+)/i,             // Single word
+    /(?:впр|vlookup)\s+(?:из|from|с)\s+["'«]([^"'»]+)["'»]/i,
+    /(?:впр|vlookup)\s+(?:из|from|с)\s+([^\s,]+)/i,
+    /(?:по|в|in)\s+(?:листе|листу|sheet)\s+["'«]([^"'»]+)["'»]/i,
+    /(?:по|в|in)\s+(?:листе|листу|sheet)\s+([^\s,]+)/i,
   ];
-  for (const pattern of patterns) {
+  for (let i = 0; i < patterns.length; i++) {
+    const pattern = patterns[i];
     const match = query.match(pattern);
     if (match && match[1]) {
+      console.log('[Sidebar] ✅ Pattern matched! Sheet name:', match[1].trim());
       return { sheetName: match[1].trim() };
     }
   }
+  // Fallback: check for reference keywords in query
   const refKeywords = ['прайс', 'справочник', 'каталог', 'price', 'catalog', 'reference'];
   for (const keyword of refKeywords) {
     if (lowerQuery.includes(keyword)) {
+      console.log('[Sidebar] ✅ Keyword matched:', keyword);
       return { sheetName: keyword };
     }
   }
+  console.log('[Sidebar] ❌ No cross-sheet pattern detected');
   return null;
 }
 
@@ -86,9 +96,11 @@ async function getReferenceSheetData(sheetNameHint) {
       (response) => {
         if (chrome.runtime.lastError) {
           reject(new Error(chrome.runtime.lastError.message));
-        } else if (response && response.success) {
-          resolve({ name: response.sheetName, headers: response.headers, data: response.data });
+        } else if (response && response.success && response.result) {
+          console.log('[Sidebar] 📦 getReferenceSheetData result:', response.result);
+          resolve({ name: response.result.sheetName, headers: response.result.headers, data: response.result.data });
         } else {
+          console.error('[Sidebar] getReferenceSheetData failed:', response);
           reject(new Error(response?.error || 'Failed to get reference sheet'));
         }
       }
@@ -993,6 +1005,7 @@ async function sendMessage() {
       }
     }
     
+    console.log('[Sidebar] 🚀 Sending PROCESS_QUERY with referenceSheet:', referenceSheet);
     const result = await sendToContentScript('PROCESS_QUERY', {
       query,
       history: conversationHistory,
@@ -1000,6 +1013,7 @@ async function sendMessage() {
       licenseKey: state.licenseKey  // v10.2: CRITICAL - pass license for usage tracking!
     });
     console.log('[Sidebar] Sent PROCESS_QUERY with licenseKey:', state.licenseKey ? 'YES' : 'NO');
+    console.log('[Sidebar] referenceSheet in data:', referenceSheet ? 'YES' : 'NO');
 
     // Remove loading
     loadingEl.remove();
@@ -1384,6 +1398,38 @@ async function getSheetData() {
   });
 }
 
+async function overwriteSheetData(dataToWrite) {
+  return new Promise((resolve, reject) => {
+    console.log('[Sidebar] overwriteSheetData called with:', dataToWrite);
+    // Send message to content script to write data
+    window.parent.postMessage({
+      type: 'OVERWRITE_SHEET_DATA',
+      data: dataToWrite
+    }, '*');
+
+    const handler = (event) => {
+      if (event.data && event.data.type === 'OVERWRITE_SHEET_DATA_RESPONSE') {
+        window.removeEventListener('message', handler);
+        if (event.data.success) {
+          console.log('[Sidebar] ✅ Sheet data written successfully');
+          resolve(event.data);
+        } else {
+          console.error('[Sidebar] ❌ Failed to write sheet data:', event.data.error);
+          reject(new Error(event.data.error || 'Failed to write data'));
+        }
+      }
+    };
+
+    window.addEventListener('message', handler);
+
+    // Timeout after 10 seconds
+    setTimeout(() => {
+      window.removeEventListener('message', handler);
+      reject(new Error('Timeout waiting for sheet data write response'));
+    }, 10000);
+  });
+}
+
 async function callAPI(query, sheetData, history = []) {
   // Format payload for /api/v1/formula endpoint
   const payload = {
@@ -1681,6 +1727,29 @@ function transformAPIResponse(apiResponse) {
       type: 'highlight',
       text: `Выделено ${apiResponse.highlighted_count || apiResponse.highlight_rows.length} строк`,
       rows: apiResponse.highlight_rows
+    };
+  }
+
+
+  // If response is a write_data action (VLOOKUP result)
+  if (apiResponse.action_type === 'write_data' && apiResponse.write_data) {
+    console.log('[Sidebar] ✅ Write data condition met! Writing to sheet...');
+    // Write data to current sheet immediately
+    const dataToWrite = {
+      headers: apiResponse.write_headers,
+      rows: apiResponse.write_data  // Note: "rows" not "data" - content.js expects this format
+    };
+    overwriteSheetData(dataToWrite).then(() => {
+      console.log('[Sidebar] ✅ Data written to sheet successfully');
+      addAIMessage({ type: 'success', text: apiResponse.summary || '✅ Данные успешно записаны в таблицу!' });
+    }).catch(err => {
+      console.error('[Sidebar] ❌ Write data failed:', err);
+      addAIMessage({ type: 'error', text: `Ошибка записи данных: ${err.message}` });
+    });
+    return {
+      type: 'write_data',
+      text: apiResponse.summary || 'Записываю данные в таблицу...',
+      dataWritten: true
     };
   }
 

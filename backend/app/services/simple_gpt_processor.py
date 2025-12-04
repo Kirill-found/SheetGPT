@@ -2477,6 +2477,10 @@ for col, val in min_row.items():
                     reference_df=reference_df
                 )
 
+                # Check retry result
+                if not result.get("success"):
+                    return self._create_error_response(result.get("error", "Validation failed after retry"), time.time() - start_time)
+
             # 4. Format response
             elapsed = time.time() - start_time
             formatted_result = self._format_result(result["result"])
@@ -2518,14 +2522,36 @@ for col, val in min_row.items():
                     logger.info(f"[SimpleGPT] Generated highlight_rows: {highlight_rows[:10]}... (total: {len(highlight_rows)})")
 
             # Add structured_data for tables/lists (only if NOT highlight query)
-            if not is_highlight_query and result_type == "table" and isinstance(formatted_result, list):
+            # Debug logging
+            logger.info(f"[SimpleGPT] DEBUG - result type: {type(result['result'])}, formatted_result type: {type(formatted_result)}")
+            logger.info(f"[SimpleGPT] DEBUG - formatted_result length: {len(formatted_result) if isinstance(formatted_result, list) else 'N/A'}")
+            if isinstance(formatted_result, list) and len(formatted_result) > 0:
+                logger.info(f"[SimpleGPT] DEBUG - first element type: {type(formatted_result[0])}, value: {formatted_result[0]}")
+            # Check if result is a table (list of dicts) - independent of result_type
+            is_table = isinstance(formatted_result, list) and len(formatted_result) > 0 and isinstance(formatted_result[0], dict)
+            logger.info(f"[SimpleGPT] Checking write_data: is_highlight={is_highlight_query}, result_type={result_type}, is_table={is_table}, has_ref_df={reference_df is not None}")
+            if not is_highlight_query and is_table:
                 # Extract headers from first row keys (rows are dicts from DataFrame)
                 headers = list(formatted_result[0].keys()) if formatted_result else []
-                response["structured_data"] = {
-                    "headers": headers,
-                    "rows": formatted_result,
-                    "display_mode": "sidebar_only" if len(formatted_result) <= 20 else "create_sheet"
-                }
+                logger.info(f"[SimpleGPT] Table result detected, headers: {headers}")
+                
+                # v9.3.2: For VLOOKUP (with reference_df), write directly to sheet
+                if reference_df is not None:
+                    logger.info(f"[SimpleGPT] ✅ VLOOKUP mode - setting write_data")
+                    # VLOOKUP result - convert to DataFrame and write to sheet
+                    vlookup_df = pd.DataFrame(formatted_result)
+                    response["action_type"] = "write_data"
+                    response["write_data"] = vlookup_df.values.tolist()
+                    response["write_headers"] = headers
+                    response["summary"] = f"✅ Данные из листа \"{reference_sheet_name or 'справочник'}\" подтянуты ({len(formatted_result)} строк)"
+                    logger.info(f"[SimpleGPT] VLOOKUP result: {len(formatted_result)} rows, writing to sheet")
+                else:
+                    # Regular table - show in sidebar or create new sheet
+                    response["structured_data"] = {
+                        "headers": headers,
+                        "rows": formatted_result,
+                        "display_mode": "sidebar_only" if len(formatted_result) <= 20 else "create_sheet"
+                    }
             elif result_type == "list" and isinstance(formatted_result, list):
                 # Convert all items to strings for schema validation
                 response["key_findings"] = [str(item) for item in formatted_result]
@@ -2534,8 +2560,9 @@ for col, val in min_row.items():
 
         except Exception as e:
             elapsed = time.time() - start_time
-            logger.error(f"[SimpleGPT] Error: {str(e)}")
-            return self._create_error_response(str(e), elapsed)
+            error_msg = f"{type(e).__name__}: {str(e)}" if str(e) else type(e).__name__
+            logger.error(f"[SimpleGPT] Error: {error_msg}", exc_info=True)
+            return self._create_error_response(error_msg, elapsed)
 
     async def _generate_and_execute(
         self,

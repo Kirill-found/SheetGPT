@@ -24,6 +24,7 @@ from dotenv import load_dotenv
 load_dotenv()  # Load .env file FIRST
 
 from fastapi import FastAPI, HTTPException, Header, Depends
+from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from typing import Optional
 from app.schemas.requests import FormulaRequest
@@ -34,6 +35,7 @@ import logging
 from datetime import datetime, timezone
 import os
 import threading
+import math
 
 # Configure logging
 logging.basicConfig(
@@ -60,6 +62,19 @@ app.add_middleware(
 
 # Include Telegram API router
 app.include_router(telegram_router)
+
+
+def sanitize_for_json(obj):
+    """Recursively replace NaN/Infinity with None for JSON serialization."""
+    if isinstance(obj, dict):
+        return {k: sanitize_for_json(v) for k, v in obj.items()}
+    elif isinstance(obj, list):
+        return [sanitize_for_json(item) for item in obj]
+    elif isinstance(obj, float):
+        if math.isnan(obj) or math.isinf(obj):
+            return None
+        return obj
+    return obj
 
 
 def start_telegram_bot():
@@ -201,6 +216,16 @@ async def health_check():
             "expected_accuracy": "98-99%"
         }
     }
+
+
+@app.get("/privacy")
+async def privacy_policy():
+    """Privacy Policy page for Chrome Web Store compliance"""
+    privacy_file = os.path.join(os.path.dirname(__file__), "templates", "privacy.html")
+    if os.path.exists(privacy_file):
+        return FileResponse(privacy_file, media_type="text/html")
+    else:
+        raise HTTPException(status_code=404, detail="Privacy policy not found")
 
 @app.post("/api/v1/formula", response_model=FormulaResponse)
 async def process_formula(
@@ -454,6 +479,11 @@ async def process_formula(
             response_dict["action_type"] = result["action_type"]
         if "value" in result:
             response_dict["value"] = result["value"]
+        # v9.3.2: VLOOKUP write_data fields
+        if "write_data" in result:
+            response_dict["write_data"] = result["write_data"]
+        if "write_headers" in result:
+            response_dict["write_headers"] = result["write_headers"]
 
         # Add sorting data
         if "sort_column" in result:
@@ -574,7 +604,8 @@ async def process_formula(
         logger.info("[COMPLETE] Response sent successfully")
         logger.info("="*60)
 
-        return response_dict
+        # Sanitize NaN/Infinity values before JSON serialization
+        return sanitize_for_json(response_dict)
 
     except ValueError as e:
         # Ошибки валидации данных
