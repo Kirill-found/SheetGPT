@@ -2,11 +2,11 @@ FROM python:3.11-slim
 
 # ============ FORCE FULL REBUILD ============
 # Change this timestamp to bust ALL cache layers
-ENV FORCE_REBUILD="2025-12-02-11:30:00-v9.2.3-MEDIA-FIX"
+ENV FORCE_REBUILD="2025-12-02-12:00:00-v9.3.0-PRIVACY-POLICY"
 RUN echo "=== FULL REBUILD: $FORCE_REBUILD ===" && date
 
-LABEL version="9.2.3"
-LABEL description="SheetGPT API v9.2.3 - Fixed media forwarding"
+LABEL version="9.3.0"
+LABEL description="SheetGPT API v9.3.0 - Privacy Policy for Chrome Web Store"
 
 WORKDIR /app
 

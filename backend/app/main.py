@@ -24,6 +24,7 @@ from dotenv import load_dotenv
 load_dotenv()  # Load .env file FIRST
 
 from fastapi import FastAPI, HTTPException, Header, Depends
+from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from typing import Optional
 from app.schemas.requests import FormulaRequest
@@ -215,6 +216,16 @@ async def health_check():
             "expected_accuracy": "98-99%"
         }
     }
+
+
+@app.get("/privacy")
+async def privacy_policy():
+    """Privacy Policy page for Chrome Web Store compliance"""
+    privacy_file = os.path.join(os.path.dirname(__file__), "templates", "privacy.html")
+    if os.path.exists(privacy_file):
+        return FileResponse(privacy_file, media_type="text/html")
+    else:
+        raise HTTPException(status_code=404, detail="Privacy policy not found")
 
 @app.post("/api/v1/formula", response_model=FormulaResponse)
 async def process_formula(
