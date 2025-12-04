@@ -2522,12 +2522,15 @@ for col, val in min_row.items():
                     logger.info(f"[SimpleGPT] Generated highlight_rows: {highlight_rows[:10]}... (total: {len(highlight_rows)})")
 
             # Add structured_data for tables/lists (only if NOT highlight query)
+            logger.info(f"[SimpleGPT] Checking write_data: is_highlight={is_highlight_query}, result_type={result_type}, is_list={isinstance(formatted_result, list)}, has_ref_df={reference_df is not None}")
             if not is_highlight_query and result_type == "table" and isinstance(formatted_result, list):
                 # Extract headers from first row keys (rows are dicts from DataFrame)
                 headers = list(formatted_result[0].keys()) if formatted_result else []
+                logger.info(f"[SimpleGPT] Table result detected, headers: {headers}")
                 
                 # v9.3.2: For VLOOKUP (with reference_df), write directly to sheet
                 if reference_df is not None:
+                    logger.info(f"[SimpleGPT] ✅ VLOOKUP mode - setting write_data")
                     # VLOOKUP result - convert to DataFrame and write to sheet
                     vlookup_df = pd.DataFrame(formatted_result)
                     response["action_type"] = "write_data"
