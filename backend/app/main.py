@@ -479,6 +479,11 @@ async def process_formula(
             response_dict["action_type"] = result["action_type"]
         if "value" in result:
             response_dict["value"] = result["value"]
+        # v9.3.2: VLOOKUP write_data fields
+        if "write_data" in result:
+            response_dict["write_data"] = result["write_data"]
+        if "write_headers" in result:
+            response_dict["write_headers"] = result["write_headers"]
 
         # Add sorting data
         if "sort_column" in result:
