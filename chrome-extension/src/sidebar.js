@@ -1398,6 +1398,38 @@ async function getSheetData() {
   });
 }
 
+async function overwriteSheetData(dataToWrite) {
+  return new Promise((resolve, reject) => {
+    console.log('[Sidebar] overwriteSheetData called with:', dataToWrite);
+    // Send message to content script to write data
+    window.parent.postMessage({
+      type: 'OVERWRITE_SHEET_DATA',
+      data: dataToWrite
+    }, '*');
+
+    const handler = (event) => {
+      if (event.data && event.data.type === 'OVERWRITE_SHEET_DATA_RESPONSE') {
+        window.removeEventListener('message', handler);
+        if (event.data.success) {
+          console.log('[Sidebar] ✅ Sheet data written successfully');
+          resolve(event.data);
+        } else {
+          console.error('[Sidebar] ❌ Failed to write sheet data:', event.data.error);
+          reject(new Error(event.data.error || 'Failed to write data'));
+        }
+      }
+    };
+
+    window.addEventListener('message', handler);
+
+    // Timeout after 10 seconds
+    setTimeout(() => {
+      window.removeEventListener('message', handler);
+      reject(new Error('Timeout waiting for sheet data write response'));
+    }, 10000);
+  });
+}
+
 async function callAPI(query, sheetData, history = []) {
   // Format payload for /api/v1/formula endpoint
   const payload = {

@@ -467,6 +467,27 @@ window.addEventListener('message', async (event) => {
     return;
   }
 
+  // Handle OVERWRITE_SHEET_DATA message from sidebar (VLOOKUP results)
+  if (event.data && event.data.type === 'OVERWRITE_SHEET_DATA') {
+    console.log('[SheetGPT] 📝 Overwriting sheet data:', event.data.data);
+    try {
+      await overwriteSheetData(event.data.data);
+      event.source.postMessage({
+        type: 'OVERWRITE_SHEET_DATA_RESPONSE',
+        success: true
+      }, event.origin);
+      console.log('[SheetGPT] ✅ Sheet data overwritten successfully');
+    } catch (e) {
+      console.error('[SheetGPT] ❌ Failed to overwrite sheet data:', e);
+      event.source.postMessage({
+        type: 'OVERWRITE_SHEET_DATA_RESPONSE',
+        success: false,
+        error: e.message
+      }, event.origin);
+    }
+    return;
+  }
+
   // Verify it's a message from our sidebar (has our message structure)
   if (!event.data || typeof event.data !== 'object' || !event.data.action || !event.data.messageId) {
     console.log('[SheetGPT] Ignoring message - not from sidebar (missing action or messageId)');
