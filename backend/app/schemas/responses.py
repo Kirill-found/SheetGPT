@@ -54,6 +54,9 @@ class FormulaResponse(BaseModel):
     color_scale_rule: Optional[dict] = Field(None, description="Правило цветовой шкалы (градиента)")
     conditional_rule: Optional[dict] = Field(None, description="Правило условного форматирования")
     convert_rule: Optional[dict] = Field(None, description="Правило конвертации колонки в числа")
+    # v9.3.2: VLOOKUP write_data fields
+    write_data: Optional[List[List[Any]]] = Field(None, description="Данные для записи в текущий лист (VLOOKUP)")
+    write_headers: Optional[List[str]] = Field(None, description="Заголовки для записываемых данных")
     # Processor metadata
     processor_version: Optional[str] = Field(None, description="Версия процессора")
     complexity: Optional[str] = Field(None, description="Сложность запроса")
