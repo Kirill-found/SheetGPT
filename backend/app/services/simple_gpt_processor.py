@@ -2524,6 +2524,8 @@ for col, val in min_row.items():
             # Add structured_data for tables/lists (only if NOT highlight query)
             if not is_highlight_query and result_type == "table" and isinstance(formatted_result, list):
                 # Extract headers from first row keys (rows are dicts from DataFrame)
+                headers = list(formatted_result[0].keys()) if formatted_result else []
+                
                 # v9.3.2: For VLOOKUP (with reference_df), write directly to sheet
                 if reference_df is not None:
                     # VLOOKUP result - convert to DataFrame and write to sheet
@@ -2540,8 +2542,6 @@ for col, val in min_row.items():
                         "rows": formatted_result,
                         "display_mode": "sidebar_only" if len(formatted_result) <= 20 else "create_sheet"
                     }
-            if not is_highlight_query and result_type == "table" and isinstance(formatted_result, list):
-                # Extract headers from first row keys (rows are dicts from DataFrame)
             elif result_type == "list" and isinstance(formatted_result, list):
                 # Convert all items to strings for schema validation
                 response["key_findings"] = [str(item) for item in formatted_result]
