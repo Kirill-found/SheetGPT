@@ -1737,7 +1737,7 @@ function transformAPIResponse(apiResponse) {
     // Write data to current sheet immediately
     const dataToWrite = {
       headers: apiResponse.write_headers,
-      data: apiResponse.write_data
+      rows: apiResponse.write_data  // Note: "rows" not "data" - content.js expects this format
     };
     overwriteSheetData(dataToWrite).then(() => {
       console.log('[Sidebar] ✅ Data written to sheet successfully');
