@@ -59,6 +59,7 @@ class SheetGPTBot:
         self.database_url = database_url
         self.async_engine = None
         self.async_session_factory = None
+        self.admin_cmds = None
 
     def _init_db(self):
         """Инициализация подключения к БД"""
@@ -926,6 +927,17 @@ SheetGPT работает как расширение для Google Chrome, ко
         elif data.startswith("admin_reset_"):
             license_key = data.replace("admin_reset_", "")
             await self._reset_user_usage(query, license_key)
+        elif data == "admin_refresh":
+            # Обновить dashboard
+            if self.admin_cmds:
+                await self.admin_cmds.admin_dashboard(update, context)
+        elif data == "admin_users":
+            # Показать список пользователей
+            await self.admin_users(update, context)
+        elif data == "admin_export":
+            # Экспорт данных
+            if self.admin_cmds:
+                await self.admin_cmds.admin_export_data(update, context)
 
     async def _reset_user_usage(self, query, license_key: str):
         """Сброс счётчика использования"""
@@ -1015,6 +1027,17 @@ SheetGPT работает как расширение для Google Chrome, ко
         self.application.add_handler(CommandHandler("grant", self.admin_grant))
         self.application.add_handler(CommandHandler("revoke", self.admin_revoke))
         self.application.add_handler(CommandHandler("reply", self.admin_reply))
+
+        # Расширенные админ-команды (admin_commands.py)
+        if self.async_session_factory:
+            try:
+                from app.admin_commands import AdminCommands
+                self.admin_cmds = AdminCommands(self.admin_id, self.async_session_factory)
+                self.application.add_handler(CommandHandler("dashboard", self.admin_cmds.admin_dashboard))
+                self.application.add_handler(CommandHandler("export", self.admin_cmds.admin_export_data))
+                logger.info("✅ Advanced admin commands registered (/dashboard, /export)")
+            except Exception as e:
+                logger.error(f"Failed to register advanced admin commands: {e}")
 
         # Обработчик callback-кнопок (админские + обычные)
         self.application.add_handler(CallbackQueryHandler(self.admin_callback, pattern="^admin_"))
