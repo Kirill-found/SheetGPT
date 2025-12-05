@@ -561,10 +561,10 @@ _Ответьте reply-ем на это сообщение_
             return
 
         text = """
-🔐 **Админ-панель**
+🔐 <b>Админ-панель</b>
 
 Команды:
-• /grant_<user_id>_<days> - выдать PRO
+• /grant_&lt;user_id&gt;_&lt;days&gt; - выдать PRO
 • /users - список пользователей
 • /stats - статистика
 
@@ -578,7 +578,7 @@ _Ответьте reply-ем на это сообщение_
 
         await query.edit_message_text(
             text,
-            parse_mode='Markdown',
+            parse_mode='HTML',
             reply_markup=InlineKeyboardMarkup(keyboard)
         )
 
