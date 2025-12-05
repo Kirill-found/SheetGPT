@@ -76,7 +76,7 @@ class TelegramUser(Base):
         # Free пользователи ограничены дневным лимитом
         return self.queries_used_today < self.queries_limit
 
-    def upgrade_to_premium(self, duration_days: int = 365):
+    def upgrade_to_premium(self, duration_days: int = 30):
         """Обновление до Premium подписки"""
         from datetime import datetime, timezone, timedelta
         self.subscription_tier = "premium"

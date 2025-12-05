@@ -806,7 +806,7 @@ SheetGPT работает как расширение для Google Chrome, ко
             return
 
         if not context.args:
-            await update.message.reply_text("Использование: /grant <license_key> [days=365]")
+            await update.message.reply_text("Использование: /grant <license_key> [days=30]")
             return
 
         license_key = context.args[0].strip().upper()

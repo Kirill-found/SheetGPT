@@ -368,7 +368,7 @@ class AdminCommands:
             return
 
         if not context.args:
-            await self._reply(update, "Использование: /grant <license_key> [days=365]")
+            await self._reply(update, "Использование: /grant <license_key> [days=30]")
             return
 
         license_key = context.args[0]

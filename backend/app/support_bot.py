@@ -422,8 +422,8 @@ _Ответьте reply-ем на это сообщение_
         days = context.user_data.get('waiting_payment_proof', 30)
         context.user_data['waiting_payment_proof'] = None
 
-        period = "месяц" if days == 30 else "год"
-        price = 299 if days == 30 else 2499
+        period = "месяц"
+        price = 299
 
         # Формируем сообщение для админа
         admin_text = f"""

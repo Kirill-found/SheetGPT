@@ -198,10 +198,7 @@ class SheetGPTAdminBot:
 
             keyboard = [
                 [action_btn],
-                [
-                    InlineKeyboardButton("📅 PRO 30д", callback_data=f"grant30_{license_key}"),
-                    InlineKeyboardButton("📅 PRO 365д", callback_data=f"grant365_{license_key}")
-                ],
+                [InlineKeyboardButton("📅 PRO 30д", callback_data=f"grant30_{license_key}")],
                 [InlineKeyboardButton("🔄 Сброс счётчика", callback_data=f"reset_{license_key}")],
                 [InlineKeyboardButton("💬 Написать", callback_data=f"msg_{license_key}")],
                 [InlineKeyboardButton("« Назад к списку", callback_data="admin_users_0")]
@@ -209,7 +206,7 @@ class SheetGPTAdminBot:
 
             await query.edit_message_text(text, parse_mode='Markdown', reply_markup=InlineKeyboardMarkup(keyboard))
 
-    async def grant_pro(self, update: Update, context: ContextTypes.DEFAULT_TYPE, license_key: str, days: int = 365):
+    async def grant_pro(self, update: Update, context: ContextTypes.DEFAULT_TYPE, license_key: str, days: int = 30):
         """Выдать PRO подписку"""
         query = update.callback_query
         await query.answer()
@@ -492,13 +489,9 @@ class SheetGPTAdminBot:
             license_key = data.replace("grant30_", "")
             await self.grant_pro(update, context, license_key, 30)
 
-        elif data.startswith("grant365_"):
-            license_key = data.replace("grant365_", "")
-            await self.grant_pro(update, context, license_key, 365)
-
         elif data.startswith("grant_"):
             license_key = data.replace("grant_", "")
-            await self.grant_pro(update, context, license_key, 365)
+            await self.grant_pro(update, context, license_key, 30)
 
         elif data.startswith("revoke_"):
             license_key = data.replace("revoke_", "")
