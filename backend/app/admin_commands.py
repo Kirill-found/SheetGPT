@@ -87,6 +87,23 @@ class AdminCommands:
             # Конверсия
             conversion = (premium_count / total_count * 100) if total_count > 0 else 0
 
+            # MRR (Monthly Recurring Revenue)
+            # Считаем активных premium (у которых premium_until > сейчас)
+            now = datetime.now(timezone.utc)
+            active_premium = await session.execute(
+                select(TelegramUser).where(
+                    TelegramUser.subscription_tier == 'premium',
+                    TelegramUser.premium_until > now
+                )
+            )
+            active_premium_users = active_premium.scalars().all()
+            
+            # Расчет MRR: считаем каждого по месячной ставке 299 руб
+            mrr = len(active_premium_users) * 299
+            
+            # ARR (Annual Recurring Revenue)
+            arr = mrr * 12
+
             # Активные пользователи (запросы за последние 7 дней)
             week_ago = datetime.now(timezone.utc) - timedelta(days=7)
             active_7d = await session.execute(
@@ -136,6 +153,8 @@ class AdminCommands:
             )
             recent_users_list = recent_users.scalars().all()
 
+        active_pro_count = len(active_premium_users)
+        
         # Формируем сообщение
         text = f"""
 📊 **АДМИН-ПАНЕЛЬ SheetGPT**
@@ -146,6 +165,11 @@ class AdminCommands:
 • Всего: **{total_count}**
 • 💎 Premium: **{premium_count}** ({conversion:.1f}%)
 • 🆓 Free: **{free_count}**
+
+💰 **ДОХОД**
+• MRR: **{mrr:,}** ₽
+• ARR: **{arr:,}** ₽
+• Активных PRO: **{active_pro_count}**
 
 📈 **РОСТ**
 • Новых за 24ч: **{new_24h_count}**
