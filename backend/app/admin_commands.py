@@ -22,6 +22,35 @@ class AdminCommands:
         """Проверка что пользователь - админ"""
         return user_id == self.admin_id
 
+    async def _reply(self, update: Update, text: str, parse_mode: str = 'Markdown', reply_markup=None):
+        """Универсальный метод для ответа - работает и с message, и с callback_query"""
+        if update.callback_query:
+            await update.callback_query.answer()
+            try:
+                await update.callback_query.edit_message_text(
+                    text, parse_mode=parse_mode, reply_markup=reply_markup
+                )
+            except Exception:
+                await update.effective_chat.send_message(
+                    text, parse_mode=parse_mode, reply_markup=reply_markup
+                )
+        elif update.message:
+            await update.message.reply_text(
+                text, parse_mode=parse_mode, reply_markup=reply_markup
+            )
+
+    async def _send_document(self, update: Update, document, filename: str, caption: str = None):
+        """Универсальный метод для отправки документа"""
+        if update.callback_query:
+            await update.callback_query.answer()
+            await update.effective_chat.send_document(
+                document=document, filename=filename, caption=caption
+            )
+        elif update.message:
+            await update.message.reply_document(
+                document=document, filename=filename, caption=caption
+            )
+
     async def admin_dashboard(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """
         Команда /dashboard - полная админ-панель с детальной статистикой
@@ -34,11 +63,11 @@ class AdminCommands:
         - Топ активных пользователей
         """
         if not self._check_admin(update.effective_user.id):
-            await update.message.reply_text("⛔ Эта команда доступна только администратору.")
+            await self._reply(update, "⛔ Эта команда доступна только администратору.")
             return
 
         if not self.session_factory:
-            await update.message.reply_text("❌ База данных не подключена")
+            await self._reply(update, "❌ База данных не подключена")
             return
 
         async with self.session_factory() as session:
@@ -169,7 +198,7 @@ class AdminCommands:
             ]
         ]
 
-        await update.message.reply_text(
+        await self._reply(update, 
             text,
             parse_mode='Markdown',
             reply_markup=InlineKeyboardMarkup(keyboard)
@@ -178,7 +207,7 @@ class AdminCommands:
     async def admin_users_list(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Команда /users - список пользователей с пагинацией"""
         if not self._check_admin(update.effective_user.id):
-            await update.message.reply_text("⛔ Только для администратора")
+            await self._reply(update, "⛔ Только для администратора")
             return
 
         page = int(context.args[0]) if context.args and context.args[0].isdigit() else 1
@@ -200,7 +229,7 @@ class AdminCommands:
             total_count = total.scalar()
 
         if not users:
-            await update.message.reply_text("Пользователей не найдено")
+            await self._reply(update, "Пользователей не найдено")
             return
 
         total_pages = (total_count + per_page - 1) // per_page
@@ -227,7 +256,7 @@ class AdminCommands:
 
         keyboard = [buttons] if buttons else []
 
-        await update.message.reply_text(
+        await self._reply(update, 
             text,
             parse_mode='Markdown',
             reply_markup=InlineKeyboardMarkup(keyboard) if keyboard else None
@@ -236,11 +265,11 @@ class AdminCommands:
     async def admin_user_info(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Команда /user <license_key> - детальная информация о пользователе"""
         if not self._check_admin(update.effective_user.id):
-            await update.message.reply_text("⛔ Только для администратора")
+            await self._reply(update, "⛔ Только для администратора")
             return
 
         if not context.args:
-            await update.message.reply_text("Использование: /user <license_key>")
+            await self._reply(update, "Использование: /user <license_key>")
             return
 
         license_key = context.args[0]
@@ -252,7 +281,7 @@ class AdminCommands:
             user = result.scalar_one_or_none()
 
         if not user:
-            await update.message.reply_text(f"❌ Пользователь с ключом `{license_key}` не найден")
+            await self._reply(update, f"❌ Пользователь с ключом `{license_key}` не найден")
             return
 
         tier = "💎 Premium" if user.subscription_tier == "premium" else "🆓 Free"
@@ -302,7 +331,7 @@ class AdminCommands:
             ]
         ]
 
-        await update.message.reply_text(
+        await self._reply(update, 
             text,
             parse_mode='Markdown',
             reply_markup=InlineKeyboardMarkup(keyboard)
@@ -311,11 +340,11 @@ class AdminCommands:
     async def admin_grant_premium(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Команда /grant <license_key> [days] - выдать Premium подписку"""
         if not self._check_admin(update.effective_user.id):
-            await update.message.reply_text("⛔ Только для администратора")
+            await self._reply(update, "⛔ Только для администратора")
             return
 
         if not context.args:
-            await update.message.reply_text("Использование: /grant <license_key> [days=365]")
+            await self._reply(update, "Использование: /grant <license_key> [days=365]")
             return
 
         license_key = context.args[0]
@@ -328,14 +357,14 @@ class AdminCommands:
             user = result.scalar_one_or_none()
 
             if not user:
-                await update.message.reply_text(f"❌ Пользователь с ключом `{license_key}` не найден")
+                await self._reply(update, f"❌ Пользователь с ключом `{license_key}` не найден")
                 return
 
             user.upgrade_to_premium(duration_days=days)
             await session.commit()
 
         premium_until = user.premium_until.strftime('%d.%m.%Y')
-        await update.message.reply_text(
+        await self._reply(update, 
             f"✅ Premium выдан!\n\n"
             f"👤 {user.first_name or user.username}\n"
             f"🔑 `{license_key}`\n"
@@ -345,7 +374,7 @@ class AdminCommands:
     async def admin_export_data(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Команда /export - экспорт данных пользователей в CSV"""
         if not self._check_admin(update.effective_user.id):
-            await update.message.reply_text("⛔ Только для администратора")
+            await self._reply(update, "⛔ Только для администратора")
             return
 
         import csv
@@ -388,8 +417,5 @@ class AdminCommands:
         output.seek(0)
         filename = f"sheetgpt_users_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"
 
-        await update.message.reply_document(
-            document=io.BytesIO(output.getvalue().encode('utf-8')),
-            filename=filename,
-            caption=f"📊 Экспорт данных\n\nВсего пользователей: {len(users)}"
+        await self._send_document(update, document=io.BytesIO(output.getvalue().encode('utf-8')), filename=filename, caption=f"📊 Экспорт данных\n\nВсего пользователей: {len(users)}"
         )
