@@ -41,3 +41,6 @@ python-telegram-bot>=20.0,<22.0
 
 # FORCE REBUILD: 25 Nov 2025 - v8.0.0 Two-Stage AI Processing
 # Railway MUST rebuild when requirements.txt changes
+
+# Payments
+yookassa>=3.0.0

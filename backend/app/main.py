@@ -31,6 +31,7 @@ from app.schemas.requests import FormulaRequest
 from app.schemas.responses import FormulaResponse
 from app.config import settings
 from app.api.telegram import router as telegram_router
+from app.api.yookassa import router as yookassa_router
 import logging
 from datetime import datetime, timezone
 import os
@@ -62,6 +63,9 @@ app.add_middleware(
 
 # Include Telegram API router
 app.include_router(telegram_router)
+
+# Include YooKassa payment router
+app.include_router(yookassa_router)
 
 
 def sanitize_for_json(obj):
