@@ -44,11 +44,15 @@ PRO_DAYS = 30    # дней
 @router.get("/status")
 async def yookassa_status():
     """Проверить статус конфигурации YooKassa"""
+    # Проверяем все env переменные с YOO
+    all_yoo_vars = {k: v[:4] + "..." if v else None for k, v in os.environ.items() if "YOO" in k.upper()}
     return {
         "shop_id_set": bool(YOOKASSA_SHOP_ID),
         "secret_key_set": bool(YOOKASSA_SECRET_KEY),
         "shop_id_prefix": YOOKASSA_SHOP_ID[:6] + "..." if YOOKASSA_SHOP_ID else None,
-        "configured": bool(YOOKASSA_SHOP_ID and YOOKASSA_SECRET_KEY)
+        "configured": bool(YOOKASSA_SHOP_ID and YOOKASSA_SECRET_KEY),
+        "all_yoo_env_vars": all_yoo_vars,
+        "total_env_vars": len(os.environ)
     }
 
 
