@@ -52,7 +52,8 @@ async def yookassa_status():
         "shop_id_prefix": YOOKASSA_SHOP_ID[:6] + "..." if YOOKASSA_SHOP_ID else None,
         "configured": bool(YOOKASSA_SHOP_ID and YOOKASSA_SECRET_KEY),
         "all_yoo_env_vars": all_yoo_vars,
-        "total_env_vars": len(os.environ)
+        "total_env_vars": len(os.environ),
+        "all_env_names": sorted([k for k in os.environ.keys() if not k.startswith("_")])
     }
 
 
