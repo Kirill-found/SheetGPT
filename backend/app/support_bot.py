@@ -184,6 +184,7 @@ class SheetGPTSupportBot:
                     confirmation_data = confirmation.get("confirmation_data")  # QR для СБП
 
                     logger.info(f"Created YooKassa payment {payment_id} for user {user.id}, sbp={use_sbp}")
+                    logger.info(f"YooKassa confirmation: {confirmation}")
 
                     if confirmation_data and use_sbp:
                         # СБП - показываем ссылку на QR
@@ -202,6 +203,22 @@ class SheetGPTSupportBot:
                         keyboard = [
                             [InlineKeyboardButton("📱 Открыть QR-код", url=confirmation_data)],
                             [InlineKeyboardButton("🔄 Проверить оплату", callback_data=f"check_payment_{payment_id}")],
+                            [InlineKeyboardButton("« Назад", callback_data="buy_pro")],
+                        ]
+                        await query.edit_message_text(text, parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(keyboard))
+                        return
+
+                    elif use_sbp and not confirmation_data:
+                        # СБП запрошен, но данные не получены
+                        logger.warning(f"SBP requested but no confirmation_data received for payment {payment_id}")
+                        text = f"""
+❌ **СБП недоступен**
+
+К сожалению, СБП-оплата временно недоступна.
+Попробуйте оплатить картой.
+"""
+                        keyboard = [
+                            [InlineKeyboardButton("💳 Оплатить картой", callback_data="pay_card")],
                             [InlineKeyboardButton("« Назад", callback_data="buy_pro")],
                         ]
                         await query.edit_message_text(text, parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(keyboard))
