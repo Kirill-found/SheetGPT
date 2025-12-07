@@ -161,9 +161,9 @@ class SheetGPTSupportBot:
             }
             
             if use_sbp:
-                # СБП - показываем QR-код
+                # СБП - редирект на страницу с QR-кодом
                 payment_data["payment_method_data"] = {"type": "sbp"}
-                payment_data["confirmation"] = {"type": "qr"}
+                payment_data["confirmation"] = {"type": "redirect", "return_url": "https://t.me/sheetgpt_supportBot"}
             else:
                 # Обычная оплата картой - редирект
                 payment_data["confirmation"] = {"type": "redirect", "return_url": "https://t.me/sheetgpt_supportBot"}
@@ -186,8 +186,8 @@ class SheetGPTSupportBot:
                     logger.info(f"Created YooKassa payment {payment_id} for user {user.id}, sbp={use_sbp}")
                     logger.info(f"YooKassa confirmation: {confirmation}")
 
-                    if confirmation_data and use_sbp:
-                        # СБП - показываем ссылку на QR
+                    if confirmation_url and use_sbp:
+                        # СБП - редирект на страницу YooKassa с QR-кодом
                         text = f"""
 📱 **Оплата через СБП**
 
@@ -195,30 +195,14 @@ class SheetGPTSupportBot:
 **Период:** {PRO_DAYS} дней
 
 1. Нажмите кнопку ниже
-2. Отсканируйте QR-код в приложении банка
-3. Подтвердите оплату
+2. На открывшейся странице отсканируйте QR-код или выберите банк
+3. Подтвердите оплату в приложении банка
 
-После оплаты нажмите "Проверить оплату"
+После оплаты подписка активируется автоматически!
 """
                         keyboard = [
-                            [InlineKeyboardButton("📱 Открыть QR-код", url=confirmation_data)],
+                            [InlineKeyboardButton("📱 Оплатить через СБП", url=confirmation_url)],
                             [InlineKeyboardButton("🔄 Проверить оплату", callback_data=f"check_payment_{payment_id}")],
-                            [InlineKeyboardButton("« Назад", callback_data="buy_pro")],
-                        ]
-                        await query.edit_message_text(text, parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(keyboard))
-                        return
-
-                    elif use_sbp and not confirmation_data:
-                        # СБП запрошен, но данные не получены
-                        logger.warning(f"SBP requested but no confirmation_data received for payment {payment_id}")
-                        text = f"""
-❌ **СБП недоступен**
-
-К сожалению, СБП-оплата временно недоступна.
-Попробуйте оплатить картой.
-"""
-                        keyboard = [
-                            [InlineKeyboardButton("💳 Оплатить картой", callback_data="pay_card")],
                             [InlineKeyboardButton("« Назад", callback_data="buy_pro")],
                         ]
                         await query.edit_message_text(text, parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(keyboard))
