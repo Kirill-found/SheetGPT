@@ -128,9 +128,12 @@ class SheetGPTSupportBot:
 • Безлимитные запросы на 30 дней
 • Приоритетная обработка
 • Все функции доступны
+
+Выберите способ оплаты:
 """
         keyboard = [
-            [InlineKeyboardButton("⭐ Оплатить 299₽", callback_data="buy_pro_month")],
+            [InlineKeyboardButton("💳 Картой", callback_data="pay_card")],
+            [InlineKeyboardButton("📱 СБП (QR-код)", callback_data="pay_sbp")],
             [InlineKeyboardButton("« Назад", callback_data="back_main")],
         ]
         await query.edit_message_text(text, parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(keyboard))
@@ -142,7 +145,7 @@ class SheetGPTSupportBot:
         user = update.effective_user
         await self.create_yookassa_payment(query, user)
 
-    async def create_yookassa_payment(self, query, user):
+    async def create_yookassa_payment(self, query, user, use_sbp: bool = False):
         """Создать платеж в ЮКасса"""
         if not YOOKASSA_SHOP_ID or not YOOKASSA_SECRET_KEY:
             await self.show_manual_payment(query, user, PRO_PRICE, PRO_DAYS, "PRO подписка")
@@ -152,11 +155,18 @@ class SheetGPTSupportBot:
             idempotence_key = str(uuid.uuid4())
             payment_data = {
                 "amount": {"value": f"{PRO_PRICE}.00", "currency": "RUB"},
-                "confirmation": {"type": "redirect", "return_url": "https://t.me/sheetgpt_supportBot"},
                 "capture": True,
                 "description": f"SheetGPT PRO подписка на {PRO_DAYS} дней",
                 "metadata": {"telegram_user_id": str(user.id), "days": str(PRO_DAYS)}
             }
+            
+            if use_sbp:
+                # СБП - показываем QR-код
+                payment_data["payment_method_data"] = {"type": "sbp"}
+                payment_data["confirmation"] = {"type": "qr"}
+            else:
+                # Обычная оплата картой - редирект
+                payment_data["confirmation"] = {"type": "redirect", "return_url": "https://t.me/sheetgpt_supportBot"}
 
             async with httpx.AsyncClient() as client:
                 response = await client.post(
@@ -169,10 +179,36 @@ class SheetGPTSupportBot:
                 if response.status_code == 200:
                     result = response.json()
                     payment_id = result.get("id")
-                    confirmation_url = result.get("confirmation", {}).get("confirmation_url")
+                    confirmation = result.get("confirmation", {})
+                    confirmation_url = confirmation.get("confirmation_url")
+                    confirmation_data = confirmation.get("confirmation_data")  # QR для СБП
 
-                    if confirmation_url:
-                        logger.info(f"Created YooKassa payment {payment_id} for user {user.id}")
+                    logger.info(f"Created YooKassa payment {payment_id} for user {user.id}, sbp={use_sbp}")
+
+                    if confirmation_data and use_sbp:
+                        # СБП - показываем ссылку на QR
+                        text = f"""
+📱 **Оплата через СБП**
+
+**Сумма:** {PRO_PRICE}₽
+**Период:** {PRO_DAYS} дней
+
+1. Нажмите кнопку ниже
+2. Отсканируйте QR-код в приложении банка
+3. Подтвердите оплату
+
+После оплаты нажмите "Проверить оплату"
+"""
+                        keyboard = [
+                            [InlineKeyboardButton("📱 Открыть QR-код", url=confirmation_data)],
+                            [InlineKeyboardButton("🔄 Проверить оплату", callback_data=f"check_payment_{payment_id}")],
+                            [InlineKeyboardButton("« Назад", callback_data="buy_pro")],
+                        ]
+                        await query.edit_message_text(text, parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(keyboard))
+                        return
+
+                    elif confirmation_url:
+                        # Карта - редирект
                         text = f"""
 💳 **Оплата PRO подписки**
 
@@ -185,7 +221,7 @@ class SheetGPTSupportBot:
                         keyboard = [
                             [InlineKeyboardButton("💳 Перейти к оплате", url=confirmation_url)],
                             [InlineKeyboardButton("🔄 Проверить оплату", callback_data=f"check_payment_{payment_id}")],
-                            [InlineKeyboardButton("« Назад", callback_data="back_main")],
+                            [InlineKeyboardButton("« Назад", callback_data="buy_pro")],
                         ]
                         await query.edit_message_text(text, parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(keyboard))
                         return
@@ -622,6 +658,10 @@ _Ответьте reply-ем на это сообщение_
             await self.show_prices(update, context)
         elif data == "buy_pro_month":
             await self.process_buy(update, context, "month")
+        elif data == "pay_card":
+            await self.create_yookassa_payment(update.callback_query, update.effective_user, use_sbp=False)
+        elif data == "pay_sbp":
+            await self.create_yookassa_payment(update.callback_query, update.effective_user, use_sbp=True)
         elif data.startswith("check_payment_"):
             payment_id = data.replace("check_payment_", "")
             await self.check_payment_status(update, context, payment_id)
