@@ -41,6 +41,17 @@ PRO_PRICE = 299  # рублей
 PRO_DAYS = 30    # дней
 
 
+@router.get("/status")
+async def yookassa_status():
+    """Проверить статус конфигурации YooKassa"""
+    return {
+        "shop_id_set": bool(YOOKASSA_SHOP_ID),
+        "secret_key_set": bool(YOOKASSA_SECRET_KEY),
+        "shop_id_prefix": YOOKASSA_SHOP_ID[:6] + "..." if YOOKASSA_SHOP_ID else None,
+        "configured": bool(YOOKASSA_SHOP_ID and YOOKASSA_SECRET_KEY)
+    }
+
+
 class CreatePaymentRequest(BaseModel):
     telegram_user_id: int
     return_url: Optional[str] = None
