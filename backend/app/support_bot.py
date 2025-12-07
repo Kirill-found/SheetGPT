@@ -176,15 +176,17 @@ class SheetGPTSupportBot:
                     headers={"Idempotence-Key": idempotence_key, "Content-Type": "application/json"}
                 )
 
+                logger.info(f"YooKassa response: status={response.status_code}")
+                
                 if response.status_code == 200:
                     result = response.json()
                     payment_id = result.get("id")
+                    payment_status = result.get("status")
                     confirmation = result.get("confirmation", {})
                     confirmation_url = confirmation.get("confirmation_url")
-                    confirmation_data = confirmation.get("confirmation_data")  # QR для СБП
 
-                    logger.info(f"Created YooKassa payment {payment_id} for user {user.id}, sbp={use_sbp}")
-                    logger.info(f"YooKassa confirmation: {confirmation}")
+                    logger.info(f"Created YooKassa payment {payment_id}, status={payment_status}, sbp={use_sbp}")
+                    logger.info(f"Full response: {result}")
 
                     if confirmation_url and use_sbp:
                         # СБП - редирект на страницу YooKassa с QR-кодом
