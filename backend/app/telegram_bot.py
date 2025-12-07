@@ -81,7 +81,6 @@ class SheetGPTBot:
         """Создание главного меню с кнопками"""
         keyboard = [
             [InlineKeyboardButton("🌐 Chrome Extension", callback_data="menu_extension")],
-            [InlineKeyboardButton("📖 Инструкция по установке", callback_data="menu_guide")],
             [InlineKeyboardButton("🔑 Лицензионный ключ", callback_data="menu_license")],
             [InlineKeyboardButton("💳 Подписка", callback_data="menu_subscription")],
             [InlineKeyboardButton("🆘 Поддержка / Оплата", url="https://t.me/sheetgpt_supportBot")],
