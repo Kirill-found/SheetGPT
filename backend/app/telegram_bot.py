@@ -42,7 +42,7 @@ user_reviews = []   # [{user_id, username, rating, text, date}] - TODO: пере
 WAITING_REVIEW_RATING, WAITING_REVIEW_TEXT, WAITING_SUPPORT_MESSAGE = range(3)
 
 # Ссылки (можно вынести в config)
-CHROME_EXTENSION_URL = "https://chrome.google.com/webstore/detail/sheetgpt"  # TODO: заменить на реальную
+CHROME_EXTENSION_URL = "https://chromewebstore.google.com/detail/sheetgpt-ai-assistant/pfdbmkpaiijidaebaplocmgnfpehbggb"
 INSTALLATION_GUIDE_URL = "https://docs.google.com/document/d/YOUR_DOC_ID"  # TODO: заменить на реальную
 # Support - users can write directly to admin via /support command
 ADMIN_TELEGRAM_ID = 517682186  # Kirill - main admin
