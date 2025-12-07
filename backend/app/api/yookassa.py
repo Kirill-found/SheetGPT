@@ -23,8 +23,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
 import os
+import httpx
 
 logger = logging.getLogger(__name__)
+
+# Telegram Bot Token для уведомлений
+TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_ADMIN_BOT_TOKEN")
 
 router = APIRouter(prefix="/yookassa", tags=["YooKassa Payments"])
 
@@ -191,14 +195,50 @@ async def activate_pro_subscription(telegram_user_id: int, days: int, payment_id
 
             logger.info(f"User {telegram_user_id} upgraded to PRO until {user.premium_until}")
 
-            # TODO: Отправить уведомление пользователю в Telegram
-            # await send_telegram_notification(telegram_user_id, days)
+            # Отправить уведомление пользователю в Telegram
+            await send_telegram_notification(telegram_user_id, days)
 
             return True
 
     except Exception as e:
         logger.error(f"Failed to activate PRO for user {telegram_user_id}: {e}")
         return False
+
+
+async def send_telegram_notification(telegram_user_id: int, days: int):
+    """Отправить уведомление пользователю в Telegram после успешной оплаты"""
+    if not TELEGRAM_BOT_TOKEN:
+        logger.warning("TELEGRAM_BOT_TOKEN not set, skipping notification")
+        return
+
+    try:
+        message = f"""🎉 **Поздравляем!**
+
+Ваша подписка **PRO** успешно активирована на {days} дней!
+
+✨ Теперь вам доступны:
+• Безлимитные запросы
+• Приоритетная обработка
+• Все функции SheetGPT
+
+Спасибо за покупку!"""
+
+        url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage"
+        
+        async with httpx.AsyncClient() as client:
+            response = await client.post(url, json={
+                "chat_id": telegram_user_id,
+                "text": message,
+                "parse_mode": "Markdown"
+            })
+            
+            if response.status_code == 200:
+                logger.info(f"Sent PRO activation notification to user {telegram_user_id}")
+            else:
+                logger.warning(f"Failed to send notification: {response.text}")
+                
+    except Exception as e:
+        logger.error(f"Error sending Telegram notification: {e}")
 
 
 @router.get("/payment/{payment_id}")

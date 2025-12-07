@@ -2,16 +2,19 @@
 SheetGPT Support Bot - Бот поддержки для пользователей
 
 Функции:
-- Оплата подписки PRO
+- Оплата подписки PRO через ЮКасса
 - Вопросы в поддержку
 - Информация о тарифах
 """
 
 import logging
 import asyncio
+import os
+import uuid
 from datetime import datetime, timezone, timedelta
 from typing import Optional
 
+import httpx
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, LabeledPrice
 from telegram.ext import (
     Application,
@@ -27,13 +30,16 @@ from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker
 
 logging.basicConfig(
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
     level=logging.INFO
 )
 logger = logging.getLogger(__name__)
 
-# Admin ID для получения сообщений поддержки
 ADMIN_TELEGRAM_ID = 517682186
+YOOKASSA_SHOP_ID = os.getenv("YOOKASSA_SHOP_ID")
+YOOKASSA_SECRET_KEY = os.getenv("YOOKASSA_SECRET_KEY")
+PRO_PRICE = 299
+PRO_DAYS = 30
 
 
 class SheetGPTSupportBot:
@@ -43,7 +49,7 @@ class SheetGPTSupportBot:
         self.token = token
         self.main_bot_token = main_bot_token
         self.database_url = database_url
-        self.payment_token = payment_token  # Telegram Payments provider token
+        self.payment_token = payment_token
         self.application = None
         self.async_engine = None
         self.async_session_factory = None
@@ -56,19 +62,14 @@ class SheetGPTSupportBot:
                 db_url = db_url.replace("postgres://", "postgresql+asyncpg://", 1)
             elif db_url.startswith("postgresql://") and "+asyncpg" not in db_url:
                 db_url = db_url.replace("postgresql://", "postgresql+asyncpg://", 1)
-
             self.async_engine = create_async_engine(db_url, echo=False)
-            self.async_session_factory = sessionmaker(
-                self.async_engine, class_=AsyncSession, expire_on_commit=False
-            )
+            self.async_session_factory = sessionmaker(self.async_engine, class_=AsyncSession, expire_on_commit=False)
             logger.info("Support bot DB connection initialized")
 
     async def start(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """Команда /start - главное меню поддержки"""
+        """Команда /start"""
         user = update.effective_user
         logger.info(f"User {user.id} ({user.username}) started support bot")
-
-        # Проверяем, является ли пользователь админом
         is_admin = user.id == ADMIN_TELEGRAM_ID
 
         text = f"""
@@ -89,52 +90,37 @@ class SheetGPTSupportBot:
             [InlineKeyboardButton("❓ Задать вопрос", callback_data="ask_question")],
             [InlineKeyboardButton("📊 Мой статус", callback_data="my_status")],
         ]
-
-        # Админские кнопки
         if is_admin:
             keyboard.append([InlineKeyboardButton("🔐 Админ-панель", callback_data="admin_panel")])
 
-        await update.message.reply_text(
-            text,
-            parse_mode='Markdown',
-            reply_markup=InlineKeyboardMarkup(keyboard)
-        )
+        await update.message.reply_text(text, parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(keyboard))
 
     async def show_prices(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Показать тарифы"""
         query = update.callback_query
         await query.answer()
-
         text = """
 📋 **Тарифы SheetGPT**
 
 **🆓 FREE** - Бесплатно
 • 10 запросов в день
 • Базовые функции
-• Стандартная скорость
 
 **⭐ PRO** - 299₽/месяц
 • Безлимитные запросы
 • Приоритетная обработка
-• Все функции доступны
-• Поддержка 24/7
+• Все функции
 """
         keyboard = [
             [InlineKeyboardButton("⭐ Купить PRO - 299₽", callback_data="buy_pro_month")],
             [InlineKeyboardButton("« Назад", callback_data="back_main")],
         ]
-
-        await query.edit_message_text(
-            text,
-            parse_mode='Markdown',
-            reply_markup=InlineKeyboardMarkup(keyboard)
-        )
+        await query.edit_message_text(text, parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(keyboard))
 
     async def buy_pro(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Показать варианты покупки PRO"""
         query = update.callback_query
         await query.answer()
-
         text = """
 💳 **Купить PRO подписку**
 
@@ -147,118 +133,196 @@ class SheetGPTSupportBot:
             [InlineKeyboardButton("⭐ Оплатить 299₽", callback_data="buy_pro_month")],
             [InlineKeyboardButton("« Назад", callback_data="back_main")],
         ]
-
-        await query.edit_message_text(
-            text,
-            parse_mode='Markdown',
-            reply_markup=InlineKeyboardMarkup(keyboard)
-        )
+        await query.edit_message_text(text, parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(keyboard))
 
     async def process_buy(self, update: Update, context: ContextTypes.DEFAULT_TYPE, period: str):
-        """Обработка покупки"""
+        """Обработка покупки - создание платежа ЮКасса"""
         query = update.callback_query
         await query.answer()
+        user = update.effective_user
+        await self.create_yookassa_payment(query, user)
 
+    async def create_yookassa_payment(self, query, user):
+        """Создать платеж в ЮКасса"""
+        if not YOOKASSA_SHOP_ID or not YOOKASSA_SECRET_KEY:
+            await self.show_manual_payment(query, user, PRO_PRICE, PRO_DAYS, "PRO подписка")
+            return
+
+        try:
+            idempotence_key = str(uuid.uuid4())
+            payment_data = {
+                "amount": {"value": f"{PRO_PRICE}.00", "currency": "RUB"},
+                "confirmation": {"type": "redirect", "return_url": "https://t.me/sheetgpt_supportBot"},
+                "capture": True,
+                "description": f"SheetGPT PRO подписка на {PRO_DAYS} дней",
+                "metadata": {"telegram_user_id": str(user.id), "days": str(PRO_DAYS)}
+            }
+
+            async with httpx.AsyncClient() as client:
+                response = await client.post(
+                    "https://api.yookassa.ru/v3/payments",
+                    json=payment_data,
+                    auth=(YOOKASSA_SHOP_ID, YOOKASSA_SECRET_KEY),
+                    headers={"Idempotence-Key": idempotence_key, "Content-Type": "application/json"}
+                )
+
+                if response.status_code == 200:
+                    result = response.json()
+                    payment_id = result.get("id")
+                    confirmation_url = result.get("confirmation", {}).get("confirmation_url")
+
+                    if confirmation_url:
+                        logger.info(f"Created YooKassa payment {payment_id} for user {user.id}")
+                        text = f"""
+💳 **Оплата PRO подписки**
+
+**Сумма:** {PRO_PRICE}₽
+**Период:** {PRO_DAYS} дней
+
+Нажмите кнопку ниже для перехода на страницу оплаты.
+После успешной оплаты подписка активируется автоматически!
+"""
+                        keyboard = [
+                            [InlineKeyboardButton("💳 Перейти к оплате", url=confirmation_url)],
+                            [InlineKeyboardButton("🔄 Проверить оплату", callback_data=f"check_payment_{payment_id}")],
+                            [InlineKeyboardButton("« Назад", callback_data="back_main")],
+                        ]
+                        await query.edit_message_text(text, parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(keyboard))
+                        return
+                else:
+                    logger.error(f"YooKassa API error {response.status_code}: {response.text}")
+
+        except Exception as e:
+            logger.error(f"Failed to create YooKassa payment: {e}")
+
+        await self.show_manual_payment(query, user, PRO_PRICE, PRO_DAYS, "PRO подписка")
+
+    async def check_payment_status(self, update: Update, context: ContextTypes.DEFAULT_TYPE, payment_id: str):
+        """Проверить статус платежа"""
+        query = update.callback_query
+        await query.answer("Проверяем статус оплаты...")
         user = update.effective_user
 
-        price = 299
-        days = 30
-        title = "PRO подписка"
+        if not YOOKASSA_SHOP_ID or not YOOKASSA_SECRET_KEY:
+            await query.edit_message_text("❌ Платежная система не настроена")
+            return
 
-        # Если есть payment_token - используем Telegram Payments
-        if self.payment_token:
-            await self.send_invoice(query, user.id, title, price, days)
-        else:
-            # Иначе показываем инструкции для ручной оплаты
-            await self.show_manual_payment(query, user, price, days, title)
+        try:
+            async with httpx.AsyncClient() as client:
+                response = await client.get(
+                    f"https://api.yookassa.ru/v3/payments/{payment_id}",
+                    auth=(YOOKASSA_SHOP_ID, YOOKASSA_SECRET_KEY)
+                )
+
+                if response.status_code == 200:
+                    result = response.json()
+                    status = result.get("status")
+
+                    if status == "succeeded":
+                        await self.activate_pro_from_payment(user.id, PRO_DAYS, payment_id)
+                        text = """
+🎉 **Оплата прошла успешно!**
+
+Ваша подписка **PRO** активирована!
+✨ Безлимитные запросы теперь доступны!
+"""
+                        keyboard = [
+                            [InlineKeyboardButton("📊 Мой статус", callback_data="my_status")],
+                            [InlineKeyboardButton("🏠 Главное меню", callback_data="back_main")],
+                        ]
+                        await query.edit_message_text(text, parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(keyboard))
+
+                    elif status == "pending":
+                        text = """
+⏳ **Ожидание оплаты**
+
+Платеж ещё не завершён.
+Если вы уже оплатили, подождите 1-2 минуты и нажмите "Проверить" снова.
+"""
+                        confirmation_url = result.get("confirmation", {}).get("confirmation_url")
+                        keyboard = []
+                        if confirmation_url:
+                            keyboard.append([InlineKeyboardButton("💳 Перейти к оплате", url=confirmation_url)])
+                        keyboard.append([InlineKeyboardButton("🔄 Проверить ещё раз", callback_data=f"check_payment_{payment_id}")])
+                        keyboard.append([InlineKeyboardButton("« Назад", callback_data="back_main")])
+                        await query.edit_message_text(text, parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(keyboard))
+
+                    elif status == "canceled":
+                        text = """
+❌ **Платеж отменён**
+
+Вы можете попробовать оплатить ещё раз.
+"""
+                        keyboard = [
+                            [InlineKeyboardButton("💳 Попробовать снова", callback_data="buy_pro_month")],
+                            [InlineKeyboardButton("« Назад", callback_data="back_main")],
+                        ]
+                        await query.edit_message_text(text, parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(keyboard))
+
+        except Exception as e:
+            logger.error(f"Error checking payment status: {e}")
+            await query.edit_message_text("❌ Ошибка проверки платежа")
+
+    async def activate_pro_from_payment(self, telegram_user_id: int, days: int, payment_id: str):
+        """Активировать PRO после успешной оплаты"""
+        if not self.async_session_factory:
+            return False
+
+        try:
+            async with self.async_session_factory() as session:
+                from app.models.telegram_user import TelegramUser
+                result = await session.execute(select(TelegramUser).where(TelegramUser.telegram_user_id == telegram_user_id))
+                user = result.scalar_one_or_none()
+
+                if not user:
+                    return False
+
+                user.subscription_tier = "premium"
+                user.queries_limit = -1
+                user.premium_until = datetime.now(timezone.utc) + timedelta(days=days)
+                await session.commit()
+                logger.info(f"PRO activated for user {telegram_user_id} via payment {payment_id}")
+                return True
+        except Exception as e:
+            logger.error(f"Failed to activate PRO: {e}")
+            return False
 
     async def show_manual_payment(self, query, user, price: int, days: int, title: str):
-        """Показать информацию об оплате (ЮКасса будет подключена)"""
+        """Fallback если ЮКасса не настроена"""
         text = f"""
 💳 **Оплата: {title}**
 
 **Сумма:** {price}₽
 
-🔧 Платежная система подключается...
-
-Скоро здесь появится удобная оплата картой!
-
-А пока напишите в поддержку для активации PRO.
+⚠️ Автоматическая оплата временно недоступна.
+Для активации PRO напишите в поддержку.
 """
         keyboard = [
-            [InlineKeyboardButton("💬 Написать в поддержку", url="https://t.me/SheetGPT_support")],
+            [InlineKeyboardButton("💬 Написать в поддержку", callback_data="ask_question")],
             [InlineKeyboardButton("« Назад", callback_data="back_main")],
         ]
-
-        await query.edit_message_text(
-            text,
-            parse_mode='Markdown',
-            reply_markup=InlineKeyboardMarkup(keyboard)
-        )
-
-    async def user_paid(self, update: Update, context: ContextTypes.DEFAULT_TYPE, days: int):
-        """Пользователь нажал 'Я оплатил'"""
-        query = update.callback_query
-        await query.answer()
-
-        user = update.effective_user
-        context.user_data['waiting_payment_proof'] = days
-
-        text = """
-📸 **Подтверждение оплаты**
-
-Пожалуйста, отправьте скриншот чека или квитанции об оплате.
-
-После проверки администратором ваша подписка будет активирована.
-"""
-        keyboard = [
-            [InlineKeyboardButton("« Отмена", callback_data="buy_pro")],
-        ]
-
-        await query.edit_message_text(
-            text,
-            parse_mode='Markdown',
-            reply_markup=InlineKeyboardMarkup(keyboard)
-        )
+        await query.edit_message_text(text, parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(keyboard))
 
     async def ask_question(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Начать диалог с поддержкой"""
         query = update.callback_query
         await query.answer()
-
-        context.user_data['waiting_question'] = True
+        context.user_data["waiting_question"] = True
 
         text = """
 ❓ **Задать вопрос**
 
 Напишите ваш вопрос, и мы ответим в ближайшее время.
-
-Вы можете спросить о:
-• Работе расширения
-• Проблемах с подпиской
-• Функциях SheetGPT
-• Технических вопросах
-
-Просто напишите сообщение:
 """
-        keyboard = [
-            [InlineKeyboardButton("« Отмена", callback_data="back_main")],
-        ]
-
-        await query.edit_message_text(
-            text,
-            parse_mode='Markdown',
-            reply_markup=InlineKeyboardMarkup(keyboard)
-        )
+        keyboard = [[InlineKeyboardButton("« Отмена", callback_data="back_main")]]
+        await query.edit_message_text(text, parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(keyboard))
 
     async def my_status(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Показать статус пользователя"""
         query = update.callback_query
         await query.answer()
-
         user = update.effective_user
 
-        # Получаем данные из БД
         status_text = "🆓 Free"
         usage_text = "Нет данных"
         premium_text = ""
@@ -266,9 +330,7 @@ class SheetGPTSupportBot:
         if self.async_session_factory:
             async with self.async_session_factory() as session:
                 from app.models.telegram_user import TelegramUser
-                result = await session.execute(
-                    select(TelegramUser).where(TelegramUser.telegram_user_id == user.id)
-                )
+                result = await session.execute(select(TelegramUser).where(TelegramUser.telegram_user_id == user.id))
                 db_user = result.scalar_one_or_none()
 
                 if db_user:
@@ -277,40 +339,30 @@ class SheetGPTSupportBot:
                         if db_user.premium_until:
                             days_left = (db_user.premium_until - datetime.now(timezone.utc)).days
                             premium_text = f"\n📅 Действует до: {db_user.premium_until.strftime('%d.%m.%Y')} ({days_left} дн.)"
-
                     limit_str = "∞" if db_user.queries_limit == -1 else str(db_user.queries_limit)
                     usage_text = f"{db_user.queries_used_today}/{limit_str} сегодня"
 
         text = f"""
 📊 **Ваш статус**
 
-👤 {user.first_name} (@{user.username or 'N/A'})
+👤 {user.first_name} (@{user.username or "N/A"})
 🆔 `{user.id}`
 
 💳 Подписка: **{status_text}**{premium_text}
 📈 Использовано: {usage_text}
-
-Хотите улучшить план?
 """
         keyboard = [
             [InlineKeyboardButton("💳 Купить PRO", callback_data="buy_pro")],
             [InlineKeyboardButton("« Назад", callback_data="back_main")],
         ]
-
-        await query.edit_message_text(
-            text,
-            parse_mode='Markdown',
-            reply_markup=InlineKeyboardMarkup(keyboard)
-        )
+        await query.edit_message_text(text, parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(keyboard))
 
     async def back_to_main(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Вернуться в главное меню"""
         query = update.callback_query
         await query.answer()
-
-        # Сбрасываем состояния
-        context.user_data.pop('waiting_question', None)
-        context.user_data.pop('waiting_payment_proof', None)
+        context.user_data.pop("waiting_question", None)
+        context.user_data.pop("waiting_payment_proof", None)
 
         user = update.effective_user
         is_admin = user.id == ADMIN_TELEGRAM_ID
@@ -326,149 +378,73 @@ class SheetGPTSupportBot:
             [InlineKeyboardButton("❓ Задать вопрос", callback_data="ask_question")],
             [InlineKeyboardButton("📊 Мой статус", callback_data="my_status")],
         ]
-
         if is_admin:
             keyboard.append([InlineKeyboardButton("🔐 Админ-панель", callback_data="admin_panel")])
 
-        await query.edit_message_text(
-            text,
-            parse_mode='Markdown',
-            reply_markup=InlineKeyboardMarkup(keyboard)
-        )
+        await query.edit_message_text(text, parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(keyboard))
 
     async def handle_message(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Обработка текстовых сообщений"""
         user = update.effective_user
 
-        # Ожидаем вопрос в поддержку
-        if context.user_data.get('waiting_question'):
+        if context.user_data.get("waiting_question"):
             await self.forward_question_to_admin(update, context)
             return
 
-        # Ожидаем подтверждение оплаты
-        if context.user_data.get('waiting_payment_proof'):
-            await self.forward_payment_proof(update, context)
-            return
-
-        # Если это админ и это reply на сообщение - отправляем ответ пользователю
         if user.id == ADMIN_TELEGRAM_ID and update.message.reply_to_message:
             await self.admin_reply(update, context)
             return
 
-        # Иначе показываем подсказку
         await update.message.reply_text(
             "Выберите действие из меню или нажмите /start",
-            reply_markup=InlineKeyboardMarkup([
-                [InlineKeyboardButton("🏠 Главное меню", callback_data="back_main")]
-            ])
+            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🏠 Главное меню", callback_data="back_main")]])
         )
 
     async def forward_question_to_admin(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """Переслать вопрос админу (текст или медиа)"""
+        """Переслать вопрос админу"""
         user = update.effective_user
         msg = update.message
-        
-        context.user_data['waiting_question'] = False
-        
-        # Определяем тип контента
-        has_media = msg.photo or msg.document or msg.video or msg.voice or msg.video_note or msg.audio
+        context.user_data["waiting_question"] = False
+
+        has_media = msg.photo or msg.document or msg.video
         text_content = msg.caption if has_media else msg.text
-        
-        # Отправляем админу заголовок
+
         admin_text = f"""
 📩 **Новый вопрос в поддержку**
 
-👤 От: {user.first_name} (@{user.username or 'N/A'})
+👤 От: {user.first_name} (@{user.username or "N/A"})
 🆔 ID: `{user.id}`
 
-💬 Сообщение: {text_content or '[Без текста]'}
+💬 Сообщение: {text_content or "[Без текста]"}
 
 _Ответьте reply-ем на это сообщение_
 """
         try:
-            await self.application.bot.send_message(
-                chat_id=ADMIN_TELEGRAM_ID,
-                text=admin_text,
-                parse_mode='Markdown'
-            )
-            
-            # Если есть медиа - пересылаем оригинальное сообщение
+            await self.application.bot.send_message(chat_id=ADMIN_TELEGRAM_ID, text=admin_text, parse_mode="Markdown")
             if has_media:
                 await msg.forward(chat_id=ADMIN_TELEGRAM_ID)
-            
             await msg.reply_text(
-                "✅ Ваш вопрос отправлен!" + chr(10) + chr(10) + "Мы ответим в ближайшее время.",
-                reply_markup=InlineKeyboardMarkup([
-                    [InlineKeyboardButton("🏠 Главное меню", callback_data="back_main")]
-                ])
+                "✅ Ваш вопрос отправлен!\n\nМы ответим в ближайшее время.",
+                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("🏠 Главное меню", callback_data="back_main")]])
             )
         except Exception as e:
             logger.error(f"Failed to forward question: {e}")
-            await msg.reply_text("❌ Ошибка отправки. Попробуйте позже.")
-
-    async def forward_payment_proof(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """Переслать подтверждение оплаты админу"""
-        user = update.effective_user
-        days = context.user_data.get('waiting_payment_proof', 30)
-        context.user_data['waiting_payment_proof'] = None
-
-        period = "месяц"
-        price = 299
-
-        # Формируем сообщение для админа
-        admin_text = f"""
-💳 **Новая оплата PRO**
-
-👤 От: {user.first_name} (@{user.username or 'N/A'})
-🆔 ID: `{user.id}`
-
-📦 Тариф: PRO на {period} ({days} дн.)
-💰 Сумма: {price}₽
-
-⬇️ Подтверждение оплаты ниже
-
-Для активации: /grant_{user.id}_{days}
-"""
-        try:
-            await self.application.bot.send_message(
-                chat_id=ADMIN_TELEGRAM_ID,
-                text=admin_text,
-                parse_mode='Markdown'
-            )
-
-            # Пересылаем сообщение/фото пользователя
-            await update.message.forward(chat_id=ADMIN_TELEGRAM_ID)
-
-            await update.message.reply_text(
-                "✅ Подтверждение отправлено!\n\n"
-                "Мы проверим оплату и активируем подписку в течение 15 минут.\n"
-                "Вы получите уведомление после активации.",
-                reply_markup=InlineKeyboardMarkup([
-                    [InlineKeyboardButton("🏠 Главное меню", callback_data="back_main")]
-                ])
-            )
-        except Exception as e:
-            logger.error(f"Failed to forward payment proof: {e}")
-            await update.message.reply_text("❌ Ошибка отправки. Попробуйте позже.")
+            await msg.reply_text("❌ Ошибка отправки.")
 
     async def admin_reply(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """Админ отвечает на сообщение пользователя"""
-        reply_msg = update.message.reply_to_message
-
-        # Извлекаем user_id из сообщения
+        """Админ отвечает на сообщение"""
         import re
-        match = re.search(r'🆔\s*(?:ID:?\s*)?(\d+)', reply_msg.text or '')
+        reply_msg = update.message.reply_to_message
+        match = re.search(r"🆔\s*(?:ID:?\s*)?(\d+)", reply_msg.text or "")
         if not match:
-            await update.message.reply_text("❌ Не удалось найти ID пользователя в сообщении")
+            await update.message.reply_text("❌ Не удалось найти ID пользователя")
             return
-
         user_id = int(match.group(1))
-
         try:
             await self.application.bot.send_message(
                 chat_id=user_id,
                 text=f"💬 **Ответ от поддержки:**\n\n{update.message.text}",
-                parse_mode='Markdown'
+                parse_mode="Markdown"
             )
             await update.message.reply_text("✅ Ответ отправлен!")
         except Exception as e:
@@ -476,75 +452,18 @@ _Ответьте reply-ем на это сообщение_
 
     async def handle_photo(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Обработка фотографий"""
-        user = update.effective_user
-        
-        # Ожидаем вопрос в поддержку
-        if context.user_data.get('waiting_question'):
+        if context.user_data.get("waiting_question"):
             await self.forward_question_to_admin(update, context)
-            return
-        
-        # Ожидаем подтверждение оплаты
-        if context.user_data.get('waiting_payment_proof'):
-            await self.forward_payment_proof(update, context)
-            return
-        
-        # Если это админ и это reply - пересылаем пользователю
-        if user.id == ADMIN_TELEGRAM_ID and update.message.reply_to_message:
-            await self.admin_reply_media(update, context)
-            return
 
     async def handle_media(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """Обработка документов, видео, голосовых и др."""
-        user = update.effective_user
-        
-        # Ожидаем вопрос в поддержку
-        if context.user_data.get('waiting_question'):
+        """Обработка медиа"""
+        if context.user_data.get("waiting_question"):
             await self.forward_question_to_admin(update, context)
-            return
-        
-        # Ожидаем подтверждение оплаты
-        if context.user_data.get('waiting_payment_proof'):
-            await self.forward_payment_proof(update, context)
-            return
-        
-        # Если это админ и это reply - пересылаем пользователю
-        if user.id == ADMIN_TELEGRAM_ID and update.message.reply_to_message:
-            await self.admin_reply_media(update, context)
-            return
-
-    async def admin_reply_media(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """Админ отвечает медиа-файлом"""
-        reply_msg = update.message.reply_to_message
-        
-        # Извлекаем user_id из сообщения
-        import re
-        match = re.search(r'🆔\s*(?:ID:?\s*)?(\d+)', reply_msg.text or reply_msg.caption or '')
-        if not match:
-            await update.message.reply_text("❌ Не удалось найти ID пользователя в сообщении")
-            return
-        
-        user_id = int(match.group(1))
-        
-        try:
-            # Сначала отправляем текст "Ответ от поддержки"
-            await self.application.bot.send_message(
-                chat_id=user_id,
-                text="💬 **Ответ от поддержки:**",
-                parse_mode='Markdown'
-            )
-            # Затем пересылаем медиа
-            await update.message.forward(chat_id=user_id)
-            await update.message.reply_text("✅ Ответ отправлен!")
-        except Exception as e:
-            await update.message.reply_text(f"❌ Ошибка: {e}")
-
-    # ==================== АДМИН ФУНКЦИИ ====================
 
     async def admin_panel(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Админ-панель"""
         query = update.callback_query
         await query.answer()
-
         user = update.effective_user
         if user.id != ADMIN_TELEGRAM_ID:
             await query.edit_message_text("❌ Доступ запрещён")
@@ -555,36 +474,25 @@ _Ответьте reply-ем на это сообщение_
 
 Команды:
 • /grant_&lt;user_id&gt;_&lt;days&gt; - выдать PRO
-• /users - список пользователей
 • /stats - статистика
-
-Также можно отвечать на сообщения пользователей reply-ем.
 """
         keyboard = [
             [InlineKeyboardButton("👥 Пользователи", callback_data="admin_users_0")],
             [InlineKeyboardButton("📊 Статистика", callback_data="admin_stats")],
             [InlineKeyboardButton("« Назад", callback_data="back_main")],
         ]
-
-        await query.edit_message_text(
-            text,
-            parse_mode='HTML',
-            reply_markup=InlineKeyboardMarkup(keyboard)
-        )
+        await query.edit_message_text(text, parse_mode="HTML", reply_markup=InlineKeyboardMarkup(keyboard))
 
     async def admin_grant(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """Команда /grant_<user_id>_<days> - выдать PRO"""
+        """Выдать PRO"""
+        import re
         user = update.effective_user
         if user.id != ADMIN_TELEGRAM_ID:
             return
-
-        # Парсим команду
-        import re
-        match = re.match(r'/grant_(\d+)_(\d+)', update.message.text)
+        match = re.match(r"/grant_(\d+)_(\d+)", update.message.text)
         if not match:
             await update.message.reply_text("Формат: /grant_<user_id>_<days>")
             return
-
         target_user_id = int(match.group(1))
         days = int(match.group(2))
 
@@ -594,9 +502,7 @@ _Ответьте reply-ем на это сообщение_
 
         async with self.async_session_factory() as session:
             from app.models.telegram_user import TelegramUser
-            result = await session.execute(
-                select(TelegramUser).where(TelegramUser.telegram_user_id == target_user_id)
-            )
+            result = await session.execute(select(TelegramUser).where(TelegramUser.telegram_user_id == target_user_id))
             db_user = result.scalar_one_or_none()
 
             if not db_user:
@@ -608,25 +514,19 @@ _Ответьте reply-ем на это сообщение_
             db_user.premium_until = datetime.now(timezone.utc) + timedelta(days=days)
             await session.commit()
 
-            # Уведомляем пользователя
             try:
                 await self.application.bot.send_message(
                     chat_id=target_user_id,
-                    text=f"🎉 **Поздравляем!**\n\n"
-                         f"Ваша подписка **PRO** активирована на {days} дней!\n\n"
-                         f"✨ Безлимитные запросы доступны!",
-                    parse_mode='Markdown'
+                    text=f"🎉 **Поздравляем!**\n\nВаша подписка **PRO** активирована на {days} дней!\n\n✨ Безлимитные запросы доступны!",
+                    parse_mode="Markdown"
                 )
-            except Exception as e:
-                logger.warning(f"Could not notify user: {e}")
+            except:
+                pass
 
-            await update.message.reply_text(
-                f"✅ PRO выдан пользователю {target_user_id} на {days} дней\n"
-                f"👤 {db_user.first_name} @{db_user.username}"
-            )
+            await update.message.reply_text(f"✅ PRO выдан пользователю {target_user_id} на {days} дней")
 
     async def admin_stats(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """Статистика для админа"""
+        """Статистика"""
         query = update.callback_query
         if query:
             await query.answer()
@@ -642,20 +542,10 @@ _Ответьте reply-ем на это сообщение_
         else:
             async with self.async_session_factory() as session:
                 from app.models.telegram_user import TelegramUser
-
                 total_result = await session.execute(select(func.count(TelegramUser.id)))
                 total_users = total_result.scalar()
-
-                pro_result = await session.execute(
-                    select(func.count(TelegramUser.id)).where(TelegramUser.subscription_tier == "premium")
-                )
+                pro_result = await session.execute(select(func.count(TelegramUser.id)).where(TelegramUser.subscription_tier == "premium"))
                 pro_users = pro_result.scalar()
-
-                queries_result = await session.execute(select(func.sum(TelegramUser.total_queries)))
-                total_queries = queries_result.scalar() or 0
-
-                today_result = await session.execute(select(func.sum(TelegramUser.queries_used_today)))
-                today_queries = today_result.scalar() or 0
 
             text = f"""
 📊 **Статистика SheetGPT**
@@ -663,28 +553,20 @@ _Ответьте reply-ем на это сообщение_
 👥 Всего пользователей: **{total_users}**
 ⭐ PRO подписчиков: **{pro_users}**
 🆓 Free: **{total_users - pro_users}**
-
-📈 Запросов всего: **{total_queries}**
-📅 Запросов сегодня: **{today_queries}**
-
-🕐 {datetime.now().strftime('%H:%M:%S')}
 """
-
         keyboard = [
             [InlineKeyboardButton("🔄 Обновить", callback_data="admin_stats")],
             [InlineKeyboardButton("« Назад", callback_data="admin_panel")],
         ]
-
         if query:
-            await query.edit_message_text(text, parse_mode='Markdown', reply_markup=InlineKeyboardMarkup(keyboard))
+            await query.edit_message_text(text, parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(keyboard))
         else:
-            await update.message.reply_text(text, parse_mode='Markdown', reply_markup=InlineKeyboardMarkup(keyboard))
+            await update.message.reply_text(text, parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(keyboard))
 
     async def admin_users(self, update: Update, context: ContextTypes.DEFAULT_TYPE, page: int = 0):
-        """Список пользователей для админа"""
+        """Список пользователей"""
         query = update.callback_query
         await query.answer()
-
         user = query.from_user
         if user.id != ADMIN_TELEGRAM_ID:
             return
@@ -698,16 +580,10 @@ _Ответьте reply-ем на это сообщение_
 
         async with self.async_session_factory() as session:
             from app.models.telegram_user import TelegramUser
-
             count_result = await session.execute(select(func.count(TelegramUser.id)))
             total = count_result.scalar()
 
-            result = await session.execute(
-                select(TelegramUser)
-                .order_by(TelegramUser.created_at.desc())
-                .offset(offset)
-                .limit(per_page)
-            )
+            result = await session.execute(select(TelegramUser).order_by(TelegramUser.created_at.desc()).offset(offset).limit(per_page))
             users = result.scalars().all()
 
             if not users:
@@ -715,12 +591,11 @@ _Ответьте reply-ем на это сообщение_
                 return
 
             text = f"👥 **Пользователи** ({offset+1}-{min(offset+per_page, total)} из {total})\n\n"
-
             keyboard = []
             for u in users:
                 tier = "⭐" if u.subscription_tier == "premium" else "🆓"
                 name = u.first_name or u.username or "N/A"
-                btn_text = f"{tier} {name[:15]} | {u.queries_used_today}/{u.queries_limit if u.queries_limit > 0 else '∞'}"
+                btn_text = f"{tier} {name[:15]}"
                 keyboard.append([InlineKeyboardButton(btn_text, callback_data=f"user_{u.license_key}")])
 
             nav_buttons = []
@@ -730,10 +605,9 @@ _Ответьте reply-ем на это сообщение_
                 nav_buttons.append(InlineKeyboardButton("➡️", callback_data=f"admin_users_{page+1}"))
             if nav_buttons:
                 keyboard.append(nav_buttons)
-
             keyboard.append([InlineKeyboardButton("« Назад", callback_data="admin_panel")])
 
-            await query.edit_message_text(text, parse_mode='Markdown', reply_markup=InlineKeyboardMarkup(keyboard))
+            await query.edit_message_text(text, parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(keyboard))
 
     async def callback_handler(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Обработка callback кнопок"""
@@ -748,9 +622,9 @@ _Ответьте reply-ем на это сообщение_
             await self.show_prices(update, context)
         elif data == "buy_pro_month":
             await self.process_buy(update, context, "month")
-        elif data.startswith("paid_"):
-            days = int(data.replace("paid_", ""))
-            await self.user_paid(update, context, days)
+        elif data.startswith("check_payment_"):
+            payment_id = data.replace("check_payment_", "")
+            await self.check_payment_status(update, context, payment_id)
         elif data == "ask_question":
             await self.ask_question(update, context)
         elif data == "my_status":
@@ -766,39 +640,21 @@ _Ответьте reply-ем на это сообщение_
     def run(self):
         """Запуск бота"""
         logger.info("Starting SheetGPT Support Bot...")
+        logger.info(f"YooKassa configured: {bool(YOOKASSA_SHOP_ID and YOOKASSA_SECRET_KEY)}")
 
         self._init_db()
-
         self.application = Application.builder().token(self.token).build()
 
-        # Команды
         self.application.add_handler(CommandHandler("start", self.start))
         self.application.add_handler(CommandHandler("stats", self.admin_stats))
-        self.application.add_handler(MessageHandler(
-            filters.Regex(r'^/grant_\d+_\d+$'),
-            self.admin_grant
-        ))
-
-        # Callback кнопки
+        self.application.add_handler(MessageHandler(filters.Regex(r"^/grant_\d+_\d+$"), self.admin_grant))
         self.application.add_handler(CallbackQueryHandler(self.callback_handler))
-
-        # Текстовые сообщения
         self.application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, self.handle_message))
-
-        # Фото
         self.application.add_handler(MessageHandler(filters.PHOTO, self.handle_photo))
-        
-        # Документы, видео, голосовые и др.
-        self.application.add_handler(MessageHandler(
-            filters.Document.ALL | filters.VIDEO | filters.VOICE | filters.VIDEO_NOTE | filters.AUDIO,
-            self.handle_media
-        ))
+        self.application.add_handler(MessageHandler(filters.Document.ALL | filters.VIDEO, self.handle_media))
 
-        # Создаём event loop для потока (важно при запуске в thread)
-        import asyncio
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
-
         logger.info("Support Bot is running...")
         self.application.run_polling(allowed_updates=Update.ALL_TYPES, stop_signals=None)
 
@@ -807,7 +663,7 @@ def main():
     """Точка входа"""
     from app.config import settings
 
-    token = settings.TELEGRAM_ADMIN_BOT_TOKEN  # Используем тот же токен
+    token = settings.TELEGRAM_ADMIN_BOT_TOKEN
     main_bot_token = settings.TELEGRAM_BOT_TOKEN
     database_url = settings.DATABASE_URL
 
@@ -815,11 +671,7 @@ def main():
         logger.error("TELEGRAM_ADMIN_BOT_TOKEN not set")
         return
 
-    bot = SheetGPTSupportBot(
-        token=token,
-        main_bot_token=main_bot_token,
-        database_url=database_url
-    )
+    bot = SheetGPTSupportBot(token=token, main_bot_token=main_bot_token, database_url=database_url)
     bot.run()
 
 
