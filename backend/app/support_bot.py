@@ -640,7 +640,10 @@ _Ответьте reply-ем на это сообщение_
     def run(self):
         """Запуск бота"""
         logger.info("Starting SheetGPT Support Bot...")
-        logger.info(f"YooKassa configured: {bool(YOOKASSA_SHOP_ID and YOOKASSA_SECRET_KEY)}")
+        logger.info(f"YooKassa SHOP_ID set: {bool(YOOKASSA_SHOP_ID)}")
+        logger.info(f"YooKassa SECRET_KEY set: {bool(YOOKASSA_SECRET_KEY)}")
+        if YOOKASSA_SHOP_ID:
+            logger.info(f"SHOP_ID prefix: {YOOKASSA_SHOP_ID[:6]}...")
 
         self._init_db()
         self.application = Application.builder().token(self.token).build()
