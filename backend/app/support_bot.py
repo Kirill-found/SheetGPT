@@ -226,7 +226,17 @@ class SheetGPTSupportBot:
                         await query.edit_message_text(text, parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(keyboard))
                         return
                 else:
-                    logger.error(f"YooKassa API error {response.status_code}: {response.text}")
+                    error_text = response.text
+                    logger.error(f"YooKassa API error {response.status_code}: {error_text}")
+                    # Показываем ошибку пользователю для отладки
+                    await query.edit_message_text(
+                        f"❌ Ошибка создания платежа
+
+Код: {response.status_code}
+Ответ: {error_text[:200]}",
+                        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("« Назад", callback_data="buy_pro")]])
+                    )
+                    return
 
         except Exception as e:
             logger.error(f"Failed to create YooKassa payment: {e}")
