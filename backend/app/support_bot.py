@@ -228,14 +228,9 @@ class SheetGPTSupportBot:
                 else:
                     error_text = response.text
                     logger.error(f"YooKassa API error {response.status_code}: {error_text}")
-                    # Показываем ошибку пользователю для отладки
-                    await query.edit_message_text(
-                        f"❌ Ошибка создания платежа
-
-Код: {response.status_code}
-Ответ: {error_text[:200]}",
-                        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("« Назад", callback_data="buy_pro")]])
-                    )
+                    err_msg = f"❌ Ошибка: {response.status_code}: {error_text[:200]}"
+                    keyboard = [[InlineKeyboardButton("« Назад", callback_data="buy_pro")]]
+                    await query.edit_message_text(err_msg, reply_markup=InlineKeyboardMarkup(keyboard))
                     return
 
         except Exception as e:
