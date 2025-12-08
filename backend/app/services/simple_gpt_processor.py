@@ -341,7 +341,95 @@ for col, val in min_row.items():
         explanation += f"• {col}: {val}\n"
 ```
 
-Возвращай ТОЛЬКО код внутри ```python ... ```
+
+Запрос: "Найди цену товара по артикулу из справочника" (VLOOKUP между листами)
+```python
+# reference_df содержит справочник с ценами
+# df - основная таблица с артикулами
+
+# Находим ключевые колонки
+lookup_col_df = None  # Колонка для поиска в df
+lookup_col_ref = None  # Колонка-ключ в reference_df
+result_col_ref = None  # Колонка с результатом в reference_df
+
+for col in df.columns:
+    if any(x in col.lower() for x in ['артикул', 'sku', 'код', 'id', 'article']):
+        lookup_col_df = col
+        
+for col in reference_df.columns:
+    if any(x in col.lower() for x in ['артикул', 'sku', 'код', 'id', 'article']):
+        lookup_col_ref = col
+    if any(x in col.lower() for x in ['цена', 'price', 'стоимость', 'cost']):
+        result_col_ref = col
+
+if lookup_col_df and lookup_col_ref and result_col_ref:
+    # Merge - аналог VLOOKUP
+    merged = df.merge(
+        reference_df[[lookup_col_ref, result_col_ref]], 
+        left_on=lookup_col_df, 
+        right_on=lookup_col_ref, 
+        how='left'
+    )
+    
+    # Считаем статистику
+    found = merged[result_col_ref].notna().sum()
+    not_found = merged[result_col_ref].isna().sum()
+    
+    result = merged
+    explanation = f"Цены подтянуты из справочника
+
+"
+    explanation += f"Найдено: {found} из {len(df)}
+"
+    if not_found > 0:
+        explanation += f"Не найдено: {not_found} артикулов
+"
+        missing = merged[merged[result_col_ref].isna()][lookup_col_df].head(5).tolist()
+        explanation += f"Примеры ненайденных: {missing}"
+else:
+    result = "Не удалось найти подходящие колонки для VLOOKUP"
+    explanation = result
+```
+
+Запрос: "Добавь названия категорий из второго листа" (VLOOKUP по ID)
+```python
+# Определяем колонки для связи
+id_col_df = None
+id_col_ref = None
+name_col_ref = None
+
+for col in df.columns:
+    if any(x in col.lower() for x in ['категория_id', 'category_id', 'cat_id', 'id_категории']):
+        id_col_df = col
+
+for col in reference_df.columns:
+    if any(x in col.lower() for x in ['id', 'код', 'категория_id']):
+        id_col_ref = col
+    if any(x in col.lower() for x in ['название', 'name', 'наименование', 'категория']):
+        name_col_ref = col
+
+if id_col_df and id_col_ref and name_col_ref:
+    # Создаём словарь для быстрого поиска
+    lookup_dict = reference_df.set_index(id_col_ref)[name_col_ref].to_dict()
+    
+    # Применяем VLOOKUP через map
+    df['Категория'] = df[id_col_df].map(lookup_dict)
+    
+    found = df['Категория'].notna().sum()
+    result = df
+    explanation = f"Добавлены названия категорий
+
+"
+    explanation += f"Найдено: {found} из {len(df)}
+"
+    explanation += f"Новая колонка: Категория"
+else:
+    result = "Не удалось определить колонки для связи"
+    explanation = result
+```
+
+
+Возвращай ТОЛЬКО код внутри ```python ... ``````python ... ```
 """
 
     VALIDATION_PROMPT = """Ты проверяешь качество ответа на запрос пользователя.
@@ -2441,10 +2529,28 @@ for col, val in min_row.items():
 ДОПОЛНИТЕЛЬНЫЙ СПРАВОЧНИК (reference_df) - лист "{ref_name}":
 {ref_prompt}
 
-ВАЖНО для VLOOKUP:
-- Основные данные в `df`, справочные в `reference_df`
-- Для поиска используй: df.merge(reference_df, left_on='колонка_df', right_on='колонка_ref', how='left')
-- Или: reference_df[reference_df['ключ'] == искомое_значение]['результат'].values[0]
+ВАЖНО для VLOOKUP (подтягивание данных между листами):
+
+СПОСОБ 1 - merge (рекомендуется для массовых операций):
+merged = df.merge(reference_df[['ключ', 'значение']], left_on='колонка_df', right_on='ключ', how='left')
+
+СПОСОБ 2 - map через словарь (быстрее для больших данных):
+lookup_dict = reference_df.set_index('ключ')['значение'].to_dict()
+df['новая_колонка'] = df['колонка_df'].map(lookup_dict)
+
+СПОСОБ 3 - поиск одного значения:
+value = reference_df.loc[reference_df['ключ'] == искомое, 'значение'].values
+result = value[0] if len(value) > 0 else 'Не найдено'
+
+ОБРАБОТКА НЕНАЙДЕННЫХ ЗНАЧЕНИЙ:
+- После merge проверяй: not_found = merged['результат'].isna().sum()
+- Сообщай пользователю сколько значений не найдено
+- Показывай примеры ненайденных: df[df['результат'].isna()]['ключ'].head(5).tolist()
+
+ТИПИЧНЫЕ ОШИБКИ (избегай!):
+- НЕ используй .values[0] без проверки длины массива
+- НЕ забывай how='left' чтобы сохранить все строки df
+- ПРОВЕРЯЙ типы данных ключей (str vs int): df['id'].astype(str)
 """
                 logger.info(f"[SimpleGPT] Reference sheet added: {ref_name}, {ref_schema['row_count']} rows")
 
