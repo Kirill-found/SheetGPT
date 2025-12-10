@@ -2908,14 +2908,16 @@ result = value[0] if len(value) > 0 else 'Не найдено'
                     response["result_type"] = "highlight"
                     logger.info(f"[SimpleGPT] Generated highlight_rows: {highlight_rows[:10]}... (total: {len(highlight_rows)})")
 
-            # Add structured_data for tables/lists (only if NOT highlight query)
+            # Add structured_data for tables/lists (only if NOT highlight query and NOT text-only)
+            # Skip if result is a simple string (text-only response)
+            is_text_only = isinstance(formatted_result, str)
+            if is_text_only:
+                logger.info(f"[SimpleGPT] Text-only response detected, no structured_data")
+
             # Debug logging
             logger.info(f"[SimpleGPT] DEBUG - result type: {type(result['result'])}, formatted_result type: {type(formatted_result)}")
-            logger.info(f"[SimpleGPT] DEBUG - formatted_result length: {len(formatted_result) if isinstance(formatted_result, list) else 'N/A'}")
-            if isinstance(formatted_result, list) and len(formatted_result) > 0:
-                logger.info(f"[SimpleGPT] DEBUG - first element type: {type(formatted_result[0])}, value: {formatted_result[0]}")
-            # Check if result is a table (list of dicts) - independent of result_type
-            is_table = isinstance(formatted_result, list) and len(formatted_result) > 0 and isinstance(formatted_result[0], dict)
+            # Check if result is a table (list of dicts) - skip for text-only
+            is_table = not is_text_only and isinstance(formatted_result, list) and len(formatted_result) > 0 and isinstance(formatted_result[0], dict)
             logger.info(f"[SimpleGPT] Checking write_data: is_highlight={is_highlight_query}, result_type={result_type}, is_table={is_table}, has_ref_df={reference_df is not None}")
             if not is_highlight_query and is_table:
                 # Extract headers from first row keys (rows are dicts from DataFrame)
