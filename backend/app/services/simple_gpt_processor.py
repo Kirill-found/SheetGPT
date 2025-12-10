@@ -96,6 +96,20 @@ class SimpleGPTProcessor:
 8. ВАЖНО: Для explanation НЕ используй тройные кавычки! Используй обычные строки с + для конкатенации
 9. ВАЖНО: НЕ конвертируй в числа колонки: телефон, phone, id, код, артикул, номер, инн, паспорт, счет - это ТЕКСТ!
 
+КРИТИЧНО - БЕЗОПАСНАЯ РАБОТА С NaN:
+- ВСЕГДА проверяй pd.notna(value) перед int() или форматированием
+- Для подсчёта используй: int(col.sum()) ТОЛЬКО после dropna()
+- Безопасное преобразование: int(val) if pd.notna(val) else 0
+- Для вывода чисел: f"{val:.0f}" только если pd.notna(val)
+- НИКОГДА не делай int() на значении которое может быть NaN!
+
+КРИТИЧНО - КОНКРЕТНЫЕ ПРИМЕРЫ:
+- При любом анализе ВСЕГДА показывай КОНКРЕТНЫЕ примеры из данных
+- НЕ ПРОСТО "найдено 21 записей" - покажи КАКИЕ ИМЕННО записи (первые 3-5)
+- Для каждой аномалии/проблемы показывай: номер строки, значения ключевых колонок
+- Пользователь должен ВИДЕТЬ конкретные данные, а не абстрактные числа
+- Формат примера: "Строка 15: Товар='Молоко', Количество=-5"
+
 КРИТИЧНО - ФОРМАТ explanation:
 - ПЕРВАЯ СТРОКА = ПРЯМОЙ ОТВЕТ на вопрос (кто, сколько, что)
 - Используй ПРОБЕЛЫ между словами и значениями
@@ -133,6 +147,17 @@ df["Город"] = df["Город"].replace("Омск", "Лондон")
 result = df
 explanation = "Заменено: Омск → Лондон\n"
 explanation += f"Изменено строк: {(df['Город'] == 'Лондон').sum()}"''
+
+5. Для АНАЛИЗА АНОМАЛИЙ (проверь данные, найди ошибки, что не так):
+# КРИТИЧНО: ВСЕГДА показывай КОНКРЕТНЫЕ примеры с номерами строк!
+explanation = "Найдены аномалии:\n\n"
+explanation += "1. Отрицательные значения (5 записей):\n"
+for idx, row in negative_rows.head(3).iterrows():
+    explanation += f"   Строка {idx+2}: {row['Товар']}, Кол-во={row['Количество']}\n"
+explanation += "\n2. Пустые значения (12 записей):\n"
+for idx, row in empty_rows.head(3).iterrows():
+    explanation += f"   Строка {idx+2}: {row['Товар']}, пусто в '{col}'\n"
+explanation += f"\nИтого проблем: {total_issues}"
 
 ФОРМАТ (КРИТИЧНО):
 - НЕ используй ** или * (markdown)
@@ -445,6 +470,70 @@ if id_col_df and id_col_ref and name_col_ref:
 else:
     result = "Не удалось определить колонки для связи"
     explanation = result
+```
+
+Запрос: "Проверь данные на ошибки" или "Найди аномалии" или "Что не так с данными"
+```python
+# Анализ данных на аномалии с КОНКРЕТНЫМИ примерами
+explanation = "Анализ данных:\n\n"
+issues_found = []
+
+# 1. Проверка на отрицательные значения в числовых колонках
+for col in df.columns:
+    if df[col].dtype in ['int64', 'float64']:
+        # Безопасно проверяем отрицательные
+        numeric_col = pd.to_numeric(df[col], errors='coerce')
+        negative_mask = numeric_col < 0
+        negative_rows = df[negative_mask]
+        if len(negative_rows) > 0:
+            issues_found.append(('negative', col, negative_rows))
+
+# 2. Проверка на пустые значения
+for col in df.columns:
+    empty_mask = df[col].isna() | (df[col].astype(str).str.strip() == '')
+    empty_rows = df[empty_mask]
+    if len(empty_rows) > 0:
+        issues_found.append(('empty', col, empty_rows))
+
+# 3. Проверка на дубликаты
+duplicates = df[df.duplicated(keep=False)]
+if len(duplicates) > 0:
+    issues_found.append(('duplicates', 'all', duplicates))
+
+# Формируем ответ с КОНКРЕТНЫМИ примерами
+total_issues = 0
+for issue_type, col, rows in issues_found:
+    count = len(rows)
+    total_issues += count
+
+    if issue_type == 'negative':
+        explanation += f"Отрицательные в '{col}': {count} записей\n"
+        for idx, row in rows.head(3).iterrows():
+            # idx+2 потому что +1 для 0-based и +1 для заголовка
+            val = row[col]
+            if pd.notna(val):
+                explanation += f"   Строка {idx+2}: {col}={val}\n"
+    elif issue_type == 'empty':
+        explanation += f"Пустые в '{col}': {count} записей\n"
+        for idx, row in rows.head(3).iterrows():
+            # Показываем первую непустую колонку для идентификации
+            first_val = next((row[c] for c in df.columns if pd.notna(row[c])), 'N/A')
+            explanation += f"   Строка {idx+2}: пусто (ID: {first_val})\n"
+    elif issue_type == 'duplicates':
+        explanation += f"Дубликаты: {count} записей\n"
+        for idx, row in rows.head(3).iterrows():
+            vals = ', '.join(str(row[c])[:20] for c in df.columns[:3] if pd.notna(row[c]))
+            explanation += f"   Строка {idx+2}: {vals}\n"
+    explanation += "\n"
+
+if total_issues == 0:
+    explanation = "Данные проверены - аномалий не найдено!\n"
+    explanation += f"Всего строк: {len(df)}\n"
+    explanation += f"Колонок: {len(df.columns)}"
+else:
+    explanation += f"Итого проблемных записей: {total_issues}"
+
+result = {"issues": total_issues, "details": issues_found}
 ```
 
 
