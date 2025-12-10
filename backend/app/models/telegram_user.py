@@ -38,6 +38,10 @@ class TelegramUser(Base):
     total_queries = Column(Integer, default=0)
     last_query_at = Column(DateTime(timezone=True))
 
+    # Реферальная система
+    referral_code = Column(String(50), nullable=True, index=True)  # Код партнёра (ref_БЛОГЕР)
+    referred_at = Column(DateTime(timezone=True))  # Когда пришёл по реферальной ссылке
+
     # Даты
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
@@ -76,7 +80,7 @@ class TelegramUser(Base):
         # Free пользователи ограничены дневным лимитом
         return self.queries_used_today < self.queries_limit
 
-    def upgrade_to_premium(self, duration_days: int = 365):
+    def upgrade_to_premium(self, duration_days: int = 30):
         """Обновление до Premium подписки"""
         from datetime import datetime, timezone, timedelta
         self.subscription_tier = "premium"

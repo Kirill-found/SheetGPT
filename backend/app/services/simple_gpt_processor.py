@@ -42,6 +42,25 @@ from .schema_extractor import SchemaExtractor, get_schema_extractor
 logger = logging.getLogger(__name__)
 
 
+def format_number_for_sheets(value):
+    """Format number for Google Sheets (comma as decimal separator for Russian locale)"""
+    if isinstance(value, float):
+        if value == int(value):
+            return int(value)  # 480.0 -> 480
+        return str(round(value, 2)).replace('.', ',')
+    return value
+
+
+def format_data_for_sheets(data):
+    """Recursively format data for Google Sheets"""
+    if isinstance(data, list):
+        return [format_data_for_sheets(item) for item in data]
+    elif isinstance(data, dict):
+        return {k: format_data_for_sheets(v) for k, v in data.items()}
+    else:
+        return format_number_for_sheets(data)
+
+
 class SimpleGPTProcessor:
     """
     Упрощённый процессор на базе GPT-4o.
@@ -76,6 +95,20 @@ class SimpleGPTProcessor:
 7. Для чисел: pd.to_numeric(df[col], errors='coerce')
 8. ВАЖНО: Для explanation НЕ используй тройные кавычки! Используй обычные строки с + для конкатенации
 9. ВАЖНО: НЕ конвертируй в числа колонки: телефон, phone, id, код, артикул, номер, инн, паспорт, счет - это ТЕКСТ!
+
+КРИТИЧНО - БЕЗОПАСНАЯ РАБОТА С NaN:
+- ВСЕГДА проверяй pd.notna(value) перед int() или форматированием
+- Для подсчёта используй: int(col.sum()) ТОЛЬКО после dropna()
+- Безопасное преобразование: int(val) if pd.notna(val) else 0
+- Для вывода чисел: f"{val:.0f}" только если pd.notna(val)
+- НИКОГДА не делай int() на значении которое может быть NaN!
+
+КРИТИЧНО - КОНКРЕТНЫЕ ПРИМЕРЫ:
+- При любом анализе ВСЕГДА показывай КОНКРЕТНЫЕ примеры из данных
+- НЕ ПРОСТО "найдено 21 записей" - покажи КАКИЕ ИМЕННО записи (первые 3-5)
+- Для каждой аномалии/проблемы показывай: номер строки, значения ключевых колонок
+- Пользователь должен ВИДЕТЬ конкретные данные, а не абстрактные числа
+- Формат примера: "Строка 15: Товар='Молоко', Количество=-5"
 
 КРИТИЧНО - ФОРМАТ explanation:
 - ПЕРВАЯ СТРОКА = ПРЯМОЙ ОТВЕТ на вопрос (кто, сколько, что)
@@ -114,6 +147,17 @@ df["Город"] = df["Город"].replace("Омск", "Лондон")
 result = df
 explanation = "Заменено: Омск → Лондон\n"
 explanation += f"Изменено строк: {(df['Город'] == 'Лондон').sum()}"''
+
+5. Для АНАЛИЗА АНОМАЛИЙ (проверь данные, найди ошибки, что не так):
+# КРИТИЧНО: ВСЕГДА показывай КОНКРЕТНЫЕ примеры с номерами строк!
+explanation = "Найдены аномалии:\n\n"
+explanation += "1. Отрицательные значения (5 записей):\n"
+for idx, row in negative_rows.head(3).iterrows():
+    explanation += f"   Строка {idx+2}: {row['Товар']}, Кол-во={row['Количество']}\n"
+explanation += "\n2. Пустые значения (12 записей):\n"
+for idx, row in empty_rows.head(3).iterrows():
+    explanation += f"   Строка {idx+2}: {row['Товар']}, пусто в '{col}'\n"
+explanation += f"\nИтого проблем: {total_issues}"
 
 ФОРМАТ (КРИТИЧНО):
 - НЕ используй ** или * (markdown)
@@ -341,7 +385,159 @@ for col, val in min_row.items():
         explanation += f"• {col}: {val}\n"
 ```
 
-Возвращай ТОЛЬКО код внутри ```python ... ```
+
+Запрос: "Найди цену товара по артикулу из справочника" (VLOOKUP между листами)
+```python
+# reference_df содержит справочник с ценами
+# df - основная таблица с артикулами
+
+# Находим ключевые колонки
+lookup_col_df = None  # Колонка для поиска в df
+lookup_col_ref = None  # Колонка-ключ в reference_df
+result_col_ref = None  # Колонка с результатом в reference_df
+
+for col in df.columns:
+    if any(x in col.lower() for x in ['артикул', 'sku', 'код', 'id', 'article']):
+        lookup_col_df = col
+        
+for col in reference_df.columns:
+    if any(x in col.lower() for x in ['артикул', 'sku', 'код', 'id', 'article']):
+        lookup_col_ref = col
+    if any(x in col.lower() for x in ['цена', 'price', 'стоимость', 'cost']):
+        result_col_ref = col
+
+if lookup_col_df and lookup_col_ref and result_col_ref:
+    # Merge - аналог VLOOKUP
+    merged = df.merge(
+        reference_df[[lookup_col_ref, result_col_ref]], 
+        left_on=lookup_col_df, 
+        right_on=lookup_col_ref, 
+        how='left'
+    )
+    
+    # Считаем статистику
+    found = merged[result_col_ref].notna().sum()
+    not_found = merged[result_col_ref].isna().sum()
+    
+    result = merged
+    explanation = f"Цены подтянуты из справочника
+
+"
+    explanation += f"Найдено: {found} из {len(df)}
+"
+    if not_found > 0:
+        explanation += f"Не найдено: {not_found} артикулов
+"
+        missing = merged[merged[result_col_ref].isna()][lookup_col_df].head(5).tolist()
+        explanation += f"Примеры ненайденных: {missing}"
+else:
+    result = "Не удалось найти подходящие колонки для VLOOKUP"
+    explanation = result
+```
+
+Запрос: "Добавь названия категорий из второго листа" (VLOOKUP по ID)
+```python
+# Определяем колонки для связи
+id_col_df = None
+id_col_ref = None
+name_col_ref = None
+
+for col in df.columns:
+    if any(x in col.lower() for x in ['категория_id', 'category_id', 'cat_id', 'id_категории']):
+        id_col_df = col
+
+for col in reference_df.columns:
+    if any(x in col.lower() for x in ['id', 'код', 'категория_id']):
+        id_col_ref = col
+    if any(x in col.lower() for x in ['название', 'name', 'наименование', 'категория']):
+        name_col_ref = col
+
+if id_col_df and id_col_ref and name_col_ref:
+    # Создаём словарь для быстрого поиска
+    lookup_dict = reference_df.set_index(id_col_ref)[name_col_ref].to_dict()
+    
+    # Применяем VLOOKUP через map
+    df['Категория'] = df[id_col_df].map(lookup_dict)
+    
+    found = df['Категория'].notna().sum()
+    result = df
+    explanation = f"Добавлены названия категорий
+
+"
+    explanation += f"Найдено: {found} из {len(df)}
+"
+    explanation += f"Новая колонка: Категория"
+else:
+    result = "Не удалось определить колонки для связи"
+    explanation = result
+```
+
+Запрос: "Проверь данные на ошибки" или "Найди аномалии" или "Что не так с данными"
+```python
+# Анализ данных на аномалии с КОНКРЕТНЫМИ примерами
+explanation = "Анализ данных:\n\n"
+issues_found = []
+
+# 1. Проверка на отрицательные значения в числовых колонках
+for col in df.columns:
+    if df[col].dtype in ['int64', 'float64']:
+        # Безопасно проверяем отрицательные
+        numeric_col = pd.to_numeric(df[col], errors='coerce')
+        negative_mask = numeric_col < 0
+        negative_rows = df[negative_mask]
+        if len(negative_rows) > 0:
+            issues_found.append(('negative', col, negative_rows))
+
+# 2. Проверка на пустые значения
+for col in df.columns:
+    empty_mask = df[col].isna() | (df[col].astype(str).str.strip() == '')
+    empty_rows = df[empty_mask]
+    if len(empty_rows) > 0:
+        issues_found.append(('empty', col, empty_rows))
+
+# 3. Проверка на дубликаты
+duplicates = df[df.duplicated(keep=False)]
+if len(duplicates) > 0:
+    issues_found.append(('duplicates', 'all', duplicates))
+
+# Формируем ответ с КОНКРЕТНЫМИ примерами
+total_issues = 0
+for issue_type, col, rows in issues_found:
+    count = len(rows)
+    total_issues += count
+
+    if issue_type == 'negative':
+        explanation += f"Отрицательные в '{col}': {count} записей\n"
+        for idx, row in rows.head(3).iterrows():
+            # idx+2 потому что +1 для 0-based и +1 для заголовка
+            val = row[col]
+            if pd.notna(val):
+                explanation += f"   Строка {idx+2}: {col}={val}\n"
+    elif issue_type == 'empty':
+        explanation += f"Пустые в '{col}': {count} записей\n"
+        for idx, row in rows.head(3).iterrows():
+            # Показываем первую непустую колонку для идентификации
+            first_val = next((row[c] for c in df.columns if pd.notna(row[c])), 'N/A')
+            explanation += f"   Строка {idx+2}: пусто (ID: {first_val})\n"
+    elif issue_type == 'duplicates':
+        explanation += f"Дубликаты: {count} записей\n"
+        for idx, row in rows.head(3).iterrows():
+            vals = ', '.join(str(row[c])[:20] for c in df.columns[:3] if pd.notna(row[c]))
+            explanation += f"   Строка {idx+2}: {vals}\n"
+    explanation += "\n"
+
+if total_issues == 0:
+    explanation = "Данные проверены - аномалий не найдено!\n"
+    explanation += f"Всего строк: {len(df)}\n"
+    explanation += f"Колонок: {len(df.columns)}"
+else:
+    explanation += f"Итого проблемных записей: {total_issues}"
+
+result = {"issues": total_issues, "details": issues_found}
+```
+
+
+Возвращай ТОЛЬКО код внутри ```python ... ``````python ... ```
 """
 
     VALIDATION_PROMPT = """Ты проверяешь качество ответа на запрос пользователя.
@@ -1197,7 +1393,7 @@ for col, val in min_row.items():
             # Convert to structured data
             pivot_data = {
                 "headers": list(pivot_df.columns),
-                "rows": pivot_df.to_dict(orient='records')
+                "rows": format_data_for_sheets(pivot_df.to_dict(orient='records'))
             }
 
             agg_names = {
@@ -1500,7 +1696,7 @@ for col, val in min_row.items():
             # Prepare result data
             cleaned_data = {
                 "headers": list(cleaned_df.columns),
-                "rows": cleaned_df.to_dict(orient='records')
+                "rows": format_data_for_sheets(cleaned_df.to_dict(orient='records'))
             }
 
             # Build message
@@ -1967,7 +2163,7 @@ for col, val in min_row.items():
             # Prepare result data
             filtered_data = {
                 "headers": list(filtered_df.columns),
-                "rows": filtered_df.to_dict(orient='records')
+                "rows": format_data_for_sheets(filtered_df.to_dict(orient='records'))
             }
 
             # Build operator display
@@ -2441,10 +2637,28 @@ for col, val in min_row.items():
 ДОПОЛНИТЕЛЬНЫЙ СПРАВОЧНИК (reference_df) - лист "{ref_name}":
 {ref_prompt}
 
-ВАЖНО для VLOOKUP:
-- Основные данные в `df`, справочные в `reference_df`
-- Для поиска используй: df.merge(reference_df, left_on='колонка_df', right_on='колонка_ref', how='left')
-- Или: reference_df[reference_df['ключ'] == искомое_значение]['результат'].values[0]
+ВАЖНО для VLOOKUP (подтягивание данных между листами):
+
+СПОСОБ 1 - merge (рекомендуется для массовых операций):
+merged = df.merge(reference_df[['ключ', 'значение']], left_on='колонка_df', right_on='ключ', how='left')
+
+СПОСОБ 2 - map через словарь (быстрее для больших данных):
+lookup_dict = reference_df.set_index('ключ')['значение'].to_dict()
+df['новая_колонка'] = df['колонка_df'].map(lookup_dict)
+
+СПОСОБ 3 - поиск одного значения:
+value = reference_df.loc[reference_df['ключ'] == искомое, 'значение'].values
+result = value[0] if len(value) > 0 else 'Не найдено'
+
+ОБРАБОТКА НЕНАЙДЕННЫХ ЗНАЧЕНИЙ:
+- После merge проверяй: not_found = merged['результат'].isna().sum()
+- Сообщай пользователю сколько значений не найдено
+- Показывай примеры ненайденных: df[df['результат'].isna()]['ключ'].head(5).tolist()
+
+ТИПИЧНЫЕ ОШИБКИ (избегай!):
+- НЕ используй .values[0] без проверки длины массива
+- НЕ забывай how='left' чтобы сохранить все строки df
+- ПРОВЕРЯЙ типы данных ключей (str vs int): df['id'].astype(str)
 """
                 logger.info(f"[SimpleGPT] Reference sheet added: {ref_name}, {ref_schema['row_count']} rows")
 
@@ -2541,7 +2755,7 @@ for col, val in min_row.items():
                     # VLOOKUP result - convert to DataFrame and write to sheet
                     vlookup_df = pd.DataFrame(formatted_result)
                     response["action_type"] = "write_data"
-                    response["write_data"] = vlookup_df.values.tolist()
+                    response["write_data"] = format_data_for_sheets(vlookup_df.values.tolist())
                     response["write_headers"] = headers
                     response["summary"] = f"✅ Данные из листа \"{reference_sheet_name or 'справочник'}\" подтянуты ({len(formatted_result)} строк)"
                     logger.info(f"[SimpleGPT] VLOOKUP result: {len(formatted_result)} rows, writing to sheet")
@@ -2549,7 +2763,7 @@ for col, val in min_row.items():
                     # Regular table - show in sidebar or create new sheet
                     response["structured_data"] = {
                         "headers": headers,
-                        "rows": formatted_result,
+                        "rows": format_data_for_sheets(formatted_result),
                         "display_mode": "sidebar_only" if len(formatted_result) <= 20 else "create_sheet"
                     }
             elif result_type == "list" and isinstance(formatted_result, list):

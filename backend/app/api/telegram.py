@@ -280,7 +280,7 @@ async def upgrade_to_premium(
 async def admin_set_premium(
     telegram_user_id: int,
     admin_key: str = Header(...),
-    duration_days: int = 365,
+    duration_days: int = 30,
     db: AsyncSession = Depends(get_db)
 ):
     """
