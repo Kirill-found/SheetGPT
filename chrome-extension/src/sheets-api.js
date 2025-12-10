@@ -267,6 +267,46 @@ async function writeSheetData(spreadsheetId, sheetName, data, startCell = 'A1') 
   }
 }
 
+
+/**
+ * Write data to a specific range (for aggregated chart data)
+ * @param {string} spreadsheetId - The spreadsheet ID
+ * @param {string} range - Full range like "Sheet1!N1:O10"
+ * @param {Array} data - 2D array of data
+ */
+async function writeDataToRange(spreadsheetId, range, data) {
+  try {
+    const token = await getAuthToken();
+
+    const response = await fetch(
+      `${SHEETS_API_BASE}/${spreadsheetId}/values/${encodeURIComponent(range)}?valueInputOption=USER_ENTERED`,
+      {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          range: range,
+          values: data
+        })
+      }
+    );
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(`Sheets API error: ${error.error?.message || response.statusText}`);
+    }
+
+    const result = await response.json();
+    console.log('[SheetsAPI] ✅ Data written to range:', result);
+    return result;
+  } catch (error) {
+    console.error('[SheetsAPI] Error writing to range:', error);
+    throw error;
+  }
+}
+
 /**
  * Append data to sheet
  */
@@ -1169,6 +1209,7 @@ if (typeof module !== 'undefined' && module.exports) {
     getActiveSheetName,
     readSheetData,
     writeSheetData,
+    writeDataToRange,
     appendSheetData,
     createNewSheet,
     highlightRows,

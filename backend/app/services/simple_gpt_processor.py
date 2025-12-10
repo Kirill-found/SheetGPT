@@ -1114,23 +1114,45 @@ explanation += "- Строка 17: Пауэрбанк, кол-во = -2\n"
 
         columns_desc = "\n".join(column_info)
 
+        # Check for duplicates in potential X columns
+        unique_counts = {}
+        for idx, col in enumerate(column_names):
+            if idx < len(df.columns):
+                unique_count = df.iloc[:, idx].nunique()
+                total_count = len(df)
+                unique_counts[col] = f"{unique_count} уникальных из {total_count}"
+
+        unique_info = "\n".join([f"  {col}: {info}" for col, info in unique_counts.items()])
+
         prompt = f"""Пользователь хочет создать диаграмму.
 Запрос: "{query}"
 
 Доступные колонки:
 {columns_desc}
 
-Выбери ТОЧНО те колонки, которые пользователь упомянул или имел в виду.
+Количество уникальных значений:
+{unique_info}
 
 Ответь ТОЛЬКО в формате JSON:
-{{"x_column": <индекс колонки для оси X (категории/даты)>, "y_columns": [<индексы колонок для оси Y (числовые значения)>], "title": "<заголовок диаграммы>"}}
+{{
+  "x_column": <индекс колонки для оси X>,
+  "y_columns": [<индексы колонок для оси Y>],
+  "title": "<заголовок>",
+  "needs_aggregation": <true/false>,
+  "aggregation": "<sum/mean/count/null>"
+}}
 
-Правила:
-- X ось: категориальная или дата колонка (то, ПО ЧЕМУ группируем)
-- Y ось: числовые колонки (то, ЧТО измеряем)
-- Если пользователь написал "по категории и выручке" - X=категория, Y=выручка
-- Если колонка не упомянута явно - НЕ добавляй её
-- title должен отражать запрос пользователя"""
+ВАЖНО - АГРЕГАЦИЯ:
+- Если X колонка имеет ПОВТОРЯЮЩИЕСЯ значения (уникальных < всего) - needs_aggregation=true
+- Например: 5 категорий на 200 строк = НУЖНА агрегация (sum/mean)
+- "по категории и выручке" = сумма выручки по каждой категории
+- aggregation: "sum" для суммы, "mean" для среднего, "count" для количества
+- Если уникальных значений = количеству строк - needs_aggregation=false
+
+Правила выбора колонок:
+- X ось: категория или дата (ПО ЧЕМУ группируем)
+- Y ось: числовые колонки (ЧТО измеряем)
+- title должен отражать запрос"""
 
         try:
             response = await self.client.chat.completions.create(
@@ -1190,6 +1212,7 @@ explanation += "- Строка 17: Пауэрбанк, кол-во = -2\n"
     async def _finalize_chart_action(self, pending_action: Dict[str, Any], column_names: List[str], df: pd.DataFrame) -> Dict[str, Any]:
         """
         Завершает создание диаграммы с помощью GPT выбора колонок.
+        Поддерживает агрегацию данных для повторяющихся категорий.
         """
         query = pending_action["query"]
         chart_type = pending_action["chart_type"]
@@ -1201,11 +1224,15 @@ explanation += "- Строка 17: Пауэрбанк, кол-во = -2\n"
             x_idx = gpt_result.get("x_column", 0)
             y_indices = gpt_result.get("y_columns", [1])
             title = gpt_result.get("title", "Диаграмма")
+            needs_aggregation = gpt_result.get("needs_aggregation", False)
+            aggregation = gpt_result.get("aggregation", "sum")
         else:
             # Fallback to simple logic
             x_idx = 0
             y_indices = [1] if len(column_names) > 1 else [0]
             title = "Диаграмма"
+            needs_aggregation = False
+            aggregation = "sum"
 
         # Validate indices
         x_idx = min(x_idx, len(column_names) - 1)
@@ -1217,6 +1244,60 @@ explanation += "- Строка 17: Пауэрбанк, кол-во = -2\n"
         if chart_type == 'PIE':
             y_indices = y_indices[:1]
 
+        # Handle aggregation if needed
+        aggregated_data = None
+        if needs_aggregation and x_idx < len(df.columns):
+            try:
+                x_col_name = column_names[x_idx]
+                y_col_names = [column_names[i] for i in y_indices if i < len(column_names)]
+
+                # Create aggregation
+                agg_df = df.copy()
+                x_col = agg_df.iloc[:, x_idx]
+
+                # Build aggregation dict
+                agg_dict = {}
+                for y_idx in y_indices:
+                    if y_idx < len(df.columns):
+                        y_col = df.columns[y_idx]
+                        # Convert to numeric
+                        agg_df[y_col] = pd.to_numeric(agg_df.iloc[:, y_idx], errors='coerce')
+                        if aggregation == "mean":
+                            agg_dict[y_col] = 'mean'
+                        elif aggregation == "count":
+                            agg_dict[y_col] = 'count'
+                        else:
+                            agg_dict[y_col] = 'sum'
+
+                # Group and aggregate
+                grouped = agg_df.groupby(agg_df.iloc[:, x_idx]).agg(agg_dict).reset_index()
+
+                # Prepare data for frontend (list of lists with headers)
+                headers = [x_col_name] + y_col_names
+                rows = []
+                for _, row in grouped.iterrows():
+                    row_data = [row.iloc[0]]  # X value
+                    for i, y_col in enumerate(y_col_names):
+                        val = row.iloc[i + 1]
+                        # Round numeric values
+                        if pd.notna(val):
+                            row_data.append(round(float(val), 2))
+                        else:
+                            row_data.append(0)
+                    rows.append(row_data)
+
+                aggregated_data = {
+                    "headers": headers,
+                    "rows": rows,
+                    "aggregation_type": aggregation
+                }
+
+                logger.info(f"[SimpleGPT] Aggregated data: {len(rows)} groups from {len(df)} rows")
+
+            except Exception as e:
+                logger.error(f"[SimpleGPT] Aggregation failed: {e}")
+                needs_aggregation = False
+
         chart_spec = {
             "chart_type": chart_type,
             "title": title,
@@ -1225,7 +1306,9 @@ explanation += "- Строка 17: Пауэрбанк, кол-во = -2\n"
             "y_column_indices": y_indices,
             "y_column_names": [column_names[i] for i in y_indices if i < len(column_names)],
             "row_count": len(df),
-            "col_count": len(column_names)
+            "col_count": len(column_names),
+            "needs_aggregation": needs_aggregation,
+            "aggregated_data": aggregated_data
         }
 
         chart_type_names = {
