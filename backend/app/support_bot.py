@@ -157,7 +157,20 @@ class SheetGPTSupportBot:
                 "amount": {"value": f"{PRO_PRICE}.00", "currency": "RUB"},
                 "capture": True,
                 "description": f"SheetGPT PRO подписка на {PRO_DAYS} дней",
-                "metadata": {"telegram_user_id": str(user.id), "days": str(PRO_DAYS)}
+                "metadata": {"telegram_user_id": str(user.id), "days": str(PRO_DAYS)},
+                "receipt": {
+                    "customer": {
+                        "email": f"{user.id}@telegram.user"
+                    },
+                    "items": [{
+                        "description": f"SheetGPT PRO подписка {PRO_DAYS} дней",
+                        "quantity": "1.00",
+                        "amount": {"value": f"{PRO_PRICE}.00", "currency": "RUB"},
+                        "vat_code": 1,
+                        "payment_subject": "service",
+                        "payment_mode": "full_payment"
+                    }]
+                }
             }
             
             if use_sbp:
