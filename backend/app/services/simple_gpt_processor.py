@@ -2780,21 +2780,9 @@ explanation += "- Строка 17: Пауэрбанк, кол-во = -2\n"
                     "processor": "SimpleGPT v1.0 (direct action)"
                 }
 
-            # 0.5. Check for conversational query (follow-up, why, explain)
-            if self._is_conversational_query(query, history):
-                logger.info(f"[SimpleGPT] Conversational query detected: {query[:50]}")
-                schema = self.schema_extractor.extract_schema(df)
-                schema_prompt = self.schema_extractor.schema_to_prompt(schema)
-                conv_result = await self._handle_conversational(query, df, schema_prompt, history)
-                if conv_result.get("success"):
-                    elapsed = time.time() - start_time
-                    return {
-                        "success": True,
-                        "response_type": "analysis",
-                        "summary": conv_result.get("explanation", ""),
-                        "processing_time": f"{elapsed:.2f}s",
-                        "processor": "SimpleGPT v9.5 (conversational)"
-                    }
+            # 0.5. Conversational mode DISABLED - was causing issues with normal queries
+            # TODO: Re-enable with stricter detection (only "почему?" single word)
+            pass
 
             # 1. Schema extraction
             logger.info(f"[SimpleGPT] Processing: {query[:50]}...")
