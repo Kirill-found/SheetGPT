@@ -42,6 +42,25 @@ from .schema_extractor import SchemaExtractor, get_schema_extractor
 logger = logging.getLogger(__name__)
 
 
+def format_number_for_sheets(value):
+    """Format number for Google Sheets (comma as decimal separator for Russian locale)"""
+    if isinstance(value, float):
+        if value == int(value):
+            return int(value)  # 480.0 -> 480
+        return str(round(value, 2)).replace('.', ',')
+    return value
+
+
+def format_data_for_sheets(data):
+    """Recursively format data for Google Sheets"""
+    if isinstance(data, list):
+        return [format_data_for_sheets(item) for item in data]
+    elif isinstance(data, dict):
+        return {k: format_data_for_sheets(v) for k, v in data.items()}
+    else:
+        return format_number_for_sheets(data)
+
+
 class SimpleGPTProcessor:
     """
     Упрощённый процессор на базе GPT-4o.
@@ -1285,7 +1304,7 @@ else:
             # Convert to structured data
             pivot_data = {
                 "headers": list(pivot_df.columns),
-                "rows": pivot_df.to_dict(orient='records')
+                "rows": format_data_for_sheets(pivot_df.to_dict(orient='records'))
             }
 
             agg_names = {
@@ -1588,7 +1607,7 @@ else:
             # Prepare result data
             cleaned_data = {
                 "headers": list(cleaned_df.columns),
-                "rows": cleaned_df.to_dict(orient='records')
+                "rows": format_data_for_sheets(cleaned_df.to_dict(orient='records'))
             }
 
             # Build message
@@ -2055,7 +2074,7 @@ else:
             # Prepare result data
             filtered_data = {
                 "headers": list(filtered_df.columns),
-                "rows": filtered_df.to_dict(orient='records')
+                "rows": format_data_for_sheets(filtered_df.to_dict(orient='records'))
             }
 
             # Build operator display
@@ -2647,7 +2666,7 @@ result = value[0] if len(value) > 0 else 'Не найдено'
                     # VLOOKUP result - convert to DataFrame and write to sheet
                     vlookup_df = pd.DataFrame(formatted_result)
                     response["action_type"] = "write_data"
-                    response["write_data"] = vlookup_df.values.tolist()
+                    response["write_data"] = format_data_for_sheets(vlookup_df.values.tolist())
                     response["write_headers"] = headers
                     response["summary"] = f"✅ Данные из листа \"{reference_sheet_name or 'справочник'}\" подтянуты ({len(formatted_result)} строк)"
                     logger.info(f"[SimpleGPT] VLOOKUP result: {len(formatted_result)} rows, writing to sheet")
@@ -2655,7 +2674,7 @@ result = value[0] if len(value) > 0 else 'Не найдено'
                     # Regular table - show in sidebar or create new sheet
                     response["structured_data"] = {
                         "headers": headers,
-                        "rows": formatted_result,
+                        "rows": format_data_for_sheets(formatted_result),
                         "display_mode": "sidebar_only" if len(formatted_result) <= 20 else "create_sheet"
                     }
             elif result_type == "list" and isinstance(formatted_result, list):
