@@ -61,6 +61,28 @@ def format_data_for_sheets(data):
         return format_number_for_sheets(data)
 
 
+
+
+def clean_explanation_text(text: str) -> str:
+    """Clean explanation text from weird formatting."""
+    if not text:
+        return text
+    # Replace tabs with space
+    text = text.replace('\t', ' ')
+    # Clean each line
+    lines = text.split('\n')
+    cleaned = []
+    for line in lines:
+        line = line.strip()
+        while '  ' in line:
+            line = line.replace('  ', ' ')
+        cleaned.append(line)
+    # Join and remove excessive blank lines
+    text = '\n'.join(cleaned)
+    while '\n\n\n' in text:
+        text = text.replace('\n\n\n', '\n\n')
+    return text.strip()
+
 class SimpleGPTProcessor:
     """
     Упрощённый процессор на базе GPT-4o.
@@ -2856,7 +2878,7 @@ result = value[0] if len(value) > 0 else 'Не найдено'
             # Use explanation from code if available, otherwise generate summary
             explanation = result.get("explanation", "")
             if explanation:
-                summary = explanation
+                summary = clean_explanation_text(explanation)
                 logger.info(f"[SimpleGPT] Using explanation from code: {explanation[:100]}...")
             else:
                 summary = self._generate_summary(result["result"], result_type, query)
