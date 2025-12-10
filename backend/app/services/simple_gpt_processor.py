@@ -67,9 +67,24 @@ def clean_explanation_text(text: str) -> str:
     """Clean explanation text from weird formatting."""
     if not text:
         return text
-    # Replace tabs with space
+
+    import re
+
+    # Replace tabs
     text = text.replace('\t', ' ')
-    # Clean each line
+
+    # Fix СтрокаN -> Строка N:
+    text = re.sub(r'Строка(\d+)', r'Строка \1:', text)
+    # Fix Строка N without colon
+    text = re.sub(r'Строка (\d+)(?!:)', r'Строка \1:', text)
+    # Fix double colons
+    text = text.replace('::', ':')
+
+    # Remove equals: Продукт='X' -> Продукт: X
+    text = re.sub(r"(\w+)='([^']+)'", r'\1: \2', text)
+    text = re.sub(r'(\w+)=([^,\n\s]+)', r'\1: \2', text)
+
+    # Clean lines
     lines = text.split('\n')
     cleaned = []
     for line in lines:
@@ -77,10 +92,11 @@ def clean_explanation_text(text: str) -> str:
         while '  ' in line:
             line = line.replace('  ', ' ')
         cleaned.append(line)
-    # Join and remove excessive blank lines
+
     text = '\n'.join(cleaned)
     while '\n\n\n' in text:
         text = text.replace('\n\n\n', '\n\n')
+
     return text.strip()
 
 class SimpleGPTProcessor:
