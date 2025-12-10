@@ -756,6 +756,90 @@ result = {"issues": total_issues, "details": issues_found}
         'empty': ['пуст', 'empty', 'null', 'nan', 'нет значения'],
         'not_empty': ['не пуст', 'not empty', 'заполнен', 'есть значение'],
     }
+    # Conversational/follow-up keywords - respond with text, not code
+    CONVERSATIONAL_KEYWORDS = [
+        'почему', 'why', 'зачем', 'объясни', 'explain', 'расскажи',
+        'как ты', 'how did you', 'на основании чего', 'откуда',
+        'уточни', 'подробнее', 'more details', 'что значит',
+        'а если', 'what if', 'а как', 'можешь ли', 'could you',
+        'не понял', "don't understand", 'поясни', 'clarify'
+    ]
+
+    # Deep analysis prompt - for thorough anomaly detection
+    ANALYSIS_SYSTEM_PROMPT = """Ты эксперт-аналитик данных. Твоя задача - ГЛУБОКИЙ и ПОЛНЫЙ анализ.
+
+КРИТИЧЕСКИ ВАЖНО:
+1. Если пользователь перечисляет несколько типов проблем - проверь КАЖДЫЙ тип!
+2. Для КАЖДОЙ найденной проблемы покажи КОНКРЕТНЫЕ примеры (строки, значения)
+3. Объясни ПОЧЕМУ это проблема и КАК её обнаружил
+4. Проверяй ЛОГИЧЕСКИЕ связи между колонками (цена vs выручка, количество vs сумма)
+
+ТИПЫ АНОМАЛИЙ ДЛЯ ПРОВЕРКИ:
+
+1. НУЛЕВЫЕ/НЕКОРРЕКТНЫЕ ЦЕНЫ:
+   - Цена = 0, пусто, None, NaN, "-", "—"
+   - Цена есть, но выручка = 0 (или наоборот)
+
+2. ОТРИЦАТЕЛЬНЫЕ ЗНАЧЕНИЯ:
+   - Количество < 0
+   - Цена < 0
+   - Выручка < 0 (если не возврат)
+
+3. АНОМАЛЬНЫЕ ЗНАЧЕНИЯ:
+   - Выручка != цена * количество (с допуском 1%)
+   - Сверхвысокие значения (выше 99 перцентиля)
+   - Сверхнизкие значения (ниже 1 перцентиля)
+
+4. ДУБЛИКАТЫ:
+   - Полные дубликаты строк
+   - Дубликаты по ключевым полям (дата + менеджер + товар + клиент)
+   - Повторяющиеся ID заказов
+
+5. ЛОГИЧЕСКИЕ ОШИБКИ:
+   - Дата в будущем
+   - Количество дробное для штучного товара
+   - Пустой клиент/менеджер при заполненной сумме
+
+ФОРМАТ ОТВЕТА (explanation):
+explanation = "АНАЛИЗ ДАННЫХ:\n\n"
+explanation += "1. НЕКОРРЕКТНЫЕ ЦЕНЫ (найдено X записей):\n"
+explanation += "   • Цена '—': строки 12, 48, 103\n"
+explanation += "   • Цена пустая: строки 57, 89\n"
+explanation += "   Причина: возможно ошибка импорта или ручной ввод\n\n"
+explanation += "2. ОТРИЦАТЕЛЬНОЕ КОЛИЧЕСТВО (найдено Y записей):\n"
+...
+
+ВАЖНО: Отвечай СТРУКТУРИРОВАННО, по пунктам, с примерами!
+"""
+
+    # Conversational prompt - for follow-up questions
+
+    # Keywords that trigger deep analysis mode
+    DEEP_ANALYSIS_KEYWORDS = [
+        'аномал', 'anomal', 'ошибк', 'error', 'проблем', 'problem',
+        'странн', 'weird', 'некорректн', 'incorrect', 'неправильн',
+        'провер', 'check', 'валидац', 'validat', 'качеств', 'quality',
+        'найди ошибк', 'find error', 'что не так', 'what wrong',
+        'дубликат', 'duplicate', 'повтор', 'repeat'
+    ]
+
+    CONVERSATIONAL_PROMPT = """Ты помощник-аналитик. Пользователь задаёт уточняющий вопрос по предыдущему анализу.
+
+ИСТОРИЯ:
+{history}
+
+ТЕКУЩИЙ ВОПРОС: {query}
+
+ЗАДАЧА: Ответь на вопрос развёрнуто и понятно:
+- Объясни своё рассуждение
+- Приведи конкретные примеры из данных если нужно
+- Если нужен дополнительный анализ, скажи что можешь сделать
+
+Отвечай как умный ассистент, а не как робот. Будь готов обсудить результаты.
+
+ОТВЕТ:"""
+
+
 
     # Color keywords for conditional formatting
     CONDITION_COLORS = {
@@ -2378,6 +2462,82 @@ result = {"issues": total_issues, "details": issues_found}
             "message": message
         }
 
+
+
+    def _is_analysis_query(self, query: str) -> bool:
+        """Detect if query requires deep analysis mode."""
+        query_lower = query.lower()
+        for keyword in self.DEEP_ANALYSIS_KEYWORDS:
+            if keyword in query_lower:
+                return True
+        return False
+
+    def _is_conversational_query(self, query: str, history: List[Dict[str, Any]] = None) -> bool:
+        """Detect if query is conversational (follow-up, why, explain)."""
+        query_lower = query.lower().strip()
+
+        # Very short queries with history are likely follow-ups
+        if history and len(history) > 0 and len(query_lower.split()) <= 3:
+            short_followups = ['почему', 'зачем', 'как', 'что', 'где', 'когда', 'объясни', 'поясни', 'подробнее']
+            if any(query_lower.startswith(w) for w in short_followups):
+                return True
+
+        # Check conversational keywords
+        for keyword in self.CONVERSATIONAL_KEYWORDS:
+            if keyword in query_lower:
+                return True
+
+        return False
+
+    async def _handle_conversational(
+        self,
+        query: str,
+        df: pd.DataFrame,
+        schema_prompt: str,
+        history: List[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
+        """Handle conversational/follow-up queries without code generation."""
+
+        # Build history string
+        history_str = ""
+        if history:
+            for i, item in enumerate(history[-3:], 1):
+                prev_q = item.get('query', '')
+                prev_r = item.get('response', '')[:500] if item.get('response') else ''
+                history_str += f"Q{i}: {prev_q}\nA{i}: {prev_r}\n\n"
+
+        prompt = self.CONVERSATIONAL_PROMPT.format(
+            history=history_str if history_str else "Нет предыдущих вопросов",
+            query=query
+        )
+
+        # Add data context
+        prompt += f"\n\nКОНТЕКСТ ДАННЫХ:\n{schema_prompt[:1000]}"
+
+        try:
+            response = await self.client.chat.completions.create(
+                model=self.MODEL,
+                messages=[
+                    {"role": "system", "content": "Ты умный аналитик данных. Отвечай развёрнуто и понятно на вопросы пользователя."},
+                    {"role": "user", "content": prompt}
+                ],
+                temperature=0.3,
+                max_tokens=800
+            )
+
+            answer = response.choices[0].message.content.strip()
+
+            return {
+                "success": True,
+                "result": answer,
+                "explanation": answer,
+                "response_type": "conversational"
+            }
+        except Exception as e:
+            logger.error(f"[SimpleGPT] Conversational error: {e}")
+            return {"success": False, "error": str(e)}
+
+
     async def process(
         self,
         query: str,
@@ -2620,6 +2780,22 @@ result = {"issues": total_issues, "details": issues_found}
                     "processing_time": f"{elapsed:.2f}s",
                     "processor": "SimpleGPT v1.0 (direct action)"
                 }
+
+            # 0.5. Check for conversational query (follow-up, why, explain)
+            if self._is_conversational_query(query, history):
+                logger.info(f"[SimpleGPT] Conversational query detected: {query[:50]}")
+                schema = self.schema_extractor.extract_schema(df)
+                schema_prompt = self.schema_extractor.schema_to_prompt(schema)
+                conv_result = await self._handle_conversational(query, df, schema_prompt, history)
+                if conv_result.get("success"):
+                    elapsed = time.time() - start_time
+                    return {
+                        "success": True,
+                        "response_type": "analysis",
+                        "summary": conv_result.get("explanation", ""),
+                        "processing_time": f"{elapsed:.2f}s",
+                        "processor": "SimpleGPT v9.5 (conversational)"
+                    }
 
             # 1. Schema extraction
             logger.info(f"[SimpleGPT] Processing: {query[:50]}...")
@@ -2879,10 +3055,16 @@ result = value[0] if len(value) > 0 else 'Не найдено'
             user_prompt += f"\nПРЕДЫДУЩАЯ ОШИБКА (избегай её): {previous_error}\n"
 
         try:
+            # Select appropriate system prompt
+            system_prompt = self.SYSTEM_PROMPT
+            if self._is_analysis_query(query):
+                system_prompt = self.ANALYSIS_SYSTEM_PROMPT + "\n\n" + self.SYSTEM_PROMPT
+                logger.info("[SimpleGPT] Using deep analysis mode")
+
             response = await self.client.chat.completions.create(
                 model=self.MODEL,
                 messages=[
-                    {"role": "system", "content": self.SYSTEM_PROMPT},
+                    {"role": "system", "content": system_prompt},
                     {"role": "user", "content": user_prompt}
                 ],
                 temperature=0.1,
