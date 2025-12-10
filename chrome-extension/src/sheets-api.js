@@ -176,10 +176,10 @@ async function getAllSheetNames(spreadsheetId) {
 
 /**
  * Read data from active sheet
- * Default limit: 500 rows for performance optimization
+ * Default limit: 1000 rows for performance optimization
  * v7.9.4: Added automatic token refresh on 401 errors
  */
-async function readSheetData(spreadsheetId, sheetName, range = 'A1:Z500', _retryCount = 0) {
+async function readSheetData(spreadsheetId, sheetName, range = 'A1:Z1000', _retryCount = 0) {
   try {
     const token = await getAuthToken(_retryCount > 0); // Force refresh on retry
     // v9.2.1: Build range - encode sheet name separately for Cyrillic support
