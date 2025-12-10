@@ -3225,10 +3225,15 @@ result = value[0] if len(value) > 0 else 'Не найдено'
         exec(code, namespace)
 
         result = namespace.get('result')
-        if result is None:
+        explanation = namespace.get('explanation', '')
+
+        # Allow result = None for text-only responses
+        if result is None and not explanation:
             raise ValueError("Код не вернул результат (result = None)")
 
-        explanation = namespace.get('explanation', '')
+        # For text-only responses, use explanation as result
+        if result is None and explanation:
+            result = explanation
 
         return {'result': result, 'explanation': explanation}
 
