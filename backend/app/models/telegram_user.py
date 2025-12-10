@@ -38,6 +38,10 @@ class TelegramUser(Base):
     total_queries = Column(Integer, default=0)
     last_query_at = Column(DateTime(timezone=True))
 
+    # Реферальная система
+    referral_code = Column(String(50), nullable=True, index=True)  # Код партнёра (ref_БЛОГЕР)
+    referred_at = Column(DateTime(timezone=True))  # Когда пришёл по реферальной ссылке
+
     # Даты
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())

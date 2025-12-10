@@ -99,6 +99,13 @@ class SheetGPTBot:
         user = update.effective_user
         logger.info(f"User {user.id} ({user.username}) started bot")
 
+        # v9.4.2: Парсим реферальный код (формат: /start ref_БЛОГЕР)
+        if context.args and len(context.args) > 0:
+            arg = context.args[0]
+            if arg.startswith('ref_'):
+                logger.info(f"User {user.id} came from referral: {arg}")
+                await self._save_referral(user.id, arg)
+
         welcome_text = f"""
 Привет, {user.first_name}! 👋
 
@@ -111,6 +118,29 @@ class SheetGPTBot:
             parse_mode='Markdown',
             reply_markup=self.get_main_menu_keyboard()
         )
+
+    async def _save_referral(self, telegram_user_id: int, referral_code: str):
+        """Сохранить реферальный код для пользователя"""
+        if not self.async_session_factory:
+            return
+
+        try:
+            from app.models.telegram_user import TelegramUser
+            from datetime import datetime, timezone
+            async with self.async_session_factory() as session:
+                result = await session.execute(
+                    select(TelegramUser).where(TelegramUser.telegram_user_id == telegram_user_id)
+                )
+                db_user = result.scalar_one_or_none()
+
+                # Сохраняем только если это новый пользователь или у него нет реферала
+                if db_user and not db_user.referral_code:
+                    db_user.referral_code = referral_code
+                    db_user.referred_at = datetime.now(timezone.utc)
+                    await session.commit()
+                    logger.info(f"Saved referral {referral_code} for user {telegram_user_id}")
+        except Exception as e:
+            logger.error(f"Error saving referral: {e}")
 
     async def menu_callback(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Обработка нажатий на кнопки меню"""
@@ -722,6 +752,60 @@ SheetGPT работает как расширение для Google Chrome, ко
 """
         await update.message.reply_text(stats_text, parse_mode='Markdown')
 
+    async def admin_refs(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Команда /refs - статистика партнёров (только для админа)"""
+        if update.effective_user.id != self.admin_id:
+            await update.message.reply_text("⛔ Только для администратора")
+            return
+
+        if not self.async_session_factory:
+            await update.message.reply_text("❌ БД не подключена")
+            return
+
+        async with self.async_session_factory() as session:
+            from app.models.telegram_user import TelegramUser
+            from sqlalchemy import func as sql_func, Integer
+
+            result = await session.execute(
+                select(
+                    TelegramUser.referral_code,
+                    sql_func.count(TelegramUser.id).label('total'),
+                    sql_func.sum(
+                        sql_func.cast(TelegramUser.subscription_tier == 'premium', Integer)
+                    ).label('paid')
+                )
+                .where(TelegramUser.referral_code.isnot(None))
+                .group_by(TelegramUser.referral_code)
+                .order_by(sql_func.count(TelegramUser.id).desc())
+            )
+            stats = result.all()
+
+            if not stats:
+                await update.message.reply_text("📊 Пока нет данных о партнёрах")
+                return
+
+            lines = ["📊 **Партнёрская статистика**", ""]
+            total_refs = 0
+            total_paid = 0
+
+            for ref_code, total, paid in stats:
+                paid = paid or 0
+                conversion = (paid / total * 100) if total > 0 else 0
+                partner_name = ref_code.replace('ref_', '')
+                lines.append(f"👤 **{partner_name}**")
+                lines.append(f"  📥 Регистраций: {total}")
+                lines.append(f"  💳 Покупок PRO: {paid}")
+                lines.append(f"  📈 Конверсия: {conversion:.1f}%")
+                lines.append("")
+                total_refs += total
+                total_paid += paid
+
+            lines.append("---")
+            lines.append(f"**Итого:** {total_refs} регистраций, {total_paid} покупок")
+
+            text = chr(10).join(lines)
+            await update.message.reply_text(text, parse_mode='Markdown')
+
 
     # ==================== ADMIN COMMANDS ====================
 
@@ -1026,6 +1110,7 @@ SheetGPT работает как расширение для Google Chrome, ко
         self.application.add_handler(CommandHandler("grant", self.admin_grant))
         self.application.add_handler(CommandHandler("revoke", self.admin_revoke))
         self.application.add_handler(CommandHandler("reply", self.admin_reply))
+        self.application.add_handler(CommandHandler("refs", self.admin_refs))
 
         # Расширенные админ-команды (admin_commands.py)
         if self.async_session_factory:

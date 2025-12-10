@@ -653,6 +653,81 @@ _Ответьте reply-ем на это сообщение_
 
             await query.edit_message_text(text, parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(keyboard))
 
+    async def admin_view_user(self, update, context, license_key):
+        query = update.callback_query
+        await query.answer()
+        if query.from_user.id != ADMIN_TELEGRAM_ID:
+            return
+        if not self.async_session_factory:
+            await query.edit_message_text("DB error")
+            return
+        async with self.async_session_factory() as session:
+            from app.models.telegram_user import TelegramUser
+            result = await session.execute(select(TelegramUser).where(TelegramUser.license_key == license_key))
+            u = result.scalar_one_or_none()
+            if not u:
+                await query.edit_message_text("Not found")
+                return
+            tier = "PRO" if u.subscription_tier == "premium" else "Free"
+            until = u.premium_until.strftime("%Y-%m-%d") if u.premium_until else "-"
+            text = "User: " + (u.first_name or "-") + " (@" + (u.username or "-") + ")\nKey: " + u.license_key + "\nTier: " + tier + "\nPRO until: " + until
+            kb = []
+            if u.subscription_tier != "premium":
+                kb.append([InlineKeyboardButton("PRO 7d", callback_data="grant_" + license_key + "_7")])
+                kb.append([InlineKeyboardButton("PRO 30d", callback_data="grant_" + license_key + "_30")])
+                kb.append([InlineKeyboardButton("PRO 365d", callback_data="grant_" + license_key + "_365")])
+            else:
+                kb.append([InlineKeyboardButton("Revoke", callback_data="revoke_" + license_key)])
+            kb.append([InlineKeyboardButton("Back", callback_data="admin_users_0")])
+            await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup(kb))
+
+    async def admin_grant_interactive(self, update, context, license_key, days):
+        query = update.callback_query
+        await query.answer()
+        if query.from_user.id != ADMIN_TELEGRAM_ID:
+            return
+        if not self.async_session_factory:
+            return
+        async with self.async_session_factory() as session:
+            from app.models.telegram_user import TelegramUser
+            result = await session.execute(select(TelegramUser).where(TelegramUser.license_key == license_key))
+            u = result.scalar_one_or_none()
+            if not u:
+                return
+            u.subscription_tier = "premium"
+            u.queries_limit = -1
+            u.premium_until = datetime.now(timezone.utc) + timedelta(days=days)
+            await session.commit()
+            text = "PRO granted!\n" + (u.first_name or "User") + "\nUntil: " + u.premium_until.strftime("%Y-%m-%d")
+            kb = [[InlineKeyboardButton("Back", callback_data="admin_users_0")]]
+            await query.edit_message_text(text, reply_markup=InlineKeyboardMarkup(kb))
+            try:
+                from telegram import Bot
+                bot = Bot(token=self.main_bot_token)
+                await bot.send_message(chat_id=u.telegram_user_id, text="PRO activated until " + u.premium_until.strftime("%Y-%m-%d") + "!")
+            except:
+                pass
+
+    async def admin_revoke_interactive(self, update, context, license_key):
+        query = update.callback_query
+        await query.answer()
+        if query.from_user.id != ADMIN_TELEGRAM_ID:
+            return
+        if not self.async_session_factory:
+            return
+        async with self.async_session_factory() as session:
+            from app.models.telegram_user import TelegramUser
+            result = await session.execute(select(TelegramUser).where(TelegramUser.license_key == license_key))
+            u = result.scalar_one_or_none()
+            if not u:
+                return
+            u.subscription_tier = "free"
+            u.queries_limit = 10
+            u.premium_until = None
+            await session.commit()
+            kb = [[InlineKeyboardButton("Back", callback_data="admin_users_0")]]
+            await query.edit_message_text("PRO revoked", reply_markup=InlineKeyboardMarkup(kb))
+
     async def callback_handler(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Обработка callback кнопок"""
         query = update.callback_query
@@ -684,6 +759,17 @@ _Ответьте reply-ем на это сообщение_
         elif data.startswith("admin_users_"):
             page = int(data.replace("admin_users_", ""))
             await self.admin_users(update, context, page)
+        elif data.startswith("user_"):
+            license_key = data.replace("user_", "")
+            await self.admin_view_user(update, context, license_key)
+        elif data.startswith("grant_"):
+            parts = data.split("_")
+            license_key = parts[1]
+            days = int(parts[2])
+            await self.admin_grant_interactive(update, context, license_key, days)
+        elif data.startswith("revoke_"):
+            license_key = data.replace("revoke_", "")
+            await self.admin_revoke_interactive(update, context, license_key)
 
     def run(self):
         """Запуск бота"""
