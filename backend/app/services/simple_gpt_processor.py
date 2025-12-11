@@ -1182,430 +1182,124 @@ explanation += "- Строка 17: Пауэрбанк, кол-во = -2\n"
             logger.error(f"[SimpleGPT] GPT chart selection failed: {e}")
             return None
 
-    async def _gpt_classify_action(self, query: str, column_names: List[str], df: pd.DataFrame, history: List[Dict[str, Any]] = None) -> Optional[Dict[str, Any]]:
+    async def _gpt_smart_action(self, query: str, column_names: List[str], df: pd.DataFrame, history: List[Dict[str, Any]] = None) -> Optional[Dict[str, Any]]:
         """
-        УНИВЕРСАЛЬНЫЙ GPT-классификатор действий. Понимает ЛЮБЫЕ запросы пользователя.
-        Заменяет ВСЕ хардкод функции _detect_*_action.
-
-        ВАЖНО: Использует историю для понимания контекста ("исправь", "не так", "другой цвет")
+        УМНЫЙ GPT-обработчик. GPT сама понимает запрос, анализирует данные и формирует готовый ответ.
+        Никакого хардкода - GPT решает всё сама.
 
         Returns:
-            - None если нужен анализ данных (передать в GPT для Python кода)
-            - Dict с action_type и параметрами для прямого выполнения
+            - None если нужен Python код для сложного анализа
+            - Dict с готовым ответом для frontend
         """
-        # Build conversation history for context
-        history_context = ""
+        import json
+
+        # Prepare history context
+        history_text = ""
         if history and len(history) > 0:
-            history_context = "\n--- ИСТОРИЯ ДИАЛОГА (предыдущие действия) ---\n"
-            for i, item in enumerate(history[-5:], 1):  # Last 5 messages
-                prev_query = item.get('query', '')
+            history_text = "\n=== ИСТОРИЯ ДИАЛОГА ===\n"
+            for i, item in enumerate(history[-5:], 1):
+                q = item.get('query', '')
+                r = item.get('response', item.get('summary', item.get('answer', '')))
+                if isinstance(r, dict):
+                    r = r.get('summary', r.get('explanation', str(r)[:300]))
+                history_text += f"{i}. Вопрос: {q}\n   Ответ: {str(r)[:300]}\n"
+            history_text += "=== КОНЕЦ ИСТОРИИ ===\n\n"
 
-                # Try to extract action_type from different possible formats
-                prev_action = item.get('action_type', '')
-                if not prev_action:
-                    # Try actions array format
-                    actions = item.get('actions', [])
-                    if actions and len(actions) > 0:
-                        prev_action = actions[0].get('type', '')
-                if not prev_action:
-                    # Try response dict format
-                    resp = item.get('response', {})
-                    if isinstance(resp, dict):
-                        prev_action = resp.get('action_type', resp.get('response_type', ''))
+        # Prepare data sample with row numbers (important for highlight)
+        data_rows = []
+        for idx, row in df.head(50).iterrows():  # First 50 rows with indices
+            row_data = {f"col_{i}_{column_names[i]}": str(v) for i, v in enumerate(row) if i < len(column_names)}
+            row_data["_row_number"] = idx + 2  # +2 for 1-indexing and header
+            data_rows.append(row_data)
 
-                # Get response/summary
-                prev_response = item.get('response', item.get('summary', item.get('answer', '')))
-                if isinstance(prev_response, dict):
-                    prev_response = prev_response.get('summary', prev_response.get('explanation', str(prev_response)[:200]))
-
-                history_context += f"{i}. Пользователь: {prev_query}\n"
-                if prev_action:
-                    history_context += f"   Действие: {prev_action}\n"
-                if prev_response:
-                    resp_str = str(prev_response)[:200]
-                    history_context += f"   Результат: {resp_str}\n"
-            history_context += "--- КОНЕЦ ИСТОРИИ ---\n\n"
-            history_context += "КРИТИЧНО ДЛЯ КОНТЕКСТА:\n"
-            history_context += "1. 'его', 'её', 'это', 'эту строку', 'этот товар' = объект из ПОСЛЕДНЕГО ответа!\n"
-            history_context += "2. 'выдели его' после вопроса 'какой товар...' = выдели ТОТ товар из ответа\n"
-            history_context += "3. Если в ответе был конкретный товар/строка - используй highlight_rows для ЭТОЙ строки\n"
-            history_context += "4. 'исправь', 'не так', 'наоборот' = измени параметры последнего действия\n\n"
-
-        # Analyze column types for GPT context
-        column_info = []
+        # Column info
+        col_info = []
         for idx, col in enumerate(column_names):
-            if idx >= len(df.columns):
-                continue
-            col_data = df.iloc[:, idx]
+            if idx < len(df.columns):
+                col_data = df.iloc[:, idx]
+                try:
+                    numeric = pd.to_numeric(col_data, errors='coerce')
+                    if numeric.notna().sum() / len(numeric) > 0.5:
+                        col_info.append(f"{idx}. '{col}' (числовая, min={numeric.min():.1f}, max={numeric.max():.1f})")
+                    else:
+                        samples = col_data.dropna().head(3).tolist()
+                        col_info.append(f"{idx}. '{col}' (текст): {samples}")
+                except:
+                    col_info.append(f"{idx}. '{col}'")
 
-            col_type = "text"
-            try:
-                numeric_data = pd.to_numeric(col_data, errors='coerce')
-                non_null_ratio = numeric_data.notna().sum() / len(numeric_data) if len(numeric_data) > 0 else 0
-                if non_null_ratio > 0.5:
-                    col_type = "number"
-                    min_val = numeric_data.min()
-                    max_val = numeric_data.max()
-                    column_info.append(f"{idx}. {col} ({col_type}, min={min_val:.0f}, max={max_val:.0f})")
-                    continue
-            except:
-                pass
+        prompt = f"""{history_text}Ты умный ассистент для работы с таблицами Google Sheets.
 
-            samples = col_data.dropna().head(2).tolist()
-            column_info.append(f"{idx}. {col} ({col_type}): {samples[:2]}")
+ЗАПРОС ПОЛЬЗОВАТЕЛЯ: "{query}"
 
-        columns_desc = "\n".join(column_info)
+КОЛОНКИ ТАБЛИЦЫ ({len(df)} строк):
+{chr(10).join(col_info)}
 
-        prompt = f"""{history_context}Определи тип действия для запроса пользователя к таблице.
+ДАННЫЕ (первые 50 строк с номерами):
+{json.dumps(data_rows[:20], ensure_ascii=False, indent=2)}
 
-Запрос: "{query}"
+ТВОЯ ЗАДАЧА:
+Проанализируй запрос и данные. Верни JSON с готовым ответом для выполнения действия.
 
-Колонки таблицы ({len(df)} строк):
-{columns_desc}
+ФОРМАТ ОТВЕТА - выбери ОДИН подходящий тип:
 
-ТИПЫ ДЕЙСТВИЙ (выбери ОДИН):
+1. Для ВЫДЕЛЕНИЯ СТРОК (highlight):
+{{"action_type": "highlight", "highlight_rows": [номера строк], "highlight_color": "#цвет", "summary": "описание"}}
 
-1. "color_scale" - цветовая шкала/градиент для числовой колонки
-   Примеры: "покрась по цене", "градиент", "тепловая карта", "раскрась по значениям"
+2. Для СОРТИРОВКИ:
+{{"action_type": "sort", "sort_column_index": индекс, "sort_order": "asc"|"desc", "summary": "описание"}}
 
-2. "conditional_format" - условное форматирование (выделить ячейки по условию)
-   Примеры: "красным где больше 1000", "выдели пустые", "зеленым положительные"
+3. Для ЦВЕТОВОЙ ШКАЛЫ (градиент по значениям):
+{{"action_type": "color_scale", "rule": {{"column_index": индекс, "column_name": "имя", "min_color": {{"red":0-1,"green":0-1,"blue":0-1}}, "mid_color": {{...}}, "max_color": {{...}}, "row_count": число}}, "summary": "описание"}}
 
-3. "sort" - сортировка данных
-   Примеры: "отсортируй по цене", "по убыванию", "сначала дорогие"
+4. Для УСЛОВНОГО ФОРМАТИРОВАНИЯ (по условию):
+{{"action_type": "conditional_format", "rule": {{"column_index": индекс, "condition_type": "NUMBER_GREATER"|"NUMBER_LESS"|"TEXT_CONTAINS"|"BLANK", "condition_value": значение, "format_color": {{"red":0-1,"green":0-1,"blue":0-1}}}}, "summary": "описание"}}
 
-4. "chart" - создать диаграмму/график
-   Примеры: "построй график", "диаграмма продаж", "гистограмма"
+5. Для ДИАГРАММЫ:
+{{"action_type": "chart", "chart_spec": {{"chart_type": "COLUMN"|"LINE"|"PIE"|"BAR", "title": "заголовок", "x_column_index": индекс, "y_column_indices": [индексы], "row_count": число}}, "summary": "описание"}}
 
-5. "pivot" - сводная таблица / группировка
-   Примеры: "сводная по менеджерам", "сгруппируй по категориям", "итоги по регионам"
+6. Для ЗАКРЕПЛЕНИЯ:
+{{"action_type": "freeze", "freeze_rows": число, "freeze_columns": число, "summary": "описание"}}
 
-6. "clean" - очистка данных
-   Примеры: "удали пробелы", "очисти данные", "убери дубликаты", "удали пустые строки"
-
-7. "freeze" - закрепить строки/столбцы
-   Примеры: "закрепи шапку", "заморозь первую строку", "закрепи столбец"
-
-8. "filter" - фильтрация данных
-   Примеры: "покажи только где...", "отфильтруй", "оставь записи где..."
-
-9. "convert" - конвертация формата (текст в числа)
-   Примеры: "преобразуй в числа", "сделай числовым", "конвертируй"
-
-10. "format_header" - форматирование заголовков
-    Примеры: "выдели заголовок", "шапку жирным", "покрась первую строку"
-
-11. "highlight_rows" - подсветка целых строк
-    Примеры: "выдели строки где...", "подсвети записи"
-
-12. "analysis" - нужен анализ/расчет (НЕ прямое действие)
-    Примеры: "посчитай сумму", "найди максимум", "сколько всего", "кто лучший"
-
-Ответь СТРОГО JSON:
-{{
-  "action_type": "<тип из списка выше>",
-  "target_column_index": <индекс колонки или null>,
-  "target_column_name": "<имя колонки или null>",
-  "sort_order": "asc" | "desc" | null,
-  "chart_type": "LINE" | "COLUMN" | "PIE" | "BAR" | null,
-  "color_direction": "high_is_good" | "low_is_good" | null,
-  "condition_type": "NUMBER_GREATER" | "NUMBER_LESS" | "NUMBER_EQ" | "BLANK" | "NOT_BLANK" | null,
-  "condition_value": <число или null>,
-  "format_color": "red" | "green" | "yellow" | "blue" | null,
-  "clean_operations": ["trim_whitespace", "remove_duplicates", "fill_empty"] | null,
-  "freeze_rows": <число или null>,
-  "freeze_columns": <число или null>,
-  "reason": "<краткое объяснение>"
-}}
+7. Для АНАЛИЗА/ВЫЧИСЛЕНИЙ (когда нужен Python код):
+{{"action_type": "analysis", "reason": "почему нужен анализ"}}
 
 ВАЖНО:
-- Если запрос требует ВЫЧИСЛЕНИЙ или АНАЛИЗА → action_type = "analysis"
-- Для color_scale: color_direction = "high_is_good" если большие значения = хорошо (прибыль, доход)
-- Выбирай колонку по смыслу запроса, не первую попавшуюся
+- Если пользователь говорит "его", "её", "это" - найди объект в ИСТОРИИ диалога
+- Для highlight_rows - укажи КОНКРЕТНЫЕ номера строк из данных
+- Цвета: синий={{"red":0.7,"green":0.85,"blue":1}}, красный={{"red":1,"green":0.7,"blue":0.7}}, зелёный={{"red":0.7,"green":0.9,"blue":0.7}}, жёлтый={{"red":1,"green":1,"blue":0.7}}
+- Если запрос требует вычислений (сумма, среднее, максимум) → action_type="analysis"
 
-ИСПРАВЛЕНИЕ ОШИБОК (если есть история):
-- "исправь", "не так", "неправильно" → повтори ПОСЛЕДНЕЕ действие с ДРУГИМИ параметрами
-- "наоборот", "поменяй цвета" → если было low_is_good, сделай high_is_good (и наоборот)
-- "другую колонку", "не ту колонку" → выбери ДРУГУЮ колонку из списка
-- "по-другому", "иначе" → измени параметры (цвет, направление, условие)
-
-ПРИМЕРЫ ИСПРАВЛЕНИЙ:
-- История: color_scale на колонку "Цена" с low_is_good
-- Запрос: "наоборот" → color_scale на "Цена" с high_is_good
-- Запрос: "не ту колонку" → color_scale на ДРУГУЮ числовую колонку"""
+Верни ТОЛЬКО JSON, без пояснений."""
 
         try:
-            import json
             response = await self.client.chat.completions.create(
-                model="gpt-4o-mini",
+                model="gpt-4o",  # Use full GPT-4o for smart analysis
                 messages=[{"role": "user", "content": prompt}],
                 temperature=0,
-                max_tokens=400,
-                response_format={"type": "json_object"}  # Force JSON output
+                max_tokens=1000,
+                response_format={"type": "json_object"}
             )
 
             result_text = response.choices[0].message.content.strip()
-            logger.info(f"[SimpleGPT] GPT raw response: {result_text[:200]}")
-
-            # Parse JSON (should be clean now with response_format)
-            if "```" in result_text:
-                result_text = result_text.split("```")[1]
-                if result_text.startswith("json"):
-                    result_text = result_text[4:]
+            logger.info(f"[SmartGPT] Response: {result_text[:500]}")
 
             result = json.loads(result_text)
-            logger.info(f"[SimpleGPT] GPT action classification: {result}")
 
+            # If GPT decided analysis is needed, return None to use Python code
             if result.get("action_type") == "analysis":
-                logger.info(f"[SimpleGPT] Analysis request, falling through to code generation")
-                return None  # Let main GPT handle analysis
+                logger.info(f"[SmartGPT] Analysis needed: {result.get('reason')}")
+                return None
 
+            # Add summary to result for display
+            if "summary" in result:
+                result["message"] = result["summary"]
+
+            logger.info(f"[SmartGPT] Final result: {result}")
             return result
-        except json.JSONDecodeError as e:
-            logger.error(f"[SimpleGPT] JSON parse error: {e}, raw: {result_text[:200] if 'result_text' in dir() else 'N/A'}")
-            return None  # Fall through to analysis mode
+
         except Exception as e:
-            logger.error(f"[SimpleGPT] GPT action classification failed: {e}")
+            logger.error(f"[SmartGPT] Error: {e}")
             return None
-
-    async def _apply_gpt_action_result(self, gpt_result: Dict[str, Any], column_names: List[str], df: pd.DataFrame) -> Optional[Dict[str, Any]]:
-        """
-        УНИВЕРСАЛЬНЫЙ обработчик результата GPT классификации.
-        Формирует финальный ответ для frontend для ЛЮБОГО типа действия.
-        """
-        action_type = gpt_result.get("action_type")
-        target_idx = gpt_result.get("target_column_index")
-        target_name = gpt_result.get("target_column_name")
-
-        # Validate target column
-        if target_idx is None and target_name:
-            for idx, col in enumerate(column_names):
-                if col.lower() == target_name.lower():
-                    target_idx = idx
-                    break
-
-        if target_idx is None and action_type in ["color_scale", "conditional_format", "sort", "convert"]:
-            # Default to first numeric column for these actions
-            for idx, col in enumerate(column_names):
-                if idx < len(df.columns):
-                    try:
-                        numeric_data = pd.to_numeric(df.iloc[:, idx], errors='coerce')
-                        if numeric_data.notna().sum() / len(numeric_data) > 0.5:
-                            target_idx = idx
-                            target_name = col
-                            break
-                    except:
-                        pass
-
-        if target_idx is None:
-            target_idx = 0
-            target_name = column_names[0] if column_names else "A"
-
-        # ===== COLOR SCALE =====
-        if action_type == "color_scale":
-            color_direction = gpt_result.get("color_direction", "low_is_good")
-            preset = self.COLOR_SCALE_PRESETS['red_yellow_green'] if color_direction == "high_is_good" else self.COLOR_SCALE_PRESETS['green_yellow_red']
-
-            try:
-                col_data = pd.to_numeric(df.iloc[:, target_idx], errors='coerce')
-                min_val, max_val, mid_val = float(col_data.min()), float(col_data.max()), float(col_data.median())
-            except:
-                min_val, mid_val, max_val = 0, 50, 100
-
-            return {
-                "action_type": "color_scale",
-                "rule": {
-                    "column_index": target_idx, "column_name": target_name,
-                    "min_color": preset['min_color'], "mid_color": preset['mid_color'], "max_color": preset['max_color'],
-                    "min_value": min_val, "mid_value": mid_val, "max_value": max_val, "row_count": len(df)
-                },
-                "message": f"Цветовая шкала для '{target_name}' ({min_val:.0f} → {max_val:.0f})"
-            }
-
-        # ===== CONDITIONAL FORMAT =====
-        elif action_type == "conditional_format":
-            condition_type = gpt_result.get("condition_type", "NUMBER_GREATER")
-            condition_value = gpt_result.get("condition_value")
-            format_color_name = gpt_result.get("format_color", "yellow")
-
-            # Validation: NUMBER conditions require a valid value
-            if condition_type in ["NUMBER_GREATER", "NUMBER_LESS", "NUMBER_EQ"]:
-                if condition_value is None:
-                    logger.warning(f"[SimpleGPT] Invalid conditional_format: {condition_type} with null value, falling back to analysis")
-                    return None  # Fall back to analysis mode
-
-            # Default value for safety
-            if condition_value is None:
-                condition_value = 0
-
-            color_map = {
-                "red": {'red': 0.96, 'green': 0.8, 'blue': 0.8},
-                "green": {'red': 0.8, 'green': 0.92, 'blue': 0.8},
-                "yellow": {'red': 1, 'green': 0.95, 'blue': 0.8},
-                "blue": {'red': 0.8, 'green': 0.85, 'blue': 0.95}
-            }
-
-            condition_text = {
-                "NUMBER_GREATER": f"> {condition_value}", "NUMBER_LESS": f"< {condition_value}",
-                "NUMBER_EQ": f"= {condition_value}", "BLANK": "пустые", "NOT_BLANK": "непустые"
-            }.get(condition_type, "")
-
-            return {
-                "action_type": "conditional_format",
-                "rule": {
-                    "column_index": target_idx, "column_name": target_name,
-                    "condition_type": condition_type, "condition_value": condition_value,
-                    "format_color": color_map.get(format_color_name, color_map["yellow"])
-                },
-                "message": f"Условное форматирование: {target_name} {condition_text} → {format_color_name}"
-            }
-
-        # ===== SORT =====
-        elif action_type == "sort":
-            sort_order = gpt_result.get("sort_order", "asc")
-            order_text = "по возрастанию" if sort_order == "asc" else "по убыванию"
-            return {
-                "action_type": "sort",
-                "sort_column": target_name, "sort_column_index": target_idx, "sort_order": sort_order,
-                "message": f"Сортировка по '{target_name}' {order_text}"
-            }
-
-        # ===== CHART =====
-        elif action_type == "chart":
-            chart_type = gpt_result.get("chart_type", "COLUMN")
-            # Use GPT chart selection for better column choice
-            gpt_chart = await self._gpt_select_chart_columns(gpt_result.get("reason", ""), column_names, df)
-
-            if gpt_chart:
-                x_idx = gpt_chart.get("x_column", 0)
-                y_indices = gpt_chart.get("y_columns", [1])
-                title = gpt_chart.get("title", "Диаграмма")
-            else:
-                x_idx, y_indices, title = 0, [1] if len(column_names) > 1 else [0], "Диаграмма"
-
-            return {
-                "action_type": "chart",
-                "chart_spec": {
-                    "chart_type": chart_type, "title": title,
-                    "x_column_index": x_idx, "x_column_name": column_names[x_idx] if x_idx < len(column_names) else "",
-                    "y_column_indices": y_indices,
-                    "y_column_names": [column_names[i] for i in y_indices if i < len(column_names)],
-                    "row_count": len(df), "col_count": len(column_names)
-                },
-                "message": f"Создаю {chart_type} диаграмму: {title}"
-            }
-
-        # ===== FREEZE =====
-        elif action_type == "freeze":
-            freeze_rows = gpt_result.get("freeze_rows", 1)
-            freeze_cols = gpt_result.get("freeze_columns", 0)
-            return {
-                "action_type": "freeze",
-                "freeze_rows": freeze_rows, "freeze_columns": freeze_cols,
-                "message": f"Закреплено: {freeze_rows} строк, {freeze_cols} столбцов"
-            }
-
-        # ===== CLEAN =====
-        elif action_type == "clean":
-            operations = gpt_result.get("clean_operations", ["trim_whitespace"])
-            cleaned_df = df.copy()
-            changes = []
-
-            for op in operations:
-                if op == 'trim_whitespace':
-                    str_cols = cleaned_df.select_dtypes(include=['object']).columns
-                    for col in str_cols:
-                        cleaned_df[col] = cleaned_df[col].apply(lambda x: ' '.join(x.split()) if isinstance(x, str) else x)
-                    changes.append("Удалены лишние пробелы")
-                elif op == 'remove_duplicates':
-                    before = len(cleaned_df)
-                    cleaned_df = cleaned_df.drop_duplicates()
-                    changes.append(f"Удалено дубликатов: {before - len(cleaned_df)}")
-                elif op == 'fill_empty':
-                    cleaned_df = cleaned_df.fillna('')
-                    changes.append("Пустые ячейки заполнены")
-
-            return {
-                "action_type": "clean_data",
-                "cleaned_data": {"headers": column_names, "rows": cleaned_df.values.tolist()},
-                "original_rows": len(df), "final_rows": len(cleaned_df),
-                "operations": operations, "changes": changes,
-                "message": f"Очистка данных: {', '.join(changes)}"
-            }
-
-        # ===== FORMAT HEADER =====
-        elif action_type == "format_header":
-            format_color_name = gpt_result.get("format_color", "blue")
-            color_map = {"red": "#FFB3B3", "green": "#B3E6B3", "yellow": "#FFFF99", "blue": "#B3D9FF"}
-            return {
-                "action_type": "format_header",
-                "target_row": 1, "bold": True,
-                "background_color": color_map.get(format_color_name, "#B3D9FF"),
-                "message": f"Заголовки отформатированы ({format_color_name})"
-            }
-
-        # ===== HIGHLIGHT ROWS =====
-        elif action_type == "highlight_rows":
-            format_color_name = gpt_result.get("format_color", "yellow")
-            color_map = {"red": "#FFB3B3", "green": "#B3E6B3", "yellow": "#FFFF99", "blue": "#B3D9FF"}
-            return {
-                "action_type": "highlight",
-                "highlight_color": color_map.get(format_color_name, "#FFFF99"),
-                "message": f"Подсветка строк: {gpt_result.get('reason', '')}"
-            }
-
-        # ===== CONVERT TO NUMBERS =====
-        elif action_type == "convert":
-            return {
-                "action_type": "convert_to_numbers",
-                "rule": {"column_index": target_idx, "column_name": target_name},
-                "message": f"Конвертация '{target_name}' в числовой формат"
-            }
-
-        # ===== PIVOT =====
-        elif action_type == "pivot":
-            # Find group column (text) and value column (numeric)
-            group_col_idx = None
-            value_col_idx = None
-            for idx, col in enumerate(column_names):
-                if idx < len(df.columns):
-                    try:
-                        numeric_ratio = pd.to_numeric(df.iloc[:, idx], errors='coerce').notna().sum() / len(df)
-                        if numeric_ratio > 0.5:
-                            if value_col_idx is None:
-                                value_col_idx = idx
-                        else:
-                            if group_col_idx is None:
-                                group_col_idx = idx
-                    except:
-                        pass
-
-            if group_col_idx is None:
-                group_col_idx = 0
-            if value_col_idx is None:
-                value_col_idx = 1 if len(column_names) > 1 else 0
-
-            group_col = column_names[group_col_idx]
-            value_col = column_names[value_col_idx]
-
-            try:
-                pivot_df = df.groupby(df.iloc[:, group_col_idx])[df.columns[value_col_idx]].sum().reset_index()
-                pivot_data = {"headers": [group_col, f"Сумма {value_col}"], "rows": pivot_df.values.tolist()}
-            except:
-                pivot_data = {"headers": [group_col, value_col], "rows": []}
-
-            return {
-                "action_type": "pivot_table",
-                "pivot_data": pivot_data, "group_column": group_col, "value_column": value_col, "agg_func": "sum",
-                "message": f"Сводная таблица: {value_col} по {group_col}"
-            }
-
-        # ===== FILTER =====
-        elif action_type == "filter":
-            # Filter is complex, let analysis handle it
-            return None
-
-        return None
 
     def _detect_chart_action(self, query: str, column_names: List[str], df: pd.DataFrame) -> Optional[Dict[str, Any]]:
         """
@@ -3199,108 +2893,26 @@ explanation += "- Строка 17: Пауэрбанк, кол-во = -2\n"
 
         try:
             # =====================================================
-            # UNIVERSAL GPT ACTION CLASSIFIER
-            # GPT понимает ЛЮБОЙ запрос + использует историю для контекста
+            # SMART GPT - GPT сама понимает и выполняет ЛЮБОЙ запрос
+            # Никакого хардкода - GPT формирует готовый ответ
             # =====================================================
-            gpt_action = await self._gpt_classify_action(query, column_names, df, history=history)
-            if gpt_action:
-                action_result = await self._apply_gpt_action_result(gpt_action, column_names, df)
-                if action_result:
-                    elapsed = time.time() - start_time
-                    action_type = action_result.get("action_type")
-                    logger.info(f"[SimpleGPT] GPT Universal Action: {action_type}")
+            smart_result = await self._gpt_smart_action(query, column_names, df, history=history)
+            if smart_result:
+                elapsed = time.time() - start_time
+                logger.info(f"[SmartGPT] Action: {smart_result.get('action_type')}")
 
-                    # Build response based on action type
-                    response = {
-                        "success": True,
-                        "result_type": "action",
-                        "processing_time": f"{elapsed:.2f}s",
-                        "processor": "SimpleGPT v2.0 (GPT Universal)"
-                    }
+                # GPT возвращает готовый ответ - просто добавляем метаданные
+                smart_result.update({
+                    "success": True,
+                    "result_type": "action",
+                    "processing_time": f"{elapsed:.2f}s",
+                    "processor": "SmartGPT v3.0",
+                    "confidence": 0.95
+                })
+                return smart_result
 
-                    if action_type == "color_scale":
-                        response.update({
-                            "action_type": "color_scale",
-                            "rule": action_result["rule"],
-                            "summary": action_result["message"]
-                        })
-                    elif action_type == "conditional_format":
-                        response.update({
-                            "action_type": "conditional_format",
-                            "rule": action_result["rule"],
-                            "summary": action_result["message"]
-                        })
-                    elif action_type == "sort":
-                        response.update({
-                            "action_type": "sort",
-                            "sort_column": action_result["sort_column"],
-                            "sort_column_index": action_result["sort_column_index"],
-                            "sort_order": action_result["sort_order"],
-                            "summary": action_result["message"]
-                        })
-                    elif action_type == "chart":
-                        response.update({
-                            "action_type": "chart",
-                            "chart_spec": action_result["chart_spec"],
-                            "summary": action_result["message"]
-                        })
-                    elif action_type == "freeze":
-                        response.update({
-                            "action_type": "freeze",
-                            "freeze_rows": action_result["freeze_rows"],
-                            "freeze_columns": action_result["freeze_columns"],
-                            "summary": action_result["message"]
-                        })
-                    elif action_type == "clean_data":
-                        response.update({
-                            "action_type": "clean_data",
-                            "cleaned_data": action_result["cleaned_data"],
-                            "original_rows": action_result["original_rows"],
-                            "final_rows": action_result["final_rows"],
-                            "operations": action_result["operations"],
-                            "changes": action_result["changes"],
-                            "summary": action_result["message"]
-                        })
-                    elif action_type == "format_header":
-                        response.update({
-                            "action_type": "format",
-                            "format_type": "header",
-                            "target_row": action_result["target_row"],
-                            "bold": action_result["bold"],
-                            "background_color": action_result["background_color"],
-                            "summary": action_result["message"]
-                        })
-                    elif action_type == "highlight":
-                        response.update({
-                            "action_type": "highlight",
-                            "highlight_color": action_result["highlight_color"],
-                            "summary": action_result["message"]
-                        })
-                    elif action_type == "convert_to_numbers":
-                        response.update({
-                            "action_type": "convert_to_numbers",
-                            "rule": action_result["rule"],
-                            "summary": action_result["message"]
-                        })
-                    elif action_type == "pivot_table":
-                        response.update({
-                            "action_type": "pivot_table",
-                            "pivot_data": action_result["pivot_data"],
-                            "group_column": action_result["group_column"],
-                            "value_column": action_result["value_column"],
-                            "agg_func": action_result["agg_func"],
-                            "summary": action_result["message"]
-                        })
-                    else:
-                        # Unknown action type, log and continue to analysis
-                        logger.warning(f"[SimpleGPT] Unknown action type: {action_type}")
-                        response = None
-
-                    if response:
-                        return response
-
-            # If GPT classifier returned None or unknown action, continue to analysis
-            logger.info(f"[SimpleGPT] GPT classifier: analysis mode")
+            # If SmartGPT returned None, continue to Python code analysis
+            logger.info(f"[SmartGPT] Analysis mode - using Python code")
 
             # 1. Schema extraction
             logger.info(f"[SimpleGPT] Processing: {query[:50]}...")

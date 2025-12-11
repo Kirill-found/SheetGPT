@@ -849,7 +849,7 @@ async function getSheetIdByName(spreadsheetId, sheetName) {
  * @param {number} sheetId - The sheet ID
  * @param {object} rule - The conditional format rule with:
  *   - column_index: Column to apply rule to
- *   - condition_type: NUMBER_GREATER, NUMBER_LESS, NUMBER_EQ, BLANK, NOT_BLANK
+ *   - condition_type: NUMBER_GREATER, NUMBER_LESS, NUMBER_EQ, TEXT_CONTAINS, TEXT_EQ, BLANK, NOT_BLANK
  *   - condition_value: Value to compare against (null for BLANK/NOT_BLANK)
  *   - format_color: RGB color object {red, green, blue}
  */
@@ -891,6 +891,18 @@ async function applyConditionalFormat(spreadsheetId, sheetId, rule) {
       case 'NOT_BLANK':
         booleanCondition = {
           type: 'NOT_BLANK'
+        };
+        break;
+      case 'TEXT_CONTAINS':
+        booleanCondition = {
+          type: 'TEXT_CONTAINS',
+          values: [{ userEnteredValue: String(condition_value) }]
+        };
+        break;
+      case 'TEXT_EQ':
+        booleanCondition = {
+          type: 'TEXT_EQ',
+          values: [{ userEnteredValue: String(condition_value) }]
         };
         break;
       default:
