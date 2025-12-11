@@ -1,0 +1,10 @@
+{
+  "appName": {
+    "message": "SheetGPT - AI for Google Sheets",
+    "description": "The name of the extension"
+  },
+  "appDescription": {
+    "message": "AI assistant for data analysis, formula creation, and automation in Google Sheets",
+    "description": "The description of the extension"
+  }
+}

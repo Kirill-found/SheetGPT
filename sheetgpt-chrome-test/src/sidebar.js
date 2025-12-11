@@ -30,81 +30,6 @@ const state = {
   isLoading: false,
   premiumUntil: null  // v9.1.0: Premium subscription expiration date
 };
-
-// ============================================
-// UNDO SYSTEM - Save state before changes
-// ============================================
-let undoSnapshot = null;  // Stores sheet data before last change
-let undoActionName = '';  // Description of what was done
-
-/**
- * Save current sheet state before making changes
- * @param {string} actionName - Description of the action being performed
- */
-async function saveSheetSnapshot(actionName) {
-  try {
-    console.log('[Sidebar] 📸 Saving snapshot before:', actionName);
-    const response = await sendToContentScript('GET_SHEET_DATA_FOR_UNDO', {});
-    if (response && response.success && response.data) {
-      undoSnapshot = response.data;
-      undoActionName = actionName;
-      // Show undo button
-      const undoBtn = document.getElementById('undoBtn');
-      if (undoBtn) {
-        undoBtn.classList.add('visible');
-        undoBtn.title = `Отменить: ${actionName}`;
-      }
-      console.log('[Sidebar] ✅ Snapshot saved:', undoSnapshot.values?.length, 'rows');
-    }
-  } catch (error) {
-    console.error('[Sidebar] ❌ Failed to save snapshot:', error);
-  }
-}
-
-/**
- * Undo last action by restoring saved snapshot
- */
-async function undoLastAction() {
-  if (!undoSnapshot) {
-    console.log('[Sidebar] ⚠️ Nothing to undo');
-    return;
-  }
-
-  try {
-    console.log('[Sidebar] ↩️ Restoring snapshot...');
-    const response = await sendToContentScript('RESTORE_SHEET_DATA', {
-      data: undoSnapshot
-    });
-
-    if (response && response.success) {
-      addAIMessage({
-        type: 'analysis',
-        text: `Действие "${undoActionName}" отменено`
-      });
-      console.log('[Sidebar] ✅ Undo successful');
-    } else {
-      addAIMessage({
-        type: 'error',
-        text: 'Не удалось отменить действие: ' + (response?.message || 'Неизвестная ошибка')
-      });
-    }
-
-    // Clear snapshot and hide button
-    undoSnapshot = null;
-    undoActionName = '';
-    const undoBtn = document.getElementById('undoBtn');
-    if (undoBtn) {
-      undoBtn.classList.remove('visible');
-    }
-  } catch (error) {
-    console.error('[Sidebar] ❌ Undo failed:', error);
-    addAIMessage({
-      type: 'error',
-      text: 'Ошибка отмены: ' + error.message
-    });
-  }
-}
-
 // ============================================
 // TEXT FORMATTING UTILITIES (v9.1.0)
 // ============================================
@@ -487,13 +412,7 @@ function setupEventListeners() {
   
   // Theme toggle
   elements.themeToggle.addEventListener('click', toggleTheme);
-
-  // Undo button
-  const undoBtn = document.getElementById('undoBtn');
-  if (undoBtn) {
-    undoBtn.addEventListener('click', undoLastAction);
-  }
-
+  
   // History dropdown
   elements.historyBtn.addEventListener('click', toggleHistoryDropdown);
   document.addEventListener('click', (e) => {
@@ -1371,19 +1290,6 @@ function addAIMessage(response) {
     `;
   }
 
-  // Chat/clarification response (agent asking a question)
-  else if (response.type === 'chat') {
-    content = `
-      <div class="response-type">
-        <svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-        Уточнение
-      </div>
-      <div class="response-content">
-        <p>${escapeHtml(cleanResponseText(response.text))}</p>
-      </div>
-    `;
-  }
-
   // Success/Action message
   else if (response.type === 'success' || response.type === 'action') {
     content = `
@@ -1770,26 +1676,6 @@ function transformAPIResponse(apiResponse) {
     };
   }
 
-  // If response is a write_value action (write single value to specific cell)
-  if (apiResponse.action_type === 'write_value' && apiResponse.target_cell && apiResponse.value !== undefined) {
-    console.log('[Sidebar] ✅ Write value condition met! Cell:', apiResponse.target_cell, 'Value:', apiResponse.value);
-    // Execute immediately
-    writeValueToCell(apiResponse.target_cell, apiResponse.value);
-    return {
-      type: 'action_done',
-      text: apiResponse.summary || `Значение ${apiResponse.value} записано в ячейку ${apiResponse.target_cell}`
-    };
-  }
-
-  // If response is a chat/clarification action (agent wants to ask a question)
-  if (apiResponse.action_type === 'chat' && apiResponse.message) {
-    console.log('[Sidebar] 💬 Chat action - agent asking:', apiResponse.message);
-    return {
-      type: 'chat',
-      text: apiResponse.message
-    };
-  }
-
   // If response is a clean data action
   if (apiResponse.action_type === 'clean_data' && apiResponse.cleaned_data) {
     console.log('[Sidebar] ✅ Clean data condition met!');
@@ -1835,8 +1721,8 @@ function transformAPIResponse(apiResponse) {
 
   // If response has highlight_rows
   if (apiResponse.highlight_rows && apiResponse.highlight_rows.length > 0) {
-    // Trigger highlight action with color from response
-    highlightRowsInSheet(apiResponse.highlight_rows, apiResponse.highlight_color);
+    // Trigger highlight action
+    highlightRowsInSheet(apiResponse.highlight_rows);
     return {
       type: 'highlight',
       text: `Выделено ${apiResponse.highlighted_count || apiResponse.highlight_rows.length} строк`,
@@ -1947,13 +1833,12 @@ function getErrorMessage(error) {
 // ============================================
 
 // Highlight rows in the sheet
-async function highlightRowsInSheet(rows, color) {
+async function highlightRowsInSheet(rows) {
   if (!rows || rows.length === 0) return;
 
   try {
-    await saveSheetSnapshot('Выделение строк');
-    await sendToContentScript('HIGHLIGHT_ROWS', { rows: rows, color: color });
-    console.log('[Sidebar] Rows highlighted:', rows, 'with color:', color);
+    await sendToContentScript('HIGHLIGHT_ROWS', { rows: rows });
+    console.log('[Sidebar] Rows highlighted:', rows);
   } catch (error) {
     console.error('[Sidebar] Error highlighting rows:', error);
   }
@@ -1964,7 +1849,6 @@ async function sortRangeInSheet(columnIndex, sortOrder) {
     console.error('[Sidebar] Sort error: columnIndex is required');
     return;
   }
-  await saveSheetSnapshot('Сортировка');
 
   try {
     await sendToContentScript('SORT_RANGE', {
@@ -1979,7 +1863,6 @@ async function sortRangeInSheet(columnIndex, sortOrder) {
 
 async function freezeRowsInSheet(freezeRows, freezeColumns) {
   try {
-    await saveSheetSnapshot('Закрепление');
     await sendToContentScript('FREEZE_ROWS', {
       freezeRows: freezeRows || 0,
       freezeColumns: freezeColumns || 0
@@ -1992,7 +1875,6 @@ async function freezeRowsInSheet(freezeRows, freezeColumns) {
 
 async function formatRowInSheet(rowIndex, bold, backgroundColor) {
   try {
-    await saveSheetSnapshot('Форматирование строки');
     await sendToContentScript('FORMAT_ROW', {
       rowIndex: rowIndex || 0,
       bold: bold,
@@ -2012,7 +1894,6 @@ async function createChartInSheet(chartSpec) {
   }
 
   try {
-    await saveSheetSnapshot('Создание диаграммы');
     console.log('[Sidebar] Creating chart with spec:', chartSpec);
     await sendToContentScript('CREATE_CHART', {
       chartSpec: chartSpec
@@ -2034,7 +1915,6 @@ async function applyConditionalFormatInSheet(rule) {
   }
 
   try {
-    await saveSheetSnapshot('Условное форматирование');
     await sendToContentScript('APPLY_CONDITIONAL_FORMAT', {
       rule: rule
     });
@@ -2051,7 +1931,6 @@ async function applyColorScaleInSheet(rule) {
   }
 
   try {
-    await saveSheetSnapshot('Цветовая шкала');
     console.log('[Sidebar] Sending APPLY_COLOR_SCALE to content script:', rule);
     const response = await sendToContentScript('APPLY_COLOR_SCALE', {
       rule: rule
@@ -2061,35 +1940,6 @@ async function applyColorScaleInSheet(rule) {
   } catch (error) {
     console.error('[Sidebar] Error applying color scale:', error);
     throw error;
-  }
-}
-
-/**
- * Write a single value to a specific cell
- * @param {string} targetCell - Cell address like "B12", "C5"
- * @param {any} value - Value to write (number or string)
- */
-async function writeValueToCell(targetCell, value) {
-  if (!targetCell || value === undefined) {
-    console.error('[Sidebar] Write value error: targetCell and value are required');
-    return;
-  }
-
-  try {
-    await saveSheetSnapshot('Запись в ячейку');
-    console.log(`[Sidebar] Writing value ${value} to cell ${targetCell}`);
-    const response = await sendToContentScript('WRITE_CELL_VALUE', {
-      targetCell: targetCell,
-      value: value
-    });
-    console.log(`[Sidebar] Value written to ${targetCell}:`, response);
-    return response;
-  } catch (error) {
-    console.error('[Sidebar] Error writing value to cell:', error);
-    addAIMessage({
-      type: 'error',
-      text: `Ошибка записи в ячейку ${targetCell}: ${error.message}`
-    });
   }
 }
 
@@ -2155,7 +2005,6 @@ window.insertTable = async function() {
   }
 
   try {
-    await saveSheetSnapshot('Вставка таблицы');
     // Note: content script expects camelCase 'structuredData'
     const result = await sendToContentScript('CREATE_TABLE_AND_CHART', {
       structuredData: structuredData
@@ -2192,24 +2041,17 @@ window.insertPivotTable = async function() {
     return;
   }
 
-  // Prompt for sheet name - pivot tables should go to NEW sheet, not overwrite current!
-  const sheetName = prompt('Введите имя нового листа для сводной таблицы:', 'Сводная таблица');
-  if (!sheetName) {
-    return; // User cancelled
-  }
-
   try {
-    // Create a NEW sheet with pivot data (not overwrite current!)
-    const result = await sendToContentScript('CREATE_NEW_SHEET_WITH_DATA', {
-      sheetName: sheetName,
+    // Create a new sheet with pivot data
+    const result = await sendToContentScript('CREATE_TABLE_AND_CHART', {
       structuredData: pivotData
     });
-    console.log('[Sidebar] Pivot table inserted to new sheet:', result);
+    console.log('[Sidebar] Pivot table inserted:', result);
 
     if (result.success) {
       addAIMessage({
         type: 'analysis',
-        text: result.message || `Сводная таблица создана на листе "${sheetName}"`
+        text: result.message || 'Сводная таблица создана'
       });
     } else {
       addAIMessage({
@@ -2243,7 +2085,6 @@ window.insertCleanedData = async function() {
   }
 
   try {
-    await saveSheetSnapshot('Вставка очищенных данных');
     // Create a new sheet with cleaned data
     const result = await sendToContentScript('CREATE_TABLE_AND_CHART', {
       structuredData: cleanedData,
@@ -2282,7 +2123,6 @@ window.overwriteWithCleanedData = async function() {
   }
 
   try {
-    await saveSheetSnapshot('Замена данных');
     // Overwrite current sheet with cleaned data
     const result = await sendToContentScript('OVERWRITE_SHEET_DATA', {
       cleanedData: cleanedData
@@ -2320,7 +2160,6 @@ window.applySplitData = async function() {
   }
 
   try {
-    await saveSheetSnapshot('Разбиение данных');
     // Overwrite current sheet with split data
     const result = await sendToContentScript('OVERWRITE_SHEET_DATA', {
       cleanedData: splitData
@@ -2358,7 +2197,6 @@ window.insertFilteredData = async function() {
   }
 
   try {
-    await saveSheetSnapshot('Вставка отфильтрованных данных');
     // Create a new sheet with filtered data
     const result = await sendToContentScript('CREATE_TABLE_AND_CHART', {
       structuredData: filteredData,
