@@ -1225,10 +1225,11 @@ explanation += "- Строка 17: Пауэрбанк, кол-во = -2\n"
                     resp_str = str(prev_response)[:200]
                     history_context += f"   Результат: {resp_str}\n"
             history_context += "--- КОНЕЦ ИСТОРИИ ---\n\n"
-            history_context += "КРИТИЧНО: Если пользователь говорит 'исправь', 'не так', 'другой', 'наоборот', 'поменяй' - "
-            history_context += "ты ДОЛЖЕН посмотреть на ПОСЛЕДНЕЕ действие и ИЗМЕНИТЬ его параметры!\n"
-            history_context += "Например: было color_scale с low_is_good → сделай high_is_good\n"
-            history_context += "Например: была колонка 'Цена' → выбери ДРУГУЮ колонку\n\n"
+            history_context += "КРИТИЧНО ДЛЯ КОНТЕКСТА:\n"
+            history_context += "1. 'его', 'её', 'это', 'эту строку', 'этот товар' = объект из ПОСЛЕДНЕГО ответа!\n"
+            history_context += "2. 'выдели его' после вопроса 'какой товар...' = выдели ТОТ товар из ответа\n"
+            history_context += "3. Если в ответе был конкретный товар/строка - используй highlight_rows для ЭТОЙ строки\n"
+            history_context += "4. 'исправь', 'не так', 'наоборот' = измени параметры последнего действия\n\n"
 
         # Analyze column types for GPT context
         column_info = []
@@ -1424,8 +1425,18 @@ explanation += "- Строка 17: Пауэрбанк, кол-во = -2\n"
         # ===== CONDITIONAL FORMAT =====
         elif action_type == "conditional_format":
             condition_type = gpt_result.get("condition_type", "NUMBER_GREATER")
-            condition_value = gpt_result.get("condition_value", 0)
+            condition_value = gpt_result.get("condition_value")
             format_color_name = gpt_result.get("format_color", "yellow")
+
+            # Validation: NUMBER conditions require a valid value
+            if condition_type in ["NUMBER_GREATER", "NUMBER_LESS", "NUMBER_EQ"]:
+                if condition_value is None:
+                    logger.warning(f"[SimpleGPT] Invalid conditional_format: {condition_type} with null value, falling back to analysis")
+                    return None  # Fall back to analysis mode
+
+            # Default value for safety
+            if condition_value is None:
+                condition_value = 0
 
             color_map = {
                 "red": {'red': 0.96, 'green': 0.8, 'blue': 0.8},
@@ -3179,12 +3190,17 @@ explanation += "- Строка 17: Пауэрбанк, кол-во = -2\n"
         """
         start_time = time.time()
 
+        # DEBUG: Log incoming history
+        logger.info(f"[SimpleGPT] Query: {query[:50]}...")
+        logger.info(f"[SimpleGPT] History received: {len(history) if history else 0} items")
+        if history:
+            for i, h in enumerate(history[-3:]):
+                logger.info(f"[SimpleGPT] History[{i}]: query={h.get('query', 'N/A')[:30]}, response={str(h.get('response', h.get('summary', 'N/A')))[:50]}")
+
         try:
             # =====================================================
             # UNIVERSAL GPT ACTION CLASSIFIER
-            # Заменяет ВСЕ хардкод функции _detect_*_action
-            # GPT понимает ЛЮБОЙ запрос без списка ключевых слов
-            # ВАЖНО: Передаём history для контекста ("исправь", "не так")
+            # GPT понимает ЛЮБОЙ запрос + использует историю для контекста
             # =====================================================
             gpt_action = await self._gpt_classify_action(query, column_names, df, history=history)
             if gpt_action:
