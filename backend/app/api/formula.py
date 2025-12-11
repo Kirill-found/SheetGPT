@@ -205,7 +205,7 @@ async def generate_formula(request: FormulaRequest):
         if result.get("confidence", 0) < 0.5:
             raise HTTPException(status_code=400, detail="Не удалось понять запрос")
 
-        response_type = result.get("response_type", result.get("type", "formula"))
+        response_type = result.get("response_type", result.get("result_type", result.get("type", "formula")))
 
         # Debug logging for VLOOKUP
         logger.info(f"[Formula API] Result keys: {list(result.keys())}")
@@ -270,7 +270,7 @@ async def generate_formula(request: FormulaRequest):
                 return response_dict
             response_data = FormulaResponse(
                 formula=None,
-                explanation=result.get("explanation", ""),
+                explanation=result.get("explanation", result.get("summary", "")),
                 insights=result.get("insights", []),
                 suggested_actions=None,
                 target_cell=None,
@@ -278,6 +278,20 @@ async def generate_formula(request: FormulaRequest):
                 response_type="action"
             )
             response_dict = response_data.model_dump()
+            response_dict["summary"] = result.get("summary")
+            # v9.3.3: Pass through all action-specific fields
+            if "action_type" in result:
+                response_dict["action_type"] = result["action_type"]
+            if "cleaned_data" in result:
+                response_dict["cleaned_data"] = result["cleaned_data"]
+            if "original_rows" in result:
+                response_dict["original_rows"] = result["original_rows"]
+            if "final_rows" in result:
+                response_dict["final_rows"] = result["final_rows"]
+            if "operations" in result:
+                response_dict["operations"] = result["operations"]
+            if "changes" in result:
+                response_dict["changes"] = result["changes"]
             if result.get("conversation_id"):
                 response_dict["conversation_id"] = result["conversation_id"]
             return response_dict
