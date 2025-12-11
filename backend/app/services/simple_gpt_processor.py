@@ -1201,8 +1201,9 @@ explanation += "- Строка 17: Пауэрбанк, кол-во = -2\n"
                 q = item.get('query', '')
                 r = item.get('response', item.get('summary', item.get('answer', '')))
                 if isinstance(r, dict):
-                    r = r.get('summary', r.get('explanation', str(r)[:300]))
-                history_text += f"{i}. Вопрос: {q}\n   Ответ: {str(r)[:300]}\n"
+                    r = r.get('summary', r.get('explanation', str(r)[:1500]))
+                # Longer limit for history to capture full analysis results (tables, lists)
+                history_text += f"{i}. Вопрос: {q}\n   Ответ: {str(r)[:1500]}\n"
             history_text += "=== КОНЕЦ ИСТОРИИ ===\n\n"
 
         # Prepare data sample with row numbers (important for highlight)
@@ -1269,7 +1270,7 @@ explanation += "- Строка 17: Пауэрбанк, кол-во = -2\n"
 ВАЖНО:
 - ВОПРОСЫ требуют ОТВЕТА, не действия! "какой?", "сколько?", "кто?", "что?", "найди" → action_type="analysis"
 - Только КОМАНДЫ выполняют действия: "выдели", "отсортируй", "покрась", "закрепи", "построй", "сгруппируй", "вставь"
-- "вставь в таблицу", "создай сводную" после анализа → pivot_table с данными из ИСТОРИИ
+- "вставь в таблицу", "создай сводную" после анализа → РАСПАРСИ данные из текста в ИСТОРИИ и создай pivot_table!
 - Если пользователь говорит "его", "её", "это" - найди объект в ИСТОРИИ диалога
 - Для highlight_rows - укажи КОНКРЕТНЫЕ номера строк из данных
 - Цвета: синий={{"red":0.7,"green":0.85,"blue":1}}, красный={{"red":1,"green":0.7,"blue":0.7}}, зелёный={{"red":0.7,"green":0.9,"blue":0.7}}, жёлтый={{"red":1,"green":1,"blue":0.7}}
