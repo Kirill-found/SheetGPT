@@ -672,7 +672,11 @@ result = {"issues": total_issues, "details": issues_found}
                             'от красного к зелёному', 'от красного к зеленому',
                             'от зелёного к красному', 'от зеленого к красному',
                             'шкала цвет', 'раскрась по значени', 'покрась по значени',
-                            'условное форматирование по', 'форматирование по']
+                            'условное форматирование по', 'форматирование по',
+                            'высокой ценой зеленым', 'высокой ценой зелёным',
+                            'низкой ценой красным', 'наоборот цвет', 'инвертируй цвет',
+                            'зеленым цветом, а', 'зелёным цветом, а',
+                            'красным цветом, а', 'поменяй цвета']
 
     # Convert to numbers keywords
     CONVERT_TO_NUMBERS_KEYWORDS = ['преобразуй в числ', 'преобразовать в числ', 'конвертируй в числ',
@@ -2627,11 +2631,13 @@ explanation += "- Строка 17: Пауэрбанк, кол-во = -2\n"
         # Determine color preset based on query
         preset_name = 'green_yellow_red'  # Default: low=green, high=red (good for costs, expenses)
 
-        if any(kw in query_lower for kw in ['к зелёному', 'к зеленому', 'to green', 'прибыл', 'доход']):
+        # "высокой ценой зеленым" / "наоборот" / "прибыль" = high values should be green
+        if any(kw in query_lower for kw in ['к зелёному', 'к зеленому', 'to green', 'прибыл', 'доход',
+                                             'высок', 'наоборот', 'инвертир', 'большой зелен', 'больше зелен']):
             preset_name = 'red_yellow_green'  # low=red, high=green (good for profits, revenue)
         elif any(kw in query_lower for kw in ['синий', 'blue', 'голуб']):
             preset_name = 'white_to_blue'
-        elif any(kw in query_lower for kw in ['зелён', 'зелен', 'green']):
+        elif any(kw in query_lower for kw in ['зелён', 'зелен', 'green']) and 'красн' not in query_lower:
             preset_name = 'white_to_green'
 
         preset = self.COLOR_SCALE_PRESETS[preset_name]
