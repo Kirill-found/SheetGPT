@@ -238,6 +238,17 @@ async def generate_formula(request: FormulaRequest):
                 response_dict["write_data"] = result["write_data"]
             if "write_headers" in result:
                 response_dict["write_headers"] = result["write_headers"]
+            # v9.3.3: Clean data fields
+            if "cleaned_data" in result:
+                response_dict["cleaned_data"] = result["cleaned_data"]
+            if "original_rows" in result:
+                response_dict["original_rows"] = result["original_rows"]
+            if "final_rows" in result:
+                response_dict["final_rows"] = result["final_rows"]
+            if "operations" in result:
+                response_dict["operations"] = result["operations"]
+            if "changes" in result:
+                response_dict["changes"] = result["changes"]
             if result.get("conversation_id"):
                 response_dict["conversation_id"] = result["conversation_id"]
             return response_dict

@@ -57,6 +57,12 @@ class FormulaResponse(BaseModel):
     # v9.3.2: VLOOKUP write_data fields
     write_data: Optional[List[List[Any]]] = Field(None, description="Данные для записи в текущий лист (VLOOKUP)")
     write_headers: Optional[List[str]] = Field(None, description="Заголовки для записываемых данных")
+    # v9.3.3: Clean data fields
+    cleaned_data: Optional[dict] = Field(None, description="Очищенные данные {headers, rows}")
+    original_rows: Optional[int] = Field(None, description="Количество строк до очистки")
+    final_rows: Optional[int] = Field(None, description="Количество строк после очистки")
+    operations: Optional[List[str]] = Field(None, description="Выполненные операции очистки")
+    changes: Optional[List[str]] = Field(None, description="Описание изменений")
     # Processor metadata
     processor_version: Optional[str] = Field(None, description="Версия процессора")
     complexity: Optional[str] = Field(None, description="Сложность запроса")
