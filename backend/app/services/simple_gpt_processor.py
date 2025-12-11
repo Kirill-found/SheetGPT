@@ -671,7 +671,8 @@ result = {"issues": total_issues, "details": issues_found}
                             'тепловая карта', 'heatmap', 'heat map',
                             'от красного к зелёному', 'от красного к зеленому',
                             'от зелёного к красному', 'от зеленого к красному',
-                            'шкала цвет', 'раскрась по значени', 'покрась по значени']
+                            'шкала цвет', 'раскрась по значени', 'покрась по значени',
+                            'условное форматирование по', 'форматирование по']
 
     # Convert to numbers keywords
     CONVERT_TO_NUMBERS_KEYWORDS = ['преобразуй в числ', 'преобразовать в числ', 'конвертируй в числ',
@@ -2572,6 +2573,36 @@ explanation += "- Строка 17: Пауэрбанк, кол-во = -2\n"
                         target_column_index = idx
                         logger.info(f"[SimpleGPT] Found partial match: column '{col_name}' in word '{word}' at index {idx}")
                         break
+                if target_column:
+                    break
+
+        # Third pass: match by word stems (handle Russian declensions)
+        if not target_column:
+            stem_mappings = {
+                'цен': ['цена', 'price', 'стоимость', 'cost'],
+                'сумм': ['сумма', 'sum', 'total', 'итого'],
+                'прибыл': ['прибыль', 'profit', 'доход'],
+                'количеств': ['количество', 'qty', 'кол-во', 'шт'],
+                'остат': ['остаток', 'остатки', 'stock', 'balance'],
+                'продаж': ['продажи', 'sales', 'выручка'],
+                'расход': ['расходы', 'expenses', 'затраты'],
+                'зарплат': ['зарплата', 'salary', 'оклад'],
+                'скидк': ['скидка', 'discount'],
+                'налог': ['налог', 'tax', 'ндс', 'vat'],
+                'марж': ['маржа', 'margin', 'наценка'],
+            }
+            for query_word in query_words:
+                for stem, col_variants in stem_mappings.items():
+                    if query_word.startswith(stem):
+                        for idx, col_name in enumerate(column_names):
+                            col_lower = col_name.lower().strip()
+                            if any(variant in col_lower for variant in col_variants) or col_lower.startswith(stem):
+                                target_column = col_name
+                                target_column_index = idx
+                                logger.info(f"[SimpleGPT] Found stem match for color scale: query '{query_word}' → column '{col_name}' at index {idx}")
+                                break
+                        if target_column:
+                            break
                 if target_column:
                     break
 
