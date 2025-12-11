@@ -84,7 +84,7 @@ async def generate_formula(request: FormulaRequest):
             # Используем Interactive Builder с поддержкой conversation history
             sheet_data_dict = {
                 "columns": request.column_names,
-                "sample_data": request.sheet_data[1:] if request.sheet_data and len(request.sheet_data) > 1 else [],
+                "sample_data": request.sheet_data if request.sheet_data else [],  # v6.2.10: Don't skip first row
                 "row_count": len(request.sheet_data) if request.sheet_data else 0,
                 "sheet_id": "default",
                 "selected_range": request.selected_range,

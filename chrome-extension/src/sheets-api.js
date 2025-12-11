@@ -176,10 +176,10 @@ async function getAllSheetNames(spreadsheetId) {
 
 /**
  * Read data from active sheet
- * Default limit: 500 rows for performance optimization
+ * Default limit: 1000 rows for performance optimization
  * v7.9.4: Added automatic token refresh on 401 errors
  */
-async function readSheetData(spreadsheetId, sheetName, range = 'A1:Z500', _retryCount = 0) {
+async function readSheetData(spreadsheetId, sheetName, range = 'A1:Z1000', _retryCount = 0) {
   try {
     const token = await getAuthToken(_retryCount > 0); // Force refresh on retry
     // v9.2.1: Build range - encode sheet name separately for Cyrillic support
@@ -263,6 +263,46 @@ async function writeSheetData(spreadsheetId, sheetName, data, startCell = 'A1') 
     return result;
   } catch (error) {
     console.error('[SheetsAPI] Error writing sheet data:', error);
+    throw error;
+  }
+}
+
+
+/**
+ * Write data to a specific range (for aggregated chart data)
+ * @param {string} spreadsheetId - The spreadsheet ID
+ * @param {string} range - Full range like "Sheet1!N1:O10"
+ * @param {Array} data - 2D array of data
+ */
+async function writeDataToRange(spreadsheetId, range, data) {
+  try {
+    const token = await getAuthToken();
+
+    const response = await fetch(
+      `${SHEETS_API_BASE}/${spreadsheetId}/values/${encodeURIComponent(range)}?valueInputOption=USER_ENTERED`,
+      {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          range: range,
+          values: data
+        })
+      }
+    );
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(`Sheets API error: ${error.error?.message || response.statusText}`);
+    }
+
+    const result = await response.json();
+    console.log('[SheetsAPI] ✅ Data written to range:', result);
+    return result;
+  } catch (error) {
+    console.error('[SheetsAPI] Error writing to range:', error);
     throw error;
   }
 }
@@ -1169,6 +1209,7 @@ if (typeof module !== 'undefined' && module.exports) {
     getActiveSheetName,
     readSheetData,
     writeSheetData,
+    writeDataToRange,
     appendSheetData,
     createNewSheet,
     highlightRows,

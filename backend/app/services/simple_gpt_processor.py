@@ -67,9 +67,28 @@ def clean_explanation_text(text: str) -> str:
     """Clean explanation text from weird formatting."""
     if not text:
         return text
-    # Replace tabs with space
+
+    import re
+
+    # Replace tabs
     text = text.replace('\t', ' ')
-    # Clean each line
+
+    # Fix СтрокаN -> Строка N:
+    text = re.sub(r'Строка(\d+)', r'Строка \1:', text)
+    # Fix Строка N without colon
+    text = re.sub(r'Строка (\d+)(?!:)', r'Строка \1:', text)
+    # Fix double colons
+    text = text.replace('::', ':')
+
+    # Fix СтрокаWord (wrong format) -> just Word
+    # Pattern: Строка followed by Cyrillic word (not number) = AI mistake
+    text = re.sub(r'Строка([А-Яа-яЁё][А-Яа-яЁёA-Za-z0-9_]*)', r'\1', text)
+
+    # Remove equals: Продукт='X' -> Продукт: X
+    text = re.sub(r"(\w+)='([^']+)'", r'\1: \2', text)
+    text = re.sub(r'(\w+)=([^,\n\s]+)', r'\1: \2', text)
+
+    # Clean lines
     lines = text.split('\n')
     cleaned = []
     for line in lines:
@@ -77,10 +96,11 @@ def clean_explanation_text(text: str) -> str:
         while '  ' in line:
             line = line.replace('  ', ' ')
         cleaned.append(line)
-    # Join and remove excessive blank lines
+
     text = '\n'.join(cleaned)
     while '\n\n\n' in text:
         text = text.replace('\n\n\n', '\n\n')
+
     return text.strip()
 
 class SimpleGPTProcessor:
@@ -144,19 +164,22 @@ explanation = "Твой текстовый ответ здесь"
 
 КРИТИЧНО - ФОРМАТ explanation:
 - ПЕРВАЯ СТРОКА = ПРЯМОЙ ОТВЕТ на вопрос
-- Каждая запись на ОДНОЙ строке целиком!
-- Формат записи: "Строка N: Товар, детали через запятую"
-- ПРОБЕЛ после "Строка", ПРОБЕЛ после номера, ДВОЕТОЧИЕ
-- НИКОГДА не разбивай одну запись на несколько строк!
-- НЕ используй знак равно, пиши просто значения
-- Пустая строка только между разделами
+- Используй ПРОСТУЮ НУМЕРАЦИЮ для списков: "1.", "2.", "3."
+- НЕ используй слово "Строка" - просто номер и точка!
+- Формат записи: f"{i}. {row['Продукт']}, {row['Количество']} шт, {row['Цена']} руб"
+- ВСЕ данные одной записи на ОДНОЙ строке!
+- НЕ используй = или кавычки в выводе
+- НЕ разбивай одну запись на несколько строк!
 
 ПРИМЕР ПРАВИЛЬНОГО ФОРМАТА:
 explanation = "Корректная выручка - когда выручка > 0 и равна цена * количество.\n\n"
 explanation += "Всего корректных: 101 из 200\n\n"
 explanation += "Примеры:\n"
-explanation += "Строка 2: Рюкзак, 12 шт, 4999 руб, выручка 59988\n"
-explanation += "Строка 3: Пауэрбанк, 10 шт, 2500 руб, выручка 25000\n"
+for i, (idx, row) in enumerate(correct_rows.head(3).iterrows(), 1):
+    explanation += f"{i}. {row['Продукт']}, {row['Количество']} шт, {row['Цена']} руб\n"
+# Результат:
+# "1. Рюкзак, 12 шт, 4999 руб"
+# "2. Кружка, 5 шт, 500 руб"
 
 ШАБЛОНЫ explanation (БЕЗ ТРОЙНЫХ КАВЫЧЕК!):
 
@@ -188,14 +211,14 @@ explanation = "Заменено: Омск → Лондон\n"
 explanation += f"Изменено строк: {(df['Город'] == 'Лондон').sum()}"''
 
 5. Для АНАЛИЗА АНОМАЛИЙ (проверь данные, найди ошибки, что не так):
-# КРИТИЧНО: ВСЕГДА показывай КОНКРЕТНЫЕ примеры с номерами строк!
+# Используй простую нумерацию! Каждая запись на ОДНОЙ строке!
 explanation = "Найдены аномалии:\n\n"
-explanation += "1. Отрицательные значения (5 записей):\n"
-for idx, row in negative_rows.head(3).iterrows():
-    explanation += f"   Строка {idx+2}: {row['Товар']}, Кол-во={row['Количество']}\n"
-explanation += "\n2. Пустые значения (12 записей):\n"
-for idx, row in empty_rows.head(3).iterrows():
-    explanation += f"   Строка {idx+2}: {row['Товар']}, пусто в '{col}'\n"
+explanation += "Отрицательные значения (5 записей):\n"
+for i, (idx, row) in enumerate(negative_rows.head(3).iterrows(), 1):
+    explanation += f"  {i}. {row['Товар']}, количество {row['Количество']}\n"
+explanation += "\nПустые значения (12 записей):\n"
+for i, (idx, row) in enumerate(empty_rows.head(3).iterrows(), 1):
+    explanation += f"  {i}. {row['Товар']}, пустое поле {col}\n"
 explanation += f"\nИтого проблем: {total_issues}"
 
 ФОРМАТ (КРИТИЧНО):
@@ -1059,10 +1082,105 @@ explanation += "- Строка 17: Пауэрбанк, кол-во = -2\n"
             "message": f"Заголовки отформатированы" + (f" (цвет: {color})" if color else "")
         }
 
+    async def _gpt_select_chart_columns(self, query: str, column_names: List[str], df: pd.DataFrame) -> Dict[str, Any]:
+        """
+        Использует GPT для умного выбора колонок диаграммы на основе запроса пользователя.
+        """
+        # Analyze column types
+        column_info = []
+        for idx, col in enumerate(column_names):
+            if idx >= len(df.columns):
+                continue
+            col_data = df.iloc[:, idx]
+
+            # Determine type
+            col_type = "text"
+            try:
+                numeric_data = pd.to_numeric(col_data, errors='coerce')
+                non_null_ratio = numeric_data.notna().sum() / len(numeric_data) if len(numeric_data) > 0 else 0
+                if non_null_ratio > 0.5:
+                    col_type = "number"
+            except:
+                pass
+
+            # Check for date
+            col_lower = col.lower()
+            if any(d in col_lower for d in ['дата', 'date', 'месяц', 'month', 'год', 'year']):
+                col_type = "date"
+
+            # Get sample values
+            samples = col_data.dropna().head(3).tolist()
+            column_info.append(f"{idx}. {col} ({col_type}): {samples}")
+
+        columns_desc = "\n".join(column_info)
+
+        # Check for duplicates in potential X columns
+        unique_counts = {}
+        for idx, col in enumerate(column_names):
+            if idx < len(df.columns):
+                unique_count = df.iloc[:, idx].nunique()
+                total_count = len(df)
+                unique_counts[col] = f"{unique_count} уникальных из {total_count}"
+
+        unique_info = "\n".join([f"  {col}: {info}" for col, info in unique_counts.items()])
+
+        prompt = f"""Пользователь хочет создать диаграмму.
+Запрос: "{query}"
+
+Доступные колонки:
+{columns_desc}
+
+Количество уникальных значений:
+{unique_info}
+
+Ответь ТОЛЬКО в формате JSON:
+{{
+  "x_column": <индекс колонки для оси X>,
+  "y_columns": [<индексы колонок для оси Y>],
+  "title": "<заголовок>",
+  "needs_aggregation": <true/false>,
+  "aggregation": "<sum/mean/count/null>"
+}}
+
+ВАЖНО - АГРЕГАЦИЯ:
+- Если X колонка имеет ПОВТОРЯЮЩИЕСЯ значения (уникальных < всего) - needs_aggregation=true
+- Например: 5 категорий на 200 строк = НУЖНА агрегация (sum/mean)
+- "по категории и выручке" = сумма выручки по каждой категории
+- aggregation: "sum" для суммы, "mean" для среднего, "count" для количества
+- Если уникальных значений = количеству строк - needs_aggregation=false
+
+Правила выбора колонок:
+- X ось: категория или дата (ПО ЧЕМУ группируем)
+- Y ось: числовые колонки (ЧТО измеряем)
+- title должен отражать запрос"""
+
+        try:
+            response = await self.client.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0,
+                max_tokens=200
+            )
+
+            result_text = response.choices[0].message.content.strip()
+            # Extract JSON from response
+            import json
+            if "```" in result_text:
+                result_text = result_text.split("```")[1]
+                if result_text.startswith("json"):
+                    result_text = result_text[4:]
+
+            result = json.loads(result_text)
+            logger.info(f"[SimpleGPT] GPT chart selection: {result}")
+            return result
+        except Exception as e:
+            logger.error(f"[SimpleGPT] GPT chart selection failed: {e}")
+            return None
+
     def _detect_chart_action(self, query: str, column_names: List[str], df: pd.DataFrame) -> Optional[Dict[str, Any]]:
         """
         Определяет, является ли запрос командой создания диаграммы.
-        Анализирует данные и определяет лучшие колонки для осей.
+        Использует GPT для умного выбора колонок.
         """
         query_lower = query.lower()
 
@@ -1081,107 +1199,116 @@ explanation += "- Строка 17: Пауэрбанк, кол-во = -2\n"
                 logger.info(f"[SimpleGPT] Chart type detected: {type_value}")
                 break
 
-        # Analyze columns to find best X and Y axes
-        numeric_cols = []
-        categorical_cols = []
-        date_cols = []
+        # Mark that we need GPT selection (will be done in async process method)
+        return {
+            "action_type": "chart_pending",
+            "chart_type": chart_type,
+            "query": query,
+            "column_names": column_names,
+            "df_len": len(df),
+            "needs_gpt_selection": True
+        }
 
-        for idx, col in enumerate(column_names):
-            if idx >= len(df.columns):
-                continue
-            col_data = df.iloc[:, idx]
+    async def _finalize_chart_action(self, pending_action: Dict[str, Any], column_names: List[str], df: pd.DataFrame) -> Dict[str, Any]:
+        """
+        Завершает создание диаграммы с помощью GPT выбора колонок.
+        Поддерживает агрегацию данных для повторяющихся категорий.
+        """
+        query = pending_action["query"]
+        chart_type = pending_action["chart_type"]
 
-            # Check if column is numeric
+        # Get GPT selection
+        gpt_result = await self._gpt_select_chart_columns(query, column_names, df)
+
+        if gpt_result:
+            x_idx = gpt_result.get("x_column", 0)
+            y_indices = gpt_result.get("y_columns", [1])
+            title = gpt_result.get("title", "Диаграмма")
+            needs_aggregation = gpt_result.get("needs_aggregation", False)
+            aggregation = gpt_result.get("aggregation", "sum")
+        else:
+            # Fallback to simple logic
+            x_idx = 0
+            y_indices = [1] if len(column_names) > 1 else [0]
+            title = "Диаграмма"
+            needs_aggregation = False
+            aggregation = "sum"
+
+        # Validate indices
+        x_idx = min(x_idx, len(column_names) - 1)
+        y_indices = [min(i, len(column_names) - 1) for i in y_indices if i < len(column_names)]
+        if not y_indices:
+            y_indices = [1] if len(column_names) > 1 else [0]
+
+        # For PIE charts, use only one Y column
+        if chart_type == 'PIE':
+            y_indices = y_indices[:1]
+
+        # Handle aggregation if needed
+        aggregated_data = None
+        if needs_aggregation and x_idx < len(df.columns):
             try:
-                numeric_data = pd.to_numeric(col_data, errors='coerce')
-                non_null_ratio = numeric_data.notna().sum() / len(numeric_data) if len(numeric_data) > 0 else 0
-                if non_null_ratio > 0.5:
-                    numeric_cols.append({'name': col, 'index': idx})
-                    continue
-            except:
-                pass
+                x_col_name = column_names[x_idx]
+                y_col_names = [column_names[i] for i in y_indices if i < len(column_names)]
 
-            # Check if column is date-like
-            col_lower = col.lower()
-            if any(d in col_lower for d in ['дата', 'date', 'месяц', 'month', 'год', 'year', 'день', 'day', 'период', 'time']):
-                date_cols.append({'name': col, 'index': idx})
-                continue
+                # Create aggregation
+                agg_df = df.copy()
+                x_col = agg_df.iloc[:, x_idx]
 
-            # Otherwise it's categorical
-            categorical_cols.append({'name': col, 'index': idx})
+                # Build aggregation dict
+                agg_dict = {}
+                for y_idx in y_indices:
+                    if y_idx < len(df.columns):
+                        y_col = df.columns[y_idx]
+                        # Convert to numeric
+                        agg_df[y_col] = pd.to_numeric(agg_df.iloc[:, y_idx], errors='coerce')
+                        if aggregation == "mean":
+                            agg_dict[y_col] = 'mean'
+                        elif aggregation == "count":
+                            agg_dict[y_col] = 'count'
+                        else:
+                            agg_dict[y_col] = 'sum'
 
-        logger.info(f"[SimpleGPT] Column analysis: numeric={[c['name'] for c in numeric_cols]}, "
-                   f"categorical={[c['name'] for c in categorical_cols]}, date={[c['name'] for c in date_cols]}")
+                # Group and aggregate
+                grouped = agg_df.groupby(agg_df.iloc[:, x_idx]).agg(agg_dict).reset_index()
 
-        # Find columns mentioned in query
-        mentioned_cols = []
-        for idx, col in enumerate(column_names):
-            col_lower = col.lower()
-            # Check if column name or any significant word from it is in query
-            if col_lower in query_lower or col in query:
-                mentioned_cols.append({'name': col, 'index': idx})
-            else:
-                # Check for partial match
-                for word in col_lower.split():
-                    if len(word) > 2 and word in query_lower:
-                        mentioned_cols.append({'name': col, 'index': idx})
-                        break
+                # Prepare data for frontend (list of lists with headers)
+                headers = [x_col_name] + y_col_names
+                rows = []
+                for _, row in grouped.iterrows():
+                    row_data = [row.iloc[0]]  # X value
+                    for i, y_col in enumerate(y_col_names):
+                        val = row.iloc[i + 1]
+                        # Round numeric values
+                        if pd.notna(val):
+                            row_data.append(round(float(val), 2))
+                        else:
+                            row_data.append(0)
+                    rows.append(row_data)
 
-        logger.info(f"[SimpleGPT] Columns mentioned in query: {[c['name'] for c in mentioned_cols]}")
+                aggregated_data = {
+                    "headers": headers,
+                    "rows": rows,
+                    "aggregation_type": aggregation
+                }
 
-        # Determine X and Y axes
-        x_column = None
-        y_columns = []
+                logger.info(f"[SimpleGPT] Aggregated data: {len(rows)} groups from {len(df)} rows")
 
-        # Priority for X axis: mentioned categorical > date > first categorical
-        # If user explicitly mentions a categorical column, use it
-        for cat in categorical_cols:
-            if cat in mentioned_cols:
-                x_column = cat
-                logger.info(f"[SimpleGPT] Using mentioned categorical column for X axis: {cat['name']}")
-                break
+            except Exception as e:
+                logger.error(f"[SimpleGPT] Aggregation failed: {e}")
+                needs_aggregation = False
 
-        # If no mentioned categorical, use date column for time series
-        if not x_column and date_cols:
-            x_column = date_cols[0]
-            logger.info(f"[SimpleGPT] Using date column for X axis: {x_column['name']}")
-
-        # Fallback to first categorical
-        if not x_column and categorical_cols:
-            x_column = categorical_cols[0]
-            logger.info(f"[SimpleGPT] Using first categorical column for X axis: {x_column['name']}")
-
-        # Y axis: mentioned numeric columns, or all numeric if none mentioned
-        for num in numeric_cols:
-            if num in mentioned_cols:
-                y_columns.append(num)
-
-        if not y_columns and numeric_cols:
-            # Take first 1-3 numeric columns
-            y_columns = numeric_cols[:3]
-
-        # For PIE charts, we need exactly one Y column and one X column
-        if chart_type == 'PIE' and y_columns:
-            y_columns = [y_columns[0]]
-
-        # Generate title from query or columns
-        title = ""
-        if y_columns and x_column:
-            y_names = ", ".join([c['name'] for c in y_columns])
-            title = f"{y_names} по {x_column['name']}"
-        elif y_columns:
-            title = ", ".join([c['name'] for c in y_columns])
-
-        # Build chart spec
         chart_spec = {
             "chart_type": chart_type,
             "title": title,
-            "x_column_index": x_column['index'] if x_column else 0,
-            "x_column_name": x_column['name'] if x_column else column_names[0],
-            "y_column_indices": [c['index'] for c in y_columns] if y_columns else [1] if len(column_names) > 1 else [0],
-            "y_column_names": [c['name'] for c in y_columns] if y_columns else [column_names[1] if len(column_names) > 1 else column_names[0]],
+            "x_column_index": x_idx,
+            "x_column_name": column_names[x_idx] if x_idx < len(column_names) else column_names[0],
+            "y_column_indices": y_indices,
+            "y_column_names": [column_names[i] for i in y_indices if i < len(column_names)],
             "row_count": len(df),
-            "col_count": len(column_names)
+            "col_count": len(column_names),
+            "needs_aggregation": needs_aggregation,
+            "aggregated_data": aggregated_data
         }
 
         chart_type_names = {
@@ -2624,6 +2751,11 @@ explanation += "- Строка 17: Пауэрбанк, кол-во = -2\n"
             # Check for chart action (needs df for column analysis)
             chart_action = self._detect_chart_action(query, column_names, df)
             if chart_action:
+                # If pending, finalize with GPT
+                if chart_action.get("needs_gpt_selection"):
+                    logger.info(f"[SimpleGPT] Chart action needs GPT selection")
+                    chart_action = await self._finalize_chart_action(chart_action, column_names, df)
+
                 elapsed = time.time() - start_time
                 logger.info(f"[SimpleGPT] Chart action detected: {chart_action}")
                 chart_result = {
