@@ -1182,6 +1182,236 @@ explanation += "- Строка 17: Пауэрбанк, кол-во = -2\n"
             logger.error(f"[SimpleGPT] GPT chart selection failed: {e}")
             return None
 
+    async def _gpt_classify_format_request(self, query: str, column_names: List[str], df: pd.DataFrame) -> Optional[Dict[str, Any]]:
+        """
+        GPT-based классификатор форматирования. Понимает любые запросы пользователя.
+        Заменяет хардкод ключевых слов интеллектуальным определением.
+
+        Returns:
+            - None если запрос не связан с форматированием
+            - Dict с action_type и параметрами для color_scale/conditional_format/highlight
+        """
+        # Analyze column types for GPT context
+        column_info = []
+        for idx, col in enumerate(column_names):
+            if idx >= len(df.columns):
+                continue
+            col_data = df.iloc[:, idx]
+
+            # Determine type
+            col_type = "text"
+            try:
+                numeric_data = pd.to_numeric(col_data, errors='coerce')
+                non_null_ratio = numeric_data.notna().sum() / len(numeric_data) if len(numeric_data) > 0 else 0
+                if non_null_ratio > 0.5:
+                    col_type = "number"
+                    # Get min/max for numeric columns
+                    min_val = numeric_data.min()
+                    max_val = numeric_data.max()
+                    column_info.append(f"{idx}. {col} ({col_type}, min={min_val:.0f}, max={max_val:.0f})")
+                    continue
+            except:
+                pass
+
+            # Get sample values for text columns
+            samples = col_data.dropna().head(2).tolist()
+            column_info.append(f"{idx}. {col} ({col_type}): {samples[:2]}")
+
+        columns_desc = "\n".join(column_info)
+
+        prompt = f"""Определи, является ли запрос пользователя командой форматирования данных.
+
+Запрос: "{query}"
+
+Доступные колонки:
+{columns_desc}
+
+Типы форматирования:
+1. color_scale (градиент/цветовая шкала) - применяется ко ВСЕМ значениям колонки, цвет зависит от величины числа
+   Примеры: "покрась по цене", "градиент для суммы", "цветовая шкала", "выдели большие красным маленькие зеленым"
+
+2. conditional_format (условное форматирование) - применяется ТОЛЬКО к ячейкам которые соответствуют условию
+   Примеры: "красным где больше 1000", "зеленым где цена < 500", "выдели пустые ячейки"
+
+3. highlight (выделение строк) - подсветка целых строк по условию
+   Примеры: "выдели строки где...", "подсвети записи с..."
+
+4. none - запрос НЕ связан с форматированием (анализ, подсчет, фильтрация и т.д.)
+
+Ответь СТРОГО в JSON формате:
+{{
+  "action_type": "color_scale" | "conditional_format" | "highlight" | "none",
+  "target_column_index": <индекс колонки или null>,
+  "target_column_name": "<название колонки или null>",
+  "color_direction": "high_is_good" | "low_is_good" | null,
+  "condition_type": "NUMBER_GREATER" | "NUMBER_LESS" | "NUMBER_EQ" | "BLANK" | "NOT_BLANK" | null,
+  "condition_value": <число или null>,
+  "format_color": "red" | "green" | "yellow" | "blue" | null,
+  "reason": "<краткое объяснение решения>"
+}}
+
+Правила:
+- color_direction: "high_is_good" = большие значения зеленые (для прибыли, дохода), "low_is_good" = большие значения красные (для расходов, цен)
+- Если пользователь говорит "наоборот" или хочет большие значения зелеными - это "high_is_good"
+- target_column_index ОБЯЗАТЕЛЕН для color_scale и conditional_format
+- Если колонка не указана явно, выбери наиболее подходящую числовую колонку из контекста"""
+
+        try:
+            response = await self.client.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0,
+                max_tokens=300
+            )
+
+            result_text = response.choices[0].message.content.strip()
+            # Extract JSON from response
+            import json
+            if "```" in result_text:
+                result_text = result_text.split("```")[1]
+                if result_text.startswith("json"):
+                    result_text = result_text[4:]
+
+            result = json.loads(result_text)
+            logger.info(f"[SimpleGPT] GPT format classification: {result}")
+
+            if result.get("action_type") == "none":
+                return None
+
+            return result
+        except Exception as e:
+            logger.error(f"[SimpleGPT] GPT format classification failed: {e}")
+            return None
+
+    async def _apply_gpt_format_result(self, gpt_result: Dict[str, Any], column_names: List[str], df: pd.DataFrame) -> Optional[Dict[str, Any]]:
+        """
+        Применяет результат GPT классификации и формирует финальный ответ для frontend.
+        """
+        action_type = gpt_result.get("action_type")
+        target_idx = gpt_result.get("target_column_index")
+        target_name = gpt_result.get("target_column_name")
+
+        # Validate target column
+        if target_idx is None and target_name:
+            # Try to find column by name
+            for idx, col in enumerate(column_names):
+                if col.lower() == target_name.lower():
+                    target_idx = idx
+                    break
+
+        if target_idx is None:
+            # Default to first numeric column
+            for idx, col in enumerate(column_names):
+                if idx < len(df.columns):
+                    try:
+                        numeric_data = pd.to_numeric(df.iloc[:, idx], errors='coerce')
+                        if numeric_data.notna().sum() / len(numeric_data) > 0.5:
+                            target_idx = idx
+                            target_name = col
+                            break
+                    except:
+                        pass
+
+        if target_idx is None:
+            target_idx = 0
+            target_name = column_names[0] if column_names else "A"
+
+        if action_type == "color_scale":
+            # Build color scale response
+            color_direction = gpt_result.get("color_direction", "low_is_good")
+
+            if color_direction == "high_is_good":
+                preset = self.COLOR_SCALE_PRESETS['red_yellow_green']  # low=red, high=green
+            else:
+                preset = self.COLOR_SCALE_PRESETS['green_yellow_red']  # low=green, high=red
+
+            # Get column stats
+            try:
+                col_data = pd.to_numeric(df.iloc[:, target_idx], errors='coerce')
+                min_val = float(col_data.min())
+                max_val = float(col_data.max())
+                mid_val = float(col_data.median())
+            except:
+                min_val, mid_val, max_val = 0, 50, 100
+
+            rule = {
+                "column_index": target_idx,
+                "column_name": target_name,
+                "min_color": preset['min_color'],
+                "mid_color": preset['mid_color'],
+                "max_color": preset['max_color'],
+                "min_value": min_val,
+                "mid_value": mid_val,
+                "max_value": max_val,
+                "row_count": len(df)
+            }
+
+            return {
+                "action_type": "color_scale",
+                "rule": rule,
+                "message": f"Цветовая шкала для '{target_name}' ({min_val:.0f} → {max_val:.0f})"
+            }
+
+        elif action_type == "conditional_format":
+            # Build conditional format response
+            condition_type = gpt_result.get("condition_type", "NUMBER_GREATER")
+            condition_value = gpt_result.get("condition_value", 0)
+            format_color_name = gpt_result.get("format_color", "yellow")
+
+            # Map color names to RGB
+            color_map = {
+                "red": {'red': 0.96, 'green': 0.8, 'blue': 0.8},
+                "green": {'red': 0.8, 'green': 0.92, 'blue': 0.8},
+                "yellow": {'red': 1, 'green': 0.95, 'blue': 0.8},
+                "blue": {'red': 0.8, 'green': 0.85, 'blue': 0.95}
+            }
+            format_color = color_map.get(format_color_name, color_map["yellow"])
+
+            rule = {
+                "column_index": target_idx,
+                "column_name": target_name,
+                "condition_type": condition_type,
+                "condition_value": condition_value,
+                "format_color": format_color
+            }
+
+            # Generate message
+            condition_text = ""
+            if condition_type == "NUMBER_GREATER":
+                condition_text = f"> {condition_value}"
+            elif condition_type == "NUMBER_LESS":
+                condition_text = f"< {condition_value}"
+            elif condition_type == "NUMBER_EQ":
+                condition_text = f"= {condition_value}"
+            elif condition_type == "BLANK":
+                condition_text = "пустые"
+            elif condition_type == "NOT_BLANK":
+                condition_text = "непустые"
+
+            return {
+                "action_type": "conditional_format",
+                "rule": rule,
+                "message": f"Условное форматирование: {target_name} {condition_text} → {format_color_name}"
+            }
+
+        elif action_type == "highlight":
+            # Highlight rows - similar to conditional format but for entire rows
+            format_color_name = gpt_result.get("format_color", "yellow")
+            color_map = {
+                "red": "#FFB3B3",
+                "green": "#B3E6B3",
+                "yellow": "#FFFF99",
+                "blue": "#B3D9FF"
+            }
+
+            return {
+                "action_type": "highlight",
+                "highlight_color": color_map.get(format_color_name, "#FFFF99"),
+                "message": f"Подсветка строк: {gpt_result.get('reason', '')}"
+            }
+
+        return None
+
     def _detect_chart_action(self, query: str, column_names: List[str], df: pd.DataFrame) -> Optional[Dict[str, Any]]:
         """
         Определяет, является ли запрос командой создания диаграммы.
@@ -2855,35 +3085,46 @@ explanation += "- Строка 17: Пауэрбанк, кол-во = -2\n"
                     "processor": "SimpleGPT v1.0 (direct action)"
                 }
 
-            # Check for color scale action (BEFORE conditional formatting!)
-            color_scale_action = self._detect_color_scale_action(query, column_names, df)
-            if color_scale_action:
-                elapsed = time.time() - start_time
-                logger.info(f"[SimpleGPT] Returning color scale action: {color_scale_action}")
-                return {
-                    "success": True,
-                    "action_type": "color_scale",
-                    "result_type": "action",
-                    "rule": color_scale_action["rule"],
-                    "summary": color_scale_action["message"],
-                    "processing_time": f"{elapsed:.2f}s",
-                    "processor": "SimpleGPT v1.0 (direct action)"
-                }
+            # GPT-based format classification (replaces keyword-based detection)
+            # This understands ANY formatting request without hardcoded keywords
+            format_result = await self._gpt_classify_format_request(query, column_names, df)
+            if format_result:
+                format_action = await self._apply_gpt_format_result(format_result, column_names, df)
+                if format_action:
+                    elapsed = time.time() - start_time
+                    action_type = format_action["action_type"]
+                    logger.info(f"[SimpleGPT] GPT format action: {action_type}, result: {format_action}")
 
-            # Check for conditional formatting action
-            conditional_action = self._detect_conditional_format_action(query, column_names, df)
-            if conditional_action:
-                elapsed = time.time() - start_time
-                logger.info(f"[SimpleGPT] Returning conditional format action: {conditional_action}")
-                return {
-                    "success": True,
-                    "action_type": "conditional_format",
-                    "result_type": "action",
-                    "rule": conditional_action["rule"],
-                    "summary": conditional_action["message"],
-                    "processing_time": f"{elapsed:.2f}s",
-                    "processor": "SimpleGPT v1.0 (direct action)"
-                }
+                    if action_type == "color_scale":
+                        return {
+                            "success": True,
+                            "action_type": "color_scale",
+                            "result_type": "action",
+                            "rule": format_action["rule"],
+                            "summary": format_action["message"],
+                            "processing_time": f"{elapsed:.2f}s",
+                            "processor": "SimpleGPT v1.0 (GPT format)"
+                        }
+                    elif action_type == "conditional_format":
+                        return {
+                            "success": True,
+                            "action_type": "conditional_format",
+                            "result_type": "action",
+                            "rule": format_action["rule"],
+                            "summary": format_action["message"],
+                            "processing_time": f"{elapsed:.2f}s",
+                            "processor": "SimpleGPT v1.0 (GPT format)"
+                        }
+                    elif action_type == "highlight":
+                        return {
+                            "success": True,
+                            "action_type": "highlight",
+                            "result_type": "action",
+                            "highlight_color": format_action["highlight_color"],
+                            "summary": format_action["message"],
+                            "processing_time": f"{elapsed:.2f}s",
+                            "processor": "SimpleGPT v1.0 (GPT format)"
+                        }
 
             # Check for pivot table action
             pivot_action = self._detect_pivot_action(query, column_names, df)
