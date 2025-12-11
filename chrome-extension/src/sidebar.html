@@ -314,6 +314,28 @@
     [data-theme="dark"] .theme-toggle .sun-icon { display: block; }
     [data-theme="dark"] .theme-toggle .moon-icon { display: none; }
 
+    /* Undo Button - hidden by default */
+    .undo-btn {
+      display: none;
+      color: var(--warning) !important;
+    }
+
+    .undo-btn.visible {
+      display: flex;
+      animation: undoPulse 0.3s var(--ease-spring);
+    }
+
+    .undo-btn:hover {
+      background: var(--warning-subtle) !important;
+      color: var(--warning) !important;
+    }
+
+    @keyframes undoPulse {
+      0% { transform: scale(0.8); opacity: 0; }
+      50% { transform: scale(1.1); }
+      100% { transform: scale(1); opacity: 1; }
+    }
+
     /* ============================================
        USER BAR
        ============================================ */
@@ -1603,6 +1625,12 @@
     </div>
 
     <div class="header-actions">
+      <button class="icon-btn undo-btn" id="undoBtn" title="Отменить последнее действие">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M3 7v6h6"/>
+          <path d="M3 13a9 9 0 1 0 2.5-6.5L3 7"/>
+        </svg>
+      </button>
       <button class="icon-btn" id="personalizeBtn" title="Персонализация">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
           <path d="M12 2L2 7l10 5 10-5-10-5z"/>

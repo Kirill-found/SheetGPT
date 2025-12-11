@@ -571,6 +571,27 @@ window.addEventListener('message', async (event) => {
         console.log('[SheetGPT] 🔢 CONVERT_TO_NUMBERS result:', result);
         break;
 
+      case 'CREATE_NEW_SHEET_WITH_DATA':
+        console.log('[SheetGPT] 📋 CREATE_NEW_SHEET_WITH_DATA received:', data);
+        result = await createNewSheetWithData(data.sheetName, data.structuredData);
+        console.log('[SheetGPT] 📋 CREATE_NEW_SHEET_WITH_DATA result:', result);
+        break;
+
+      case 'GET_SHEET_DATA_FOR_UNDO':
+        console.log('[SheetGPT] 📸 GET_SHEET_DATA_FOR_UNDO - saving snapshot');
+        result = await getSheetDataForUndo();
+        break;
+
+      case 'RESTORE_SHEET_DATA':
+        console.log('[SheetGPT] ↩️ RESTORE_SHEET_DATA - restoring snapshot');
+        result = await restoreSheetData(data.data);
+        break;
+
+      case 'WRITE_CELL_VALUE':
+        console.log('[SheetGPT] ✏️ WRITE_CELL_VALUE - writing to cell:', data.targetCell, 'value:', data.value);
+        result = await writeCellValue(data.targetCell, data.value);
+        break;
+
       default:
         throw new Error(`Unknown action: ${action}`);
     }
@@ -815,6 +836,232 @@ async function createTableAndChart(structuredData) {
     return {
       success: false,
       message: `Ошибка создания таблицы: ${error.message}`
+    };
+  }
+}
+
+/**
+ * Create a NEW sheet and write data to it (does not overwrite current sheet!)
+ * Used for pivot tables and summaries that should not replace existing data
+ */
+async function createNewSheetWithData(newSheetName, structuredData) {
+  console.log('[SheetGPT] 📋 Creating NEW sheet with data:', newSheetName);
+  console.log('[SheetGPT] structuredData:', JSON.stringify(structuredData, null, 2));
+
+  try {
+    if (!structuredData) {
+      throw new Error('structuredData is null or undefined');
+    }
+
+    if (!structuredData.headers || !Array.isArray(structuredData.headers) || structuredData.headers.length === 0) {
+      throw new Error('No headers in structured data');
+    }
+
+    if (!structuredData.rows || !Array.isArray(structuredData.rows)) {
+      throw new Error('No rows array in structured data');
+    }
+
+    // Convert structured data to 2D array
+    const values = convertStructuredDataToValues(structuredData);
+    console.log('[SheetGPT] Converted values:', values);
+
+    if (!values || values.length === 0) {
+      throw new Error('Converted values array is empty');
+    }
+
+    // CREATE_NEW_SHEET creates sheet AND writes data in one call
+    console.log('[SheetGPT] Creating new sheet and writing data:', newSheetName);
+    let response = await safeSendMessage({
+      action: 'CREATE_NEW_SHEET',
+      data: {
+        sheetTitle: newSheetName,
+        values: values
+      }
+    });
+
+    // If sheet already exists, try with a unique name
+    if (!response.success && response.error?.includes('already exists')) {
+      const uniqueName = `${newSheetName} (${Date.now()})`;
+      console.log('[SheetGPT] Sheet exists, trying unique name:', uniqueName);
+      response = await safeSendMessage({
+        action: 'CREATE_NEW_SHEET',
+        data: {
+          sheetTitle: uniqueName,
+          values: values
+        }
+      });
+      if (response.success) {
+        newSheetName = uniqueName;
+      }
+    }
+
+    if (!response.success) {
+      throw new Error(response.error);
+    }
+
+    console.log('[SheetGPT] ✅ New sheet created with data:', response.result);
+    return {
+      success: true,
+      message: `Сводная таблица создана на новом листе "${newSheetName}" (${response.result?.rowsWritten || values.length} строк)`
+    };
+  } catch (error) {
+    console.error('[SheetGPT] Error creating new sheet with data:', error);
+    return {
+      success: false,
+      message: `Ошибка создания листа: ${error.message}`
+    };
+  }
+}
+
+/**
+ * Get current sheet data for undo snapshot
+ * Returns all values and formatting from current sheet
+ */
+async function getSheetDataForUndo() {
+  console.log('[SheetGPT] 📸 Getting sheet data for undo...');
+
+  try {
+    // Get spreadsheet ID
+    const match = window.location.href.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
+    if (!match) {
+      throw new Error('Could not get spreadsheet ID from URL');
+    }
+    const spreadsheetId = match[1];
+
+    // Get current sheet name from storage
+    const storageKey = `sheetName_${spreadsheetId}`;
+    const storage = await chrome.storage.local.get([storageKey]);
+    const sheetName = storage[storageKey];
+    if (!sheetName) {
+      throw new Error('Could not get active sheet name');
+    }
+
+    // Get sheet data via background script
+    const response = await safeSendMessage({
+      action: 'GET_SHEET_DATA'
+    });
+
+    if (!response.success) {
+      throw new Error(response.error || 'Failed to get sheet data');
+    }
+
+    console.log('[SheetGPT] ✅ Snapshot captured:', response.result?.values?.length, 'rows');
+    return {
+      success: true,
+      data: {
+        sheetName: sheetName,
+        values: response.result.values,
+        headers: response.result.headers
+      }
+    };
+  } catch (error) {
+    console.error('[SheetGPT] ❌ Error getting sheet data for undo:', error);
+    return {
+      success: false,
+      message: error.message
+    };
+  }
+}
+
+/**
+ * Restore sheet data from undo snapshot
+ * @param {Object} snapshot - The saved sheet state
+ */
+async function restoreSheetData(snapshot) {
+  console.log('[SheetGPT] ↩️ Restoring sheet data...');
+
+  try {
+    if (!snapshot || !snapshot.values) {
+      throw new Error('Invalid snapshot data');
+    }
+
+    const sheetName = snapshot.sheetName;
+    const values = snapshot.values;
+
+    console.log('[SheetGPT] Restoring to sheet:', sheetName, 'with', values.length, 'rows');
+
+    // Write data back to sheet
+    const response = await safeSendMessage({
+      action: 'WRITE_SHEET_DATA',
+      data: {
+        sheetName: sheetName,
+        values: values,
+        startCell: 'A1',
+        mode: 'overwrite'
+      }
+    });
+
+    if (!response.success) {
+      throw new Error(response.error || 'Failed to restore data');
+    }
+
+    console.log('[SheetGPT] ✅ Sheet data restored successfully');
+    return {
+      success: true,
+      message: `Данные восстановлены (${values.length} строк)`
+    };
+  } catch (error) {
+    console.error('[SheetGPT] ❌ Error restoring sheet data:', error);
+    return {
+      success: false,
+      message: error.message
+    };
+  }
+}
+
+/**
+ * Write a single value to a specific cell
+ * @param {string} targetCell - Cell address like "B12", "C5"
+ * @param {any} value - Value to write
+ */
+async function writeCellValue(targetCell, value) {
+  console.log('[SheetGPT] ✏️ Writing value to cell:', targetCell, value);
+
+  try {
+    // Get spreadsheet ID
+    const match = window.location.href.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
+    if (!match) {
+      throw new Error('Could not get spreadsheet ID from URL');
+    }
+    const spreadsheetId = match[1];
+
+    // Get current sheet name from storage
+    const storageKey = `sheetName_${spreadsheetId}`;
+    const storage = await chrome.storage.local.get([storageKey]);
+    const sheetName = storage[storageKey];
+    if (!sheetName) {
+      throw new Error('Could not get active sheet name');
+    }
+
+    // Build the range - include sheet name for safety
+    const range = `${sheetName}!${targetCell}`;
+    console.log('[SheetGPT] Writing to range:', range);
+
+    // Write single value via background script
+    const response = await safeSendMessage({
+      action: 'WRITE_SHEET_DATA',
+      data: {
+        sheetName: sheetName,
+        values: [[value]],  // 2D array with single value
+        startCell: targetCell,
+        mode: 'overwrite'
+      }
+    });
+
+    if (!response.success) {
+      throw new Error(response.error || 'Failed to write value');
+    }
+
+    console.log('[SheetGPT] ✅ Value written successfully to', targetCell);
+    return {
+      success: true,
+      message: `Значение ${value} записано в ячейку ${targetCell}`
+    };
+  } catch (error) {
+    console.error('[SheetGPT] ❌ Error writing cell value:', error);
+    return {
+      success: false,
+      message: error.message
     };
   }
 }
