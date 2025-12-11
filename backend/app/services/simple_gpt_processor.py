@@ -1182,15 +1182,54 @@ explanation += "- Строка 17: Пауэрбанк, кол-во = -2\n"
             logger.error(f"[SimpleGPT] GPT chart selection failed: {e}")
             return None
 
-    async def _gpt_classify_action(self, query: str, column_names: List[str], df: pd.DataFrame) -> Optional[Dict[str, Any]]:
+    async def _gpt_classify_action(self, query: str, column_names: List[str], df: pd.DataFrame, history: List[Dict[str, Any]] = None) -> Optional[Dict[str, Any]]:
         """
         УНИВЕРСАЛЬНЫЙ GPT-классификатор действий. Понимает ЛЮБЫЕ запросы пользователя.
         Заменяет ВСЕ хардкод функции _detect_*_action.
+
+        ВАЖНО: Использует историю для понимания контекста ("исправь", "не так", "другой цвет")
 
         Returns:
             - None если нужен анализ данных (передать в GPT для Python кода)
             - Dict с action_type и параметрами для прямого выполнения
         """
+        # Build conversation history for context
+        history_context = ""
+        if history and len(history) > 0:
+            history_context = "\n--- ИСТОРИЯ ДИАЛОГА (предыдущие действия) ---\n"
+            for i, item in enumerate(history[-5:], 1):  # Last 5 messages
+                prev_query = item.get('query', '')
+
+                # Try to extract action_type from different possible formats
+                prev_action = item.get('action_type', '')
+                if not prev_action:
+                    # Try actions array format
+                    actions = item.get('actions', [])
+                    if actions and len(actions) > 0:
+                        prev_action = actions[0].get('type', '')
+                if not prev_action:
+                    # Try response dict format
+                    resp = item.get('response', {})
+                    if isinstance(resp, dict):
+                        prev_action = resp.get('action_type', resp.get('response_type', ''))
+
+                # Get response/summary
+                prev_response = item.get('response', item.get('summary', item.get('answer', '')))
+                if isinstance(prev_response, dict):
+                    prev_response = prev_response.get('summary', prev_response.get('explanation', str(prev_response)[:200]))
+
+                history_context += f"{i}. Пользователь: {prev_query}\n"
+                if prev_action:
+                    history_context += f"   Действие: {prev_action}\n"
+                if prev_response:
+                    resp_str = str(prev_response)[:200]
+                    history_context += f"   Результат: {resp_str}\n"
+            history_context += "--- КОНЕЦ ИСТОРИИ ---\n\n"
+            history_context += "КРИТИЧНО: Если пользователь говорит 'исправь', 'не так', 'другой', 'наоборот', 'поменяй' - "
+            history_context += "ты ДОЛЖЕН посмотреть на ПОСЛЕДНЕЕ действие и ИЗМЕНИТЬ его параметры!\n"
+            history_context += "Например: было color_scale с low_is_good → сделай high_is_good\n"
+            history_context += "Например: была колонка 'Цена' → выбери ДРУГУЮ колонку\n\n"
+
         # Analyze column types for GPT context
         column_info = []
         for idx, col in enumerate(column_names):
@@ -1216,7 +1255,7 @@ explanation += "- Строка 17: Пауэрбанк, кол-во = -2\n"
 
         columns_desc = "\n".join(column_info)
 
-        prompt = f"""Определи тип действия для запроса пользователя к таблице.
+        prompt = f"""{history_context}Определи тип действия для запроса пользователя к таблице.
 
 Запрос: "{query}"
 
@@ -1281,7 +1320,18 @@ explanation += "- Строка 17: Пауэрбанк, кол-во = -2\n"
 ВАЖНО:
 - Если запрос требует ВЫЧИСЛЕНИЙ или АНАЛИЗА → action_type = "analysis"
 - Для color_scale: color_direction = "high_is_good" если большие значения = хорошо (прибыль, доход)
-- Выбирай колонку по смыслу запроса, не первую попавшуюся"""
+- Выбирай колонку по смыслу запроса, не первую попавшуюся
+
+ИСПРАВЛЕНИЕ ОШИБОК (если есть история):
+- "исправь", "не так", "неправильно" → повтори ПОСЛЕДНЕЕ действие с ДРУГИМИ параметрами
+- "наоборот", "поменяй цвета" → если было low_is_good, сделай high_is_good (и наоборот)
+- "другую колонку", "не ту колонку" → выбери ДРУГУЮ колонку из списка
+- "по-другому", "иначе" → измени параметры (цвет, направление, условие)
+
+ПРИМЕРЫ ИСПРАВЛЕНИЙ:
+- История: color_scale на колонку "Цена" с low_is_good
+- Запрос: "наоборот" → color_scale на "Цена" с high_is_good
+- Запрос: "не ту колонку" → color_scale на ДРУГУЮ числовую колонку"""
 
         try:
             response = await self.client.chat.completions.create(
@@ -3126,8 +3176,9 @@ explanation += "- Строка 17: Пауэрбанк, кол-во = -2\n"
             # UNIVERSAL GPT ACTION CLASSIFIER
             # Заменяет ВСЕ хардкод функции _detect_*_action
             # GPT понимает ЛЮБОЙ запрос без списка ключевых слов
+            # ВАЖНО: Передаём history для контекста ("исправь", "не так")
             # =====================================================
-            gpt_action = await self._gpt_classify_action(query, column_names, df)
+            gpt_action = await self._gpt_classify_action(query, column_names, df, history=history)
             if gpt_action:
                 action_result = await self._apply_gpt_action_result(gpt_action, column_names, df)
                 if action_result:
