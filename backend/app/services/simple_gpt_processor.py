@@ -1877,11 +1877,11 @@ explanation += "- Строка 17: Пауэрбанк, кол-во = -2\n"
                         changes.append(f"удалено {removed} пустых строк")
 
                 elif op == 'trim_whitespace':
-                    # Trim string columns
+                    # Trim string columns - remove leading/trailing AND multiple internal spaces
                     str_cols = cleaned_df.select_dtypes(include=['object']).columns
                     for col in str_cols:
                         cleaned_df[col] = cleaned_df[col].apply(
-                            lambda x: x.strip() if isinstance(x, str) else x
+                            lambda x: ' '.join(x.split()) if isinstance(x, str) else x
                         )
                     if len(str_cols) > 0:
                         changes.append(f"убраны пробелы в {len(str_cols)} колонках")
