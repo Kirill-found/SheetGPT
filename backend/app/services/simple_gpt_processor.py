@@ -1334,15 +1334,19 @@ explanation += "- Строка 17: Пауэрбанк, кол-во = -2\n"
 - Запрос: "не ту колонку" → color_scale на ДРУГУЮ числовую колонку"""
 
         try:
+            import json
             response = await self.client.chat.completions.create(
                 model="gpt-4o-mini",
                 messages=[{"role": "user", "content": prompt}],
                 temperature=0,
-                max_tokens=400
+                max_tokens=400,
+                response_format={"type": "json_object"}  # Force JSON output
             )
 
             result_text = response.choices[0].message.content.strip()
-            import json
+            logger.info(f"[SimpleGPT] GPT raw response: {result_text[:200]}")
+
+            # Parse JSON (should be clean now with response_format)
             if "```" in result_text:
                 result_text = result_text.split("```")[1]
                 if result_text.startswith("json"):
@@ -1352,9 +1356,13 @@ explanation += "- Строка 17: Пауэрбанк, кол-во = -2\n"
             logger.info(f"[SimpleGPT] GPT action classification: {result}")
 
             if result.get("action_type") == "analysis":
+                logger.info(f"[SimpleGPT] Analysis request, falling through to code generation")
                 return None  # Let main GPT handle analysis
 
             return result
+        except json.JSONDecodeError as e:
+            logger.error(f"[SimpleGPT] JSON parse error: {e}, raw: {result_text[:200] if 'result_text' in dir() else 'N/A'}")
+            return None  # Fall through to analysis mode
         except Exception as e:
             logger.error(f"[SimpleGPT] GPT action classification failed: {e}")
             return None
