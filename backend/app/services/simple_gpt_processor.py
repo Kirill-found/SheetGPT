@@ -1193,6 +1193,15 @@ explanation += "- Строка 17: Пауэрбанк, кол-во = -2\n"
         """
         import json
 
+        # Safety check for None values
+        if df is None or column_names is None:
+            logger.warning("[SmartGPT] df or column_names is None, falling back to Python")
+            return None
+
+        if len(df) == 0 or len(column_names) == 0:
+            logger.warning("[SmartGPT] Empty df or column_names, falling back to Python")
+            return None
+
         # Prepare history context
         history_text = ""
         if history and len(history) > 0:
