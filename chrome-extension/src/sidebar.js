@@ -1721,8 +1721,8 @@ function transformAPIResponse(apiResponse) {
 
   // If response has highlight_rows
   if (apiResponse.highlight_rows && apiResponse.highlight_rows.length > 0) {
-    // Trigger highlight action
-    highlightRowsInSheet(apiResponse.highlight_rows);
+    // Trigger highlight action with color from response
+    highlightRowsInSheet(apiResponse.highlight_rows, apiResponse.highlight_color);
     return {
       type: 'highlight',
       text: `Выделено ${apiResponse.highlighted_count || apiResponse.highlight_rows.length} строк`,
@@ -1833,12 +1833,12 @@ function getErrorMessage(error) {
 // ============================================
 
 // Highlight rows in the sheet
-async function highlightRowsInSheet(rows) {
+async function highlightRowsInSheet(rows, color) {
   if (!rows || rows.length === 0) return;
 
   try {
-    await sendToContentScript('HIGHLIGHT_ROWS', { rows: rows });
-    console.log('[Sidebar] Rows highlighted:', rows);
+    await sendToContentScript('HIGHLIGHT_ROWS', { rows: rows, color: color });
+    console.log('[Sidebar] Rows highlighted:', rows, 'with color:', color);
   } catch (error) {
     console.error('[Sidebar] Error highlighting rows:', error);
   }

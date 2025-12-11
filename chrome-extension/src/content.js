@@ -1266,8 +1266,18 @@ function convertStructuredDataToValues(structuredData) {
   throw new Error(`Invalid structured data format. Expected {headers, rows} or {columns, data}, got: ${JSON.stringify(Object.keys(structuredData))}`);
 }
 
-// Helper function to convert color name to RGB
-function convertColorNameToRGB(colorName) {
+// Helper function to convert color name or hex to RGB
+function convertColorNameToRGB(color) {
+  // Handle hex colors like "#B3D9FF"
+  if (color && color.startsWith('#')) {
+    const hex = color.slice(1);
+    const r = parseInt(hex.substring(0, 2), 16) / 255;
+    const g = parseInt(hex.substring(2, 4), 16) / 255;
+    const b = parseInt(hex.substring(4, 6), 16) / 255;
+    return { red: r, green: g, blue: b };
+  }
+
+  // Handle color names
   const colorMap = {
     'yellow': { red: 1, green: 1, blue: 0.8 },
     'green': { red: 0.8, green: 1, blue: 0.8 },
@@ -1276,5 +1286,5 @@ function convertColorNameToRGB(colorName) {
     'orange': { red: 1, green: 0.9, blue: 0.7 }
   };
 
-  return colorMap[colorName?.toLowerCase()] || colorMap['yellow'];
+  return colorMap[color?.toLowerCase()] || colorMap['yellow'];
 }
