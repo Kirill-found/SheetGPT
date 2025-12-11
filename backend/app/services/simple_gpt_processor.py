@@ -2993,7 +2993,9 @@ PYTHON АНАЛИЗ (когда нужны вычисления/изменени
                     "result_type": "action",
                     "processing_time": f"{elapsed:.2f}s",
                     "processor": "SmartGPT v3.0",
-                    "confidence": 0.95
+                    "confidence": 0.95,
+                    "explanation": smart_result.get("summary", ""),  # Required by schema
+                    "response_type": "analysis"  # Required by schema
                 })
                 return smart_result
 
