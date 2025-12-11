@@ -1,5 +1,6 @@
 # v6.2.8 - Custom Context Debug
 # v6.2.9 - Chart spec generation
+# v6.2.10 - Fix: Don't skip first data row (frontend already separates headers)
 from fastapi import APIRouter, HTTPException
 from app.schemas.requests import FormulaRequest
 from app.schemas.responses import FormulaResponse, ErrorResponse
@@ -181,7 +182,7 @@ async def generate_formula(request: FormulaRequest):
         if request.conversation_id:
             sheet_data_dict = {
                 "columns": request.column_names,
-                "sample_data": request.sheet_data[1:] if request.sheet_data and len(request.sheet_data) > 1 else [],
+                "sample_data": request.sheet_data if request.sheet_data else [],  # v6.2.10: Don't skip first row - frontend already separates headers
                 "row_count": len(request.sheet_data) if request.sheet_data else 0,
                 "sheet_id": "default",
                 "selected_range": request.selected_range,
