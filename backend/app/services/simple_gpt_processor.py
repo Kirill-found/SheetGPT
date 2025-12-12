@@ -149,11 +149,11 @@ explanation = "Твой текстовый ответ здесь"
 9. ВАЖНО: НЕ конвертируй в числа колонки: телефон, phone, id, код, артикул, номер, инн, паспорт, счет - это ТЕКСТ!
 
 КРИТИЧНО - БЕЗОПАСНАЯ РАБОТА С NaN:
-- ВСЕГДА проверяй pd.notna(value) перед int() или форматированием
+- ИСПОЛЬЗУЙ safe_int(val) и safe_float(val) вместо int() и float()!
+- safe_int(val) и safe_float(val) доступны глобально - они обрабатывают NaN автоматически
 - Для подсчёта используй: int(col.sum()) ТОЛЬКО после dropna()
-- Безопасное преобразование: int(val) if pd.notna(val) else 0
-- Для вывода чисел: f"{val:.0f}" только если pd.notna(val)
 - НИКОГДА не делай int() на значении которое может быть NaN!
+- Пример: df['col'].apply(safe_int) вместо df['col'].astype(int)
 
 КРИТИЧНО - КОНКРЕТНЫЕ ПРИМЕРЫ:
 - При любом анализе ВСЕГДА показывай КОНКРЕТНЫЕ примеры из данных
@@ -345,6 +345,31 @@ if len(sales) > 1:
     gap_pct = (gap / second_sum) * 100
     explanation += f"Отрыв от 2-го: +{gap:,.0f} руб. (+{gap_pct:.0f}%)\n"
 explanation += f"\nВывод: {leader} лидирует по объёму продаж"
+```
+
+Запрос: "Разбей данные по ячейкам" или "Разбей колонку на несколько"
+```python
+# Находим колонку с текстом для разбиения (обычно первая или с длинными значениями)
+text_col = df.columns[0]  # По умолчанию первая колонка
+
+# Разбиваем по пробелам, запятым или другим разделителям
+# ВАЖНО: используем expand=True для создания новых колонок
+split_df = df[text_col].astype(str).str.split(r'[,;\s]+', expand=True)
+
+# Даем новым колонкам имена
+split_df.columns = [f'Колонка_{i+1}' for i in range(len(split_df.columns))]
+
+# Заменяем None на пустые строки
+split_df = split_df.fillna('')
+
+# Объединяем с оригинальным df или возвращаем новый
+result = split_df.to_dict(orient='records')
+
+explanation = f"Данные разбиты на {len(split_df.columns)} колонок.\n\n"
+explanation += "Первые 3 строки:\n"
+for i, row in split_df.head(3).iterrows():
+    vals = [str(v) for v in row.values if v]
+    explanation += f"{i+1}. {' | '.join(vals)}\n"
 ```
 
 Запрос: "почему?" (после вопроса о продуктивности)
@@ -3432,6 +3457,25 @@ result = value[0] if len(value) > 0 else 'Не найдено'
     def _execute_code(self, code: str, df: pd.DataFrame, reference_df: pd.DataFrame = None) -> dict:
         """Выполняет код в sandbox. Возвращает dict с result и explanation."""
 
+        # Helper functions for safe NaN handling
+        def safe_int(val, default=0):
+            """Safely convert to int, handling NaN/None"""
+            if pd.isna(val) or val is None:
+                return default
+            try:
+                return int(float(val))
+            except (ValueError, TypeError):
+                return default
+
+        def safe_float(val, default=0.0):
+            """Safely convert to float, handling NaN/None"""
+            if pd.isna(val) or val is None:
+                return default
+            try:
+                return float(val)
+            except (ValueError, TypeError):
+                return default
+
         # Create safe namespace
         namespace = {
             'df': df.copy(),
@@ -3443,6 +3487,8 @@ result = value[0] if len(value) > 0 else 'Не найдено'
             'timedelta': __import__('datetime').timedelta,
             're': __import__('re'),
             'math': __import__('math'),
+            'safe_int': safe_int,
+            'safe_float': safe_float,
         }
         
         # v9.2.0: Add reference_df for cross-sheet VLOOKUP
