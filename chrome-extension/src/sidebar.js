@@ -41,12 +41,16 @@ let undoActionName = '';  // Description of what was done
  * Save current sheet state before making changes
  * @param {string} actionName - Description of the action being performed
  */
-async function saveSheetSnapshot(actionName) {
+async function saveSheetSnapshot(actionName, extraData = null) {
   try {
     console.log('[Sidebar] 📸 Saving snapshot before:', actionName);
     const response = await sendToContentScript('GET_SHEET_DATA_FOR_UNDO', {});
     if (response && response.success && response.data) {
       undoSnapshot = response.data;
+      // Save extra data (e.g., highlighted rows for undo)
+      if (extraData) {
+        undoSnapshot.extraData = extraData;
+      }
       undoActionName = actionName;
       // Show undo button
       const undoBtn = document.getElementById('undoBtn');
@@ -72,9 +76,22 @@ async function undoLastAction() {
 
   try {
     console.log('[Sidebar] ↩️ Restoring snapshot...');
-    const response = await sendToContentScript('RESTORE_SHEET_DATA', {
-      data: undoSnapshot
-    });
+
+    let response;
+
+    // For highlight actions, just clear the colors instead of restoring all data
+    if (undoSnapshot.extraData?.highlightedRows) {
+      console.log('[Sidebar] ↩️ Clearing highlight colors from rows:', undoSnapshot.extraData.highlightedRows);
+      response = await sendToContentScript('CLEAR_ROW_COLORS', {
+        rows: undoSnapshot.extraData.highlightedRows,
+        sheetName: undoSnapshot.sheetName
+      });
+    } else {
+      // For other actions, restore the full data
+      response = await sendToContentScript('RESTORE_SHEET_DATA', {
+        data: undoSnapshot
+      });
+    }
 
     if (response && response.success) {
       addAIMessage({
@@ -1975,7 +1992,8 @@ async function highlightRowsInSheet(rows, color) {
   if (!rows || rows.length === 0) return;
 
   try {
-    await saveSheetSnapshot('Выделение строк');
+    // Pass highlighted rows to snapshot for proper undo (clear colors, not restore data)
+    await saveSheetSnapshot('Выделение строк', { highlightedRows: rows });
     await sendToContentScript('HIGHLIGHT_ROWS', { rows: rows, color: color });
     console.log('[Sidebar] Rows highlighted:', rows, 'with color:', color);
   } catch (error) {

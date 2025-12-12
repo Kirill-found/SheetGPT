@@ -438,6 +438,64 @@ async function highlightRows(spreadsheetId, sheetId, rowIndices, color = { red: 
 }
 
 /**
+ * Clear row background colors (set to white/default)
+ */
+async function clearRowBackgrounds(spreadsheetId, sheetName, rowIndices) {
+  try {
+    const token = await getAuthToken();
+
+    // Get sheet ID from name
+    const sheetId = await getSheetIdByName(spreadsheetId, sheetName);
+    if (sheetId === null) {
+      throw new Error(`Sheet "${sheetName}" not found`);
+    }
+
+    // Set background to white (removing any highlight)
+    const whiteColor = { red: 1, green: 1, blue: 1 };
+
+    const requests = rowIndices.map(rowIndex => ({
+      repeatCell: {
+        range: {
+          sheetId: sheetId,
+          startRowIndex: rowIndex - 1,  // Convert to 0-based
+          endRowIndex: rowIndex         // End is exclusive
+        },
+        cell: {
+          userEnteredFormat: {
+            backgroundColor: whiteColor
+          }
+        },
+        fields: 'userEnteredFormat.backgroundColor'
+      }
+    }));
+
+    const response = await fetch(
+      `${SHEETS_API_BASE}/${spreadsheetId}:batchUpdate`,
+      {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ requests })
+      }
+    );
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(`Sheets API error: ${error.error?.message || response.statusText}`);
+    }
+
+    const result = await response.json();
+    console.log('[SheetsAPI] ✅ Row backgrounds cleared:', result);
+    return result;
+  } catch (error) {
+    console.error('[SheetsAPI] Error clearing row backgrounds:', error);
+    throw error;
+  }
+}
+
+/**
  * Sort data in a range by column
  * @param {string} spreadsheetId - The spreadsheet ID
  * @param {number} sheetId - The sheet ID (not name!)
@@ -1225,6 +1283,7 @@ if (typeof module !== 'undefined' && module.exports) {
     appendSheetData,
     createNewSheet,
     highlightRows,
+    clearRowBackgrounds,
     sortRange,
     freezeRowsColumns,
     formatRow,

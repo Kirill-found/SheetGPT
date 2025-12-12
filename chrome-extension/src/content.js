@@ -600,6 +600,11 @@ window.addEventListener('message', async (event) => {
         result = await addFormulaColumn(data.columnName, data.formulaTemplate, data.rowCount);
         break;
 
+      case 'CLEAR_ROW_COLORS':
+        console.log('[SheetGPT] ↩️ CLEAR_ROW_COLORS - clearing highlight from rows:', data.rows);
+        result = await clearRowColors(data.rows, data.sheetName);
+        break;
+
       default:
         throw new Error(`Unknown action: ${action}`);
     }
@@ -1042,6 +1047,45 @@ async function restoreSheetData(snapshot) {
     };
   } catch (error) {
     console.error('[SheetGPT] ❌ Error restoring sheet data:', error);
+    return {
+      success: false,
+      message: error.message
+    };
+  }
+}
+
+/**
+ * Clear background color from specified rows (for highlight undo)
+ * @param {Array} rows - Row numbers to clear (1-indexed)
+ * @param {string} sheetName - Name of the sheet
+ */
+async function clearRowColors(rows, sheetName) {
+  console.log('[SheetGPT] ↩️ Clearing colors from rows:', rows);
+
+  try {
+    if (!rows || rows.length === 0) {
+      return { success: true, message: 'No rows to clear' };
+    }
+
+    const response = await safeSendMessage({
+      action: 'CLEAR_ROW_COLORS',
+      data: {
+        sheetName: sheetName || 'Sheet1',
+        rowIndices: rows
+      }
+    });
+
+    if (!response.success) {
+      throw new Error(response.error || 'Failed to clear row colors');
+    }
+
+    console.log('[SheetGPT] ✅ Row colors cleared');
+    return {
+      success: true,
+      message: `Цвет убран с ${rows.length} строк`
+    };
+  } catch (error) {
+    console.error('[SheetGPT] ❌ Error clearing row colors:', error);
     return {
       success: false,
       message: error.message
