@@ -1359,8 +1359,14 @@ explanation += "- Строка 17: Пауэрбанк, кол-во = -2\n"
   "y_columns": [<индексы колонок для оси Y>],
   "title": "<заголовок>",
   "needs_aggregation": <true/false>,
-  "aggregation": "<sum/mean/count/null>"
+  "aggregation": "<sum/mean/count/null>",
+  "row_filter": {{"column": <индекс>, "value": "<значение>"}} или null
 }}
+
+ВАЖНО - ФИЛЬТРАЦИЯ ПО СТРОКЕ:
+- Если пользователь просит "за декабрь", "за январь", "за 2024" и т.п.:
+  row_filter = {{"column": 0, "value": "Декабрь"}} (ищи значение в первом столбце)
+- Если НЕ указан конкретный период: row_filter = null
 
 ВАЖНО - АГРЕГАЦИЯ:
 - Если X колонка имеет ПОВТОРЯЮЩИЕСЯ значения (уникальных < всего) - needs_aggregation=true
@@ -1767,6 +1773,47 @@ chat: {{"action_type": "chat", "message": "Уточните, пожалуйст�
             title = gpt_result.get("title", "Диаграмма")
             needs_aggregation = gpt_result.get("needs_aggregation", False)
             aggregation = gpt_result.get("aggregation", "sum")
+            row_filter = gpt_result.get("row_filter")
+
+            # Apply row filter if specified (e.g., "за декабрь")
+            if row_filter and isinstance(row_filter, dict):
+                filter_col = row_filter.get("column", 0)
+                filter_val = row_filter.get("value", "")
+                if filter_col < len(df.columns) and filter_val:
+                    # Find matching row
+                    col_data = df.iloc[:, filter_col].astype(str).str.lower()
+                    mask = col_data.str.contains(filter_val.lower(), na=False)
+                    filtered_df = df[mask]
+                    if len(filtered_df) > 0:
+                        df = filtered_df
+                        logger.info(f"[SimpleGPT] Chart row filter applied: {filter_val}, {len(df)} rows")
+
+                        # If we filtered to a single row, transpose data for "по категориям" view
+                        # This makes column names become X-axis labels
+                        if len(df) == 1 and len(y_indices) > 1:
+                            logger.info(f"[SimpleGPT] Single row detected, creating transposed chart data")
+                            y_col_names = [column_names[i] for i in y_indices if i < len(column_names)]
+                            row_data = df.iloc[0]
+
+                            # Create transposed aggregated_data
+                            rows = []
+                            for i, y_idx in enumerate(y_indices):
+                                if y_idx < len(df.columns):
+                                    cat_name = column_names[y_idx]
+                                    try:
+                                        val = float(row_data.iloc[y_idx])
+                                    except:
+                                        val = 0
+                                    rows.append([cat_name, val])
+
+                            if rows:
+                                aggregated_data = {
+                                    "headers": ["Категория", "Значение"],
+                                    "rows": rows,
+                                    "aggregation_type": "single_row"
+                                }
+                                needs_aggregation = True  # Force use of aggregated data
+                                logger.info(f"[SimpleGPT] Transposed data: {rows}")
         else:
             # Fallback to simple logic
             x_idx = 0
@@ -1785,9 +1832,10 @@ chat: {{"action_type": "chat", "message": "Уточните, пожалуйст�
         if chart_type == 'PIE':
             y_indices = y_indices[:1]
 
-        # Handle aggregation if needed
-        aggregated_data = None
-        if needs_aggregation and x_idx < len(df.columns):
+        # Handle aggregation if needed (skip if already set by single-row transposition)
+        if 'aggregated_data' not in locals():
+            aggregated_data = None
+        if needs_aggregation and x_idx < len(df.columns) and aggregated_data is None:
             try:
                 x_col_name = column_names[x_idx]
                 y_col_names = [column_names[i] for i in y_indices if i < len(column_names)]
