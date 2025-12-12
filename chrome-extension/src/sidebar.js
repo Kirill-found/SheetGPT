@@ -1644,6 +1644,8 @@ function translateToRussian(text) {
 function transformAPIResponse(apiResponse) {
   console.log('[Sidebar] transformAPIResponse received:', apiResponse);
   console.log('[Sidebar] action_type:', apiResponse.action_type);
+  console.log('[Sidebar] formula_template:', apiResponse.formula_template);
+  console.log('[Sidebar] column_name:', apiResponse.column_name);
   console.log('[Sidebar] chart_spec:', apiResponse.chart_spec);
 
   // Store structured_data globally for table insertion
