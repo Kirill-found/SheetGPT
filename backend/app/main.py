@@ -346,17 +346,44 @@ async def process_formula(
                 if pattern in col_lower:
                     return True
             return False
-        
+
+        def convert_russian_number(val):
+            """Convert Russian number format to float.
+            Russian: "11 838 336,22" -> 11838336.22
+            - Space is thousands separator
+            - Comma is decimal separator
+            """
+            if pd.isna(val):
+                return None
+            s = str(val).strip()
+            if not s:
+                return None
+            # Remove spaces (thousands separator)
+            s = s.replace(' ', '').replace('\u00a0', '')  # regular space and non-breaking space
+            # Replace comma with dot (decimal separator)
+            s = s.replace(',', '.')
+            try:
+                return float(s)
+            except ValueError:
+                return None
+
         for col in df.columns:
             if should_skip_convert(col):
                 # v9.2.2: FORCE phone/ID columns to STRING to prevent any calculations
                 df[col] = df[col].astype(str)
                 logger.info(f"[AUTO-CONVERT] 🔒 '{col}' → FORCED to string (phone/ID/code)")
                 continue
-            converted = pd.to_numeric(df[col], errors='coerce')
+            # v11.0.2: Try Russian number format first, then standard
+            converted = df[col].apply(convert_russian_number)
             if converted.notna().sum() > len(df) * 0.5:
                 df[col] = converted
-                logger.info(f"[AUTO-CONVERT] ✅ '{col}' → numeric")
+                logger.info(f"[AUTO-CONVERT] ✅ '{col}' → numeric (ru format)")
+            else:
+                # Fallback to standard pandas conversion
+                converted = pd.to_numeric(df[col], errors='coerce')
+                if converted.notna().sum() > len(df) * 0.5:
+                    df[col] = converted
+                    logger.info(f"[AUTO-CONVERT] ✅ '{col}' → numeric")
 
         # v9.2.0: Create reference DataFrame for cross-sheet VLOOKUP
         reference_df = None
@@ -382,9 +409,14 @@ async def process_formula(
                     reference_df[col] = reference_df[col].astype(str)
                     logger.info(f"[AUTO-CONVERT] 🔒 ref:'{col}' → FORCED to string")
                     continue
-                converted = pd.to_numeric(reference_df[col], errors='coerce')
+                # v11.0.2: Try Russian number format first
+                converted = reference_df[col].apply(convert_russian_number)
                 if converted.notna().sum() > len(reference_df) * 0.5:
                     reference_df[col] = converted
+                else:
+                    converted = pd.to_numeric(reference_df[col], errors='coerce')
+                    if converted.notna().sum() > len(reference_df) * 0.5:
+                        reference_df[col] = converted
 
         # v10.0.0: Use SimpleGPT Processor (no patterns, full GPT)
         processor = get_simple_gpt_processor()
