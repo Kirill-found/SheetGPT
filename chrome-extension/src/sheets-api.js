@@ -840,10 +840,14 @@ async function createChart(spreadsheetId, sheetId, chartSpec) {
           ],
           domains: [domain],
           series: series,
-          headerCount: 1,
-          stackedType: 'NOT_STACKED'
+          headerCount: 1
         }
       };
+
+      // stackedType only supported for BAR, COLUMN, AREA (NOT for LINE, SCATTER)
+      if (['BAR', 'COLUMN', 'AREA'].includes(googleChartType)) {
+        spec.basicChart.stackedType = 'NOT_STACKED';
+      }
 
       // interpolateNulls only supported for LINE, AREA, SCATTER
       if (['LINE', 'AREA', 'SCATTER'].includes(googleChartType)) {
