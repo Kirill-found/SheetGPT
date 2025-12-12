@@ -481,6 +481,9 @@ async def process_formula(
             response_dict["highlight_message"] = result["highlight_message"]
         if "action_type" in result:
             response_dict["action_type"] = result["action_type"]
+        # v11.0.1: Chat message for GPT responses
+        if "message" in result:
+            response_dict["message"] = result["message"]
         if "value" in result:
             response_dict["value"] = result["value"]
         # v9.3.2: VLOOKUP write_data fields
