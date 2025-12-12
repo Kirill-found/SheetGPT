@@ -402,7 +402,7 @@ async function handleClearRowColors(tabId, tabUrl, data) {
   console.log('[Background] Using sheet name "' + actualSheetName + '" for clearing colors');
 
   // Clear colors using Sheets API
-  const result = await SheetsAPI.clearRowBackgrounds(spreadsheetId, actualSheetName, rowIndices);
+  const result = await clearRowBackgrounds(spreadsheetId, actualSheetName, rowIndices);
   console.log('[Background] ✅ Row colors cleared:', result);
   return result;
 }
