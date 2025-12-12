@@ -234,6 +234,9 @@ async def generate_formula(request: FormulaRequest):
             # v9.3.2: VLOOKUP write_data fields
             if "action_type" in result:
                 response_dict["action_type"] = result["action_type"]
+            # v10.0.2: Chat message for clarification
+            if "message" in result:
+                response_dict["message"] = result["message"]
             if "write_data" in result:
                 response_dict["write_data"] = result["write_data"]
             if "write_headers" in result:
@@ -282,6 +285,8 @@ async def generate_formula(request: FormulaRequest):
             # v9.3.3: Pass through all action-specific fields
             if "action_type" in result:
                 response_dict["action_type"] = result["action_type"]
+            if "message" in result:
+                response_dict["message"] = result["message"]
             if "cleaned_data" in result:
                 response_dict["cleaned_data"] = result["cleaned_data"]
             if "original_rows" in result:

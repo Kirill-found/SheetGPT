@@ -22,7 +22,8 @@ class FormulaResponse(BaseModel):
     # Table/Chart creation field (CRITICAL for actions system)
     structured_data: Optional[dict] = Field(None, description="Структурированные данные для создания таблиц/графиков")
     # Highlight action fields
-    action_type: Optional[str] = Field(None, description="Тип действия: highlight | none")
+    action_type: Optional[str] = Field(None, description="Тип действия: highlight | chat | write_value | etc")
+    message: Optional[str] = Field(None, description="Сообщение для chat action (уточняющий вопрос)")
     highlight_rows: Optional[List[int]] = Field(None, description="Номера строк для выделения (1-indexed)")
     highlight_color: Optional[str] = Field(None, description="Цвет выделения (hex, например #FFFF00)")
     highlight_message: Optional[str] = Field(None, description="Сообщение о выделенных строках")
