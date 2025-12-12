@@ -766,9 +766,15 @@ async function createChart(spreadsheetId, sheetId, chartSpec) {
     console.log(`[SheetsAPI] X column: ${x_column_index}, Y columns: ${y_column_indices}, rows: ${row_count}`);
 
     // Handle aggregated/transposed data (e.g., for single-row filtered charts)
+    // Only write temp data for TRANSPOSED single-row data, not regular aggregation
     let tempDataRange = null;
-    if (aggregated_data && aggregated_data.rows && aggregated_data.rows.length > 0) {
-      console.log(`[SheetsAPI] Using aggregated data: ${aggregated_data.rows.length} rows`);
+    const needsTempWrite = aggregated_data &&
+                           aggregated_data.rows &&
+                           aggregated_data.rows.length > 0 &&
+                           aggregated_data.aggregation_type === 'single_row';
+
+    if (needsTempWrite) {
+      console.log(`[SheetsAPI] Writing transposed data: ${aggregated_data.rows.length} rows (single_row mode)`);
 
       // Helper function to convert column index to letter (handles AA, AB, etc.)
       const colIndexToLetter = (index) => {
