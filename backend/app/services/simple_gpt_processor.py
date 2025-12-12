@@ -860,7 +860,7 @@ result = {"issues": total_issues, "details": issues_found}
         # Column charts (vertical bars) - default
         'столбч': 'COLUMN', 'column': 'COLUMN', 'столбик': 'COLUMN', 'гистограмм': 'COLUMN',
         # Pie charts
-        'кругов': 'PIE', 'pie': 'PIE', 'пирог': 'PIE', 'долей': 'PIE', 'процент': 'PIE', 'долями': 'PIE', 'доли': 'PIE',
+        'кругов': 'PIE', 'круговую': 'PIE', 'круговая': 'PIE', 'круговой': 'PIE', 'pie': 'PIE', 'пирог': 'PIE', 'долей': 'PIE', 'процент': 'PIE', 'долями': 'PIE', 'доли': 'PIE',
         # Area charts
         'область': 'AREA', 'area': 'AREA', 'заливк': 'AREA',
         # Scatter plots
