@@ -50,6 +50,10 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           result = await handleClearRowColors(sender.tab.id, sender.tab.url, data);
           break;
 
+        case 'DELETE_COLUMN':
+          result = await handleDeleteColumn(sender.tab.id, sender.tab.url, data);
+          break;
+
         case 'SORT_RANGE':
           result = await handleSortRange(sender.tab.id, sender.tab.url, data);
           break;
@@ -404,6 +408,32 @@ async function handleClearRowColors(tabId, tabUrl, data) {
   // Clear colors using Sheets API
   const result = await clearRowBackgrounds(spreadsheetId, actualSheetName, rowIndices);
   console.log('[Background] ✅ Row colors cleared:', result);
+  return result;
+}
+
+/**
+ * Delete a column from the sheet
+ */
+async function handleDeleteColumn(tabId, tabUrl, data) {
+  console.log('[Background] Deleting column:', data);
+
+  const match = tabUrl.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
+  if (!match) {
+    throw new Error('Could not get spreadsheet ID from URL');
+  }
+  const spreadsheetId = match[1];
+
+  const { sheetName, column } = data;
+
+  // Get stored sheet name or use provided
+  const storageKey = `sheetName_${spreadsheetId}`;
+  const storage = await chrome.storage.local.get([storageKey]);
+  const actualSheetName = storage[storageKey] || sheetName || 'Sheet1';
+  console.log('[Background] Using sheet name "' + actualSheetName + '" for deleting column');
+
+  // Delete column using Sheets API
+  const result = await deleteColumn(spreadsheetId, actualSheetName, column);
+  console.log('[Background] ✅ Column deleted:', result);
   return result;
 }
 

@@ -86,6 +86,13 @@ async function undoLastAction() {
         rows: undoSnapshot.extraData.highlightedRows,
         sheetName: undoSnapshot.sheetName
       });
+    } else if (undoSnapshot.extraData?.addedColumn) {
+      // For add_formula actions, delete the added column
+      console.log('[Sidebar] ↩️ Deleting added column:', undoSnapshot.extraData.addedColumn);
+      response = await sendToContentScript('DELETE_COLUMN', {
+        column: undoSnapshot.extraData.addedColumn,
+        sheetName: undoSnapshot.sheetName
+      });
     } else {
       // For other actions, restore the full data
       response = await sendToContentScript('RESTORE_SHEET_DATA', {
@@ -2148,7 +2155,6 @@ async function addFormulaColumn(columnName, formulaTemplate, rowCount) {
   }
 
   try {
-    await saveSheetSnapshot('Добавление столбца с формулой');
     console.log(`[Sidebar] Adding formula column "${columnName}" with template: ${formulaTemplate}`);
     const response = await sendToContentScript('ADD_FORMULA_COLUMN', {
       columnName: columnName || 'Итого',
@@ -2156,6 +2162,12 @@ async function addFormulaColumn(columnName, formulaTemplate, rowCount) {
       rowCount: rowCount || 100
     });
     console.log(`[Sidebar] Formula column added:`, response);
+
+    // Save snapshot AFTER adding column, so we know which column was added
+    if (response?.column) {
+      await saveSheetSnapshot('Добавление столбца с формулой', { addedColumn: response.column });
+    }
+
     return response;
   } catch (error) {
     console.error('[Sidebar] Error adding formula column:', error);

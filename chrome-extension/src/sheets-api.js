@@ -496,6 +496,62 @@ async function clearRowBackgrounds(spreadsheetId, sheetName, rowIndices) {
 }
 
 /**
+ * Delete a column from the sheet
+ * @param {string} spreadsheetId - The spreadsheet ID
+ * @param {string} sheetName - The sheet name
+ * @param {string} column - Column letter (e.g., "M")
+ */
+async function deleteColumn(spreadsheetId, sheetName, column) {
+  try {
+    const token = await getAuthToken();
+
+    // Get sheet ID from name
+    const sheetId = await getSheetIdByName(spreadsheetId, sheetName);
+    if (sheetId === null) {
+      throw new Error(`Sheet "${sheetName}" not found`);
+    }
+
+    // Convert column letter to index (A=0, B=1, ..., M=12)
+    const columnIndex = column.toUpperCase().charCodeAt(0) - 65;
+
+    const requests = [{
+      deleteDimension: {
+        range: {
+          sheetId: sheetId,
+          dimension: 'COLUMNS',
+          startIndex: columnIndex,
+          endIndex: columnIndex + 1
+        }
+      }
+    }];
+
+    const response = await fetch(
+      `${SHEETS_API_BASE}/${spreadsheetId}:batchUpdate`,
+      {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ requests })
+      }
+    );
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(`Sheets API error: ${error.error?.message || response.statusText}`);
+    }
+
+    const result = await response.json();
+    console.log('[SheetsAPI] ✅ Column deleted:', result);
+    return result;
+  } catch (error) {
+    console.error('[SheetsAPI] Error deleting column:', error);
+    throw error;
+  }
+}
+
+/**
  * Sort data in a range by column
  * @param {string} spreadsheetId - The spreadsheet ID
  * @param {number} sheetId - The sheet ID (not name!)
@@ -1284,6 +1340,7 @@ if (typeof module !== 'undefined' && module.exports) {
     createNewSheet,
     highlightRows,
     clearRowBackgrounds,
+    deleteColumn,
     sortRange,
     freezeRowsColumns,
     formatRow,

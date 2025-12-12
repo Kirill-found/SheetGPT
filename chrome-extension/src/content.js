@@ -605,6 +605,11 @@ window.addEventListener('message', async (event) => {
         result = await clearRowColors(data.rows, data.sheetName);
         break;
 
+      case 'DELETE_COLUMN':
+        console.log('[SheetGPT] ↩️ DELETE_COLUMN - deleting column:', data.column);
+        result = await deleteColumn(data.column, data.sheetName);
+        break;
+
       default:
         throw new Error(`Unknown action: ${action}`);
     }
@@ -1086,6 +1091,45 @@ async function clearRowColors(rows, sheetName) {
     };
   } catch (error) {
     console.error('[SheetGPT] ❌ Error clearing row colors:', error);
+    return {
+      success: false,
+      message: error.message
+    };
+  }
+}
+
+/**
+ * Delete a column from the sheet
+ * @param {string} column - Column letter (e.g., "M")
+ * @param {string} sheetName - Name of the sheet
+ */
+async function deleteColumn(column, sheetName) {
+  console.log('[SheetGPT] ↩️ Deleting column:', column);
+
+  try {
+    if (!column) {
+      return { success: false, message: 'No column specified' };
+    }
+
+    const response = await safeSendMessage({
+      action: 'DELETE_COLUMN',
+      data: {
+        sheetName: sheetName || 'Sheet1',
+        column: column
+      }
+    });
+
+    if (!response.success) {
+      throw new Error(response.error || 'Failed to delete column');
+    }
+
+    console.log('[SheetGPT] ✅ Column deleted');
+    return {
+      success: true,
+      message: `Колонка ${column} удалена`
+    };
+  } catch (error) {
+    console.error('[SheetGPT] ❌ Error deleting column:', error);
     return {
       success: false,
       message: error.message
