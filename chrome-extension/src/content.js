@@ -1128,13 +1128,15 @@ async function addFormulaColumn(columnName, formulaTemplate, rowCount) {
       action: 'GET_SHEET_DATA'
     });
 
-    if (!sheetData.success || !sheetData.data) {
+    console.log('[SheetGPT] sheetData response:', sheetData);
+
+    // GET_SHEET_DATA returns { headers: [...], data: [...] } directly
+    if (!sheetData || !sheetData.headers) {
       throw new Error('Could not get sheet data');
     }
 
     // Find next empty column index (after last column with data)
-    const data = sheetData.data;
-    const numCols = data.headers ? data.headers.length : (data[0] ? data[0].length : 0);
+    const numCols = sheetData.headers.length;
     const nextColIndex = numCols; // 0-indexed, so this is the first empty column
     const nextColLetter = String.fromCharCode(65 + nextColIndex); // A=0, B=1, etc.
 
@@ -1144,7 +1146,7 @@ async function addFormulaColumn(columnName, formulaTemplate, rowCount) {
     // Row 1 = header (columnName)
     // Row 2+ = formulas with row numbers replaced
     const formulas = [[columnName]]; // Header
-    const actualRowCount = rowCount || data.rows?.length || 100;
+    const actualRowCount = rowCount || sheetData.data?.length || 100;
 
     for (let i = 2; i <= actualRowCount + 1; i++) {
       // Replace {row} placeholder with actual row number
