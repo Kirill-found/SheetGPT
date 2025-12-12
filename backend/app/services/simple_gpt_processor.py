@@ -1785,8 +1785,10 @@ chat: {{"action_type": "chat", "message": "Уточните, пожалуйст�
                     mask = col_data.str.contains(filter_val.lower(), na=False)
                     filtered_df = df[mask]
                     if len(filtered_df) > 0:
+                        # Get the original row indices before replacing df
+                        filtered_row_indices = filtered_df.index.tolist()
                         df = filtered_df
-                        logger.info(f"[SimpleGPT] Chart row filter applied: {filter_val}, {len(df)} rows")
+                        logger.info(f"[SimpleGPT] Chart row filter applied: {filter_val}, {len(df)} rows, indices: {filtered_row_indices}")
 
                         # If we filtered to a single row, transpose data for "по категориям" view
                         # This makes column names become X-axis labels
@@ -1887,10 +1889,17 @@ chat: {{"action_type": "chat", "message": "Уточните, пожалуйст�
                 logger.error(f"[SimpleGPT] Aggregation failed: {e}")
                 needs_aggregation = False
 
+        # Determine start row for chart (use filtered row index if available)
+        start_row_index = 0
+        if 'filtered_row_indices' in locals() and filtered_row_indices:
+            start_row_index = filtered_row_indices[0]  # Use first filtered row
+            logger.info(f"[SimpleGPT] Chart will start from row index: {start_row_index}")
+
         chart_spec = {
             "chart_type": chart_type,
             "title": title,
             "x_column_index": x_idx,
+            "start_row_index": start_row_index,
             "x_column_name": column_names[x_idx] if x_idx < len(column_names) else column_names[0],
             "y_column_indices": y_indices,
             "y_column_names": [column_names[i] for i in y_indices if i < len(column_names)],
