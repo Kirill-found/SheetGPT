@@ -384,6 +384,33 @@ for i, (idx, row) in enumerate(empty_rows.head(3).iterrows(), 1):
     explanation += f"  {i}. {row['Товар']}, пустое поле {col}\n"
 explanation += f"\nИтого проблем: {total_issues}"
 
+6. Для ПОИСКА СТРОК по условию (найди товары где X=0, найди строки с нулевыми значениями):
+# Фильтруем по условию и выводим СПИСОК найденных записей
+stock_cols = [col for col in df.columns if 'остат' in col.lower() and 'шт' in col.lower()]
+id_col = df.columns[0]  # Первая колонка обычно ID/артикул
+
+if stock_cols:
+    # Конвертируем в числа, пустые = 0
+    for col in stock_cols:
+        df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
+
+    # Фильтруем: все указанные колонки = 0
+    mask = (df[stock_cols] == 0).all(axis=1)
+    found = df[mask]
+
+    explanation = f"Товары с нулевыми остатками ({len(found)} шт.):\n\n"
+    if len(found) > 0:
+        for i, (idx, row) in enumerate(found.head(20).iterrows(), 1):
+            explanation += f"{i}. {row[id_col]}\n"
+        if len(found) > 20:
+            explanation += f"\n...и ещё {len(found) - 20} товаров"
+    else:
+        explanation = "Товаров с нулевыми остатками на всех складах не найдено."
+    result = found[id_col].tolist() if len(found) > 0 else []
+else:
+    explanation = "Колонки с остатками не найдены"
+    result = explanation
+
 ФОРМАТ (КРИТИЧНО):
 - НЕ используй ** или * (markdown)
 - НЕ используй # для заголовков
