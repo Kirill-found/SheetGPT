@@ -1238,6 +1238,17 @@ function addAIMessage(response) {
     `;
   }
 
+  // Chat response (AI answering a question or providing info)
+  else if (response.type === 'chat') {
+    content = `
+      <div class="response-type">
+        <svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+        Ответ
+      </div>
+      <div class="response-content">${formatAnalysisResponse(response.text)}</div>
+    `;
+  }
+
   // Conditional format / Color scale
   else if (response.type === 'conditional_format' || response.type === 'color_scale') {
     content = `

@@ -207,9 +207,10 @@ async def generate_formula(request: FormulaRequest):
 
         response_type = result.get("response_type", result.get("result_type", result.get("type", "formula")))
 
-        # Debug logging for VLOOKUP
+        # Debug logging
         logger.info(f"[Formula API] Result keys: {list(result.keys())}")
-        logger.info(f"[Formula API] action_type: {result.get('action_type')}, write_data present: {'write_data' in result}")
+        logger.info(f"[Formula API] response_type resolved: {response_type}")
+        logger.info(f"[Formula API] action_type: {result.get('action_type')}, message: {result.get('message')}")
 
         if response_type in ("analysis", "question", "chat"):
             response_data = FormulaResponse(
