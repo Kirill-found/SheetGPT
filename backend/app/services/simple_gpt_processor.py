@@ -1666,6 +1666,29 @@ chat: {{"action_type": "chat", "message": "Уточните, пожалуйст�
                     logger.warning(f"[SmartGPT] ⚠️ OVERRIDE: search/filter query detected, using Python for accuracy")
                     return None  # Python is more accurate for filtering large datasets
 
+            # v11.2: OVERRIDE - chart queries should use chart action, not analysis
+            # SmartGPT often returns action_type: null/analysis for chart requests
+            chart_keywords = ['диаграмм', 'график', 'chart', 'гистограмм', 'круговая', 'круговую', 'круговой', 'кругов', 'pie']
+            query_lower = query.lower()
+            is_chart_query = any(kw in query_lower for kw in chart_keywords)
+
+            if is_chart_query and result.get("action_type") in [None, "analysis"]:
+                logger.warning(f"[SmartGPT] ⚠️ OVERRIDE: chart query detected but action_type={result.get('action_type')}, forcing chart action")
+                # Determine chart type from query
+                chart_type = 'COLUMN'  # Default
+                for type_keyword, type_value in self.CHART_TYPES.items():
+                    if type_keyword in query_lower:
+                        chart_type = type_value
+                        break
+                return {
+                    "action_type": "chart_pending",
+                    "chart_type": chart_type,
+                    "query": query,
+                    "column_names": column_names,
+                    "df_len": len(df),
+                    "needs_gpt_selection": True
+                }
+
             # If GPT decided analysis is needed, return None to use Python code
             if result.get("action_type") == "analysis":
                 logger.info(f"[SmartGPT] Analysis needed: {result.get('reason')}")
