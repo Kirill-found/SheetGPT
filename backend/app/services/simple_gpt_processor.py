@@ -1591,6 +1591,12 @@ chat: {{"action_type": "chat", "message": "Уточните, пожалуйст�
             result = json.loads(json_match.group())
             logger.info(f"[SmartGPT] Parsed result: {result}")
 
+            # v11.1.1: OVERRIDE - in SAMPLE mode, highlight is FORBIDDEN
+            # GPT sometimes ignores instructions, so we enforce programmatically
+            if data_mode == "sample" and result.get("action_type") == "highlight":
+                logger.warning(f"[SmartGPT] ⚠️ OVERRIDE: highlight forbidden in SAMPLE mode! Switching to Python analysis")
+                return None  # Will trigger Python code analysis with ALL data
+
             # If GPT decided analysis is needed, return None to use Python code
             if result.get("action_type") == "analysis":
                 logger.info(f"[SmartGPT] Analysis needed: {result.get('reason')}")
