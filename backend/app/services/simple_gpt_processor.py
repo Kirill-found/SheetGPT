@@ -1360,8 +1360,16 @@ explanation += "- Строка 17: Пауэрбанк, кол-во = -2\n"
   "title": "<заголовок>",
   "needs_aggregation": <true/false>,
   "aggregation": "<sum/mean/count/null>",
-  "row_filter": {{"column": <индекс>, "value": "<значение>"}} или null
+  "row_filter": {{"column": <индекс>, "value": "<значение>"}} или null,
+  "transpose_columns": <true/false>
 }}
+
+ВАЖНО - ТРАНСПОНИРОВАНИЕ КОЛОНОК (transpose_columns):
+- Если пользователь просит "по категориям", "долю категорий", "распределение по категориям"
+  и категории это КОЛОНКИ (Электроника, Одежда, Продукты и т.п.):
+  transpose_columns = true
+  Это создаст диаграмму где НАЗВАНИЯ КОЛОНОК станут X-осью, а СУММЫ по колонкам - значениями
+- Если категории это СТРОКИ (уже в одной колонке): transpose_columns = false
 
 ВАЖНО - ФИЛЬТРАЦИЯ ПО СТРОКЕ:
 - Если пользователь просит "за декабрь", "за январь", "за 2024" и т.п.:
@@ -1775,6 +1783,30 @@ chat: {{"action_type": "chat", "message": "Уточните, пожалуйст�
             needs_aggregation = gpt_result.get("needs_aggregation", False)
             aggregation = gpt_result.get("aggregation", "sum")
             row_filter = gpt_result.get("row_filter")
+            transpose_columns = gpt_result.get("transpose_columns", False)
+
+            # Handle transpose_columns: sum each numeric column and create transposed data
+            # This is for "по категориям" where column names become X-axis labels
+            if transpose_columns and len(y_indices) > 1:
+                logger.info(f"[SimpleGPT] Transpose columns mode: summing columns and transposing")
+                rows = []
+                for y_idx in y_indices:
+                    if y_idx < len(df.columns):
+                        col_name = column_names[y_idx]
+                        try:
+                            col_sum = pd.to_numeric(df.iloc[:, y_idx], errors='coerce').sum()
+                            rows.append([col_name, round(float(col_sum), 2)])
+                        except Exception as e:
+                            logger.error(f"[SimpleGPT] Error summing column {col_name}: {e}")
+
+                if rows:
+                    aggregated_data = {
+                        "headers": ["Категория", "Сумма"],
+                        "rows": rows,
+                        "aggregation_type": "single_row"  # Use single_row to trigger temp write
+                    }
+                    needs_aggregation = True
+                    logger.info(f"[SimpleGPT] Transposed column data: {rows}")
 
             # Apply row filter if specified (e.g., "за декабрь")
             if row_filter and isinstance(row_filter, dict):
