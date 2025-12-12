@@ -1792,6 +1792,17 @@ function transformAPIResponse(apiResponse) {
     };
   }
 
+  // If response is an add_formula action (add new column with formula)
+  if (apiResponse.action_type === 'add_formula' && apiResponse.formula_template) {
+    console.log('[Sidebar] ➕ Add formula condition met!', apiResponse);
+    // Execute immediately - add column with formula
+    addFormulaColumn(apiResponse.column_name, apiResponse.formula_template, apiResponse.row_count);
+    return {
+      type: 'action_done',
+      text: apiResponse.summary || `Добавлен столбец "${apiResponse.column_name}" с формулой`
+    };
+  }
+
   // If response is a chat/clarification action (agent wants to ask a question)
   if (apiResponse.action_type === 'chat' && apiResponse.message) {
     console.log('[Sidebar] 💬 Chat action - agent asking:', apiResponse.message);
@@ -2100,6 +2111,37 @@ async function writeValueToCell(targetCell, value) {
     addAIMessage({
       type: 'error',
       text: `Ошибка записи в ячейку ${targetCell}: ${error.message}`
+    });
+  }
+}
+
+/**
+ * Add a new column with a formula
+ * @param {string} columnName - Name for the new column header
+ * @param {string} formulaTemplate - Formula template like "=H{row}+E{row}"
+ * @param {number} rowCount - Number of data rows
+ */
+async function addFormulaColumn(columnName, formulaTemplate, rowCount) {
+  if (!formulaTemplate) {
+    console.error('[Sidebar] Add formula error: formulaTemplate is required');
+    return;
+  }
+
+  try {
+    await saveSheetSnapshot('Добавление столбца с формулой');
+    console.log(`[Sidebar] Adding formula column "${columnName}" with template: ${formulaTemplate}`);
+    const response = await sendToContentScript('ADD_FORMULA_COLUMN', {
+      columnName: columnName || 'Итого',
+      formulaTemplate: formulaTemplate,
+      rowCount: rowCount || 100
+    });
+    console.log(`[Sidebar] Formula column added:`, response);
+    return response;
+  } catch (error) {
+    console.error('[Sidebar] Error adding formula column:', error);
+    addAIMessage({
+      type: 'error',
+      text: `Ошибка добавления столбца с формулой: ${error.message}`
     });
   }
 }

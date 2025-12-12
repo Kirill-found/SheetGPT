@@ -595,6 +595,11 @@ window.addEventListener('message', async (event) => {
         result = await writeCellValue(data.targetCell, data.value);
         break;
 
+      case 'ADD_FORMULA_COLUMN':
+        console.log('[SheetGPT] ➕ ADD_FORMULA_COLUMN - adding column:', data.columnName, 'formula:', data.formulaTemplate);
+        result = await addFormulaColumn(data.columnName, data.formulaTemplate, data.rowCount);
+        break;
+
       default:
         throw new Error(`Unknown action: ${action}`);
     }
@@ -1086,6 +1091,93 @@ async function writeCellValue(targetCell, value) {
     };
   } catch (error) {
     console.error('[SheetGPT] ❌ Error writing cell value:', error);
+    return {
+      success: false,
+      message: error.message
+    };
+  }
+}
+
+/**
+ * Add a new column with a formula
+ * @param {string} columnName - Name for the new column header
+ * @param {string} formulaTemplate - Formula template like "=H{row}+E{row}"
+ * @param {number} rowCount - Number of data rows
+ */
+async function addFormulaColumn(columnName, formulaTemplate, rowCount) {
+  console.log('[SheetGPT] ➕ Adding formula column:', columnName, formulaTemplate, rowCount);
+
+  try {
+    // Get spreadsheet ID
+    const match = window.location.href.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
+    if (!match) {
+      throw new Error('Could not get spreadsheet ID from URL');
+    }
+    const spreadsheetId = match[1];
+
+    // Get current sheet name from storage
+    const storageKey = `sheetName_${spreadsheetId}`;
+    const storage = await chrome.storage.local.get([storageKey]);
+    const sheetName = storage[storageKey];
+    if (!sheetName) {
+      throw new Error('Could not get active sheet name');
+    }
+
+    // Get current sheet data to find the next empty column
+    const sheetData = await safeSendMessage({
+      action: 'GET_SHEET_DATA'
+    });
+
+    if (!sheetData.success || !sheetData.data) {
+      throw new Error('Could not get sheet data');
+    }
+
+    // Find next empty column index (after last column with data)
+    const data = sheetData.data;
+    const numCols = data.headers ? data.headers.length : (data[0] ? data[0].length : 0);
+    const nextColIndex = numCols; // 0-indexed, so this is the first empty column
+    const nextColLetter = String.fromCharCode(65 + nextColIndex); // A=0, B=1, etc.
+
+    console.log('[SheetGPT] Next column:', nextColLetter, 'index:', nextColIndex);
+
+    // Build formula values array:
+    // Row 1 = header (columnName)
+    // Row 2+ = formulas with row numbers replaced
+    const formulas = [[columnName]]; // Header
+    const actualRowCount = rowCount || data.rows?.length || 100;
+
+    for (let i = 2; i <= actualRowCount + 1; i++) {
+      // Replace {row} placeholder with actual row number
+      const formula = formulaTemplate.replace(/\{row\}/g, i.toString());
+      formulas.push([formula]);
+    }
+
+    console.log('[SheetGPT] Writing formulas to column', nextColLetter, ':', formulas.slice(0, 3), '...');
+
+    // Write the formulas to the new column
+    const response = await safeSendMessage({
+      action: 'WRITE_SHEET_DATA',
+      data: {
+        sheetName: sheetName,
+        values: formulas,
+        startCell: `${nextColLetter}1`,
+        mode: 'overwrite',
+        valueInputOption: 'USER_ENTERED' // Important! This interprets formulas
+      }
+    });
+
+    if (!response.success) {
+      throw new Error(response.error || 'Failed to write formulas');
+    }
+
+    console.log('[SheetGPT] ✅ Formula column added successfully');
+    return {
+      success: true,
+      message: `Столбец "${columnName}" с формулой добавлен в колонку ${nextColLetter}`,
+      column: nextColLetter
+    };
+  } catch (error) {
+    console.error('[SheetGPT] ❌ Error adding formula column:', error);
     return {
       success: false,
       message: error.message

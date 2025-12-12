@@ -1509,6 +1509,14 @@ explanation += "- Строка 17: Пауэрбанк, кол-во = -2\n"
 🔹 БЫСТРЫЕ ДЕЙСТВИЯ (визуальное оформление):
    highlight, sort, color_scale, conditional_format, chart, freeze, write_value
 
+🔹 ФОРМУЛЫ В СТОЛБЕЦ (add_formula):
+   Когда пользователь просит ДОБАВИТЬ СТОЛБЕЦ с вычислением:
+   - "сложи колонки в новом столбце", "добавь столбец с суммой"
+   - "создай колонку Итого = A + B", "в отдельном столбце посчитай"
+   → Используй add_formula с шаблоном формулы
+   → formula_template использует {{row}} для номера строки: "=A{{row}}+B{{row}}"
+   → Буквы колонок: A=0, B=1, C=2... (индекс в буквы: chr(65+index))
+
 🔹 PYTHON АНАЛИЗ (вычисления, изменение данных):
    Для сложных вопросов, расчётов, группировки — верни analysis
 
@@ -1538,6 +1546,7 @@ conditional_format: {{"action_type": "conditional_format", "rule": {{"column_ind
 chart: {{"action_type": "chart", "chart_spec": {{"chart_type": "COLUMN", "title": "...", "x_column_index": 0, "y_column_indices": [1, 2], "row_count": {len(df)}}}, "summary": "..."}}
 freeze: {{"action_type": "freeze", "freeze_rows": 1, "freeze_columns": 0, "summary": "..."}}
 write_value: {{"action_type": "write_value", "target_cell": "B13", "value": 55790, "summary": "..."}}
+add_formula: {{"action_type": "add_formula", "column_name": "Итого", "formula_template": "=H{{row}}+E{{row}}", "source_columns": ["H", "E"], "row_count": {len(df)}, "summary": "Добавляю столбец Итого с формулой =H+E"}}
 analysis: {{"action_type": "analysis", "reason": "Нужен Python для расчёта"}}
 chat: {{"action_type": "chat", "message": "Уточните, пожалуйста..."}}
 
