@@ -388,7 +388,10 @@ async function handleSortRange(tabId, tabUrl, data) {
     throw new Error('Not a valid Google Sheets URL');
   }
 
-  const { columnIndex, sortOrder } = data;
+  const { columnIndex, sortOrder: rawSortOrder } = data;
+
+  // Convert "desc"/"asc" to Google Sheets API format "DESCENDING"/"ASCENDING"
+  const sortOrder = rawSortOrder?.toLowerCase() === 'desc' ? 'DESCENDING' : 'ASCENDING';
 
   // Get saved sheet name from storage (saved by handleGetSheetData)
   const storageKey = `sheetName_${spreadsheetId}`;
