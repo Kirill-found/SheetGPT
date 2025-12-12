@@ -55,6 +55,11 @@ class FormulaResponse(BaseModel):
     color_scale_rule: Optional[dict] = Field(None, description="Правило цветовой шкалы (градиента)")
     conditional_rule: Optional[dict] = Field(None, description="Правило условного форматирования")
     convert_rule: Optional[dict] = Field(None, description="Правило конвертации колонки в числа")
+    # v11.1.0: add_formula fields (formula-first approach)
+    formula_template: Optional[str] = Field(None, description="Шаблон формулы для добавления в столбец, напр. =H{row}+E{row}")
+    column_name: Optional[str] = Field(None, description="Название нового столбца")
+    source_columns: Optional[List[str]] = Field(None, description="Буквы исходных колонок для формулы")
+    row_count: Optional[int] = Field(None, description="Количество строк данных")
     # v9.3.2: VLOOKUP write_data fields
     write_data: Optional[List[List[Any]]] = Field(None, description="Данные для записи в текущий лист (VLOOKUP)")
     write_headers: Optional[List[str]] = Field(None, description="Заголовки для записываемых данных")
