@@ -583,8 +583,11 @@ window.addEventListener('message', async (event) => {
         break;
 
       case 'RESTORE_SHEET_DATA':
-        console.log('[SheetGPT] ↩️ RESTORE_SHEET_DATA - restoring snapshot');
-        result = await restoreSheetData(data.data);
+        console.log('[SheetGPT] ↩️ RESTORE_SHEET_DATA - restoring snapshot, data:', data);
+        // Handle different nesting levels: data.data.data or data.data or data
+        const snapshot = data?.data?.data || data?.data || data;
+        console.log('[SheetGPT] ↩️ Extracted snapshot:', snapshot);
+        result = await restoreSheetData(snapshot);
         break;
 
       case 'WRITE_CELL_VALUE':

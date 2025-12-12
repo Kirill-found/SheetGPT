@@ -211,7 +211,7 @@ async def generate_formula(request: FormulaRequest):
         logger.info(f"[Formula API] Result keys: {list(result.keys())}")
         logger.info(f"[Formula API] action_type: {result.get('action_type')}, write_data present: {'write_data' in result}")
 
-        if response_type == "analysis" or response_type == "question":
+        if response_type in ("analysis", "question", "chat"):
             response_data = FormulaResponse(
                 formula=None,
                 explanation=result.get("answer", result.get("summary", "")),
