@@ -3450,6 +3450,28 @@ chat: {{"action_type": "chat", "message": "Уточните, пожалуйст�
                 elapsed = time.time() - start_time
                 logger.info(f"[SmartGPT] Action: {smart_result.get('action_type')}")
 
+                # Handle chart_pending: call _finalize_chart_action to create actual chart_spec
+                if smart_result.get("action_type") == "chart_pending":
+                    logger.info(f"[SmartGPT] chart_pending detected, finalizing chart...")
+                    try:
+                        finalized = await self._finalize_chart_action(smart_result, column_names, df)
+                        smart_result = finalized
+                        logger.info(f"[SmartGPT] Chart finalized: {finalized.get('chart_spec', {}).get('title', 'N/A')}")
+                    except Exception as e:
+                        logger.error(f"[SmartGPT] Chart finalization failed: {e}")
+                        # Fallback to simple chart
+                        smart_result = {
+                            "action_type": "chart",
+                            "chart_spec": {
+                                "chart_type": smart_result.get("chart_type", "COLUMN"),
+                                "title": "Диаграмма",
+                                "x_column_index": 0,
+                                "y_column_indices": [1],
+                                "row_count": len(df)
+                            },
+                            "message": "Создаю диаграмму"
+                        }
+
                 # GPT возвращает готовый ответ - просто добавляем метаданные
                 smart_result.update({
                     "success": True,
