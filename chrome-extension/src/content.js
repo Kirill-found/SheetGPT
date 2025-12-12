@@ -809,9 +809,33 @@ async function createTableAndChart(structuredData) {
       throw new Error('Could not get active sheet name. Try refreshing the page.');
     }
 
-    console.log('[SheetGPT] Writing table to current sheet:', sheetName);
+    // v10.0.3: Respect display_mode - create new sheet or overwrite current
+    if (structuredData.display_mode === 'create_sheet') {
+      // Generate unique sheet name based on headers or timestamp
+      const newSheetName = structuredData.headers[0] + '_' + new Date().toLocaleTimeString('ru-RU', {hour: '2-digit', minute: '2-digit'});
+      console.log('[SheetGPT] 📋 display_mode=create_sheet, creating new sheet:', newSheetName);
 
-    // Write to current sheet instead of creating new one
+      const response = await safeSendMessage({
+        action: 'CREATE_NEW_SHEET',
+        data: {
+          sheetTitle: newSheetName,
+          values: values
+        }
+      });
+
+      if (!response.success) {
+        throw new Error(response.error);
+      }
+
+      console.log('[SheetGPT] ✅ New sheet created:', response.result);
+      return {
+        success: true,
+        message: `Создан новый лист "${newSheetName}" (${values.length - 1} строк)`
+      };
+    }
+
+    // Default: write to current sheet
+    console.log('[SheetGPT] Writing table to current sheet:', sheetName);
     const response = await safeSendMessage({
       action: 'WRITE_SHEET_DATA',
       data: {
@@ -829,7 +853,7 @@ async function createTableAndChart(structuredData) {
     console.log('[SheetGPT] ✅ Table created:', response.result);
     return {
       success: true,
-      message: `Данные вставлены в лист "${sheetName}" (${response.result.rowsWritten} строк)`
+      message: `Данные вставлены в лист "${sheetName}" (${response.result?.updatedRows || values.length} строк)`
     };
   } catch (error) {
     console.error('[SheetGPT] Error creating table:', error);
