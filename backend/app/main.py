@@ -518,6 +518,15 @@ async def process_formula(
             response_dict["message"] = result["message"]
         if "value" in result:
             response_dict["value"] = result["value"]
+        # v11.1.0: add_formula fields
+        if "formula_template" in result:
+            response_dict["formula_template"] = result["formula_template"]
+        if "column_name" in result:
+            response_dict["column_name"] = result["column_name"]
+        if "source_columns" in result:
+            response_dict["source_columns"] = result["source_columns"]
+        if "row_count" in result:
+            response_dict["row_count"] = result["row_count"]
         # v9.3.2: VLOOKUP write_data fields
         if "write_data" in result:
             response_dict["write_data"] = result["write_data"]
