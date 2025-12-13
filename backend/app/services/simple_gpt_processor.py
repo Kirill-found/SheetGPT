@@ -2,23 +2,23 @@
 Simple GPT Processor v1.0.0 - Упрощённая архитектура без паттернов
 
 Архитектура:
-┌─────────────────────────────────────────────────────┐
-│              SIMPLE GPT PROCESSOR v1.0              │
-├─────────────────────────────────────────────────────┤
-│                                                     │
-│  1. Schema Extraction (локально, 0 tokens)          │
-│     → Типы колонок, уникальные значения             │
-│                                                     │
-│  2. GPT-4o генерирует Pandas код (ВСЕГДА)           │
-│     → Без классификации, без паттернов              │
-│                                                     │
-│  3. Execute + Self-Correction (до 3 попыток)        │
-│                                                     │
-│  4. POST-VALIDATION                                 │
-│     → GPT проверяет релевантность ответа            │
-│     → Если нет → retry с уточнением                 │
-│                                                     │
-└─────────────────────────────────────────────────────┘
++-----------------------------------------------------+
+|              SIMPLE GPT PROCESSOR v1.0              |
++-----------------------------------------------------+
+|                                                     |
+|  1. Schema Extraction (локально, 0 tokens)          |
+|     -> Типы колонок, уникальные значения             |
+|                                                     |
+|  2. GPT-4o генерирует Pandas код (ВСЕГДА)           |
+|     -> Без классификации, без паттернов              |
+|                                                     |
+|  3. Execute + Self-Correction (до 3 попыток)        |
+|                                                     |
+|  4. POST-VALIDATION                                 |
+|     -> GPT проверяет релевантность ответа            |
+|     -> Если нет -> retry с уточнением                 |
+|                                                     |
++-----------------------------------------------------+
 
 Преимущества:
 - Нет ограничений паттернов
@@ -123,9 +123,9 @@ class SimpleGPTProcessor:
         r'\brequests\b', r'\burllib\b', r'\bsocket\b', r'\bpickle\b',
     ]
 
-    # ═══════════════════════════════════════════════════════════════════════════
+    # ===========================================================================
     # v11.0.0: ГИБРИДНАЯ ЛОГИКА - SAMPLE vs FULL DATA
-    # ═══════════════════════════════════════════════════════════════════════════
+    # ===========================================================================
     # Ключевые слова требующие ВСЕ данные (Python обработка)
     FULL_DATA_KEYWORDS = [
         # Поиск конкретных строк
@@ -351,8 +351,8 @@ explanation = "Самый продуктивный: Иванов\n"
 explanation += "Сумма: 1,417,500 руб.\n"
 explanation += "Сделок: 14\n"
 explanation += "\nРейтинг:\n"
-explanation += "1. Иванов — 1,417,500 руб.\n"
-explanation += "2. Петров — 1,106,490 руб.\n"
+explanation += "1. Иванов - 1,417,500 руб.\n"
+explanation += "2. Петров - 1,106,490 руб.\n"
 
 2. Для СРАВНЕНИЯ:
 explanation = "Сравнение: Январь vs Февраль\n\n"
@@ -370,7 +370,7 @@ explanation += "Доля от общего: 35%"
 # Замена значений в колонке
 df["Город"] = df["Город"].replace("Омск", "Лондон")
 result = df
-explanation = "Заменено: Омск → Лондон\n"
+explanation = "Заменено: Омск -> Лондон\n"
 explanation += f"Изменено строк: {(df['Город'] == 'Лондон').sum()}"''
 
 5. Для АНАЛИЗА АНОМАЛИЙ (проверь данные, найди ошибки, что не так):
@@ -527,7 +527,7 @@ explanation += f"Сделок: {leader_count:.0f}\n"
 explanation += f"Средний чек: {leader_avg:,.0f} руб.\n\n"
 explanation += "Рейтинг:\n"
 for i, (name, row) in enumerate(sales.head(5).iterrows(), 1):
-    explanation += f"{i}. {name} — {row['sum']:,.0f} руб.\n"
+    explanation += f"{i}. {name} - {row['sum']:,.0f} руб.\n"
 explanation += f"\nДоля от общего: {leader_share:.1f}%\n"
 if len(sales) > 1:
     second_sum = sales.iloc[1]['sum']
@@ -828,10 +828,10 @@ result = {"issues": total_issues, "details": issues_found}
 - "BAD" - если результат НЕ отвечает на запрос (неправильный тип данных, не та информация, пустой ответ)
 
 Примеры:
-- Запрос "какие продукты" → Результат ["Телефон", "Ноутбук"] → OK
-- Запрос "какие продукты" → Результат 5 (число) → BAD (нужен список, не число)
-- Запрос "сколько продаж" → Результат 42 → OK
-- Запрос "сколько продаж" → Результат ["продукт1", "продукт2"] → BAD (нужно число)
+- Запрос "какие продукты" -> Результат ["Телефон", "Ноутбук"] -> OK
+- Запрос "какие продукты" -> Результат 5 (число) -> BAD (нужен список, не число)
+- Запрос "сколько продаж" -> Результат 42 -> OK
+- Запрос "сколько продаж" -> Результат ["продукт1", "продукт2"] -> BAD (нужно число)
 
 Ответь ТОЛЬКО "OK" или "BAD":
 """
@@ -1432,7 +1432,7 @@ explanation += "- Строка 17: Пауэрбанк, кол-во = -2\n"
             return None
 
         # v11.1.3: Rewrite short follow-up queries to be explicit
-        # "а на Ozon?" with history "Сколько товаров на WB?" → "Сколько товаров на Ozon?"
+        # "а на Ozon?" with history "Сколько товаров на WB?" -> "Сколько товаров на Ozon?"
         query = self._rewrite_followup_query(query, history)
 
         # Prepare history context
@@ -1457,11 +1457,11 @@ explanation += "- Строка 17: Пауэрбанк, кол-во = -2\n"
 ВАЖНО: Учитывай роль пользователя при формулировании ответов и выборе действий!
 === КОНЕЦ РОЛИ ===
 
-"
+"""
 
-        # ═══════════════════════════════════════════════════════════════════════════
+        # ===========================================================================
         # v11.0.0: ГИБРИДНАЯ ЛОГИКА - определяем режим данных
-        # ═══════════════════════════════════════════════════════════════════════════
+        # ===========================================================================
         data_mode = self.determine_data_mode(query, len(df))
         logger.info(f"[SmartGPT] 📊 Data mode: {data_mode} for query: {query[:50]}... ({len(df)} rows)")
 
@@ -1499,13 +1499,13 @@ explanation += "- Строка 17: Пауэрбанк, кол-во = -2\n"
             # Для highlight нужен JSON с номерами строк
             data_json_section = f"\n\nJSON (для highlight, с _row_number):\n{json.dumps(data_rows[:100], ensure_ascii=False)}"
 
-        prompt = f"""{context_text}{history_text}Ты — ДУМАЮЩИЙ ЭКСПЕРТ по таблицам. Не исполнитель команд, а настоящий специалист.
+        prompt = f"""{context_text}{history_text}Ты - ДУМАЮЩИЙ ЭКСПЕРТ по таблицам. Не исполнитель команд, а настоящий специалист.
 
-══════════════════════════════════════════════════════════════
+==============================================================
 ЗАПРОС: "{query}"
-══════════════════════════════════════════════════════════════
+==============================================================
 
-РЕЖИМ ДАННЫХ: {data_mode.upper()} {'(все данные доступны - можешь использовать highlight)' if data_mode == 'full' else '⛔ SAMPLE - ЗАПРЕЩЕНО: highlight! Для поиска/фильтрации → ТОЛЬКО analysis!'}
+РЕЖИМ ДАННЫХ: {data_mode.upper()} {'(все данные доступны - можешь использовать highlight)' if data_mode == 'full' else '[X] SAMPLE - ЗАПРЕЩЕНО: highlight! Для поиска/фильтрации -> ТОЛЬКО analysis!'}
 
 КОЛОНКИ ({len(column_names)}):
 {chr(10).join(col_info)}
@@ -1515,85 +1515,85 @@ explanation += "- Строка 17: Пауэрбанк, кол-во = -2\n"
 {ascii_table}
 ```{data_json_section}
 
-══════════════════════════════════════════════════════════════
+==============================================================
 ТВОЙ ПРОЦЕСС МЫШЛЕНИЯ
-══════════════════════════════════════════════════════════════
+==============================================================
 
-1. ПОНИМАНИЕ — Что реально хочет пользователь?
-   Перескажи своими словами. Если не уверен — спроси.
+1. ПОНИМАНИЕ - Что реально хочет пользователь?
+   Перескажи своими словами. Если не уверен - спроси.
 
-2. АНАЛИЗ ДАННЫХ — Что я вижу в таблице?
+2. АНАЛИЗ ДАННЫХ - Что я вижу в таблице?
    Есть ли проблемы? Пустые ячейки? Странные значения? Дубликаты?
-   ⚠️ ЕСТЬ ЛИ СТРОКИ "ИТОГО/ВСЕГО"? Их надо ИСКЛЮЧИТЬ из расчётов!
+   [\!] ЕСТЬ ЛИ СТРОКИ "ИТОГО/ВСЕГО"? Их надо ИСКЛЮЧИТЬ из расчётов!
 
-3. ВЫБОР РЕШЕНИЯ — Какие варианты? Какой лучший?
-   Если запрос неоптимален — предложи лучше.
+3. ВЫБОР РЕШЕНИЯ - Какие варианты? Какой лучший?
+   Если запрос неоптимален - предложи лучше.
 
-4. ПРОВЕРКА — Имеет ли результат смысл?
-   Если нет — скажи об этом.
+4. ПРОВЕРКА - Имеет ли результат смысл?
+   Если нет - скажи об этом.
 
-══════════════════════════════════════════════════════════════
+==============================================================
 ТВОИ ПРАВА (используй их!)
-══════════════════════════════════════════════════════════════
+==============================================================
 
-✓ СПРАШИВАТЬ уточнения если что-то неясно
-✓ СПОРИТЬ если запрос пользователя неправильный или неоптимальный
-✓ ПРЕДЛАГАТЬ альтернативы ("Лучше сделать так...")
-✓ ПРИЗНАВАТЬ неуверенность ("Не уверен, но думаю...")
-✓ ОТКАЗЫВАТЬСЯ от бессмысленных запросов
+[OK] СПРАШИВАТЬ уточнения если что-то неясно
+[OK] СПОРИТЬ если запрос пользователя неправильный или неоптимальный
+[OK] ПРЕДЛАГАТЬ альтернативы ("Лучше сделать так...")
+[OK] ПРИЗНАВАТЬ неуверенность ("Не уверен, но думаю...")
+[OK] ОТКАЗЫВАТЬСЯ от бессмысленных запросов
 
 Примеры:
 - "Вы просите удалить дубликаты, но в таблице их нет"
-- "Эта сортировка не имеет смысла — там даты в текстовом формате"
+- "Эта сортировка не имеет смысла - там даты в текстовом формате"
 - "Лучше сначала очистить данные от пустых строк"
 
-══════════════════════════════════════════════════════════════
+==============================================================
 КОРОТКИЕ FOLLOW-UP ВОПРОСЫ (КРИТИЧНО!)
-══════════════════════════════════════════════════════════════
+==============================================================
 
 Если запрос короткий (1-3 слова) типа:
 - "а на Ozon?" / "а WB?" / "а по МСК?"
 - "а Петров?" / "а за июль?" / "а вчера?"
 - "а сколько?" / "а какой процент?"
 
-→ ЭТО ПРОДОЛЖЕНИЕ предыдущего вопроса!
-→ Посмотри в ИСТОРИЮ ДИАЛОГА выше
-→ Примени ТУ ЖЕ ЛОГИКУ, просто с другим параметром
+-> ЭТО ПРОДОЛЖЕНИЕ предыдущего вопроса!
+-> Посмотри в ИСТОРИЮ ДИАЛОГА выше
+-> Примени ТУ ЖЕ ЛОГИКУ, просто с другим параметром
 
 Пример:
-- История: "Сколько товаров на WB?" → "31912 шт"
+- История: "Сколько товаров на WB?" -> "31912 шт"
 - Запрос: "а на Ozon?"
 - Понимание: "Сколько товаров на Ozon?"
 - Ответ: chat с количеством товаров на Ozon (НЕ highlight!)
 
-══════════════════════════════════════════════════════════════
+==============================================================
 ИНСТРУМЕНТЫ (выбирай в зависимости от режима данных!)
-══════════════════════════════════════════════════════════════
+==============================================================
 
 📊 РЕЖИМ SAMPLE (показаны только примеры):
-   → Используй БЫСТРЫЕ ДЕЙСТВИЯ: sort, chart, freeze, color_scale, conditional_format
-   → Для расчётов отправляй в analysis (там Python посчитает ВСЕ данные)
-   → НЕ ПЫТАЙСЯ считать суммы/проценты по примерам — они неполные!
-   → ⚠️ ЗАПРЕЩЕНО highlight в SAMPLE режиме! Ты НЕ видишь все данные!
-   → Для "найди где", "какие", "выдели где X>Y" → ТОЛЬКО analysis!
+   -> Используй БЫСТРЫЕ ДЕЙСТВИЯ: sort, chart, freeze, color_scale, conditional_format
+   -> Для расчётов отправляй в analysis (там Python посчитает ВСЕ данные)
+   -> НЕ ПЫТАЙСЯ считать суммы/проценты по примерам - они неполные!
+   -> [\!] ЗАПРЕЩЕНО highlight в SAMPLE режиме! Ты НЕ видишь все данные!
+   -> Для "найди где", "какие", "выдели где X>Y" -> ТОЛЬКО analysis!
 
 📊 РЕЖИМ FULL (показаны все данные):
-   → Можешь анализировать данные напрямую
-   → highlight — ты видишь все строки и их номера
-   → write_value — можешь вычислить и вписать результат
-   → Для сложных расчётов всё равно лучше analysis
+   -> Можешь анализировать данные напрямую
+   -> highlight - ты видишь все строки и их номера
+   -> write_value - можешь вычислить и вписать результат
+   -> Для сложных расчётов всё равно лучше analysis
 
 🔹 БЫСТРЫЕ ДЕЙСТВИЯ (визуальное оформление):
    sort, color_scale, conditional_format, chart, freeze, write_value
-   ⚠️ highlight — ТОЛЬКО в FULL режиме! В SAMPLE → analysis
+   [\!] highlight - ТОЛЬКО в FULL режиме! В SAMPLE -> analysis
 
 🔹 ДИАГРАММЫ (chart) - ВАЖНО!
    Когда просят "диаграмму", "график", "chart":
-   → ВСЕГДА возвращай action_type: "chart"
-   → НЕ используй analysis для диаграмм!
-   → chart_type: "PIE" для круговой, "COLUMN" для столбчатой, "LINE" для линейной
-   → x_column_index: индекс колонки с категориями (0, 1, 2...)
-   → y_column_indices: [индексы колонок со значениями]
+   -> ВСЕГДА возвращай action_type: "chart"
+   -> НЕ используй analysis для диаграмм!
+   -> chart_type: "PIE" для круговой, "COLUMN" для столбчатой, "LINE" для линейной
+   -> x_column_index: индекс колонки с категориями (0, 1, 2...)
+   -> y_column_indices: [индексы колонок со значениями]
 
    Пример для "круговая диаграмма по складам":
    {{"action_type": "chart", "chart_spec": {{"chart_type": "PIE", "title": "Остатки по складам", "x_column_index": 0, "y_column_indices": [1], "row_count": 109}}, "summary": "Создаю круговую диаграмму"}}
@@ -1602,16 +1602,16 @@ explanation += "- Строка 17: Пауэрбанк, кол-во = -2\n"
    Когда пользователь просит ДОБАВИТЬ СТОЛБЕЦ с вычислением:
    - "сложи колонки в новом столбце", "добавь столбец с суммой"
    - "создай колонку Итого = A + B", "в отдельном столбце посчитай"
-   → Используй add_formula с шаблоном формулы
-   → formula_template использует {{row}} для номера строки: "=A{{row}}+B{{row}}"
-   → Буквы колонок: A=0, B=1, C=2... (индекс в буквы: chr(65+index))
+   -> Используй add_formula с шаблоном формулы
+   -> formula_template использует {{row}} для номера строки: "=A{{row}}+B{{row}}"
+   -> Буквы колонок: A=0, B=1, C=2... (индекс в буквы: chr(65+index))
 
 🔹 PYTHON АНАЛИЗ (вычисления, изменение данных):
-   Для сложных вопросов, расчётов, группировки — верни analysis
+   Для сложных вопросов, расчётов, группировки - верни analysis
 
-══════════════════════════════════════════════════════════════
+==============================================================
 ФОРМАТ ОТВЕТА
-══════════════════════════════════════════════════════════════
+==============================================================
 
 <thinking>
 1. Понимание: [что хочет пользователь своими словами]
@@ -1624,9 +1624,9 @@ explanation += "- Строка 17: Пауэрбанк, кол-во = -2\n"
 [JSON действия]
 </response>
 
-══════════════════════════════════════════════════════════════
+==============================================================
 JSON ФОРМАТЫ
-══════════════════════════════════════════════════════════════
+==============================================================
 
 highlight: {{"action_type": "highlight", "highlight_rows": [2, 5], "highlight_color": "#FFB3B3", "summary": "..."}}
 sort: {{"action_type": "sort", "sort_column_index": 3, "sort_order": "desc", "summary": "..."}}
@@ -1636,7 +1636,7 @@ chart: {{"action_type": "chart", "chart_spec": {{"chart_type": "COLUMN", "title"
 freeze: {{"action_type": "freeze", "freeze_rows": 1, "freeze_columns": 0, "summary": "..."}}
 write_value: {{"action_type": "write_value", "target_cell": "B13", "value": 55790, "summary": "..."}}
 add_formula: {{"action_type": "add_formula", "column_name": "Итого", "formula_template": "=H{{row}}+E{{row}}", "source_columns": ["H", "E"], "row_count": {len(df)}, "target_column": "F" или null, "summary": "Добавляю столбец Итого с формулой =H+E"}}
-   → target_column: если пользователь указал "в столбец F" или "в колонку F" - укажи букву. Если не указал - null (создать новый столбец)
+   -> target_column: если пользователь указал "в столбец F" или "в колонку F" - укажи букву. Если не указал - null (создать новый столбец)
 analysis: {{"action_type": "analysis", "reason": "Нужен Python для расчёта"}}
 chat: {{"action_type": "chat", "message": "Уточните, пожалуйста..."}}
 
@@ -1686,10 +1686,10 @@ chat: {{"action_type": "chat", "message": "Уточните, пожалуйст�
                 is_search_query = any(kw in query_lower for kw in search_keywords)
 
                 if data_mode == "sample":
-                    logger.warning(f"[SmartGPT] ⚠️ OVERRIDE: highlight forbidden in SAMPLE mode! Switching to Python analysis")
+                    logger.warning(f"[SmartGPT] [\!] OVERRIDE: highlight forbidden in SAMPLE mode! Switching to Python analysis")
                     return None
                 elif is_search_query:
-                    logger.warning(f"[SmartGPT] ⚠️ OVERRIDE: search/filter query detected, using Python for accuracy")
+                    logger.warning(f"[SmartGPT] [\!] OVERRIDE: search/filter query detected, using Python for accuracy")
                     return None  # Python is more accurate for filtering large datasets
 
             # v11.3: OVERRIDE - ALWAYS use chart_pending for chart queries
@@ -1700,7 +1700,7 @@ chat: {{"action_type": "chat", "message": "Уточните, пожалуйст�
             is_chart_query = any(kw in query_lower for kw in chart_keywords)
 
             if is_chart_query:
-                logger.warning(f"[SmartGPT] ⚠️ OVERRIDE: chart query detected (action_type={result.get('action_type')}), forcing chart_pending for proper filtering")
+                logger.warning(f"[SmartGPT] [\!] OVERRIDE: chart query detected (action_type={result.get('action_type')}), forcing chart_pending for proper filtering")
                 # Determine chart type from query
                 chart_type = 'COLUMN'  # Default
                 for type_keyword, type_value in self.CHART_TYPES.items():
@@ -2035,7 +2035,7 @@ chat: {{"action_type": "chat", "message": "Уточните, пожалуйст�
 
         # Third pass: match by word stems (handle Russian declensions)
         if not target_column:
-            # Common word stems: query word stem → column name stems
+            # Common word stems: query word stem -> column name stems
             stem_mappings = {
                 'цен': ['цена', 'price', 'стоимость', 'cost'],
                 'сумм': ['сумма', 'sum', 'total', 'итого'],
@@ -2058,7 +2058,7 @@ chat: {{"action_type": "chat", "message": "Уточните, пожалуйст�
                             if any(variant in col_lower for variant in col_variants) or col_lower.startswith(stem):
                                 target_column = col_name
                                 target_column_index = idx
-                                logger.info(f"[SimpleGPT] Found stem match: query '{query_word}' → column '{col_name}' at index {idx}")
+                                logger.info(f"[SimpleGPT] Found stem match: query '{query_word}' -> column '{col_name}' at index {idx}")
                                 break
                         if target_column:
                             break
@@ -2145,7 +2145,7 @@ chat: {{"action_type": "chat", "message": "Уточните, пожалуйст�
         elif condition_type == "NOT_BLANK":
             condition_text = "непустые"
 
-        message = f"Условное форматирование: {target_column or 'колонка'} {condition_text} → {color_name}"
+        message = f"Условное форматирование: {target_column or 'колонка'} {condition_text} -> {color_name}"
 
         return {
             "action_type": "conditional_format",
@@ -3080,7 +3080,7 @@ chat: {{"action_type": "chat", "message": "Уточните, пожалуйст�
             else:
                 condition_str = f"{target_column} {op_display.get(operator, operator)} {filter_value}"
 
-            message = f"Фильтр: {condition_str} → {filtered_rows} из {original_rows} строк"
+            message = f"Фильтр: {condition_str} -> {filtered_rows} из {original_rows} строк"
 
             return {
                 "action_type": "filter_data",
@@ -3241,7 +3241,7 @@ chat: {{"action_type": "chat", "message": "Уточните, пожалуйст�
                             if any(variant in col_lower for variant in col_variants) or col_lower.startswith(stem):
                                 target_column = col_name
                                 target_column_index = idx
-                                logger.info(f"[SimpleGPT] Found stem match for color scale: query '{query_word}' → column '{col_name}' at index {idx}")
+                                logger.info(f"[SimpleGPT] Found stem match for color scale: query '{query_word}' -> column '{col_name}' at index {idx}")
                                 break
                         if target_column:
                             break
@@ -3304,7 +3304,7 @@ chat: {{"action_type": "chat", "message": "Уточните, пожалуйст�
             "row_count": len(df)
         }
 
-        message = f"Цветовая шкала для колонки '{target_column}' ({min_val:.0f} → {max_val:.0f})"
+        message = f"Цветовая шкала для колонки '{target_column}' ({min_val:.0f} -> {max_val:.0f})"
 
         return {
             "action_type": "color_scale",
@@ -3327,7 +3327,7 @@ chat: {{"action_type": "chat", "message": "Уточните, пожалуйст�
         v11.1.3: Rewrite short follow-up queries to be explicit.
 
         Example:
-        - History: "Сколько товаров на WB?" → "31912 шт"
+        - History: "Сколько товаров на WB?" -> "31912 шт"
         - Query: "а на Ozon?"
         - Rewritten: "Сколько товаров на Ozon?"
         """
@@ -3351,14 +3351,14 @@ chat: {{"action_type": "chat", "message": "Уточните, пожалуйст�
             return query
 
         # Extract the new subject from current query
-        # "а на Ozon?" → "Ozon", "а Петров?" → "Петров", "а за июль?" → "июль"
+        # "а на Ozon?" -> "Ozon", "а Петров?" -> "Петров", "а за июль?" -> "июль"
         import re
 
         # Remove leading "а " or "и " and trailing "?"
         subject_part = re.sub(r'^[аи]\s*', '', query, flags=re.IGNORECASE)
         subject_part = subject_part.rstrip('?').strip()
 
-        # Extract preposition and subject: "на Ozon" → ("на", "Ozon"), "Петров" → ("", "Петров")
+        # Extract preposition and subject: "на Ozon" -> ("на", "Ozon"), "Петров" -> ("", "Петров")
         prep_match = re.match(r'^(на|по|за|в|от|до|с|у|к|из)?\s*(.+)$', subject_part, re.IGNORECASE)
         if prep_match:
             prep = prep_match.group(1) or ''
@@ -3391,7 +3391,7 @@ chat: {{"action_type": "chat", "message": "Уточните, пожалуйст�
                 break
 
         if replaced and rewritten != prev_query:
-            logger.info(f"[SmartGPT] 🔄 Query rewritten: '{query}' → '{rewritten}'")
+            logger.info(f"[SmartGPT] 🔄 Query rewritten: '{query}' -> '{rewritten}'")
             return rewritten
 
         return query
