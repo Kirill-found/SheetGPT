@@ -247,10 +247,14 @@ function formatAnalysisResponse(text) {
       continue;
     }
 
-    const metricMatch = line.match(/^([^:]+?):\s*(.+)$/);
+    // v9.4: Use greedy match (.+) to handle labels with colons like "Веб: камера"
+    // Match up to the LAST colon followed by a value (number/text)
+    const metricMatch = line.match(/^(.+):\s*(\d[\d\s,.]*(?:руб|₽|%|шт)?\.?|.+)$/i);
     if (metricMatch) {
-      const label = metricMatch[1].trim();
+      let label = metricMatch[1].trim();
       const value = metricMatch[2].trim();
+      // Clean up any extra colons in label (from malformed data)
+      label = label.replace(/:\s*$/, '').trim();
       if (value && !/^(Рейтинг|Вывод|Итог|Анализ)$/i.test(label)) {
         // Fix concatenated words like "Ивановчек" -> "ср. чек"
         const fixedValue = value.replace(/(\d)чек/gi, '$1 чек').replace(/срчек/gi, 'ср. чек').replace(/(\d)руб/gi, '$1 руб');

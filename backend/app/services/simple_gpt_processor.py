@@ -85,8 +85,15 @@ def clean_explanation_text(text: str) -> str:
     text = re.sub(r'Строка([А-Яа-яЁё][А-Яа-яЁёA-Za-z0-9_]*)', r'\1', text)
 
     # Remove equals: Продукт='X' -> Продукт: X
-    text = re.sub(r"(\w+)='([^']+)'", r'\1: \2', text)
-    text = re.sub(r'(\w+)=([^,\n\s]+)', r'\1: \2', text)
+    # But NOT if the line already has a colon (to avoid "Веб: камера: 426" issues)
+    lines_fixed = []
+    for line in text.split('\n'):
+        if ':' not in line:
+            # Only replace = with : if no colon exists in the line
+            line = re.sub(r"(\w+)='([^']+)'", r'\1: \2', line)
+            line = re.sub(r'(\w+)=([^,\n\s]+)', r'\1: \2', line)
+        lines_fixed.append(line)
+    text = '\n'.join(lines_fixed)
 
     # Clean lines
     lines = text.split('\n')
