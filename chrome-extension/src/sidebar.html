@@ -2035,7 +2035,15 @@
         settingsContext.value = customContext;
         document.getElementById('charCount').textContent = customContext.length;
       }
-      document.getElementById('personalizationModal').classList.remove('show');
+
+      // ВАЖНО: Синхронизируем с state.customContext для API вызовов
+      if (typeof savePersonalization === 'function') {
+        // Вызываем функцию из sidebar.js которая обновляет state
+        savePersonalization();
+      } else {
+        // Fallback: закрываем модалку
+        document.getElementById('personalizationModal').classList.remove('show');
+      }
     });
 
     // Preset card selection
