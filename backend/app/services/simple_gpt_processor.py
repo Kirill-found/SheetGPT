@@ -1411,7 +1411,7 @@ explanation += "- Строка 17: Пауэрбанк, кол-во = -2\n"
             logger.error(f"[SimpleGPT] GPT chart selection failed: {e}")
             return None
 
-    async def _gpt_smart_action(self, query: str, column_names: List[str], df: pd.DataFrame, history: List[Dict[str, Any]] = None) -> Optional[Dict[str, Any]]:
+    async def _gpt_smart_action(self, query: str, column_names: List[str], df: pd.DataFrame, history: List[Dict[str, Any]] = None, custom_context: Optional[str] = None) -> Optional[Dict[str, Any]]:
         """
         УМНЫЙ GPT-обработчик. GPT сама понимает запрос, анализирует данные и формирует готовый ответ.
         Никакого хардкода - GPT решает всё сама.
@@ -1447,6 +1447,17 @@ explanation += "- Строка 17: Пауэрбанк, кол-во = -2\n"
                 # Longer limit for history to capture full analysis results (tables, lists)
                 history_text += f"{i}. Вопрос: {q}\n   Ответ: {str(r)[:1500]}\n"
             history_text += "=== КОНЕЦ ИСТОРИИ ===\n\n"
+
+        # Add personalization context
+        context_text = ""
+        if custom_context:
+            context_text = f"""
+=== РОЛЬ ПОЛЬЗОВАТЕЛЯ ===
+{custom_context}
+ВАЖНО: Учитывай роль пользователя при формулировании ответов и выборе действий!
+=== КОНЕЦ РОЛИ ===
+
+"
 
         # ═══════════════════════════════════════════════════════════════════════════
         # v11.0.0: ГИБРИДНАЯ ЛОГИКА - определяем режим данных
@@ -1488,7 +1499,7 @@ explanation += "- Строка 17: Пауэрбанк, кол-во = -2\n"
             # Для highlight нужен JSON с номерами строк
             data_json_section = f"\n\nJSON (для highlight, с _row_number):\n{json.dumps(data_rows[:100], ensure_ascii=False)}"
 
-        prompt = f"""{history_text}Ты — ДУМАЮЩИЙ ЭКСПЕРТ по таблицам. Не исполнитель команд, а настоящий специалист.
+        prompt = f"""{context_text}{history_text}Ты — ДУМАЮЩИЙ ЭКСПЕРТ по таблицам. Не исполнитель команд, а настоящий специалист.
 
 ══════════════════════════════════════════════════════════════
 ЗАПРОС: "{query}"
@@ -3478,7 +3489,7 @@ chat: {{"action_type": "chat", "message": "Уточните, пожалуйст�
             # SMART GPT - GPT сама понимает и выполняет ЛЮБОЙ запрос
             # Никакого хардкода - GPT формирует готовый ответ
             # =====================================================
-            smart_result = await self._gpt_smart_action(query, column_names, df, history=history)
+            smart_result = await self._gpt_smart_action(query, column_names, df, history=history, custom_context=custom_context)
             if smart_result:
                 elapsed = time.time() - start_time
                 logger.info(f"[SmartGPT] Action: {smart_result.get('action_type')}")
