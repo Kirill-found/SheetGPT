@@ -3531,7 +3531,6 @@ chat: {{"action_type": "chat", "message": "Уточните, пожалуйст�
 
                     # 3. Replace commas with semicolons (Russian locale uses ; as argument separator)
                     # But only inside formulas, not inside quoted strings
-                    # Simple approach: replace , with ; but preserve text in quotes
                     def replace_commas_outside_quotes(f):
                         result = []
                         in_quotes = False
@@ -3545,6 +3544,16 @@ chat: {{"action_type": "chat", "message": "Уточните, пожалуйст�
                         return ''.join(result)
 
                     formula = replace_commas_outside_quotes(formula)
+
+                    # 4. Replace decimal point with comma for numbers (e.g., 3.14 -> 3,14)
+                    # But only for actual numbers, not cell references like A1.B1
+                    # Pattern: digit.digit -> digit,digit
+                    formula = re.sub(r'(\d)\.(\d)', r'\1,\2', formula)
+
+                    # 5. Replace TRUE/FALSE literals with ИСТИНА/ЛОЖЬ
+                    # (when used as values, not as function calls - those are already handled)
+                    formula = re.sub(r'\bTRUE\b(?!\s*\()', 'ИСТИНА', formula, flags=re.IGNORECASE)
+                    formula = re.sub(r'\bFALSE\b(?!\s*\()', 'ЛОЖЬ', formula, flags=re.IGNORECASE)
 
                     smart_result["formula_template"] = formula
                     logger.info(f"[SmartGPT] Fixed formula (Russian): {formula}")
