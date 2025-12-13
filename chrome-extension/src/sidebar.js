@@ -247,9 +247,9 @@ function formatAnalysisResponse(text) {
       continue;
     }
 
-    // v9.4: Use greedy match (.+) to handle labels with colons like "Веб: камера"
-    // Match up to the LAST colon followed by a value (number/text)
-    const metricMatch = line.match(/^(.+):\s*(\d[\d\s,.]*(?:руб|₽|%|шт)?\.?|.+)$/i);
+    // v11.8: Fix regex to NOT allow colons in value - forces greedy backtracking
+    // This ensures "Веб: камера: 49.0 шт." parses as label="Веб: камера", value="49.0 шт."
+    const metricMatch = line.match(/^(.+):\s*(\d[\d\s,.]*(?:руб|₽|%|шт)?\.?|[^:]+)$/i);
     if (metricMatch) {
       let label = metricMatch[1].trim();
       const value = metricMatch[2].trim();
