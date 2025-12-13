@@ -597,7 +597,7 @@ window.addEventListener('message', async (event) => {
 
       case 'ADD_FORMULA_COLUMN':
         console.log('[SheetGPT] ➕ ADD_FORMULA_COLUMN - adding column:', data.columnName, 'formula:', data.formulaTemplate);
-        result = await addFormulaColumn(data.columnName, data.formulaTemplate, data.rowCount);
+        result = await addFormulaColumn(data.columnName, data.formulaTemplate, data.rowCount, data.targetColumn);
         break;
 
       case 'CLEAR_ROW_COLORS':
@@ -1200,8 +1200,8 @@ async function writeCellValue(targetCell, value) {
  * @param {string} formulaTemplate - Formula template like "=H{row}+E{row}"
  * @param {number} rowCount - Number of data rows
  */
-async function addFormulaColumn(columnName, formulaTemplate, rowCount) {
-  console.log('[SheetGPT] ➕ Adding formula column:', columnName, formulaTemplate, rowCount);
+async function addFormulaColumn(columnName, formulaTemplate, rowCount, targetColumn = null) {
+  console.log('[SheetGPT] ➕ Adding formula column:', columnName, formulaTemplate, rowCount, 'target:', targetColumn);
 
   try {
     // Get spreadsheet ID
@@ -1231,12 +1231,19 @@ async function addFormulaColumn(columnName, formulaTemplate, rowCount) {
       throw new Error('Could not get sheet data');
     }
 
-    // Find next empty column index (after last column with data)
-    const numCols = sheetData.result.headers.length;
-    const nextColIndex = numCols; // 0-indexed, so this is the first empty column
-    const nextColLetter = String.fromCharCode(65 + nextColIndex); // A=0, B=1, etc.
-
-    console.log('[SheetGPT] Next column:', nextColLetter, 'index:', nextColIndex);
+    // Determine target column
+    let targetColLetter;
+    if (targetColumn) {
+      // Use specified column
+      targetColLetter = targetColumn.toUpperCase();
+      console.log('[SheetGPT] Using specified target column:', targetColLetter);
+    } else {
+      // Find next empty column index (after last column with data)
+      const numCols = sheetData.result.headers.length;
+      const nextColIndex = numCols; // 0-indexed, so this is the first empty column
+      targetColLetter = String.fromCharCode(65 + nextColIndex); // A=0, B=1, etc.
+      console.log('[SheetGPT] Using next empty column:', targetColLetter, 'index:', nextColIndex);
+    }
 
     // Build formula values array:
     // Row 1 = header (columnName)
@@ -1250,7 +1257,7 @@ async function addFormulaColumn(columnName, formulaTemplate, rowCount) {
       formulas.push([formula]);
     }
 
-    console.log('[SheetGPT] Writing formulas to column', nextColLetter, ':', formulas.slice(0, 3), '...');
+    console.log('[SheetGPT] Writing formulas to column', targetColLetter, ':', formulas.slice(0, 3), '...');
 
     // Write the formulas to the new column
     const response = await safeSendMessage({
@@ -1258,7 +1265,7 @@ async function addFormulaColumn(columnName, formulaTemplate, rowCount) {
       data: {
         sheetName: sheetName,
         values: formulas,
-        startCell: `${nextColLetter}1`,
+        startCell: `${targetColLetter}1`,
         mode: 'overwrite',
         valueInputOption: 'USER_ENTERED' // Important! This interprets formulas
       }
@@ -1271,8 +1278,8 @@ async function addFormulaColumn(columnName, formulaTemplate, rowCount) {
     console.log('[SheetGPT] ✅ Formula column added successfully');
     return {
       success: true,
-      message: `Столбец "${columnName}" с формулой добавлен в колонку ${nextColLetter}`,
-      column: nextColLetter
+      message: `Столбец "${columnName}" с формулой добавлен в колонку ${targetColLetter}`,
+      column: targetColLetter
     };
   } catch (error) {
     console.error('[SheetGPT] ❌ Error adding formula column:', error);

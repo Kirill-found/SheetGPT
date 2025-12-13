@@ -1822,7 +1822,7 @@ function transformAPIResponse(apiResponse) {
   if (apiResponse.action_type === 'add_formula' && apiResponse.formula_template) {
     console.log('[Sidebar] ➕ Add formula condition met!', apiResponse);
     // Execute immediately - add column with formula
-    addFormulaColumn(apiResponse.column_name, apiResponse.formula_template, apiResponse.row_count);
+    addFormulaColumn(apiResponse.column_name, apiResponse.formula_template, apiResponse.row_count, apiResponse.target_column);
     return {
       type: 'action_done',
       text: apiResponse.summary || `Добавлен столбец "${apiResponse.column_name}" с формулой`
@@ -2148,7 +2148,7 @@ async function writeValueToCell(targetCell, value) {
  * @param {string} formulaTemplate - Formula template like "=H{row}+E{row}"
  * @param {number} rowCount - Number of data rows
  */
-async function addFormulaColumn(columnName, formulaTemplate, rowCount) {
+async function addFormulaColumn(columnName, formulaTemplate, rowCount, targetColumn = null) {
   if (!formulaTemplate) {
     console.error('[Sidebar] Add formula error: formulaTemplate is required');
     return;
@@ -2159,7 +2159,8 @@ async function addFormulaColumn(columnName, formulaTemplate, rowCount) {
     const response = await sendToContentScript('ADD_FORMULA_COLUMN', {
       columnName: columnName || 'Итого',
       formulaTemplate: formulaTemplate,
-      rowCount: rowCount || 100
+      rowCount: rowCount || 100,
+      targetColumn: targetColumn || null
     });
     console.log(`[Sidebar] Formula column added:`, response);
 

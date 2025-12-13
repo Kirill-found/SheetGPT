@@ -1624,7 +1624,8 @@ conditional_format: {{"action_type": "conditional_format", "rule": {{"column_ind
 chart: {{"action_type": "chart", "chart_spec": {{"chart_type": "COLUMN", "title": "...", "x_column_index": 0, "y_column_indices": [1, 2], "row_count": {len(df)}}}, "summary": "..."}}
 freeze: {{"action_type": "freeze", "freeze_rows": 1, "freeze_columns": 0, "summary": "..."}}
 write_value: {{"action_type": "write_value", "target_cell": "B13", "value": 55790, "summary": "..."}}
-add_formula: {{"action_type": "add_formula", "column_name": "Итого", "formula_template": "=H{{row}}+E{{row}}", "source_columns": ["H", "E"], "row_count": {len(df)}, "summary": "Добавляю столбец Итого с формулой =H+E"}}
+add_formula: {{"action_type": "add_formula", "column_name": "Итого", "formula_template": "=H{{row}}+E{{row}}", "source_columns": ["H", "E"], "row_count": {len(df)}, "target_column": "F" или null, "summary": "Добавляю столбец Итого с формулой =H+E"}}
+   → target_column: если пользователь указал "в столбец F" или "в колонку F" - укажи букву. Если не указал - null (создать новый столбец)
 analysis: {{"action_type": "analysis", "reason": "Нужен Python для расчёта"}}
 chat: {{"action_type": "chat", "message": "Уточните, пожалуйста..."}}
 
