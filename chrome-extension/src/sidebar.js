@@ -228,8 +228,12 @@ function formatAnalysisResponse(text) {
   let headerText = '';
   let conclusionText = '';
 
+  // DEBUG: Log all lines to see what we're parsing
+  console.log('[DEBUG formatAnalysis] Lines:', lines);
+
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
+    console.log(`[DEBUG] Line ${i}: "${line}"`);
     if (/^(АНАЛИЗ|Лидер|Вывод|Итог|Рейтинг):?$/i.test(line)) continue;
 
     if (i === 0 || /^(Самый|Лидер|Победитель|Лучший|Худший|Топ)/i.test(line)) {
@@ -251,6 +255,7 @@ function formatAnalysisResponse(text) {
     // This ensures "Веб: камера: 49.0 шт." parses as label="Веб: камера", value="49.0 шт."
     const metricMatch = line.match(/^(.+):\s*(\d[\d\s,.]*(?:руб|₽|%|шт)?\.?|[^:]+)$/i);
     if (metricMatch) {
+      console.log(`[DEBUG] metricMatch: label="${metricMatch[1]}", value="${metricMatch[2]}"`);
       let label = metricMatch[1].trim();
       const value = metricMatch[2].trim();
       // Clean up any extra colons in label (from malformed data)
