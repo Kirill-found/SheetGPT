@@ -1447,6 +1447,30 @@ explanation += "- Строка 17: Пауэрбанк, кол-во = -2\n"
             csv_split_result['result_type'] = 'action'
             return csv_split_result
 
+        # v11.5: ANTI-HALLUCINATION - check for profitability queries WITHOUT cost data
+        query_lower = query.lower()
+        profitability_keywords = ['прибыл', 'прибыльн', 'выгодн', 'маржа', 'марж', 'рентабельн', 'наценк', 'себестоим']
+        is_profitability_query = any(kw in query_lower for kw in profitability_keywords)
+
+        if is_profitability_query:
+            # Check if there's a cost/purchase price column
+            cost_keywords = ['себестоим', 'закуп', 'cost', 'purchase', 'входн', 'оптов']
+            has_cost_column = any(
+                any(kw in col.lower() for kw in cost_keywords)
+                for col in column_names
+            )
+
+            if not has_cost_column:
+                logger.warning(f"[SmartGPT] Profitability query detected but NO COST COLUMN found!")
+                return {
+                    'action_type': 'chat',
+                    'message': 'Для расчёта прибыльности/маржи нужны данные о себестоимости (закупочной цене). В таблице такой колонки нет. Могу показать товар с максимальной выручкой или средним чеком - это вам подойдёт?',
+                    'success': True,
+                    'result_type': 'chat'
+                }
+            else:
+                logger.info(f"[SmartGPT] Profitability query - cost column found: {[c for c in column_names if any(kw in c.lower() for kw in cost_keywords)]}")
+
         # v11.1.3: Rewrite short follow-up queries to be explicit
         # "а на Ozon?" with history "Сколько товаров на WB?" -> "Сколько товаров на Ozon?"
         query = self._rewrite_followup_query(query, history)
