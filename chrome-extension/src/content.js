@@ -1233,25 +1233,41 @@ async function addFormulaColumn(columnName, formulaTemplate, rowCount, targetCol
 
     // Determine target column
     let targetColLetter;
+    let skipHeader = false; // If using existing column, don't overwrite header
+
     if (targetColumn) {
       // Use specified column
       targetColLetter = targetColumn.toUpperCase();
       console.log('[SheetGPT] Using specified target column:', targetColLetter);
     } else {
-      // Find next empty column index (after last column with data)
-      const numCols = sheetData.result.headers.length;
-      const nextColIndex = numCols; // 0-indexed, so this is the first empty column
-      targetColLetter = String.fromCharCode(65 + nextColIndex); // A=0, B=1, etc.
-      console.log('[SheetGPT] Using next empty column:', targetColLetter, 'index:', nextColIndex);
+      // Check if column with same name already exists
+      const headers = sheetData.result.headers;
+      const existingColIndex = headers.findIndex(h =>
+        h && h.toString().toLowerCase().trim() === columnName.toLowerCase().trim()
+      );
+
+      if (existingColIndex >= 0) {
+        // Use existing column
+        targetColLetter = String.fromCharCode(65 + existingColIndex);
+        skipHeader = true; // Don't overwrite existing header
+        console.log('[SheetGPT] Found existing column "' + columnName + '" at:', targetColLetter);
+      } else {
+        // Find next empty column index (after last column with data)
+        const numCols = headers.length;
+        const nextColIndex = numCols; // 0-indexed, so this is the first empty column
+        targetColLetter = String.fromCharCode(65 + nextColIndex); // A=0, B=1, etc.
+        console.log('[SheetGPT] Using next empty column:', targetColLetter, 'index:', nextColIndex);
+      }
     }
 
     // Build formula values array:
-    // Row 1 = header (columnName)
+    // Row 1 = header (columnName) - skip if using existing column
     // Row 2+ = formulas with row numbers replaced
-    const formulas = [[columnName]]; // Header
+    const formulas = skipHeader ? [] : [[columnName]]; // Header only if new column
     const actualRowCount = rowCount || sheetData.result?.data?.length || 100;
+    const startRow = skipHeader ? 2 : 2; // Always start formulas from row 2
 
-    for (let i = 2; i <= actualRowCount + 1; i++) {
+    for (let i = startRow; i <= actualRowCount + 1; i++) {
       // Replace {row} placeholder with actual row number
       const formula = formulaTemplate.replace(/\{row\}/g, i.toString());
       formulas.push([formula]);
@@ -1265,7 +1281,7 @@ async function addFormulaColumn(columnName, formulaTemplate, rowCount, targetCol
       data: {
         sheetName: sheetName,
         values: formulas,
-        startCell: `${targetColLetter}1`,
+        startCell: skipHeader ? `${targetColLetter}2` : `${targetColLetter}1`,
         mode: 'overwrite',
         valueInputOption: 'USER_ENTERED' // Important! This interprets formulas
       }
