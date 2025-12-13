@@ -1915,6 +1915,19 @@ function transformAPIResponse(apiResponse) {
     };
   }
 
+  // If response is a csv_split action
+  if (apiResponse.action_type === 'csv_split' && apiResponse.structured_data) {
+    console.log('[Sidebar] CSV split condition met!');
+    // Store split data for later use with "Заменить данные" button
+    window.lastSplitData = apiResponse.structured_data;
+    return {
+      type: 'csv_split',
+      text: apiResponse.summary || 'Данные разбиты по ячейкам',
+      newRows: apiResponse.new_rows || apiResponse.structured_data.rows?.length || 0,
+      newCols: apiResponse.new_cols || apiResponse.structured_data.headers?.length || 0
+    };
+  }
+
   // If response has structured_data (table)
   if (apiResponse.structured_data) {
     return {

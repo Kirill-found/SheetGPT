@@ -1431,6 +1431,15 @@ explanation += "- Строка 17: Пауэрбанк, кол-во = -2\n"
             logger.warning("[SmartGPT] Empty df or column_names, falling back to Python")
             return None
 
+        # v11.4: CSV split detection - check BEFORE GPT call
+        # "разбей данные по ячейкам" should split in current sheet, not create new
+        csv_split_result = self._detect_csv_split_action(query, column_names, df)
+        if csv_split_result:
+            logger.info(f"[SmartGPT] CSV split detected, returning direct action")
+            csv_split_result['success'] = True
+            csv_split_result['result_type'] = 'action'
+            return csv_split_result
+
         # v11.1.3: Rewrite short follow-up queries to be explicit
         # "а на Ozon?" with history "Сколько товаров на WB?" -> "Сколько товаров на Ozon?"
         query = self._rewrite_followup_query(query, history)
@@ -2415,12 +2424,15 @@ chat: {{"action_type": "chat", "message": "Уточните, пожалуйст�
 Нажмите кнопку ниже, чтобы заменить данные в таблице."""
             
             return {
+                'action_type': 'csv_split',
+                'display_mode': 'split_cells',
                 'structured_data': structured_data,
                 'original_rows': len(df),
                 'new_rows': len(rows),
                 'new_cols': len(headers),
                 'delimiter': delimiter,
-                'message': message
+                'message': message,
+                'summary': message
             }
             
         except Exception as e:
