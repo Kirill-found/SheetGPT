@@ -245,8 +245,11 @@ function formatAnalysisResponse(text) {
       continue;
     }
 
-    const rankMatch = line.match(/^(\d+)[.\)]\s*([^—\-:]+)[—\-:]\s*(.+)$/);
+    // v11.9: Fix rankMatch to not split on hyphens inside words like "Веб-камера"
+    // Match: "1. Label: value" or "1. Label — value" (use colon or em-dash as separator, not hyphen)
+    const rankMatch = line.match(/^(\d+)[.\)]\s*(.+?):\s*(.+)$/);
     if (rankMatch) {
+      console.log(`[DEBUG] rankMatch: label="${rankMatch[2]}", value="${rankMatch[3]}"`);
       dataRows.push({ label: rankMatch[2].trim(), value: rankMatch[3].trim() });
       continue;
     }
