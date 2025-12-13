@@ -3529,6 +3529,23 @@ chat: {{"action_type": "chat", "message": "Уточните, пожалуйст�
                         pattern = rf'\b{eng}\s*\('
                         formula = re.sub(pattern, f'{rus}(', formula, flags=re.IGNORECASE)
 
+                    # 3. Replace commas with semicolons (Russian locale uses ; as argument separator)
+                    # But only inside formulas, not inside quoted strings
+                    # Simple approach: replace , with ; but preserve text in quotes
+                    def replace_commas_outside_quotes(f):
+                        result = []
+                        in_quotes = False
+                        for char in f:
+                            if char == '"':
+                                in_quotes = not in_quotes
+                            if char == ',' and not in_quotes:
+                                result.append(';')
+                            else:
+                                result.append(char)
+                        return ''.join(result)
+
+                    formula = replace_commas_outside_quotes(formula)
+
                     smart_result["formula_template"] = formula
                     logger.info(f"[SmartGPT] Fixed formula (Russian): {formula}")
 
