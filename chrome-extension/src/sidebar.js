@@ -271,7 +271,9 @@ function formatAnalysisResponse(text) {
 
     if (line.startsWith('•') || line.startsWith('·') || line.startsWith('-')) {
       const cleanLine = line.replace(/^[•·\-]\s*/, '').trim();
-      const bulletMetric = cleanLine.match(/^([^:]+?):\s*(.+)$/);
+      // v11.7: Use greedy match like main metric regex to handle "Веб: камера: 49.0 шт." correctly
+      // Match everything up to the LAST colon that's followed by a number/value
+      const bulletMetric = cleanLine.match(/^(.+):\s*(\d[\d\s,.]*(?:руб|₽|%|шт)?\.?|[^:]+)$/i);
       if (bulletMetric) {
         dataRows.push({ label: bulletMetric[1].trim(), value: bulletMetric[2].trim() });
       } else if (cleanLine.length > 3) {
