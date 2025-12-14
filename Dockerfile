@@ -2,7 +2,7 @@ FROM python:3.11-slim
 
 # ============ FORCE FULL REBUILD ============
 # Change this timestamp to bust ALL cache layers
-ENV FORCE_REBUILD="2025-12-14-22:45:00-v10.2.0-SMART-FORECASTING-TRANSPARENCY"
+ENV FORCE_REBUILD="2025-12-14-23:00:00-v10.2.1-FORECAST-ADD-COLUMN"
 RUN echo "=== FULL REBUILD: $FORCE_REBUILD ===" && date
 
 LABEL version="10.1.1"
