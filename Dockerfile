@@ -2,11 +2,11 @@ FROM python:3.11-slim
 
 # ============ FORCE FULL REBUILD ============
 # Change this timestamp to bust ALL cache layers
-ENV FORCE_REBUILD="2025-12-14-23:45:00-v10.2.3-MERGE-BY-KEY-FIELD"
+ENV FORCE_REBUILD="2025-12-15-00:00:00-v10.2.4-FORECAST-CRITICAL-INSTRUCTION"
 RUN echo "=== FULL REBUILD: $FORCE_REBUILD ===" && date
 
-LABEL version="10.2.3"
-LABEL description="SheetGPT API v10.2.3 - Add merge_by_key field to schema for forecast append"
+LABEL version="10.2.4"
+LABEL description="SheetGPT API v10.2.4 - Critical forecast instruction at prompt start"
 
 WORKDIR /app
 
