@@ -2,11 +2,11 @@ FROM python:3.11-slim
 
 # ============ FORCE FULL REBUILD ============
 # Change this timestamp to bust ALL cache layers
-ENV FORCE_REBUILD="2025-12-14-20:50:00-v10.1.0-VLOOKUP-SMARTGPT"
+ENV FORCE_REBUILD="2025-12-14-21:30:00-v10.1.1-VLOOKUP-APPEND-COLUMN"
 RUN echo "=== FULL REBUILD: $FORCE_REBUILD ===" && date
 
-LABEL version="9.3.0"
-LABEL description="SheetGPT API v9.3.0 - Privacy Policy for Chrome Web Store"
+LABEL version="10.1.1"
+LABEL description="SheetGPT API v10.1.1 - VLOOKUP append column instead of overwrite"
 
 WORKDIR /app
 

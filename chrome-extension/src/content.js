@@ -488,6 +488,28 @@ window.addEventListener('message', async (event) => {
     return;
   }
 
+  // v10.1.1: Handle APPEND_COLUMN_BY_KEY message from sidebar (VLOOKUP - add column to the right)
+  if (event.data && event.data.type === 'APPEND_COLUMN_BY_KEY') {
+    console.log('[SheetGPT] 🔗 VLOOKUP: Appending column by key:', event.data.data);
+    try {
+      const result = await appendColumnByKey(event.data.data);
+      event.source.postMessage({
+        type: 'APPEND_COLUMN_BY_KEY_RESPONSE',
+        success: true,
+        result: result
+      }, event.origin);
+      console.log('[SheetGPT] ✅ Column appended successfully');
+    } catch (e) {
+      console.error('[SheetGPT] ❌ Failed to append column:', e);
+      event.source.postMessage({
+        type: 'APPEND_COLUMN_BY_KEY_RESPONSE',
+        success: false,
+        error: e.message
+      }, event.origin);
+    }
+    return;
+  }
+
   // Verify it's a message from our sidebar (has our message structure)
   if (!event.data || typeof event.data !== 'object' || !event.data.action || !event.data.messageId) {
     console.log('[SheetGPT] Ignoring message - not from sidebar (missing action or messageId)');
@@ -1789,4 +1811,134 @@ function convertColorNameToRGB(color) {
   };
 
   return colorMap[color?.toLowerCase()] || colorMap['yellow'];
+}
+
+// v10.1.1: Append column by key (VLOOKUP mode)
+// Adds new column(s) to the RIGHT of existing data, matching rows by key column
+async function appendColumnByKey({ keyColumn, writeHeaders, writeData }) {
+  console.log('[SheetGPT] 🔗 appendColumnByKey:', { keyColumn, writeHeaders, writeData });
+
+  try {
+    // 1. Get current sheet data
+    const sheetData = await safeSendMessage({
+      action: 'GET_SHEET_DATA'
+    });
+
+    if (!sheetData || !sheetData.success || !sheetData.result) {
+      throw new Error('Could not get current sheet data');
+    }
+
+    const currentHeaders = sheetData.result.headers || [];
+    const currentData = sheetData.result.data || [];
+    console.log('[SheetGPT] 📊 Current sheet:', currentHeaders.length, 'cols,', currentData.length, 'rows');
+
+    // 2. Find the key column index in current sheet
+    const keyColIndex = currentHeaders.findIndex(h =>
+      h && h.toString().toLowerCase().trim() === keyColumn.toLowerCase().trim()
+    );
+
+    if (keyColIndex < 0) {
+      throw new Error(`Key column "${keyColumn}" not found in current sheet. Available: ${currentHeaders.join(', ')}`);
+    }
+    console.log('[SheetGPT] 🔑 Key column index:', keyColIndex, 'name:', currentHeaders[keyColIndex]);
+
+    // 3. Build a map of key values -> row index in current sheet
+    const keyToRowIndex = new Map();
+    currentData.forEach((row, rowIdx) => {
+      const keyValue = row[keyColIndex];
+      if (keyValue !== null && keyValue !== undefined && keyValue !== '') {
+        // Normalize key for matching (trim, lowercase)
+        const normalizedKey = String(keyValue).trim().toLowerCase();
+        keyToRowIndex.set(normalizedKey, rowIdx);
+      }
+    });
+    console.log('[SheetGPT] 🗺️ Built key map with', keyToRowIndex.size, 'entries');
+
+    // 4. Determine new columns to add (skip the key column from writeHeaders)
+    const keyIdxInWrite = writeHeaders.findIndex(h =>
+      h && h.toString().toLowerCase().trim() === keyColumn.toLowerCase().trim()
+    );
+    if (keyIdxInWrite < 0) {
+      throw new Error(`Key column "${keyColumn}" not found in write headers: ${writeHeaders.join(', ')}`);
+    }
+
+    // New columns are all columns except the key column
+    const newColumnHeaders = writeHeaders.filter((_, idx) => idx !== keyIdxInWrite);
+    const newColumnIndices = writeHeaders.map((_, idx) => idx).filter(idx => idx !== keyIdxInWrite);
+    console.log('[SheetGPT] ➕ New columns to add:', newColumnHeaders);
+
+    // 5. Find the next empty column letter (after current columns)
+    const nextColIndex = currentHeaders.length;
+    console.log('[SheetGPT] 📍 Will write to column index:', nextColIndex);
+
+    // 6. Build values array for the new column(s)
+    // First row = header(s)
+    const valuesToWrite = [newColumnHeaders];
+
+    // Create empty array for each row in current data
+    for (let i = 0; i < currentData.length; i++) {
+      valuesToWrite.push(new Array(newColumnHeaders.length).fill(''));
+    }
+
+    // 7. Fill in values by matching keys
+    let matchCount = 0;
+    writeData.forEach(row => {
+      const keyValue = row[keyIdxInWrite];
+      if (keyValue !== null && keyValue !== undefined) {
+        const normalizedKey = String(keyValue).trim().toLowerCase();
+        const targetRowIdx = keyToRowIndex.get(normalizedKey);
+        if (targetRowIdx !== undefined) {
+          // Found matching row - fill in values (skip key column)
+          newColumnIndices.forEach((srcIdx, destIdx) => {
+            valuesToWrite[targetRowIdx + 1][destIdx] = row[srcIdx]; // +1 for header row
+          });
+          matchCount++;
+        }
+      }
+    });
+    console.log('[SheetGPT] ✅ Matched', matchCount, 'rows out of', writeData.length);
+
+    // 8. Get spreadsheet ID and sheet name
+    const match = window.location.href.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
+    if (!match) {
+      throw new Error('Could not get spreadsheet ID from URL');
+    }
+    const spreadsheetId = match[1];
+
+    const storageKey = `sheetName_${spreadsheetId}`;
+    const storage = await chrome.storage.local.get([storageKey]);
+    const sheetName = storage[storageKey];
+    if (!sheetName) {
+      throw new Error('Could not get active sheet name');
+    }
+
+    // 9. Write new column(s) to the sheet
+    const startColLetter = String.fromCharCode(65 + nextColIndex); // A=0, B=1, etc.
+    console.log('[SheetGPT] 📝 Writing', valuesToWrite.length, 'rows to column', startColLetter);
+
+    const response = await safeSendMessage({
+      action: 'WRITE_SHEET_DATA',
+      data: {
+        sheetName: sheetName,
+        values: valuesToWrite,
+        startCell: `${startColLetter}1`,
+        mode: 'overwrite'
+      }
+    });
+
+    if (!response || !response.success) {
+      throw new Error(response?.error || 'Failed to write column data');
+    }
+
+    console.log('[SheetGPT] ✅ Column appended successfully!', response.result);
+    return {
+      success: true,
+      message: `Добавлена колонка "${newColumnHeaders.join(', ')}" (${matchCount} совпадений)`,
+      matchedRows: matchCount,
+      totalRows: writeData.length
+    };
+  } catch (error) {
+    console.error('[SheetGPT] ❌ appendColumnByKey error:', error);
+    throw error;
+  }
 }

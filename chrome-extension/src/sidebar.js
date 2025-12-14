@@ -1580,6 +1580,45 @@ async function overwriteSheetData(dataToWrite) {
   });
 }
 
+// v10.1.1: Append column by key (VLOOKUP mode)
+// Adds new column(s) to the right of existing data, matching rows by key column
+async function appendColumnByKey(keyColumn, writeHeaders, writeData) {
+  return new Promise((resolve, reject) => {
+    console.log('[Sidebar] appendColumnByKey called:', { keyColumn, writeHeaders, writeData });
+
+    // Send message to content script to append column
+    window.parent.postMessage({
+      type: 'APPEND_COLUMN_BY_KEY',
+      data: {
+        keyColumn: keyColumn,        // Column name to match by (e.g., "Артикул")
+        writeHeaders: writeHeaders,  // All headers from VLOOKUP result [key, col1, col2...]
+        writeData: writeData         // Data rows [[keyVal, val1, val2], ...]
+      }
+    }, '*');
+
+    const handler = (event) => {
+      if (event.data && event.data.type === 'APPEND_COLUMN_BY_KEY_RESPONSE') {
+        window.removeEventListener('message', handler);
+        if (event.data.success) {
+          console.log('[Sidebar] ✅ Column appended successfully');
+          resolve(event.data);
+        } else {
+          console.error('[Sidebar] ❌ Failed to append column:', event.data.error);
+          reject(new Error(event.data.error || 'Failed to append column'));
+        }
+      }
+    };
+
+    window.addEventListener('message', handler);
+
+    // Timeout after 15 seconds (longer for complex operations)
+    setTimeout(() => {
+      window.removeEventListener('message', handler);
+      reject(new Error('Timeout waiting for append column response'));
+    }, 15000);
+  });
+}
+
 async function callAPI(query, sheetData, history = []) {
   // Format payload for /api/v1/formula endpoint
   const payload = {
@@ -1916,8 +1955,33 @@ function transformAPIResponse(apiResponse) {
 
   // If response is a write_data action (VLOOKUP result)
   if (apiResponse.action_type === 'write_data' && apiResponse.write_data) {
-    console.log('[Sidebar] ✅ Write data condition met! Writing to sheet...');
-    // Write data to current sheet immediately
+    console.log('[Sidebar] ✅ Write data condition met!');
+
+    // v10.1.1: Check for merge_by_key (VLOOKUP mode - add column to the right)
+    if (apiResponse.merge_by_key) {
+      console.log('[Sidebar] 🔗 VLOOKUP mode - appending column by key:', apiResponse.merge_by_key);
+      // Call appendColumnByKey instead of overwriting
+      appendColumnByKey(
+        apiResponse.merge_by_key,  // Key column name (e.g., "Артикул")
+        apiResponse.write_headers, // Headers including key + new columns
+        apiResponse.write_data     // Data rows [[key, val1, val2], ...]
+      ).then(() => {
+        console.log('[Sidebar] ✅ Column appended successfully');
+        addAIMessage({ type: 'success', text: apiResponse.summary || '✅ Колонка добавлена справа!' });
+      }).catch(err => {
+        console.error('[Sidebar] ❌ Append column failed:', err);
+        addAIMessage({ type: 'error', text: `Ошибка добавления колонки: ${err.message}` });
+      });
+      return {
+        type: 'write_data',
+        text: apiResponse.summary || 'Добавляю колонку...',
+        dataWritten: true,
+        mergeMode: true
+      };
+    }
+
+    // Default: overwrite mode (legacy behavior)
+    console.log('[Sidebar] 📝 Overwrite mode - replacing sheet data');
     const dataToWrite = {
       headers: apiResponse.write_headers,
       rows: apiResponse.write_data  // Note: "rows" not "data" - content.js expects this format
