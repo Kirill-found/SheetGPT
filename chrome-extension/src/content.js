@@ -703,6 +703,14 @@ async function processQuery(query, history = [], licenseKey = null, referenceShe
   console.log('[SheetGPT] 📤 column_names:', sheetData.headers);
   console.log('[SheetGPT] 📤 sheet_data first row:', sheetData.data[0]);
   console.log('[SheetGPT] 📤 sheet_data rows:', sheetData.data.length);
+  // v10.0.9: Log reference sheet data being sent
+  if (referenceSheet) {
+    console.log('[SheetGPT] 📤 reference_sheet_name:', referenceSheet.name);
+    console.log('[SheetGPT] 📤 reference_sheet_headers:', referenceSheet.headers);
+    console.log('[SheetGPT] 📤 reference_sheet_data rows:', referenceSheet.data?.length);
+  } else {
+    console.log('[SheetGPT] 📤 reference_sheet: NOT SENDING (null)');
+  }
 
   const response = await fetch(API_URLS[API_MODE], {
     method: 'POST',
