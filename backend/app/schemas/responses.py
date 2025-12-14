@@ -49,8 +49,10 @@ class FormulaResponse(BaseModel):
     # Pivot table fields
     pivot_data: Optional[dict] = Field(None, description="Данные сводной таблицы {headers, rows}")
     group_column: Optional[str] = Field(None, description="Колонка группировки")
-    value_column: Optional[str] = Field(None, description="Колонка значений")
+    value_column: Optional[str] = Field(None, description="Колонка значений (для pivot или VLOOKUP)")
     agg_func: Optional[str] = Field(None, description="Функция агрегации (sum, mean, count...)")
+    # v10.1.3: VLOOKUP fields
+    key_column: Optional[str] = Field(None, description="Ключевая колонка для VLOOKUP (например 'Артикул')")
     # Color scale / conditional formatting fields
     color_scale_rule: Optional[dict] = Field(None, description="Правило цветовой шкалы (градиента)")
     conditional_rule: Optional[dict] = Field(None, description="Правило условного форматирования")
