@@ -1,248 +1,602 @@
 # SheetGPT - Product Requirements Document
-
-## 🎯 Product Vision
-AI assistant that works inside Google Sheets, helping users analyze data and create formulas using natural language instead of complex syntax.
-
-## 👤 Target User
-Sales managers, marketers, small business owners who:
-- Work with Google Sheets daily
-- Spend 3-10 hours/week on reports and analysis
-- Don't know advanced formulas
-- Want results fast without learning Excel/Sheets syntax
-
-## 🎭 Core User Story
-**Dmitry, Sales Manager:**
-"I need to analyze why sales dropped last month. Usually takes me 3 hours with pivot tables. With SheetGPT, I just ask 'Why did sales drop in October?' and get answer in 30 seconds."
+**Version:** 2.0 | **Last Updated:** December 2024 | **Product Version:** 9.2.0
 
 ---
 
-## ✨ Core Features (MVP)
+## Executive Summary
 
-### Feature 1: AI Sidebar
-**What:** Persistent sidebar in Google Sheets where user types requests in natural language
+**SheetGPT** - AI-ассистент для Google Sheets, позволяющий анализировать данные и создавать формулы на естественном языке. Вместо изучения сложного синтаксиса формул пользователи просто описывают что хотят получить.
+
+**Ключевые метрики:**
+- 100+ встроенных аналитических функций
+- 95-99% точность выполнения запросов
+- <5 секунд среднее время ответа
+- Поддержка русского и английского языков
+
+---
+
+## 1. Product Vision
+
+### Миссия
+Сделать анализ данных в Google Sheets доступным для всех, независимо от уровня технических знаний.
+
+### Проблема
+- 73% пользователей Excel/Sheets не знают функции сложнее SUM
+- Создание сводных таблиц и формул занимает часы
+- Ошибки в формулах приводят к неверным бизнес-решениям
+
+### Решение
+AI-ассистент, который:
+1. Понимает запросы на естественном языке
+2. Автоматически анализирует структуру данных
+3. Генерирует формулы, графики и отчёты
+4. Работает прямо внутри Google Sheets
+
+---
+
+## 2. Target Audience
+
+### Основные пользователи
+
+| Сегмент | Описание | Боль | Частота использования |
+|---------|----------|------|----------------------|
+| **Sales Managers** | Менеджеры по продажам | Еженедельные отчёты занимают 3-5 часов | 5-10 раз/день |
+| **Маркетологи** | Анализ рекламных кампаний | Сравнение периодов, ROI расчёты | 3-5 раз/день |
+| **Владельцы бизнеса** | Малый и средний бизнес | Нет времени на Excel-курсы | 2-3 раза/день |
+| **Аналитики** | Data-специалисты | Рутинные операции с данными | 10+ раз/день |
+| **Финансисты** | Бухгалтеры, финдиректоры | Сложные формулы, отчётность | 5-7 раз/день |
+
+### User Persona
+
+**Дмитрий, 35 лет, Sales Manager**
+> "Каждый понедельник я трачу 3 часа на создание отчёта по продажам. Сводные таблицы, формулы, графики... С SheetGPT я просто пишу 'Создай отчёт по продажам за неделю' и получаю готовый отчёт за 30 секунд."
+
+**Ключевые характеристики:**
+- Работает с Google Sheets ежедневно
+- Тратит 3-10 часов в неделю на отчёты
+- Не знает продвинутых формул (VLOOKUP, SUMIFS)
+- Ценит скорость и простоту
+
+---
+
+## 3. Core Features
+
+### 3.1 AI Sidebar (Chrome Extension)
+
+**Описание:** Боковая панель в Google Sheets для ввода запросов на естественном языке.
+
+**Технические характеристики:**
+- Загрузка: <2 секунд
+- OAuth аутентификация через Google
+- Автоматическое определение активного листа
+- Поддержка до 500 строк данных
+- Темная тема с акцентом #A1FF62
 
 **User Flow:**
-1. User opens Google Sheets
-2. Extensions → SheetGPT → Open (sidebar appears on right)
-3. User types: "Find customers who bought >500K"
-4. AI analyzes sheet, creates formula/filter
-5. Result inserted into sheet
+```
+1. Открыть Google Sheets
+2. Кликнуть на иконку расширения SheetGPT
+3. Ввести запрос: "Найди клиентов с покупками > 500K"
+4. AI анализирует данные
+5. Результат отображается в sidebar / вставляется в таблицу
+```
 
 **Success Criteria:**
-- Sidebar loads <2 seconds
-- AI responds <15 seconds
-- 90%+ queries work correctly
+- Время отклика: <15 секунд
+- Точность: 95%+ запросов работают корректно
+- NPS: 40+
 
 ---
 
-### Feature 2: Formula Generation
-**What:** User describes what they want, AI creates the correct Google Sheets formula
+### 3.2 Formula Generation
 
-**Examples:**
-```
-User: "Sum of sales where amount > 500000"
-AI creates: =SUMIF(B:B, ">500000", B:B)
+**Описание:** Генерация формул Google Sheets из текстового описания.
 
-User: "Average order value per customer"
-AI creates: =AVERAGEIF(A:A, "Customer X", B:B)
+**Примеры:**
+| Запрос | Формула |
+|--------|---------|
+| "Сумма продаж где сумма > 500000" | `=SUMIF(B:B,">500000",B:B)` |
+| "Средний чек по каждому клиенту" | `=AVERAGEIF(A:A,"Клиент",B:B)` |
+| "Количество уникальных клиентов" | `=COUNTA(UNIQUE(A:A))` |
+| "VLOOKUP цены из прайса" | `=VLOOKUP(A2,Прайс!A:B,2,0)` |
 
-User: "Count unique customers"
-AI creates: =COUNTA(UNIQUE(A:A))
-```
+**Поддерживаемые функции:**
+- Базовые: SUM, AVERAGE, COUNT, MIN, MAX
+- Условные: SUMIF, COUNTIF, AVERAGEIF, SUMIFS
+- Поиск: VLOOKUP, HLOOKUP, INDEX, MATCH, FILTER
+- Массивы: ARRAYFORMULA, UNIQUE, SORT, FILTER
+- Даты: DATE, DATEDIF, EOMONTH, WORKDAY
+- Текст: CONCATENATE, LEFT, RIGHT, MID, SUBSTITUTE
 
 **Edge Cases:**
-- Sheet has 10,000+ rows (AI should use ranges, not full columns)
-- Multiple sheets (AI needs to know which sheet)
-- Cyrillic column names (must work)
-- Date formats (DD.MM.YYYY vs MM/DD/YYYY)
-
-**Success Criteria:**
-- 90% formulas work without errors
-- User doesn't need to edit formula
-- Works with Russian column names
+- Кириллические названия колонок
+- Даты в формате DD.MM.YYYY и MM/DD/YYYY
+- Таблицы с 10,000+ строк
+- Многолистовые ссылки
 
 ---
 
-### Feature 3: Data Analysis
-**What:** User asks analytical question, AI examines data and provides insights
+### 3.3 Data Analysis (100+ Functions)
 
-**Examples:**
+**Описание:** Интеллектуальный анализ данных с автоматическим выбором подходящего метода.
+
+**Категории функций:**
+
+| Категория | Кол-во | Примеры |
+|-----------|--------|---------|
+| **Math** | 8 | sum, average, median, percentile, std_dev, correlation |
+| **Filtering** | 20 | filter_by, top_n, bottom_n, unique, duplicates, regex |
+| **Grouping** | 22 | group_by, pivot, running_total, cumulative_percent |
+| **Sorting** | 15 | sort, rank, percentile_rank, dense_rank, partition |
+| **Text** | 10 | find, regex_extract, split, concatenate, format |
+| **Dates** | 10 | date_diff, extract_month, add_days, format_date |
+| **Actions** | 10 | highlight_rows, create_chart, add_column, freeze |
+| **Insights** | 5 | analyze_trends, find_anomalies, compare_periods |
+
+**Пример анализа:**
 ```
-User: "Why did sales drop in October?"
-AI Response:
-"📉 Found 3 main reasons:
-1. Product 'Coffee Machine Deluxe': -40% (-340K₽)
-2. Manager Ivanov: -35% (-217K₽)  
-3. Region St. Petersburg: -25%
+Запрос: "Почему упали продажи в октябре?"
 
-Main cause: Coffee machines stopped selling in SPb.
-September: 12 units, October: 2 units"
-```
+Ответ:
+📉 Найдено 3 основных причины:
 
-**What AI Should Do:**
-1. Read all data from sheet
-2. Compare time periods (if question about change)
-3. Identify biggest contributors to change
-4. Explain in simple language
-5. Offer to create visualizations
+1. Товар "Кофемашина Deluxe": -40% (-340,000₽)
+   Сентябрь: 12 шт., Октябрь: 2 шт.
 
-**Success Criteria:**
-- Analysis is factually correct
-- Highlights top 3 causes
-- Response in <30 seconds
-- Clear actionable insights
+2. Менеджер Иванов: -35% (-217,000₽)
+   Был в отпуске 2 недели
 
----
+3. Регион Санкт-Петербург: -25%
+   Конкурент открыл магазин рядом
 
-### Feature 4: Automatic Reports
-**What:** AI creates formatted report in new sheet based on user request
-
-**Example:**
-```
-User: "Create weekly sales report"
-
-AI Creates New Sheet:
-┌─────────────────────────────────┐
-│ WEEKLY SALES REPORT            │
-│ Nov 4-10, 2024                 │
-│                                 │
-│ Total Sales: 1,240,000₽        │
-│ Change: +12% vs last week      │
-│                                 │
-│ TOP PERFORMERS:                │
-│ 1. Petrov: 420,000₽           │
-│ 2. Ivanov: 380,000₽           │
-│                                 │
-│ [Chart automatically inserted] │
-└─────────────────────────────────┘
+💡 Рекомендация: Провести акцию на кофемашины в СПб
 ```
 
-**Success Criteria:**
-- Report is formatted nicely
-- Includes relevant metrics
-- Chart/graph auto-generated
-- Takes <20 seconds
+---
+
+### 3.4 Report Generation
+
+**Описание:** Автоматическое создание отформатированных отчётов в новом листе.
+
+**Возможности:**
+- Заголовки и форматирование
+- Ключевые метрики с изменениями (%)
+- Автоматические графики (column, pie, line)
+- Цветовое кодирование
+- Время создания: <20 секунд
+
+**Пример:**
+```
+Запрос: "Создай еженедельный отчёт по продажам"
+
+Результат (новый лист):
+┌─────────────────────────────────────┐
+│ ЕЖЕНЕДЕЛЬНЫЙ ОТЧЁТ ПО ПРОДАЖАМ     │
+│ 4-10 ноября 2024                    │
+├─────────────────────────────────────┤
+│ Общая выручка: 1,240,000₽          │
+│ Изменение: +12% vs прошлая неделя   │
+├─────────────────────────────────────┤
+│ ТОП МЕНЕДЖЕРЫ:                      │
+│ 1. Петров: 420,000₽ (+15%)         │
+│ 2. Иванов: 380,000₽ (+8%)          │
+├─────────────────────────────────────┤
+│ [Автоматически вставленный график] │
+└─────────────────────────────────────┘
+```
 
 ---
 
-## 🚫 NOT in MVP
+### 3.5 Row Highlighting
 
-These are good ideas but NOT for first version:
-- ❌ Error checking (proactive warnings about formula errors)
-- ❌ Voice input
-- ❌ Scheduled reports (automatic weekly emails)
-- ❌ Multi-sheet analysis
-- ❌ Excel support (only Google Sheets)
-- ❌ Templates library
-- ❌ Team collaboration features
+**Описание:** Подсветка строк по условию.
 
-**Why not?** Focus on core value first. Add later if users want.
+**Примеры:**
+| Запрос | Действие |
+|--------|----------|
+| "Подсвети просроченные заказы" | Красный фон для дат < сегодня |
+| "Выдели топ-10 клиентов" | Зелёный фон для топ-10 по сумме |
+| "Отметь дубликаты" | Жёлтый фон для повторяющихся строк |
 
 ---
 
-## 💰 Monetization
+### 3.6 Chart Generation
 
-### Free Tier
-- 20 queries/month
-- All features available
-- Goal: let users try and get hooked
+**Описание:** Создание графиков и диаграмм по запросу.
 
-### Paid Tier: STARTER (490₽/month = $5)
-- 200 queries/month
-- All features
-- Priority processing (faster)
+**Поддерживаемые типы:**
+- Column Chart (столбчатая)
+- Bar Chart (горизонтальная)
+- Line Chart (линейная)
+- Pie Chart (круговая)
+- Stacked Chart (с накоплением)
 
-### Paid Tier: PRO (1,490₽/month = $15)
-- 1000 queries/month
-- All features
-- Automatic reports (up to 5)
-- Priority support
-
-### Paid Tier: TEAM (4,990₽/month = $50)
-- Unlimited queries
-- Up to 10 users
-- Shared templates
-- Admin dashboard
+**Пример:**
+```
+Запрос: "Построй график продаж по месяцам"
+→ Создаётся Line Chart с осью X = месяцы, Y = сумма продаж
+```
 
 ---
 
-## 📊 Success Metrics
+### 3.7 Custom In-Cell Functions
 
-### Activation
-- User installs → opens sidebar → makes first query
-- Target: 50%+ activation rate
+**Описание:** Универсальная функция `=GPT()` для использования прямо в ячейках.
 
-### Retention
-- User makes query week 1 → returns week 2
-- Target: 40%+ week 1 retention
+**Синтаксис:**
+```
+=GPT("запрос", [диапазон данных])
+```
 
-### Conversion
-- Free user → paid user
-- Target: 20% conversion (industry standard: 15-25%)
+**Примеры:**
+| Формула | Результат |
+|---------|-----------|
+| `=GPT("топ-5 товаров по выручке", A1:C100)` | Вертикальный список |
+| `=GPT("средний чек", B:B)` | Число |
+| `=GPT("сводка продаж по городам", A1:D50)` | Таблица |
 
-### Churn
-- Paid user cancels subscription
-- Target: <25% monthly churn
-
----
-
-## 🎨 UX Principles
-
-1. **Zero Learning Curve**
-   User should understand what to do in 3 seconds
-
-2. **Instant Gratification**
-   First query should WOW the user (magic moment)
-
-3. **Forgiving**
-   If query unclear, ask clarifying question (don't fail)
-
-4. **Transparent**
-   Show what AI is doing ("Analyzing 200 rows...")
-
-5. **Fast**
-   <15 seconds response time (users won't wait more)
+**Автоопределение формата:**
+- Text → строка
+- Number → число
+- List → вертикальный массив
+- Table → 2D массив
 
 ---
 
-## 🔐 Security & Privacy
+### 3.8 Telegram Bot
 
-### Data Access
-- Add-on only accesses sheets where user installed it
-- NO access to other user's sheets
-- Data sent to backend for AI processing
-- Data NOT stored permanently (only during query)
+**Описание:** Альтернативный интерфейс через Telegram.
 
-### API Security
+**Функции:**
+- Регистрация с лицензионным ключом
+- Обработка запросов к данным
+- Управление подпиской
+- Поддержка пользователей
+
+**Боты:**
+- `@SheetGPT_bot` - основной бот
+- `@SheetGPT_admin_bot` - админ-панель
+- `@SheetGPT_support_bot` - поддержка
+
+---
+
+## 4. Technical Architecture
+
+### Архитектура системы
+
+```
+┌─────────────────────────────────────────────────────────┐
+│                    FRONTEND LAYER                        │
+├──────────────────────────┬──────────────────────────────┤
+│   Chrome Extension       │   Google Apps Script         │
+│   - sidebar.js           │   - Code.gs                  │
+│   - sheets-api.js        │   - CustomFunctions.gs       │
+│   - OAuth integration    │   - Server-side functions    │
+└───────────────┬──────────┴──────────────┬───────────────┘
+                │         HTTPS           │
+                ▼                         ▼
+┌─────────────────────────────────────────────────────────┐
+│                    BACKEND API                           │
+│              FastAPI / Python 3.11+                      │
+│              Railway.app (Production)                    │
+├─────────────────────────────────────────────────────────┤
+│  Endpoints:                                              │
+│  - POST /api/v1/formula     (основной)                  │
+│  - POST /api/v1/analyze     (глубокий анализ)           │
+│  - POST /api/v1/report      (генерация отчётов)         │
+│  - POST /api/v1/telegram/*  (Telegram bot)              │
+│  - POST /api/v1/yookassa/*  (платежи)                   │
+├─────────────────────────────────────────────────────────┤
+│  Services:                                               │
+│  - simple_gpt_processor.py  (основной процессор)        │
+│  - hybrid_processor.py      (3-tier архитектура)        │
+│  - code_generator.py        (генерация pandas кода)     │
+│  - function_registry.py     (100+ функций)              │
+└────────────────┬────────────────────────────────────────┘
+                 │
+        ┌────────┴────────┐
+        ▼                 ▼
+   ┌─────────┐      ┌──────────┐
+   │ OpenAI  │      │ PostgreSQL│
+   │ GPT-4o  │      │ Supabase  │
+   └─────────┘      └──────────┘
+```
+
+### Hybrid Intelligence Architecture (v7.8.0+)
+
+```
+             ┌──────────────────────────────────────┐
+             │          INCOMING QUERY              │
+             └──────────────────┬───────────────────┘
+                                ▼
+┌─────────────────────────────────────────────────────────┐
+│ TIER 1: Pattern Detection                                │
+│ - Regex-based matching                                   │
+│ - 0 tokens, <100ms                                       │
+│ - Covers 30-40% of queries                               │
+│ - Examples: "top N", "bottom N", "group by"              │
+└─────────────────────────┬───────────────────────────────┘
+                          │ (no match)
+                          ▼
+┌─────────────────────────────────────────────────────────┐
+│ TIER 2: Query Complexity Classifier                      │
+│ - GPT-4o-mini (~100 tokens)                              │
+│ - Determines: simple vs complex                          │
+│ - Response time: ~200ms                                  │
+└────────────────┬────────────────────┬───────────────────┘
+                 │                    │
+          (simple)              (complex)
+                 ▼                    ▼
+┌────────────────────────┐  ┌────────────────────────────┐
+│ TIER 3A: Function      │  │ TIER 3B: Code Generation   │
+│ Calling                │  │                            │
+│ - GPT-4o selects from  │  │ - GPT-4o writes pandas     │
+│   100+ functions       │  │   code                     │
+│ - ~500 tokens          │  │ - Safe execution env       │
+│ - 95% accuracy         │  │ - 99% accuracy             │
+│ - ~500ms               │  │ - Handles edge cases       │
+└────────────────────────┘  └────────────────────────────┘
+```
+
+### Database Schema
+
+```sql
+-- Users table
+CREATE TABLE users (
+    id UUID PRIMARY KEY,
+    email VARCHAR(255) UNIQUE,
+    license_key VARCHAR(64) UNIQUE,
+    subscription_tier VARCHAR(20),  -- free, starter, pro, business
+    queries_used_this_month INTEGER DEFAULT 0,
+    queries_limit INTEGER DEFAULT 50,
+    created_at TIMESTAMP,
+    subscription_expires_at TIMESTAMP
+);
+
+-- Query history
+CREATE TABLE query_history (
+    id UUID PRIMARY KEY,
+    user_id UUID REFERENCES users(id),
+    query TEXT,
+    response TEXT,
+    success BOOLEAN,
+    processing_time_ms INTEGER,
+    tokens_used INTEGER,
+    created_at TIMESTAMP
+);
+
+-- Telegram users
+CREATE TABLE telegram_users (
+    id BIGINT PRIMARY KEY,  -- Telegram user ID
+    license_key VARCHAR(64) REFERENCES users(license_key),
+    username VARCHAR(255),
+    registered_at TIMESTAMP
+);
+```
+
+---
+
+## 5. Monetization
+
+### Pricing Tiers
+
+| Plan | Цена | Запросов/мес | Особенности |
+|------|------|--------------|-------------|
+| **Free** | 0₽ | 50 | Базовый анализ, sidebar |
+| **Starter** | 490₽/мес | 500 | Формулы, email поддержка |
+| **Pro** | 1,490₽/мес | 2,000 | Продвинутая аналитика, приоритет |
+| **Business** | 4,990₽/мес | Unlimited | API, white-label, SLA |
+
+### Платёжная интеграция
+- **Провайдер:** YooKassa (Россия)
+- **Webhook:** Автоматическая активация подписки
+- **Валюта:** RUB
+
+### Unit Economics
+
+| Метрика | Значение |
+|---------|----------|
+| CAC (Customer Acquisition Cost) | ~500₽ |
+| LTV (Lifetime Value) | ~4,500₽ (9 мес avg) |
+| LTV/CAC | 9x |
+| Gross Margin | 89% |
+| Monthly Churn | <15% |
+
+**При 300 платящих пользователях:**
+- Выручка: 300 × 600₽ = 180,000₽/мес
+- Расходы AI: ~15,000₽/мес
+- Расходы сервера: ~4,500₽/мес
+- Чистая прибыль: ~160,000₽/мес
+
+---
+
+## 6. Success Metrics
+
+### Ключевые KPI
+
+| Метрика | Цель | Текущее |
+|---------|------|---------|
+| **Activation Rate** | 50% | - |
+| **Week 1 Retention** | 40% | - |
+| **Conversion to Paid** | 20% | - |
+| **Query Success Rate** | >95% | 95%+ |
+| **Avg Response Time** | <5s | 2-4s |
+| **NPS** | 40+ | - |
+| **Monthly Churn** | <15% | - |
+
+### Воронка конверсии
+
+```
+Установка расширения
+        ↓ (60%)
+Первый запрос (Activation)
+        ↓ (70%)
+5+ запросов в первую неделю
+        ↓ (50%)
+Достижение лимита (50 запросов)
+        ↓ (20%)
+Оплата подписки
+```
+
+---
+
+## 7. Security & Privacy
+
+### Доступ к данным
+- Расширение получает доступ только к активному листу
+- Данные не хранятся постоянно (только на время обработки)
+- Нет доступа к чужим таблицам
+
+### Безопасность API
 - HTTPS only
-- API keys encrypted
-- Rate limiting (prevent abuse)
+- JWT токены с истечением (30 дней)
+- Rate limiting (10 req/min)
+- CORS ограничения
 
-### User Privacy
-- No PII stored without consent
-- GDPR compliant (user can delete all data)
-- Transparent privacy policy
+### Code Execution Safety
+- Запрещённые функции: `import`, `exec`, `eval`, `open`
+- Sandbox environment для pandas кода
+- Timeout: 30 секунд
 
----
-
-## 🌍 Localization
-
-### MVP: Russian First
-- All UI in Russian
-- AI understands Russian queries
-- Works with Cyrillic column names
-
-### Later: English
-- After MVP proven in Russian market
+### Compliance
+- GDPR compliant
+- Google API Services User Data Policy
+- Прозрачная политика конфиденциальности
 
 ---
 
-## 📱 Platform Support
+## 8. Roadmap
 
-### MVP: Desktop Only
-- Google Sheets on desktop browser
-- Chrome, Firefox, Safari, Edge
+### Completed (v9.2.0)
 
-### Later: Mobile
-- Google Sheets mobile app
-- After desktop is stable
+- [x] Chrome Extension с OAuth
+- [x] 100+ аналитических функций
+- [x] Hybrid Intelligence Architecture
+- [x] Генерация формул
+- [x] Анализ данных
+- [x] Row highlighting
+- [x] Chart generation
+- [x] Telegram bot
+- [x] YooKassa интеграция
+- [x] Русский и английский языки
+
+### In Progress
+
+- [ ] Custom in-cell functions (`=GPT()`)
+- [ ] Улучшение UI/UX sidebar
+- [ ] A/B тестирование промптов
+
+### Planned
+
+- [ ] Scheduled reports (автоматические еженедельные отчёты)
+- [ ] Multi-sheet analysis
+- [ ] AI memory (запоминание контекста)
+- [ ] Bulk processing (пакетная обработка)
+- [ ] Excel support
+- [ ] Mobile app
+
+### Not Planned
+
+- Voice input
+- Team collaboration
+- Templates library
+- On-premise deployment
+
+---
+
+## 9. Competitive Analysis
+
+| Feature | SheetGPT | Sheets AI | GPT for Sheets |
+|---------|----------|-----------|----------------|
+| Русский язык | ✅ Полная | ❌ Нет | ⚠️ Частично |
+| Формулы | ✅ | ✅ | ✅ |
+| Анализ данных | ✅ 100+ функций | ⚠️ Базовый | ⚠️ Базовый |
+| Графики | ✅ | ❌ | ❌ |
+| Отчёты | ✅ | ❌ | ❌ |
+| Подсветка строк | ✅ | ❌ | ❌ |
+| Цена | 490₽/мес | $9/мес | $6/мес |
+| Локальный хостинг | ❌ | ❌ | ❌ |
+
+**Конкурентное преимущество:**
+1. Полная поддержка русского языка
+2. 100+ специализированных функций
+3. Генерация отчётов и графиков
+4. Низкая цена для российского рынка
+
+---
+
+## 10. Technical Requirements
+
+### Browser Support
+- Chrome 88+ (основной)
+- Edge 88+
+- Firefox (через WebExtension)
+
+### Backend Requirements
+- Python 3.11+
+- PostgreSQL 14+
+- 2GB RAM minimum
+- 10GB storage
+
+### API Limits
+- OpenAI: 30,000 TPM
+- Rate limit: 10 req/min per user
+- Max rows: 500 (Chrome extension)
+- Timeout: 30 seconds
+
+### Dependencies
+```
+fastapi==0.104+
+uvicorn==0.24+
+sqlalchemy==2.0+
+asyncpg==0.29+
+openai==1.109+
+pandas==2.0+
+python-telegram-bot==20.0+
+yookassa==3.0+
+```
+
+---
+
+## Appendix A: Glossary
+
+| Term | Definition |
+|------|------------|
+| **Sidebar** | Боковая панель в Google Sheets |
+| **Function Calling** | Вызов предопределённых функций через OpenAI API |
+| **Hybrid Architecture** | 3-уровневая система обработки запросов |
+| **Pattern Detection** | Распознавание типовых запросов без AI |
+| **Code Generation** | Генерация pandas кода для сложных запросов |
+
+---
+
+## Appendix B: API Reference
+
+### POST /api/v1/formula
+
+**Request:**
+```json
+{
+  "query": "Сумма продаж по менеджерам",
+  "sheet_data": {
+    "headers": ["Менеджер", "Продажи", "Дата"],
+    "rows": [["Иванов", 50000, "2024-01-15"], ...]
+  },
+  "license_key": "xxx-xxx-xxx"
+}
+```
+
+**Response:**
+```json
+{
+  "response_type": "analysis",
+  "summary": "Выручка по менеджерам:\n1. Иванов: 150,000₽\n2. Петров: 120,000₽",
+  "confidence": 0.98,
+  "processing_time": "2.34s"
+}
+```
+
+---
+
+*Document maintained by SheetGPT Team*
+*Last review: December 2024*
