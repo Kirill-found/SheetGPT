@@ -159,20 +159,24 @@ function cleanResponseText(text, preserveNewlines = false) {
 function detectCrossSheetQuery(query) {
   console.log('[Sidebar] 🔍 detectCrossSheetQuery:', query);
   const lowerQuery = query.toLowerCase();
-  // v10.0.7: Patterns to extract sheet name - support ALL quote types:
-  // Standard: " ' « »
-  // Curly/Smart: " " ' '  (U+201C, U+201D, U+2018, U+2019)
-  const quoteOpen = `["'«"'\u201C\u2018]`;
-  const quoteClose = `["'»"'\u201D\u2019]`;
+  // v10.0.8: Simplified patterns - support all common quote types
+  // All quotes (open/close): " ' « » " " ' '
+  const anyQuote = '["\'\u00AB\u00BB\u201C\u201D\u2018\u2019]';
+  const notQuote = '[^"\'\u00AB\u00BB\u201C\u201D\u2018\u2019]';
+
   const patterns = [
-    new RegExp(`(?:из|с|from)\\s+(?:листа|sheet|таблицы)\\s+${quoteOpen}([^"'»"']+)${quoteClose}`, 'i'),  // With quotes
-    /(?:из|с|from)\s+(?:листа|sheet|таблицы)\s+([^\s,]+)/i,             // Single word (no quotes)
-    new RegExp(`(?:впр|vlookup)\\s+(?:из|from|с)\\s+${quoteOpen}([^"'»"']+)${quoteClose}`, 'i'),
+    // Pattern 1: из/с/from листа "name" (with quotes)
+    new RegExp('(?:из|с|from)\\s+(?:листа|sheet|таблицы)\\s+' + anyQuote + '(' + notQuote + '+)' + anyQuote, 'i'),
+    // Pattern 2: из/с/from листа name (without quotes, single word)
+    /(?:из|с|from)\s+(?:листа|sheet|таблицы)\s+([^\s,]+)/i,
+    // Pattern 3: впр/vlookup из "name"
+    new RegExp('(?:впр|vlookup)\\s+(?:из|from|с)\\s+' + anyQuote + '(' + notQuote + '+)' + anyQuote, 'i'),
     /(?:впр|vlookup)\s+(?:из|from|с)\s+([^\s,]+)/i,
-    new RegExp(`(?:по|в|in)\\s+(?:листе|листу|sheet)\\s+${quoteOpen}([^"'»"']+)${quoteClose}`, 'i'),
+    // Pattern 4: по/в/in листе "name"
+    new RegExp('(?:по|в|in)\\s+(?:листе|листу|sheet)\\s+' + anyQuote + '(' + notQuote + '+)' + anyQuote, 'i'),
     /(?:по|в|in)\s+(?:листе|листу|sheet)\s+([^\s,]+)/i,
-    // v10.0.7: Added pattern for "подтяни ... значения"
-    new RegExp(`подтян[иьу]\\s+(?:из|с)\\s+(?:листа|sheet)\\s+${quoteOpen}([^"'»"']+)${quoteClose}`, 'i'),
+    // Pattern 5: подтяни из листа "name"
+    new RegExp('подтян[иьу]\\s+(?:из|с)\\s+(?:листа|sheet)\\s+' + anyQuote + '(' + notQuote + '+)' + anyQuote, 'i'),
   ];
   for (let i = 0; i < patterns.length; i++) {
     const pattern = patterns[i];
