@@ -3807,6 +3807,8 @@ result = value[0] if len(value) > 0 else 'Не найдено'
 - ПРОВЕРЯЙ типы данных ключей (str vs int): df['id'].astype(str)
 """
                 logger.info(f"[SimpleGPT] Reference sheet added: {ref_name}, {ref_schema['row_count']} rows")
+                # v10.0.9: Mark that reference_df was received (for debugging deployment)
+                logger.info(f"[SimpleGPT] ⚠️ VLOOKUP MODE ACTIVATED - reference_df has {ref_schema['row_count']} rows")
 
             # 2. Generate and execute code (with retries)
             result = await self._generate_and_execute(

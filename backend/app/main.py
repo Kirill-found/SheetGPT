@@ -608,6 +608,9 @@ async def process_formula(
         response_dict["strategy"] = result.get("strategy")
         response_dict["processing_time"] = result.get("processing_time")
         response_dict["retry_count"] = result.get("retry_count", 0)
+        # v10.0.9: Debug marker - shows if reference_df was received
+        response_dict["_debug_ref_df_received"] = reference_df is not None
+        response_dict["_debug_ref_df_rows"] = len(reference_df) if reference_df is not None else 0
 
         # Debug fields
         response_dict["code_generated"] = result.get("code_generated")
