@@ -81,15 +81,22 @@ class AICodeExecutor:
 
         return sanitized
 
-    def process_with_code(self, query: str, column_names: List[str], sheet_data: List[List[Any]], history: List[Dict[str, Any]] = None, custom_context: Optional[str] = None) -> Dict[str, Any]:
+    def process_with_code(self, query: str, column_names: List[str], sheet_data: List[List[Any]], history: List[Dict[str, Any]] = None, custom_context: Optional[str] = None, reference_sheet_name: Optional[str] = None, reference_sheet_headers: Optional[List[str]] = None, reference_sheet_data: Optional[List[List[Any]]] = None) -> Dict[str, Any]:
         """
         Основная функция - генерирует и выполняет Python код для точных расчетов
+        v10.0.6: Added reference_sheet support for cross-sheet operations (VLOOKUP, merge, etc.)
         """
         try:
             # Шаг 0: Санитизируем custom_context
             safe_custom_context = self._sanitize_custom_context(custom_context)
             print(f"\n🔍 DEBUG: custom_context = {custom_context}")
             print(f"🔍 DEBUG: safe_custom_context = {safe_custom_context}")
+
+            # v10.0.6: Log reference sheet info
+            if reference_sheet_name:
+                print(f"📊 DEBUG: reference_sheet_name = {reference_sheet_name}")
+                print(f"📊 DEBUG: reference_sheet_headers = {reference_sheet_headers}")
+                print(f"📊 DEBUG: reference_sheet_data rows = {len(reference_sheet_data) if reference_sheet_data else 0}")
 
             # v7.3.0: Проверка на создание таблицы из AI-знаний (без исходных данных)
             # Улучшенная проверка на "пустые данные" - обрабатывает разные форматы от фронтенда
@@ -123,11 +130,17 @@ class AICodeExecutor:
             # Шаг 1: Создаем DataFrame
             df = pd.DataFrame(sheet_data, columns=column_names)
 
+            # v10.0.6: Создаем reference DataFrame если есть данные из другого листа
+            ref_df = None
+            if reference_sheet_data and reference_sheet_headers:
+                ref_df = pd.DataFrame(reference_sheet_data, columns=reference_sheet_headers)
+                print(f"📊 Created ref_df with shape: {ref_df.shape}")
+
             # Шаг 2: AI генерирует Python код
-            generated_code = self._generate_python_code(query, df, safe_custom_context, history)
+            generated_code = self._generate_python_code(query, df, safe_custom_context, history, ref_df, reference_sheet_name)
 
             # Шаг 3: Выполняем код безопасно
-            result = self._execute_python_code(generated_code, df)
+            result = self._execute_python_code(generated_code, df, ref_df)
 
             # Шаг 4: Форматируем ответ
             print(f"🔍 DEBUG: Before _format_response, safe_custom_context = {safe_custom_context}")
@@ -153,10 +166,11 @@ class AICodeExecutor:
                 "response_type": "error"
             }
 
-    def _generate_python_code(self, query: str, df: pd.DataFrame, custom_context: Optional[str] = None, history: List[Dict[str, Any]] = None) -> str:
+    def _generate_python_code(self, query: str, df: pd.DataFrame, custom_context: Optional[str] = None, history: List[Dict[str, Any]] = None, ref_df: Optional[pd.DataFrame] = None, reference_sheet_name: Optional[str] = None) -> str:
         """
         AI генерирует Python код для решения задачи
         С опциональным custom_context для персонализации
+        v10.0.6: Added ref_df support for cross-sheet operations
         """
         print("\n" + "="*80)
         print("[TRACE 1] _generate_python_code() CALLED")
@@ -164,34 +178,32 @@ class AICodeExecutor:
         print(f"[TRACE 1] df.shape: {df.shape}")
         print(f"[TRACE 1] custom_context: {custom_context is not None}")
         print(f"[TRACE 1] history: {len(history) if history else 0} messages")
+        print(f"[TRACE 1] ref_df: {ref_df.shape if ref_df is not None else 'None'}")
+        print(f"[TRACE 1] reference_sheet_name: {reference_sheet_name}")
         print("="*80 + "\n")
 
         # Анализируем структуру данных
         data_info = self._analyze_dataframe(df)
 
+        # v10.0.6: Анализируем reference sheet если есть
+        ref_data_info = ""
+        if ref_df is not None:
+            ref_data_info = self._analyze_dataframe(ref_df)
+
         # v8.0.1: Строим контекст истории разговора
         history_context = ""
         if history and len(history) > 0:
-            history_context = "
-CONVERSATION HISTORY (previous questions and answers):
-"
-            history_context += "=" * 50 + "
-"
+            history_context = "\nCONVERSATION HISTORY (previous questions and answers):\n"
+            history_context += "=" * 50 + "\n"
             for i, item in enumerate(history[-5:], 1):  # Last 5 messages
                 prev_query = item.get('query', '')
                 prev_response = item.get('response', '')
                 if prev_query:
-                    history_context += f"{i}. User asked: {prev_query}
-"
+                    history_context += f"{i}. User asked: {prev_query}\n"
                     if prev_response:
-                        history_context += f"   AI answered: {prev_response[:200]}...
-" if len(prev_response) > 200 else f"   AI answered: {prev_response}
-"
-            history_context += "=" * 50 + "
-"
-            history_context += "IMPORTANT: Use this context to understand follow-up questions like 'почему?' (why?), 'а Петров?' (what about Petrov?), etc.
-
-"
+                        history_context += f"   AI answered: {prev_response[:200]}...\n" if len(prev_response) > 200 else f"   AI answered: {prev_response}\n"
+            history_context += "=" * 50 + "\n"
+            history_context += "IMPORTANT: Use this context to understand follow-up questions like 'почему?' (why?), 'а Петров?' (what about Petrov?), etc.\n\n"
             print(f"[HISTORY] Added conversation context: {len(history)} messages")
 
         # Строим базовый промпт
@@ -213,7 +225,29 @@ DataFrame 'df' with {len(df)} rows and columns:
 
 SAMPLE DATA (first 5 rows):
 {df.head().to_string()}
+"""
 
+        # v10.0.6: Add reference sheet info if available
+        if ref_df is not None and reference_sheet_name:
+            prompt += f"""
+
+REFERENCE SHEET DATA (from '{reference_sheet_name}'):
+========================================
+You also have access to 'ref_df' - a DataFrame from another sheet!
+DataFrame 'ref_df' with {len(ref_df)} rows and columns:
+{ref_data_info}
+
+SAMPLE REFERENCE DATA (first 5 rows):
+{ref_df.head().to_string()}
+
+CROSS-SHEET OPERATIONS:
+- Use 'ref_df' to look up values from the reference sheet
+- For VLOOKUP-style operations: merge df with ref_df on common columns
+- Example: df.merge(ref_df[['key_column', 'value_column']], on='key_column', how='left')
+- You can add columns from ref_df to df using merge or map operations
+"""
+
+        prompt += """
 UNDERSTANDING CONVERSATIONAL REQUESTS:
 ========================================
 Users may ask questions in casual, conversational language. You MUST understand the intent:
@@ -551,13 +585,15 @@ Return ONLY the Python code, no explanations."""
                     f"Code:\n{code[:500]}"
                 )
 
-    def _execute_python_code(self, code: str, df: pd.DataFrame) -> Dict[str, Any]:
+    def _execute_python_code(self, code: str, df: pd.DataFrame, ref_df: Optional[pd.DataFrame] = None) -> Dict[str, Any]:
         """
         Безопасно выполняет Python код и возвращает результат
+        v10.0.6: Added ref_df support for cross-sheet operations
         """
         print("\n" + "="*80)
         print("[TRACE 3] _execute_python_code() CALLED")
         print(f"[TRACE 3] Code to execute (first 300 chars):\n{code[:300]}")
+        print(f"[TRACE 3] ref_df available: {ref_df is not None}")
         print("="*80 + "\n")
 
         # ИСПРАВЛЕНИЕ: Автоматически исправляем частые ошибки
@@ -577,6 +613,7 @@ Return ONLY the Python code, no explanations."""
         # Создаем безопасное окружение для выполнения
         safe_globals = {
             'df': df,
+            'ref_df': ref_df,  # v10.0.6: Reference sheet DataFrame for cross-sheet operations
             'pd': pd,
             'np': np,
             'len': len,

@@ -194,12 +194,16 @@ async def generate_formula(request: FormulaRequest):
                 conversation_id=request.conversation_id
             )
         else:
+            # v10.0.5: Pass reference sheet data for cross-sheet VLOOKUP
             result = ai_service.process_formula_request(
                 query=request.query,
                 column_names=request.column_names,
                 sheet_data=request.sheet_data,
                 history=request.history or [],
-                custom_context=request.custom_context
+                custom_context=request.custom_context,
+                reference_sheet_name=request.reference_sheet_name,
+                reference_sheet_headers=request.reference_sheet_headers,
+                reference_sheet_data=request.reference_sheet_data
             )
 
         if result.get("confidence", 0) < 0.5:

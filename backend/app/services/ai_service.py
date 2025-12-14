@@ -143,7 +143,7 @@ class AIService:
         except Exception as e:
             return {"error": str(e)}
 
-    def process_formula_request(self, query: str, column_names: List[str], sheet_data: List[List[Any]], history: List[Dict[str, Any]], custom_context: Optional[str] = None) -> Dict[str, Any]:
+    def process_formula_request(self, query: str, column_names: List[str], sheet_data: List[List[Any]], history: List[Dict[str, Any]], custom_context: Optional[str] = None, reference_sheet_name: Optional[str] = None, reference_sheet_headers: Optional[List[str]] = None, reference_sheet_data: Optional[List[List[Any]]] = None) -> Dict[str, Any]:
         """
         v5.1.0: Uses AI Code Executor for 99% accuracy
         Supports ANY query: top products, averages, sums, counts, etc.
@@ -228,7 +228,10 @@ class AIService:
                 column_names=column_names,
                 sheet_data=sheet_data,
                 custom_context=custom_context,  # v6.2.0: Персонализированная роль AI
-                history=history or []
+                history=history or [],
+                reference_sheet_name=reference_sheet_name,  # v10.0.6: Cross-sheet support
+                reference_sheet_headers=reference_sheet_headers,
+                reference_sheet_data=reference_sheet_data
             )
 
             # If successful, return result
