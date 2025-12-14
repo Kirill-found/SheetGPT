@@ -1142,7 +1142,8 @@ async function sendMessage() {
     loadingEl.remove();
 
     // Transform and display AI response
-    const response = transformAPIResponse(result);
+    // v10.1.2: Pass referenceSheet flag to auto-detect VLOOKUP mode
+    const response = transformAPIResponse(result, { isVlookup: !!referenceSheet, referenceSheetName: referenceSheet?.name });
     addAIMessage(response);
 
     // v9.1.0: Sync usage from server response
@@ -1725,12 +1726,14 @@ function translateToRussian(text) {
 }
 
 // Transform API response to UI format
-function transformAPIResponse(apiResponse) {
+// v10.1.2: Added options parameter for VLOOKUP auto-detection
+function transformAPIResponse(apiResponse, options = {}) {
   console.log('[Sidebar] transformAPIResponse received:', apiResponse);
   console.log('[Sidebar] action_type:', apiResponse.action_type);
   console.log('[Sidebar] formula_template:', apiResponse.formula_template);
   console.log('[Sidebar] column_name:', apiResponse.column_name);
   console.log('[Sidebar] chart_spec:', apiResponse.chart_spec);
+  console.log('[Sidebar] options:', options);
 
   // Store structured_data globally for table insertion
   if (apiResponse.structured_data) {
@@ -1957,14 +1960,20 @@ function transformAPIResponse(apiResponse) {
   if (apiResponse.action_type === 'write_data' && apiResponse.write_data) {
     console.log('[Sidebar] ✅ Write data condition met!');
 
-    // v10.1.1: Check for merge_by_key (VLOOKUP mode - add column to the right)
-    if (apiResponse.merge_by_key) {
-      console.log('[Sidebar] 🔗 VLOOKUP mode - appending column by key:', apiResponse.merge_by_key);
+    // v10.1.2: Auto-detect VLOOKUP mode from options OR merge_by_key
+    // If we had a reference sheet (isVlookup), automatically use append mode
+    const isVlookupMode = apiResponse.merge_by_key || options.isVlookup;
+    // Use first header as key column if not specified (typically "Артикул")
+    const keyColumn = apiResponse.merge_by_key || (options.isVlookup ? apiResponse.write_headers[0] : null);
+
+    if (isVlookupMode && keyColumn) {
+      console.log('[Sidebar] 🔗 VLOOKUP mode - appending column by key:', keyColumn);
+      console.log('[Sidebar] 🔗 Auto-detected from:', apiResponse.merge_by_key ? 'API response' : 'reference sheet');
       // Call appendColumnByKey instead of overwriting
       appendColumnByKey(
-        apiResponse.merge_by_key,  // Key column name (e.g., "Артикул")
-        apiResponse.write_headers, // Headers including key + new columns
-        apiResponse.write_data     // Data rows [[key, val1, val2], ...]
+        keyColumn,                  // Key column name (e.g., "Артикул")
+        apiResponse.write_headers,  // Headers including key + new columns
+        apiResponse.write_data      // Data rows [[key, val1, val2], ...]
       ).then(() => {
         console.log('[Sidebar] ✅ Column appended successfully');
         addAIMessage({ type: 'success', text: apiResponse.summary || '✅ Колонка добавлена справа!' });
@@ -1980,7 +1989,7 @@ function transformAPIResponse(apiResponse) {
       };
     }
 
-    // Default: overwrite mode (legacy behavior)
+    // Default: overwrite mode (legacy behavior - no reference sheet)
     console.log('[Sidebar] 📝 Overwrite mode - replacing sheet data');
     const dataToWrite = {
       headers: apiResponse.write_headers,
