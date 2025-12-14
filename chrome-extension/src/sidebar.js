@@ -1142,8 +1142,13 @@ async function sendMessage() {
     loadingEl.remove();
 
     // Transform and display AI response
-    // v10.1.2: Pass referenceSheet flag to auto-detect VLOOKUP mode
-    const response = transformAPIResponse(result, { isVlookup: !!referenceSheet, referenceSheetName: referenceSheet?.name });
+    // v10.1.3: Pass full referenceSheet data for frontend VLOOKUP
+    const response = transformAPIResponse(result, {
+      isVlookup: !!referenceSheet,
+      referenceSheetName: referenceSheet?.name,
+      referenceSheetHeaders: referenceSheet?.headers,
+      referenceSheetData: referenceSheet?.data
+    });
     addAIMessage(response);
 
     // v9.1.0: Sync usage from server response
@@ -1955,6 +1960,58 @@ function transformAPIResponse(apiResponse, options = {}) {
     };
   }
 
+
+  // v10.1.3: If response is a vlookup action (frontend does the lookup)
+  if (apiResponse.action_type === 'vlookup' && options.referenceSheetData) {
+    console.log('[Sidebar] 🔗 VLOOKUP action - doing lookup on frontend');
+    const keyColumn = apiResponse.key_column || 'Артикул';
+    const valueColumn = apiResponse.value_column;
+
+    if (!valueColumn) {
+      console.error('[Sidebar] ❌ VLOOKUP missing value_column');
+      return { type: 'error', text: 'Ошибка: не указана колонка для подтягивания' };
+    }
+
+    // Find column indices in reference sheet
+    const refHeaders = options.referenceSheetHeaders || [];
+    const keyColIdx = refHeaders.findIndex(h => h && h.toString().toLowerCase().trim() === keyColumn.toLowerCase().trim());
+    const valueColIdx = refHeaders.findIndex(h => h && h.toString().toLowerCase().trim() === valueColumn.toLowerCase().trim());
+
+    if (keyColIdx < 0) {
+      console.error('[Sidebar] ❌ Key column not found in reference sheet:', keyColumn);
+      return { type: 'error', text: `Колонка "${keyColumn}" не найдена в справочном листе` };
+    }
+    if (valueColIdx < 0) {
+      console.error('[Sidebar] ❌ Value column not found in reference sheet:', valueColumn);
+      return { type: 'error', text: `Колонка "${valueColumn}" не найдена в справочном листе` };
+    }
+
+    console.log('[Sidebar] 🔗 Key column:', keyColumn, 'index:', keyColIdx);
+    console.log('[Sidebar] 🔗 Value column:', valueColumn, 'index:', valueColIdx);
+
+    // Build lookup data from reference sheet
+    const refData = options.referenceSheetData || [];
+    const writeData = refData.map(row => [row[keyColIdx], row[valueColIdx]]);
+    const writeHeaders = [keyColumn, valueColumn];
+
+    console.log('[Sidebar] 🔗 Built lookup data:', writeData.length, 'rows');
+
+    // Call appendColumnByKey with the full data
+    appendColumnByKey(keyColumn, writeHeaders, writeData).then(() => {
+      console.log('[Sidebar] ✅ VLOOKUP column appended successfully');
+      addAIMessage({ type: 'success', text: apiResponse.summary || `✅ Колонка "${valueColumn}" добавлена!` });
+    }).catch(err => {
+      console.error('[Sidebar] ❌ VLOOKUP append failed:', err);
+      addAIMessage({ type: 'error', text: `Ошибка: ${err.message}` });
+    });
+
+    return {
+      type: 'vlookup',
+      text: apiResponse.summary || `Подтягиваю "${valueColumn}"...`,
+      keyColumn,
+      valueColumn
+    };
+  }
 
   // If response is a write_data action (VLOOKUP result)
   if (apiResponse.action_type === 'write_data' && apiResponse.write_data) {
