@@ -217,11 +217,52 @@ async function readSheetData(spreadsheetId, sheetName, range = 'A1:Z1000', _retr
       return { headers: [], data: [] };
     }
 
-    // First row as headers, rest as data
-    const headers = data.values[0] || [];
-    const rows = data.values.slice(1);
+    // Smart header detection - handle two-row headers
+    let headers = data.values[0] || [];
+    let dataStartRow = 1;
 
-    console.log('[SheetsAPI] ✅ Parsed data:', { headers, rowCount: rows.length });
+    // Check if we have a two-row header situation
+    // Signs: row 1 has few non-empty cells, row 2 has more specific headers (months, dates, etc.)
+    if (data.values.length > 1) {
+      const row1 = data.values[0] || [];
+      const row2 = data.values[1] || [];
+
+      // Count non-empty cells in each row
+      const row1NonEmpty = row1.filter(cell => cell && cell.toString().trim()).length;
+      const row2NonEmpty = row2.filter(cell => cell && cell.toString().trim()).length;
+
+      // Check if row2 looks like headers (has month names, dates, or more specific values)
+      const monthPattern = /^(январ|феврал|март|апрел|май|июн|июл|август|сентябр|октябр|ноябр|декабр|jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)/i;
+      const row2HasMonths = row2.some(cell => cell && monthPattern.test(cell.toString()));
+
+      // If row2 has more non-empty cells or has month names, it's likely the real header
+      if (row2NonEmpty > row1NonEmpty || row2HasMonths) {
+        console.log('[SheetsAPI] 📋 Detected two-row header, using row 2 as headers');
+        console.log('[SheetsAPI] Row 1:', row1, 'non-empty:', row1NonEmpty);
+        console.log('[SheetsAPI] Row 2:', row2, 'non-empty:', row2NonEmpty);
+
+        // Merge headers: use row2, but fill empty cells from row1
+        headers = row2.map((cell, i) => {
+          if (cell && cell.toString().trim()) {
+            return cell;
+          }
+          // If row2 cell is empty, try row1
+          return row1[i] || '';
+        });
+
+        // Ensure we have at least as many headers as the widest row
+        const maxCols = Math.max(row1.length, row2.length);
+        while (headers.length < maxCols) {
+          headers.push('');
+        }
+
+        dataStartRow = 2; // Data starts from row 3 (index 2)
+      }
+    }
+
+    const rows = data.values.slice(dataStartRow);
+
+    console.log('[SheetsAPI] ✅ Parsed data:', { headers, rowCount: rows.length, dataStartRow });
 
     return { headers, data: rows };
   } catch (error) {
