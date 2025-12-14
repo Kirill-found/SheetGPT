@@ -1436,7 +1436,7 @@ explanation += "- Строка 17: Пауэрбанк, кол-во = -2\n"
             logger.error(f"[SimpleGPT] GPT chart selection failed: {e}")
             return None
 
-    async def _gpt_smart_action(self, query: str, column_names: List[str], df: pd.DataFrame, history: List[Dict[str, Any]] = None, custom_context: Optional[str] = None) -> Optional[Dict[str, Any]]:
+    async def _gpt_smart_action(self, query: str, column_names: List[str], df: pd.DataFrame, history: List[Dict[str, Any]] = None, custom_context: Optional[str] = None, reference_df: pd.DataFrame = None, reference_sheet_name: Optional[str] = None) -> Optional[Dict[str, Any]]:
         """
         УМНЫЙ GPT-обработчик. GPT сама понимает запрос, анализирует данные и формирует готовый ответ.
         Никакого хардкода - GPT решает всё сама.
@@ -1533,7 +1533,32 @@ explanation += "- Строка 17: Пауэрбанк, кол-во = -2\n"
             # Для highlight нужен JSON с номерами строк
             data_json_section = f"\n\nJSON (для highlight, с _row_number):\n{json.dumps(data_rows[:100], ensure_ascii=False)}"
 
-        prompt = f"""{context_text}{history_text}Ты - ДУМАЮЩИЙ ЭКСПЕРТ по таблицам. Не исполнитель команд, а настоящий специалист.
+        # v10.0.9: Add reference sheet info if provided (for VLOOKUP/cross-sheet operations)
+        reference_sheet_section = ""
+        if reference_df is not None and reference_sheet_name:
+            ref_cols = list(reference_df.columns)
+            ref_rows_sample = reference_df.head(5).to_string()
+            logger.info(f"[SmartGPT] 🔗 VLOOKUP MODE - reference_df: {reference_sheet_name}, {len(reference_df)} rows, cols: {ref_cols}")
+            reference_sheet_section = f"""
+
+⚠️⚠️⚠️ ВАЖНО: CROSS-SHEET VLOOKUP ⚠️⚠️⚠️
+Пользователь просит подтянуть данные из листа "{reference_sheet_name}".
+Данные этого листа ЗАГРУЖЕНЫ и доступны ниже!
+
+ДОПОЛНИТЕЛЬНЫЙ ЛИСТ "{reference_sheet_name}" ({len(reference_df)} строк):
+Колонки: {ref_cols}
+Пример данных:
+{ref_rows_sample}
+
+🔴 НЕ ГОВОРИ "нет данных" - данные ЕСТЬ выше!
+🔴 НЕ СПРАШИВАЙ откуда взять данные - они УЖЕ ЗАГРУЖЕНЫ!
+🟢 Найди общую колонку (например "Артикул") и подтяни нужные значения!
+
+Пример ответа для VLOOKUP:
+{{"action_type": "write_data", "write_headers": ["Артикул", "Сентябрь"], "write_data": [["SKU1", 100], ["SKU2", 200]], "summary": "Подтянуты данные за сентябрь по артикулам"}}
+"""
+
+        prompt = f"""{context_text}{history_text}{reference_sheet_section}Ты - ДУМАЮЩИЙ ЭКСПЕРТ по таблицам. Не исполнитель команд, а настоящий специалист.
 
 ==============================================================
 ЗАПРОС: "{query}"
@@ -3641,7 +3666,7 @@ chat: {{"action_type": "chat", "message": "Уточните, пожалуйст�
             # SMART GPT - GPT сама понимает и выполняет ЛЮБОЙ запрос
             # Никакого хардкода - GPT формирует готовый ответ
             # =====================================================
-            smart_result = await self._gpt_smart_action(query, column_names, df, history=history, custom_context=custom_context)
+            smart_result = await self._gpt_smart_action(query, column_names, df, history=history, custom_context=custom_context, reference_df=reference_df, reference_sheet_name=reference_sheet_name)
             if smart_result:
                 elapsed = time.time() - start_time
                 logger.info(f"[SmartGPT] Action: {smart_result.get('action_type')}")

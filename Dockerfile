@@ -2,7 +2,7 @@ FROM python:3.11-slim
 
 # ============ FORCE FULL REBUILD ============
 # Change this timestamp to bust ALL cache layers
-ENV FORCE_REBUILD="2025-12-14-20:20:00-v10.0.9-VLOOKUP-FIX"
+ENV FORCE_REBUILD="2025-12-14-20:50:00-v10.1.0-VLOOKUP-SMARTGPT"
 RUN echo "=== FULL REBUILD: $FORCE_REBUILD ===" && date
 
 LABEL version="9.3.0"
