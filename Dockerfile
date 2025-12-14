@@ -2,11 +2,11 @@ FROM python:3.11-slim
 
 # ============ FORCE FULL REBUILD ============
 # Change this timestamp to bust ALL cache layers
-ENV FORCE_REBUILD="2025-12-14-23:00:00-v10.2.1-FORECAST-ADD-COLUMN"
+ENV FORCE_REBUILD="2025-12-14-23:30:00-v10.2.2-STRICT-FORECAST-PROHIBITION"
 RUN echo "=== FULL REBUILD: $FORCE_REBUILD ===" && date
 
-LABEL version="10.1.1"
-LABEL description="SheetGPT API v10.1.1 - VLOOKUP append column instead of overwrite"
+LABEL version="10.2.2"
+LABEL description="SheetGPT API v10.2.2 - Strict prohibition of structured_data for forecasts"
 
 WORKDIR /app
 
