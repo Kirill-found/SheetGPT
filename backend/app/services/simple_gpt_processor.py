@@ -3884,6 +3884,48 @@ chat: {{"action_type": "chat", "message": "Уточните, пожалуйст�
                             "message": "Создаю диаграмму"
                         }
 
+                # v10.2.5: Forecast query fix - convert structured_data to write_data
+                # AI often returns structured_data for forecasts, but we need write_data + merge_by_key
+                is_forecast_query = any(kw in query.lower() for kw in ['прогноз', 'спрогнозир', 'forecast', 'предсказ'])
+                has_structured_data = smart_result.get("structured_data") is not None
+                missing_write_data = smart_result.get("action_type") != "write_data" or smart_result.get("merge_by_key") is None
+
+                if is_forecast_query and has_structured_data and missing_write_data:
+                    logger.info(f"[SmartGPT] 🔄 FORECAST FIX: Converting structured_data to write_data")
+                    sd = smart_result["structured_data"]
+                    headers = sd.get("headers", [])
+                    rows = sd.get("rows", [])
+
+                    # Find key column (usually first one, e.g., "Артикул")
+                    key_col = headers[0] if headers else "Артикул"
+                    # Find forecast column (usually last one or contains "прогноз")
+                    forecast_col = None
+                    for h in reversed(headers):
+                        if "прогноз" in h.lower() or "forecast" in h.lower():
+                            forecast_col = h
+                            break
+                    if not forecast_col and len(headers) > 1:
+                        forecast_col = headers[-1]  # Default to last column
+
+                    # Convert rows (dict format) to arrays [[key, value], ...]
+                    write_data = []
+                    write_headers = [key_col, forecast_col] if forecast_col else [key_col]
+                    for row in rows:
+                        if isinstance(row, dict):
+                            key_val = row.get(key_col, "")
+                            forecast_val = row.get(forecast_col, "") if forecast_col else ""
+                            write_data.append([key_val, forecast_val])
+                        elif isinstance(row, list):
+                            write_data.append(row[:2])  # Take first 2 columns
+
+                    # Replace structured_data with write_data
+                    smart_result["action_type"] = "write_data"
+                    smart_result["merge_by_key"] = key_col
+                    smart_result["write_data"] = write_data
+                    smart_result["write_headers"] = write_headers
+                    del smart_result["structured_data"]  # Remove to prevent confusion
+                    logger.info(f"[SmartGPT] ✅ FORECAST FIX: Converted to write_data with merge_by_key='{key_col}', {len(write_data)} rows")
+
                 # GPT возвращает готовый ответ - просто добавляем метаданные
                 smart_result.update({
                     "success": True,
