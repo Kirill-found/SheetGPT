@@ -1142,12 +1142,13 @@ async function sendMessage() {
     loadingEl.remove();
 
     // Transform and display AI response
-    // v10.1.3: Pass full referenceSheet data for frontend VLOOKUP
+    // v10.1.5: Pass full referenceSheet data and query for frontend VLOOKUP
     const response = transformAPIResponse(result, {
       isVlookup: !!referenceSheet,
       referenceSheetName: referenceSheet?.name,
       referenceSheetHeaders: referenceSheet?.headers,
-      referenceSheetData: referenceSheet?.data
+      referenceSheetData: referenceSheet?.data,
+      lastQuery: query  // Pass query for fallback column detection
     });
     addAIMessage(response);
 
@@ -1965,11 +1966,49 @@ function transformAPIResponse(apiResponse, options = {}) {
   if (apiResponse.action_type === 'vlookup' && options.referenceSheetData) {
     console.log('[Sidebar] 🔗 VLOOKUP action - doing lookup on frontend');
     const keyColumn = apiResponse.key_column || 'Артикул';
-    const valueColumn = apiResponse.value_column;
+    let valueColumn = apiResponse.value_column;
+
+    // v10.1.5: Fallback - extract column from query if AI didn't specify
+    if (!valueColumn && options.lastQuery) {
+      console.log('[Sidebar] 🔍 Trying to extract value_column from query:', options.lastQuery);
+      const refHeaders = options.referenceSheetHeaders || [];
+      const queryLower = options.lastQuery.toLowerCase();
+
+      // Try to find matching column from reference sheet headers
+      for (const header of refHeaders) {
+        if (header && header.toLowerCase() !== keyColumn.toLowerCase()) {
+          // Check if header name appears in query
+          if (queryLower.includes(header.toLowerCase())) {
+            valueColumn = header;
+            console.log('[Sidebar] ✅ Found value_column in query:', valueColumn);
+            break;
+          }
+        }
+      }
+
+      // Try common month names in Russian
+      if (!valueColumn) {
+        const months = ['январь', 'февраль', 'март', 'апрель', 'май', 'июнь',
+                        'июль', 'август', 'сентябрь', 'октябрь', 'ноябрь', 'декабрь'];
+        for (const month of months) {
+          if (queryLower.includes(month)) {
+            // Find matching header (case-insensitive)
+            const matchingHeader = refHeaders.find(h =>
+              h && h.toLowerCase().includes(month)
+            );
+            if (matchingHeader) {
+              valueColumn = matchingHeader;
+              console.log('[Sidebar] ✅ Found month in query:', valueColumn);
+              break;
+            }
+          }
+        }
+      }
+    }
 
     if (!valueColumn) {
       console.error('[Sidebar] ❌ VLOOKUP missing value_column');
-      return { type: 'error', text: 'Ошибка: не указана колонка для подтягивания' };
+      return { type: 'error', text: 'Ошибка: не указана колонка для подтягивания. Укажите название колонки (например "октябрь")' };
     }
 
     // Find column indices in reference sheet
