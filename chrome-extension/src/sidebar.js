@@ -1939,8 +1939,17 @@ function transformAPIResponse(apiResponse) {
     };
   }
 
-  // If response has structured_data (table)
+  // If response has structured_data (table) - but respect display_mode
   if (apiResponse.structured_data) {
+    // v11.10: If display_mode is 'sidebar_only', don't offer table insertion
+    if (apiResponse.structured_data.display_mode === 'sidebar_only') {
+      // Just show the summary as analysis, don't offer to insert table
+      let responseText = apiResponse.summary || apiResponse.explanation || 'Анализ завершён';
+      return {
+        type: 'analysis',
+        text: responseText
+      };
+    }
     return {
       type: 'table',
       text: `Найдено ${apiResponse.structured_data.rows?.length || 0} записей`,
