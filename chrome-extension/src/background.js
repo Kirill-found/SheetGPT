@@ -232,15 +232,17 @@ async function handleGetReferenceSheetData(tabId, tabUrl, sheetNameHint) {
 
     // Find matching sheet by hint
     let targetSheetName = null;
-    const lowerHint = sheetNameHint.toLowerCase();
+    // v10.0.5: Normalize Russian ё -> е for matching
+    const normalizeRu = (s) => s.toLowerCase().replace(/ё/g, 'е');
+    const normalizedHint = normalizeRu(sheetNameHint);
 
-    // 1. Exact match (case-insensitive)
-    targetSheetName = allSheetNames.find(s => s.toLowerCase() === lowerHint);
+    // 1. Exact match (case-insensitive, ё-normalized)
+    targetSheetName = allSheetNames.find(s => normalizeRu(s) === normalizedHint);
 
-    // 2. Contains match (case-insensitive)
+    // 2. Contains match (case-insensitive, ё-normalized)
     if (!targetSheetName) {
       targetSheetName = allSheetNames.find(s =>
-        s.toLowerCase().includes(lowerHint) || lowerHint.includes(s.toLowerCase())
+        normalizeRu(s).includes(normalizedHint) || normalizedHint.includes(normalizeRu(s))
       );
     }
 
