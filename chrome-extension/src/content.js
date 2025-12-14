@@ -698,6 +698,12 @@ async function processQuery(query, history = [], licenseKey = null, referenceShe
     console.log('[SheetGPT] Sending request with license key');
   }
 
+  // DEBUG: Log what we're sending to backend
+  console.log('[SheetGPT] 📤 Sending to backend:');
+  console.log('[SheetGPT] 📤 column_names:', sheetData.headers);
+  console.log('[SheetGPT] 📤 sheet_data first row:', sheetData.data[0]);
+  console.log('[SheetGPT] 📤 sheet_data rows:', sheetData.data.length);
+
   const response = await fetch(API_URLS[API_MODE], {
     method: 'POST',
     headers: headers,
