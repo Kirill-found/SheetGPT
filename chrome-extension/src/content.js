@@ -833,11 +833,12 @@ async function createTableAndChart(structuredData) {
       throw new Error('Could not get active sheet name. Try refreshing the page.');
     }
 
-    // v10.0.3: Respect display_mode - create new sheet or overwrite current
-    if (structuredData.display_mode === 'create_sheet') {
+    // v10.0.4: Respect display_mode - create new sheet or overwrite current
+    // 'create_sheet' and 'preview' both create new sheets (to avoid overwriting data)
+    if (structuredData.display_mode === 'create_sheet' || structuredData.display_mode === 'preview') {
       // Generate unique sheet name based on headers or timestamp
       const newSheetName = structuredData.headers[0] + '_' + new Date().toLocaleTimeString('ru-RU', {hour: '2-digit', minute: '2-digit'});
-      console.log('[SheetGPT] 📋 display_mode=create_sheet, creating new sheet:', newSheetName);
+      console.log('[SheetGPT] 📋 display_mode=' + structuredData.display_mode + ', creating new sheet:', newSheetName);
 
       const response = await safeSendMessage({
         action: 'CREATE_NEW_SHEET',

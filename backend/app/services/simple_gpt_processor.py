@@ -3900,11 +3900,18 @@ result = value[0] if len(value) > 0 else 'Не найдено'
                     response["summary"] = f"✅ Данные из листа \"{reference_sheet_name or 'справочник'}\" подтянуты ({len(formatted_result)} строк)"
                     logger.info(f"[SimpleGPT] VLOOKUP result: {len(formatted_result)} rows, writing to sheet")
                 else:
-                    # Regular table - show in sidebar or create new sheet
+                    # Regular table - show preview in sidebar, let user decide where to insert
+                    # v10.0.4: Use 'preview' mode for tables - shows table + insert button
+                    # Only auto-create sheet for very large results (>200 rows)
+                    if len(formatted_result) <= 200:
+                        display_mode = "preview"  # Show table, user clicks "Insert" to add
+                    else:
+                        display_mode = "create_sheet"  # Too large, create separate sheet
+
                     response["structured_data"] = {
                         "headers": headers,
                         "rows": format_data_for_sheets(formatted_result),
-                        "display_mode": "sidebar_only" if len(formatted_result) <= 20 else "create_sheet"
+                        "display_mode": display_mode
                     }
             elif result_type == "list" and isinstance(formatted_result, list):
                 # Convert all items to strings for schema validation
