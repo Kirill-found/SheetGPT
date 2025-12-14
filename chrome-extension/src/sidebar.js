@@ -2056,11 +2056,19 @@ function transformAPIResponse(apiResponse, options = {}) {
   if (apiResponse.action_type === 'write_data' && apiResponse.write_data) {
     console.log('[Sidebar] ✅ Write data condition met!');
 
-    // v10.1.2: Auto-detect VLOOKUP mode from options OR merge_by_key
-    // If we had a reference sheet (isVlookup), automatically use append mode
-    const isVlookupMode = apiResponse.merge_by_key || options.isVlookup;
+    // v10.2.6: Smart detection of append mode
+    // Check if first header looks like a key column (Артикул, ID, SKU, etc.)
+    const firstHeader = apiResponse.write_headers?.[0]?.toLowerCase() || '';
+    const keyPatterns = ['артикул', 'id', 'sku', 'код', 'key', 'название', 'наименование', 'name'];
+    const looksLikeKey = keyPatterns.some(p => firstHeader.includes(p));
+
+    // v10.1.2: Auto-detect VLOOKUP/append mode
+    // Use append mode if: merge_by_key specified, or isVlookup, or first header looks like a key
+    const isVlookupMode = apiResponse.merge_by_key || options.isVlookup || looksLikeKey;
     // Use first header as key column if not specified (typically "Артикул")
-    const keyColumn = apiResponse.merge_by_key || (options.isVlookup ? apiResponse.write_headers[0] : null);
+    const keyColumn = apiResponse.merge_by_key || apiResponse.write_headers?.[0] || null;
+
+    console.log('[Sidebar] 🔍 Append mode detection:', { merge_by_key: apiResponse.merge_by_key, isVlookup: options.isVlookup, looksLikeKey, firstHeader, keyColumn });
 
     if (isVlookupMode && keyColumn) {
       console.log('[Sidebar] 🔗 VLOOKUP mode - appending column by key:', keyColumn);
