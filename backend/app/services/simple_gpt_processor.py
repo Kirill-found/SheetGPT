@@ -4109,6 +4109,52 @@ result = value[0] if len(value) > 0 else 'Не найдено'
                 # Convert all items to strings for schema validation
                 response["key_findings"] = [str(item) for item in formatted_result]
 
+            # v10.2.5: Forecast fix for Python analysis path
+            # Same logic as SmartGPT path - convert structured_data to write_data for forecasts
+            is_forecast_query = any(kw in query.lower() for kw in ['прогноз', 'спрогнозир', 'forecast', 'предсказ'])
+            has_structured_data = response.get("structured_data") is not None
+
+            if is_forecast_query and has_structured_data:
+                logger.info(f"[SimpleGPT] 🔄 FORECAST FIX (Python path): Converting structured_data to write_data")
+                sd = response["structured_data"]
+                headers = sd.get("headers", [])
+                rows = sd.get("rows", [])
+
+                # Find key column (usually first one, e.g., "Артикул")
+                key_col = headers[0] if headers else "Артикул"
+                # Find forecast column (contains "прогноз" or last column)
+                forecast_col = None
+                for h in reversed(headers):
+                    if "прогноз" in h.lower() or "forecast" in h.lower():
+                        forecast_col = h
+                        break
+                if not forecast_col and len(headers) > 1:
+                    forecast_col = headers[-1]  # Default to last column
+
+                # Convert rows to arrays [[key, value], ...]
+                write_data = []
+                write_headers = [key_col, forecast_col] if forecast_col else [key_col]
+                for row in rows:
+                    if isinstance(row, dict):
+                        key_val = row.get(key_col, "")
+                        forecast_val = row.get(forecast_col, "") if forecast_col else ""
+                        write_data.append([key_val, forecast_val])
+                    elif isinstance(row, list):
+                        # Find indices for key and forecast columns
+                        key_idx = headers.index(key_col) if key_col in headers else 0
+                        forecast_idx = headers.index(forecast_col) if forecast_col and forecast_col in headers else -1
+                        key_val = row[key_idx] if key_idx < len(row) else ""
+                        forecast_val = row[forecast_idx] if forecast_idx >= 0 and forecast_idx < len(row) else ""
+                        write_data.append([key_val, forecast_val])
+
+                # Replace structured_data with write_data
+                response["action_type"] = "write_data"
+                response["merge_by_key"] = key_col
+                response["write_data"] = write_data
+                response["write_headers"] = write_headers
+                del response["structured_data"]  # Remove to prevent new sheet creation
+                logger.info(f"[SimpleGPT] ✅ FORECAST FIX: Converted to write_data with merge_by_key='{key_col}', {len(write_data)} rows")
+
             return response
 
         except Exception as e:
