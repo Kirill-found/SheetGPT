@@ -159,14 +159,20 @@ function cleanResponseText(text, preserveNewlines = false) {
 function detectCrossSheetQuery(query) {
   console.log('[Sidebar] 🔍 detectCrossSheetQuery:', query);
   const lowerQuery = query.toLowerCase();
-  // Patterns to extract sheet name: quoted text OR single word
+  // v10.0.7: Patterns to extract sheet name - support ALL quote types:
+  // Standard: " ' « »
+  // Curly/Smart: " " ' '  (U+201C, U+201D, U+2018, U+2019)
+  const quoteOpen = `["'«"'\u201C\u2018]`;
+  const quoteClose = `["'»"'\u201D\u2019]`;
   const patterns = [
-    /(?:из|с|from)\s+(?:листа|sheet|таблицы)\s+["'«]([^"'»]+)["'»]/i,  // With quotes
-    /(?:из|с|from)\s+(?:листа|sheet|таблицы)\s+([^\s,]+)/i,             // Single word
-    /(?:впр|vlookup)\s+(?:из|from|с)\s+["'«]([^"'»]+)["'»]/i,
+    new RegExp(`(?:из|с|from)\\s+(?:листа|sheet|таблицы)\\s+${quoteOpen}([^"'»"']+)${quoteClose}`, 'i'),  // With quotes
+    /(?:из|с|from)\s+(?:листа|sheet|таблицы)\s+([^\s,]+)/i,             // Single word (no quotes)
+    new RegExp(`(?:впр|vlookup)\\s+(?:из|from|с)\\s+${quoteOpen}([^"'»"']+)${quoteClose}`, 'i'),
     /(?:впр|vlookup)\s+(?:из|from|с)\s+([^\s,]+)/i,
-    /(?:по|в|in)\s+(?:листе|листу|sheet)\s+["'«]([^"'»]+)["'»]/i,
+    new RegExp(`(?:по|в|in)\\s+(?:листе|листу|sheet)\\s+${quoteOpen}([^"'»"']+)${quoteClose}`, 'i'),
     /(?:по|в|in)\s+(?:листе|листу|sheet)\s+([^\s,]+)/i,
+    // v10.0.7: Added pattern for "подтяни ... значения"
+    new RegExp(`подтян[иьу]\\s+(?:из|с)\\s+(?:листа|sheet)\\s+${quoteOpen}([^"'»"']+)${quoteClose}`, 'i'),
   ];
   for (let i = 0; i < patterns.length; i++) {
     const pattern = patterns[i];
