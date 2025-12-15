@@ -838,6 +838,125 @@ else:
 result = {"issues": total_issues, "details": issues_found}
 ```
 
+Запрос: "Прогноз на январь" или "Спрогнозируй продажи" или "Сделай forecast"
+ЛОГИКА ПРОГНОЗИРОВАНИЯ (ОЧЕНЬ ВАЖНО!):
+
+1. СНАЧАЛА определи есть ли ТРЕНД в данных:
+   - Сравни первое и последнее значение временного ряда
+   - Если изменение > 10% - есть чёткий тренд (рост или падение)
+   - Если изменение < 10% - данные стабильны
+
+2. ВЫБЕРИ метод прогноза:
+   - ТРЕНД (рост > 10%): forecast = last_value × (1 + growth_rate)
+   - ТРЕНД (падение > 10%): forecast = last_value × (1 + growth_rate)  # growth_rate будет отрицательным
+   - СТАБИЛЬНО (±10%): forecast = weighted_average (больший вес последним значениям)
+
+3. В explanation ОБЯЗАТЕЛЬНО напиши:
+   - Какой метод использовал и ПОЧЕМУ
+   - Какой тренд обнаружен (рост X% / падение X% / стабильно)
+   - Какие значения использовал для расчёта
+
+```python
+# Находим колонки для прогноза
+id_col = None  # Артикул/ID для привязки
+value_cols = []  # Колонки с числовыми значениями по периодам
+
+for col in df.columns:
+    col_lower = col.lower()
+    if any(x in col_lower for x in ['артикул', 'id', 'sku', 'код', 'key']):
+        id_col = col
+    # Колонки с месяцами/периодами или числовые данные
+    if any(x in col_lower for x in ['янв', 'фев', 'мар', 'апр', 'май', 'июн',
+                                      'июл', 'авг', 'сен', 'окт', 'ноя', 'дек',
+                                      'jan', 'feb', 'mar', 'apr', 'may', 'jun',
+                                      'jul', 'aug', 'sep', 'oct', 'nov', 'dec',
+                                      'q1', 'q2', 'q3', 'q4', 'заказ', 'продаж', 'кол-во']):
+        value_cols.append(col)
+
+# Если не нашли колонки по названию, берём все числовые кроме первой (ID)
+if not value_cols:
+    for col in df.columns[1:]:  # Пропускаем первую колонку (обычно ID)
+        if df[col].dtype in ['int64', 'float64'] or pd.to_numeric(df[col], errors='coerce').notna().any():
+            value_cols.append(col)
+
+if id_col and len(value_cols) >= 2:
+    # Конвертируем в числа
+    for col in value_cols:
+        df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
+
+    forecasts = []
+    methods_used = []
+
+    for idx, row in df.iterrows():
+        values = [row[col] for col in value_cols]
+        values = [v for v in values if v > 0]  # Только положительные
+
+        if len(values) >= 2:
+            first_val = values[0]
+            last_val = values[-1]
+
+            # Определяем тренд
+            if first_val > 0:
+                change_pct = (last_val - first_val) / first_val * 100
+            else:
+                change_pct = 0
+
+            # ВЫБОР МЕТОДА на основе тренда
+            if abs(change_pct) > 10:
+                # Есть чёткий тренд - используем экстраполяцию
+                if len(values) >= 2:
+                    # Средний темп роста между периодами
+                    growth_rates = []
+                    for i in range(1, len(values)):
+                        if values[i-1] > 0:
+                            rate = (values[i] - values[i-1]) / values[i-1]
+                            growth_rates.append(rate)
+                    avg_growth = sum(growth_rates) / len(growth_rates) if growth_rates else 0
+                    forecast = last_val * (1 + avg_growth)
+                    method = 'trend'
+                    methods_used.append(f"тренд {change_pct:+.1f}%")
+                else:
+                    forecast = last_val
+                    method = 'last'
+            else:
+                # Стабильные данные - взвешенное среднее
+                weights = list(range(1, len(values) + 1))  # [1,2,3,...] - больший вес последним
+                forecast = sum(v * w for v, w in zip(values, weights)) / sum(weights)
+                method = 'weighted_avg'
+                methods_used.append('стабильно')
+
+            forecast = max(0, round(forecast))
+        else:
+            forecast = values[0] if values else 0
+            methods_used.append('недостаточно данных')
+
+        forecasts.append(forecast)
+
+    df['Прогноз'] = forecasts
+
+    # Формируем результат для write_data
+    result_data = []
+    for idx, row in df.iterrows():
+        result_data.append([row[id_col], row['Прогноз']])
+
+    result = {"headers": [id_col, "Прогноз"], "rows": result_data}
+
+    # Статистика по методам
+    trend_count = sum(1 for m in methods_used if 'тренд' in m)
+    stable_count = sum(1 for m in methods_used if 'стабильно' in m)
+
+    explanation = f"Прогноз рассчитан для {len(forecasts)} позиций\n\n"
+    explanation += f"Методы расчёта:\n"
+    if trend_count > 0:
+        explanation += f"- Тренд (экстраполяция): {trend_count} позиций\n"
+    if stable_count > 0:
+        explanation += f"- Взвешенное среднее: {stable_count} позиций\n"
+    explanation += f"\nИсходные периоды: {', '.join(value_cols)}"
+else:
+    result = "Не найдены колонки для прогнозирования"
+    explanation = result
+```
+
 
 Возвращай ТОЛЬКО код внутри ```python ... ``````python ... ```
 """
