@@ -1340,11 +1340,21 @@ function addAIMessage(response) {
     // Build methodology section
     let methodologyHtml = '';
     if (response.methodology) {
+      const copyableFormula = response.methodology.copyable_formula;
       methodologyHtml = `
         <div class="methodology-section">
           <div class="methodology-header">📊 Методология: ${escapeHtml(response.methodology.name || 'расчёт')}</div>
           ${response.methodology.reason ? `<div class="methodology-reason">${escapeHtml(response.methodology.reason)}</div>` : ''}
           ${response.methodology.formula ? `<div class="formula-block">${escapeHtml(response.methodology.formula)}</div>` : ''}
+          ${copyableFormula ? `
+            <div class="copyable-formula-section">
+              <div class="copyable-formula-label">📋 Формула для копирования:</div>
+              <div class="copyable-formula-row">
+                <code class="copyable-formula">${escapeHtml(copyableFormula)}</code>
+                <button class="copy-formula-btn" data-action="copyToClipboard" data-text="${escapeHtml(copyableFormula)}">Копировать</button>
+              </div>
+            </div>
+          ` : ''}
         </div>
       `;
     }
