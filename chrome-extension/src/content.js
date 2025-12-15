@@ -1880,13 +1880,27 @@ async function appendColumnByKey({ keyColumn, writeHeaders, writeData }) {
       valuesToWrite.push(new Array(newColumnHeaders.length).fill(''));
     }
 
-    // 7. Fill in values by matching keys
+    // 7. Fill in values by matching keys (with fuzzy matching for truncated keys)
     let matchCount = 0;
+    let fuzzyMatchCount = 0;
     writeData.forEach(row => {
       const keyValue = row[keyIdxInWrite];
       if (keyValue !== null && keyValue !== undefined) {
         const normalizedKey = String(keyValue).trim().toLowerCase();
-        const targetRowIdx = keyToRowIndex.get(normalizedKey);
+        let targetRowIdx = keyToRowIndex.get(normalizedKey);
+
+        // If exact match not found, try fuzzy matching (GPT sometimes truncates long keys)
+        if (targetRowIdx === undefined && normalizedKey.length >= 10) {
+          // Try to find a key that starts with our truncated key or vice versa
+          for (const [sheetKey, rowIdx] of keyToRowIndex.entries()) {
+            if (sheetKey.startsWith(normalizedKey) || normalizedKey.startsWith(sheetKey)) {
+              targetRowIdx = rowIdx;
+              fuzzyMatchCount++;
+              break;
+            }
+          }
+        }
+
         if (targetRowIdx !== undefined) {
           // Found matching row - fill in values (skip key column)
           newColumnIndices.forEach((srcIdx, destIdx) => {
@@ -1896,7 +1910,7 @@ async function appendColumnByKey({ keyColumn, writeHeaders, writeData }) {
         }
       }
     });
-    console.log('[SheetGPT] ✅ Matched', matchCount, 'rows out of', writeData.length);
+    console.log('[SheetGPT] ✅ Matched', matchCount, 'rows out of', writeData.length, '(fuzzy:', fuzzyMatchCount, ')');
 
     // 8. Get spreadsheet ID and sheet name
     const match = window.location.href.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
