@@ -1517,11 +1517,11 @@ async function sendToContentScript(action, data = {}) {
 
     window.addEventListener('message', handler);
 
-    // Timeout after 30 seconds
+    // Timeout after 90 seconds (CleanAnalyst needs more time for large datasets)
     const timeout = setTimeout(() => {
       window.removeEventListener('message', handler);
       reject(new Error('Таймаут ожидания ответа. Перезагрузите страницу.'));
-    }, 30000);
+    }, 90000);
 
     // Send message to parent (content script)
     console.log('[Sidebar] Sending to content script:', { action, data, messageId });
