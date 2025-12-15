@@ -1473,7 +1473,7 @@ function addAIMessage(response) {
     `;
   }
 
-  // CSV split
+  // CSV split (legacy)
   else if (response.type === 'csv_split') {
     const newRows = response.newRows || 0;
     const newCols = response.newCols || 0;
@@ -1489,6 +1489,35 @@ function addAIMessage(response) {
       <div class="action-buttons">
         <button class="action-btn" data-action="applySplitData">Заменить данные</button>
       </div>
+    `;
+  }
+
+  // v11.1: Replace data response (auto-executed)
+  else if (response.type === 'replace_data') {
+    const rowCount = response.rowCount || 0;
+    const colCount = response.structuredData?.headers?.length || 0;
+
+    // Build methodology section
+    let methodologyHtml = '';
+    if (response.methodology) {
+      methodologyHtml = `
+        <div class="methodology-section">
+          <div class="methodology-header">📊 Методология: ${escapeHtml(response.methodology.name || 'структурирование')}</div>
+          ${response.methodology.reason ? `<div class="methodology-reason">${escapeHtml(response.methodology.reason)}</div>` : ''}
+        </div>
+      `;
+    }
+
+    content = `
+      <div class="response-type">
+        <svg viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/><path d="M9 21V9"/></svg>
+        Замена данных
+      </div>
+      <div class="response-content">
+        <p>${escapeHtml(cleanResponseText(response.text) || 'Данные заменены')}</p>
+      </div>
+      ${methodologyHtml}
+      <div class="summary-box">${rowCount} строк × ${colCount} колонок</div>
     `;
   }
 
@@ -2107,6 +2136,39 @@ function transformAPIResponse(apiResponse, options = {}) {
       examples: apiResponse.examples,
       warnings: apiResponse.warnings,
       rowCount: apiResponse.fill_values?.length || 0
+    };
+  }
+
+  // v11.1: If response is a replace_data action (full data replacement, CSV split)
+  if (apiResponse.action_type === 'replace_data' && apiResponse.structured_data) {
+    console.log('[Sidebar] 📋 Replace data condition met!');
+    console.log('[Sidebar] Headers:', apiResponse.structured_data.headers);
+    console.log('[Sidebar] Rows:', apiResponse.structured_data.rows?.length);
+
+    // Store structured data for insertion
+    window.lastStructuredData = apiResponse.structured_data;
+
+    // Execute replacement immediately
+    overwriteSheetData({
+      headers: apiResponse.structured_data.headers,
+      rows: apiResponse.structured_data.rows
+    }).then(() => {
+      console.log('[Sidebar] ✅ Data replaced successfully');
+      addAIMessage({ type: 'success', text: apiResponse.summary || '✅ Данные успешно заменены!' });
+    }).catch(err => {
+      console.error('[Sidebar] ❌ Replace data failed:', err);
+      addAIMessage({ type: 'error', text: `Ошибка замены данных: ${err.message}` });
+    });
+
+    return {
+      type: 'replace_data',
+      text: apiResponse.summary || 'Заменяю данные в таблице...',
+      structuredData: apiResponse.structured_data,
+      thinking: apiResponse.thinking,
+      methodology: apiResponse.methodology,
+      examples: apiResponse.examples,
+      warnings: apiResponse.warnings,
+      rowCount: apiResponse.structured_data.rows?.length || 0
     };
   }
 

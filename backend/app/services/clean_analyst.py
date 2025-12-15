@@ -126,6 +126,21 @@ class CleanAnalyst:
 }
 ```
 
+### replace_data - полная перезапись данных (разбить CSV, структурировать)
+Используй когда данные в одной ячейке/колонке содержат CSV или нужно полностью заменить структуру таблицы.
+Например: "разбей данные по ячейкам", "разделить по колонкам", данные вида "A,B,C" в одной ячейке.
+**ВАЖНО**: НЕ используй write_column с merge_by_key для разбиения CSV - нет ключевой колонки!
+```json
+{
+  "type": "replace_data",
+  "headers": ["Месяц", "Заказов", "Выручка", "Прибыль"],
+  "rows": [
+    ["Июль 2024", 245, 287650, 41200],
+    ["Август 2024", 312, 358900, 52300]
+  ]
+}
+```
+
 ### highlight - выделить строки
 ```json
 {
@@ -489,6 +504,14 @@ class CleanAnalyst:
             response["target_column"] = action.get("target_column")  # e.g., "B"
             response["column_name"] = action.get("column_name")  # e.g., "Ответы"
             response["fill_values"] = action.get("values", [])  # List of values to write
+
+        elif action_type == "replace_data":
+            # replace_data - full data replacement (for CSV split, restructure)
+            response["action_type"] = "replace_data"
+            response["structured_data"] = {
+                "headers": action.get("headers", []),
+                "rows": action.get("rows", [])
+            }
 
         else:  # answer
             response["action_type"] = None
