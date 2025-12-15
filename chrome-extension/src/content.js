@@ -287,8 +287,8 @@ async function handleSendMessage() {
     // Получаем данные из активного листа
     const sheetData = await getActiveSheetData();
 
-    // Отправляем запрос в SheetGPT API
-    const response = await fetch('https://sheetgpt-production.up.railway.app/api/v1/formula', {
+    // Отправляем запрос в SheetGPT API (CleanAnalyst v1.0)
+    const response = await fetch('https://sheetgpt-production.up.railway.app/api/v1/analyze', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -672,8 +672,8 @@ function sendMessageToSidebar(data) {
 const API_MODE = 'production';  // Change to 'production' for Railway server
 
 const API_URLS = {
-  local: 'http://localhost:8000/api/v1/formula',
-  production: 'https://sheetgpt-production.up.railway.app/api/v1/formula'
+  local: 'http://localhost:8000/api/v1/analyze',
+  production: 'https://sheetgpt-production.up.railway.app/api/v1/analyze'
 };
 
 // ===== API HANDLERS =====
