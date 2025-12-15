@@ -1983,6 +1983,7 @@ async function appendColumnByKey({ keyColumn, writeHeaders, writeData }) {
 // Writes values directly to a specific column by letter (e.g., "B")
 async function fillColumnDirect({ targetColumn, columnName, values }) {
   console.log('[SheetGPT] 📝 fillColumnDirect:', { targetColumn, columnName, valuesCount: values?.length });
+  console.log('[SheetGPT] 📝 First value type:', typeof values?.[0], Array.isArray(values?.[0]) ? 'is array' : 'not array');
 
   try {
     // 1. Get spreadsheet ID and sheet name
@@ -2003,7 +2004,7 @@ async function fillColumnDirect({ targetColumn, columnName, values }) {
     const colLetter = targetColumn.toUpperCase();
 
     // 3. Build values array: header + values
-    // Each row should be an array with one element
+    // Each row should be an array with one element (for single column write)
     const valuesToWrite = [];
 
     // Add header row if column name is provided
@@ -2011,12 +2012,20 @@ async function fillColumnDirect({ targetColumn, columnName, values }) {
       valuesToWrite.push([columnName]);
     }
 
-    // Add all values
+    // Add all values - handle both flat array and nested array formats
     values.forEach(val => {
-      valuesToWrite.push([val]);
+      // If val is already an array, take the first element (GPT sometimes returns nested arrays)
+      // If val is a primitive, wrap it in array
+      if (Array.isArray(val)) {
+        // For single column, take first element only
+        valuesToWrite.push([val[0]]);
+      } else {
+        valuesToWrite.push([val]);
+      }
     });
 
     console.log('[SheetGPT] 📝 Writing', valuesToWrite.length, 'rows to column', colLetter);
+    console.log('[SheetGPT] 📝 Sample values:', valuesToWrite.slice(0, 3));
 
     // 4. Write values to the specified column
     // Start from row 1 if header provided, otherwise row 2 (assuming row 1 is existing header)
