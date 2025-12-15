@@ -2811,12 +2811,47 @@ window.highlightFilteredRows = async function() {
 
 window.copyToClipboard = async function(text) {
   try {
+    // Try modern Clipboard API first
     await navigator.clipboard.writeText(text);
-    // Could show a toast notification here
+    showCopySuccess();
   } catch (e) {
-    console.error('Copy failed:', e);
+    // Fallback for iframe/extension context where Clipboard API is blocked
+    console.log('[Sidebar] Clipboard API blocked, using fallback');
+    try {
+      const textArea = document.createElement('textarea');
+      textArea.value = text;
+      textArea.style.position = 'fixed';
+      textArea.style.left = '-9999px';
+      textArea.style.top = '0';
+      document.body.appendChild(textArea);
+      textArea.focus();
+      textArea.select();
+      const success = document.execCommand('copy');
+      document.body.removeChild(textArea);
+      if (success) {
+        showCopySuccess();
+      } else {
+        console.error('Copy fallback failed');
+      }
+    } catch (fallbackError) {
+      console.error('Copy failed completely:', fallbackError);
+    }
   }
 };
+
+function showCopySuccess() {
+  // Brief visual feedback
+  const btn = document.querySelector('.copy-formula-btn');
+  if (btn) {
+    const originalText = btn.textContent;
+    btn.textContent = '✓ Скопировано!';
+    btn.style.background = 'var(--success)';
+    setTimeout(() => {
+      btn.textContent = originalText;
+      btn.style.background = '';
+    }, 1500);
+  }
+}
 
 // ============================================
 // UTILITIES
