@@ -609,6 +609,28 @@ window.addEventListener('message', async (event) => {
     return;
   }
 
+  // v11.3: Handle FILL_COLUMNS message from sidebar (multiple columns at once)
+  if (event.data && event.data.type === 'FILL_COLUMNS') {
+    console.log('[SheetGPT] 📝 FILL_COLUMNS: Writing values to multiple columns:', event.data.data);
+    try {
+      const result = await fillColumnsDirect(event.data.data);
+      event.source.postMessage({
+        type: 'FILL_COLUMNS_RESPONSE',
+        success: true,
+        result: result
+      }, event.origin);
+      console.log('[SheetGPT] ✅ All columns filled successfully');
+    } catch (e) {
+      console.error('[SheetGPT] ❌ Failed to fill columns:', e);
+      event.source.postMessage({
+        type: 'FILL_COLUMNS_RESPONSE',
+        success: false,
+        error: e.message
+      }, event.origin);
+    }
+    return;
+  }
+
   // Verify it's a message from our sidebar (has our message structure)
   if (!event.data || typeof event.data !== 'object' || !event.data.action || !event.data.messageId) {
     console.log('[SheetGPT] Ignoring message - not from sidebar (missing action or messageId)');
@@ -2156,6 +2178,69 @@ async function fillColumnDirect({ targetColumn, columnName, startRow, values }) 
     };
   } catch (error) {
     console.error('[SheetGPT] ❌ fillColumnDirect error:', error);
+    throw error;
+  }
+}
+
+// v11.3: Fill multiple columns at once
+async function fillColumnsDirect({ startRow, columns }) {
+  console.log('[SheetGPT] 📝 fillColumnsDirect:', { startRow, columnsCount: columns?.length });
+
+  try {
+    // Get current active sheet name from DOM
+    const sheetName = getCurrentSheetNameFromDOM();
+    if (!sheetName) {
+      throw new Error('Could not determine active sheet name');
+    }
+    console.log('[SheetGPT] 📋 Will write to sheet:', sheetName);
+
+    const writeStartRow = startRow || 2;
+    const results = [];
+
+    // Process each column
+    for (const col of columns) {
+      const { target, name, values } = col;
+      if (!target || !values || values.length === 0) {
+        console.log('[SheetGPT] ⚠️ Skipping column - missing target or values:', col);
+        continue;
+      }
+
+      const colLetter = target.toUpperCase();
+
+      // Prepare values for this column
+      const valuesToWrite = values.map(v => [v]);
+
+      console.log('[SheetGPT] 📝 Writing', valuesToWrite.length, 'rows to column', colLetter, '(', name, ') starting at row', writeStartRow);
+
+      const response = await safeSendMessage({
+        action: 'WRITE_SHEET_DATA',
+        data: {
+          sheetName: sheetName,
+          values: valuesToWrite,
+          startCell: `${colLetter}${writeStartRow}`,
+          mode: 'overwrite'
+        }
+      });
+
+      if (!response || !response.success) {
+        throw new Error(`Failed to write column ${colLetter}: ${response?.error || 'Unknown error'}`);
+      }
+
+      results.push({
+        column: colLetter,
+        name: name,
+        rowsWritten: values.length
+      });
+    }
+
+    console.log('[SheetGPT] ✅ All columns filled successfully!', results);
+    return {
+      success: true,
+      message: `Заполнено ${results.length} колонок`,
+      columns: results
+    };
+  } catch (error) {
+    console.error('[SheetGPT] ❌ fillColumnsDirect error:', error);
     throw error;
   }
 }

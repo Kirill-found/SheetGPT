@@ -1473,6 +1473,57 @@ function addAIMessage(response) {
     `;
   }
 
+  // v11.3: Fill multiple columns response
+  else if (response.type === 'fill_columns') {
+    const rowCount = response.rowCount || 0;
+    const columnCount = response.columnCount || 0;
+
+    // Build methodology section
+    let methodologyHtml = '';
+    if (response.methodology) {
+      const copyableFormula = response.methodology.copyable_formula;
+      methodologyHtml = `
+        <div class="methodology-section">
+          <div class="methodology-header">📊 Методология: ${escapeHtml(response.methodology.name || 'прогноз')}</div>
+          ${response.methodology.reason ? `<div class="methodology-reason">${escapeHtml(response.methodology.reason)}</div>` : ''}
+          ${response.methodology.formula ? `<div class="formula-block">${escapeHtml(response.methodology.formula)}</div>` : ''}
+          ${copyableFormula ? `
+            <div class="copyable-formula-section">
+              <div class="copyable-formula-label">📋 Формула:</div>
+              <div class="copyable-formula-row">
+                <code class="copyable-formula">${escapeHtml(copyableFormula)}</code>
+                <button class="copy-formula-btn" data-action="copyToClipboard" data-text="${escapeHtml(copyableFormula)}">Копировать</button>
+              </div>
+            </div>
+          ` : ''}
+        </div>
+      `;
+    }
+
+    // Build warnings section
+    let warningsHtml = '';
+    if (response.warnings && response.warnings.length > 0) {
+      warningsHtml = `
+        <div class="warnings-section">
+          ${response.warnings.map(w => `<div class="warning-item">⚠️ ${escapeHtml(w)}</div>`).join('')}
+        </div>
+      `;
+    }
+
+    content = `
+      <div class="response-type">
+        <svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><polyline points="19 12 12 19 5 12"/></svg>
+        Заполнение колонок
+      </div>
+      <div class="response-content">
+        <p>${escapeHtml(cleanResponseText(response.text) || 'Колонки заполнены')}</p>
+      </div>
+      ${methodologyHtml}
+      ${warningsHtml}
+      <div class="summary-box">${columnCount} колонок × ${rowCount} строк</div>
+    `;
+  }
+
   // CSV split (legacy)
   else if (response.type === 'csv_split') {
     const newRows = response.newRows || 0;
@@ -1835,6 +1886,43 @@ async function fillColumn(targetColumn, columnName, startRow, values) {
   });
 }
 
+// v11.3: Fill multiple columns at once
+async function fillColumns(startRow, columns) {
+  return new Promise((resolve, reject) => {
+    console.log('[Sidebar] fillColumns called:', { startRow, columnsCount: columns?.length });
+
+    // Send message to content script to fill multiple columns
+    window.parent.postMessage({
+      type: 'FILL_COLUMNS',
+      data: {
+        startRow: startRow || 2,
+        columns: columns  // Array of {target, name, values}
+      }
+    }, '*');
+
+    const handler = (event) => {
+      if (event.data && event.data.type === 'FILL_COLUMNS_RESPONSE') {
+        window.removeEventListener('message', handler);
+        if (event.data.success) {
+          console.log('[Sidebar] ✅ All columns filled successfully');
+          resolve(event.data);
+        } else {
+          console.error('[Sidebar] ❌ Failed to fill columns:', event.data.error);
+          reject(new Error(event.data.error || 'Failed to fill columns'));
+        }
+      }
+    };
+
+    window.addEventListener('message', handler);
+
+    // Timeout after 30 seconds (longer for multiple columns)
+    setTimeout(() => {
+      window.removeEventListener('message', handler);
+      reject(new Error('Timeout waiting for fill columns response'));
+    }, 30000);
+  });
+}
+
 async function callAPI(query, sheetData, history = []) {
   // Format payload for /api/v1/analyze endpoint (CleanAnalyst v1.0)
   const payload = {
@@ -2139,6 +2227,38 @@ function transformAPIResponse(apiResponse, options = {}) {
       examples: apiResponse.examples,
       warnings: apiResponse.warnings,
       rowCount: apiResponse.fill_values?.length || 0
+    };
+  }
+
+  // v11.3: If response is a fill_columns action (multiple columns at once)
+  if (apiResponse.action_type === 'fill_columns' && apiResponse.columns) {
+    console.log('[Sidebar] 📝 Fill COLUMNS (multiple) condition met!');
+    console.log('[Sidebar] Start row:', apiResponse.start_row);
+    console.log('[Sidebar] Columns:', apiResponse.columns.length);
+
+    // Call fillColumns to write values to multiple columns
+    fillColumns(
+      apiResponse.start_row,
+      apiResponse.columns
+    ).then(() => {
+      console.log('[Sidebar] ✅ All columns filled successfully');
+      const colNames = apiResponse.columns.map(c => c.name || c.target).join(', ');
+      addAIMessage({ type: 'success', text: apiResponse.summary || `✅ Колонки заполнены: ${colNames}` });
+    }).catch(err => {
+      console.error('[Sidebar] ❌ Fill columns failed:', err);
+      addAIMessage({ type: 'error', text: `Ошибка заполнения колонок: ${err.message}` });
+    });
+
+    return {
+      type: 'fill_columns',
+      text: apiResponse.summary || `Заполняю колонки...`,
+      dataWritten: true,
+      thinking: apiResponse.thinking,
+      methodology: apiResponse.methodology,
+      examples: apiResponse.examples,
+      warnings: apiResponse.warnings,
+      rowCount: apiResponse.columns[0]?.values?.length || 0,
+      columnCount: apiResponse.columns.length
     };
   }
 
