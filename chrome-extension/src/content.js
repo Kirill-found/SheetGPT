@@ -2117,8 +2117,31 @@ async function fillColumnDirect({ targetColumn, columnName, startRow, values }) 
     }
     console.log('[SheetGPT] 📋 Will write to sheet:', sheetName);
 
-    // 2. Convert column letter to uppercase
-    const colLetter = targetColumn.toUpperCase();
+    // v11.4: Get current headers to auto-correct column letter
+    let headers = [];
+    try {
+      const sheetData = await getActiveSheetData();
+      headers = sheetData?.headers || [];
+      console.log('[SheetGPT] 📋 Current headers for column correction:', headers);
+    } catch (e) {
+      console.log('[SheetGPT] ⚠️ Could not get headers for correction:', e.message);
+    }
+
+    // 2. Convert column letter to uppercase and auto-correct if needed
+    let colLetter = targetColumn.toUpperCase();
+    if (columnName && headers.length > 0) {
+      const headerIndex = headers.findIndex(h =>
+        h && h.toString().toLowerCase().includes(columnName.toLowerCase()) ||
+        columnName.toLowerCase().includes(h?.toString().toLowerCase() || '')
+      );
+      if (headerIndex >= 0) {
+        const correctLetter = String.fromCharCode(65 + headerIndex);
+        if (correctLetter !== colLetter) {
+          console.log('[SheetGPT] 🔧 Column correction:', columnName, colLetter, '→', correctLetter);
+          colLetter = correctLetter;
+        }
+      }
+    }
 
     // 3. Determine the actual start row
     // If startRow is provided, use it; otherwise default based on columnName presence
@@ -2194,6 +2217,16 @@ async function fillColumnsDirect({ startRow, columns }) {
     }
     console.log('[SheetGPT] 📋 Will write to sheet:', sheetName);
 
+    // v11.4: Get current headers to auto-correct column letters
+    let headers = [];
+    try {
+      const sheetData = await getActiveSheetData();
+      headers = sheetData?.headers || [];
+      console.log('[SheetGPT] 📋 Current headers for column correction:', headers);
+    } catch (e) {
+      console.log('[SheetGPT] ⚠️ Could not get headers for correction:', e.message);
+    }
+
     const writeStartRow = startRow || 2;
     const results = [];
 
@@ -2205,7 +2238,21 @@ async function fillColumnsDirect({ startRow, columns }) {
         continue;
       }
 
-      const colLetter = target.toUpperCase();
+      // v11.4: Auto-correct column letter based on header name
+      let colLetter = target.toUpperCase();
+      if (name && headers.length > 0) {
+        const headerIndex = headers.findIndex(h =>
+          h && h.toString().toLowerCase().includes(name.toLowerCase()) ||
+          name.toLowerCase().includes(h?.toString().toLowerCase() || '')
+        );
+        if (headerIndex >= 0) {
+          const correctLetter = String.fromCharCode(65 + headerIndex); // A=65
+          if (correctLetter !== colLetter) {
+            console.log('[SheetGPT] 🔧 Column correction:', name, colLetter, '→', correctLetter);
+            colLetter = correctLetter;
+          }
+        }
+      }
 
       // Prepare values for this column
       const valuesToWrite = values.map(v => [v]);
