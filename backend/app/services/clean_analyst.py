@@ -100,7 +100,8 @@ class CleanAnalyst:
 
 ## ТИПЫ ДЕЙСТВИЙ (action)
 
-### write_column - добавить колонку
+### write_column - добавить колонку (с привязкой по ключу)
+Используй когда нужно СОПОСТАВИТЬ данные по ключевой колонке (Артикул, ID, SKU).
 ```json
 {
   "type": "write_column",
@@ -110,6 +111,18 @@ class CleanAnalyst:
     ["АРТ001", 5193],
     ["АРТ002", 2852]
   ]
+}
+```
+
+### fill_column - заполнить колонку (по порядку строк)
+Используй когда нужно просто записать данные в конкретную колонку БЕЗ сопоставления по ключу.
+Например: "запиши ответы в колонку B", "заполни колонку C значениями".
+```json
+{
+  "type": "fill_column",
+  "target_column": "B",
+  "column_name": "Ответы",
+  "values": ["Ответ 1", "Ответ 2", "Ответ 3"]
 }
 ```
 
@@ -465,6 +478,13 @@ class CleanAnalyst:
             response["formula"] = self._translate_formula(action.get("formula", ""))
             response["target_cell"] = action.get("target_cell")
             response["explanation"] = action.get("explanation", "")
+
+        elif action_type == "fill_column":
+            # fill_column - write values directly to a specific column without key matching
+            response["action_type"] = "fill_column"
+            response["target_column"] = action.get("target_column")  # e.g., "B"
+            response["column_name"] = action.get("column_name")  # e.g., "Ответы"
+            response["fill_values"] = action.get("values", [])  # List of values to write
 
         else:  # answer
             response["action_type"] = None

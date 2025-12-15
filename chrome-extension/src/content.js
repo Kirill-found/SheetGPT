@@ -510,6 +510,28 @@ window.addEventListener('message', async (event) => {
     return;
   }
 
+  // v11.1: Handle FILL_COLUMN message from sidebar (direct column write without key matching)
+  if (event.data && event.data.type === 'FILL_COLUMN') {
+    console.log('[SheetGPT] 📝 FILL_COLUMN: Writing values to column:', event.data.data);
+    try {
+      const result = await fillColumnDirect(event.data.data);
+      event.source.postMessage({
+        type: 'FILL_COLUMN_RESPONSE',
+        success: true,
+        result: result
+      }, event.origin);
+      console.log('[SheetGPT] ✅ Column filled successfully');
+    } catch (e) {
+      console.error('[SheetGPT] ❌ Failed to fill column:', e);
+      event.source.postMessage({
+        type: 'FILL_COLUMN_RESPONSE',
+        success: false,
+        error: e.message
+      }, event.origin);
+    }
+    return;
+  }
+
   // Verify it's a message from our sidebar (has our message structure)
   if (!event.data || typeof event.data !== 'object' || !event.data.action || !event.data.messageId) {
     console.log('[SheetGPT] Ignoring message - not from sidebar (missing action or messageId)');
@@ -1953,6 +1975,74 @@ async function appendColumnByKey({ keyColumn, writeHeaders, writeData }) {
     };
   } catch (error) {
     console.error('[SheetGPT] ❌ appendColumnByKey error:', error);
+    throw error;
+  }
+}
+
+// v11.1: Fill column directly (without key matching)
+// Writes values directly to a specific column by letter (e.g., "B")
+async function fillColumnDirect({ targetColumn, columnName, values }) {
+  console.log('[SheetGPT] 📝 fillColumnDirect:', { targetColumn, columnName, valuesCount: values?.length });
+
+  try {
+    // 1. Get spreadsheet ID and sheet name
+    const match = window.location.href.match(/\/spreadsheets\/d\/([a-zA-Z0-9-_]+)/);
+    if (!match) {
+      throw new Error('Could not get spreadsheet ID from URL');
+    }
+    const spreadsheetId = match[1];
+
+    const storageKey = `sheetName_${spreadsheetId}`;
+    const storage = await chrome.storage.local.get([storageKey]);
+    const sheetName = storage[storageKey];
+    if (!sheetName) {
+      throw new Error('Could not get active sheet name');
+    }
+
+    // 2. Convert column letter to uppercase
+    const colLetter = targetColumn.toUpperCase();
+
+    // 3. Build values array: header + values
+    // Each row should be an array with one element
+    const valuesToWrite = [];
+
+    // Add header row if column name is provided
+    if (columnName) {
+      valuesToWrite.push([columnName]);
+    }
+
+    // Add all values
+    values.forEach(val => {
+      valuesToWrite.push([val]);
+    });
+
+    console.log('[SheetGPT] 📝 Writing', valuesToWrite.length, 'rows to column', colLetter);
+
+    // 4. Write values to the specified column
+    // Start from row 1 if header provided, otherwise row 2 (assuming row 1 is existing header)
+    const startRow = columnName ? 1 : 2;
+    const response = await safeSendMessage({
+      action: 'WRITE_SHEET_DATA',
+      data: {
+        sheetName: sheetName,
+        values: valuesToWrite,
+        startCell: `${colLetter}${startRow}`,
+        mode: 'overwrite'
+      }
+    });
+
+    if (!response || !response.success) {
+      throw new Error(response?.error || 'Failed to write column data');
+    }
+
+    console.log('[SheetGPT] ✅ Column filled successfully!', response.result);
+    return {
+      success: true,
+      message: `Колонка ${colLetter} заполнена (${values.length} значений)`,
+      rowsWritten: values.length
+    };
+  } catch (error) {
+    console.error('[SheetGPT] ❌ fillColumnDirect error:', error);
     throw error;
   }
 }

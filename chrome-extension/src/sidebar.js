@@ -1403,6 +1403,76 @@ function addAIMessage(response) {
     `;
   }
 
+  // v11.1: Fill column response (direct column write without key matching)
+  else if (response.type === 'fill_column') {
+    const rowCount = response.rowCount || 0;
+
+    // Build methodology section (same as write_data)
+    let methodologyHtml = '';
+    if (response.methodology) {
+      const copyableFormula = response.methodology.copyable_formula;
+      methodologyHtml = `
+        <div class="methodology-section">
+          <div class="methodology-header">📊 Методология: ${escapeHtml(response.methodology.name || 'заполнение')}</div>
+          ${response.methodology.reason ? `<div class="methodology-reason">${escapeHtml(response.methodology.reason)}</div>` : ''}
+          ${response.methodology.formula ? `<div class="formula-block">${escapeHtml(response.methodology.formula)}</div>` : ''}
+          ${copyableFormula ? `
+            <div class="copyable-formula-section">
+              <div class="copyable-formula-label">📋 Формула для копирования:</div>
+              <div class="copyable-formula-row">
+                <code class="copyable-formula">${escapeHtml(copyableFormula)}</code>
+                <button class="copy-formula-btn" data-action="copyToClipboard" data-text="${escapeHtml(copyableFormula)}">Копировать</button>
+              </div>
+            </div>
+          ` : ''}
+        </div>
+      `;
+    }
+
+    // Build examples section
+    let examplesHtml = '';
+    if (response.examples && response.examples.length > 0) {
+      const examplesToShow = response.examples.slice(0, 3);
+      examplesHtml = `
+        <div class="examples-section">
+          <div class="examples-header">📝 Примеры:</div>
+          ${examplesToShow.map(ex => `
+            <div class="example-item">
+              <div class="example-name">${escapeHtml(ex.item || '')}</div>
+              <div class="example-input">${escapeHtml(ex.input || '')}</div>
+              <div class="example-calc">${escapeHtml(ex.calculation || '')}</div>
+              <div class="example-result">= ${escapeHtml(String(ex.result || ''))}</div>
+            </div>
+          `).join('')}
+        </div>
+      `;
+    }
+
+    // Build warnings section
+    let warningsHtml = '';
+    if (response.warnings && response.warnings.length > 0) {
+      warningsHtml = `
+        <div class="warnings-section">
+          ${response.warnings.map(w => `<div class="warning-item">⚠️ ${escapeHtml(w)}</div>`).join('')}
+        </div>
+      `;
+    }
+
+    content = `
+      <div class="response-type">
+        <svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><polyline points="19 12 12 19 5 12"/></svg>
+        Заполнение колонки
+      </div>
+      <div class="response-content">
+        <p>${escapeHtml(cleanResponseText(response.text) || 'Колонка заполнена')}</p>
+      </div>
+      ${methodologyHtml}
+      ${examplesHtml}
+      ${warningsHtml}
+      <div class="summary-box">${rowCount} значений записано</div>
+    `;
+  }
+
   // CSV split
   else if (response.type === 'csv_split') {
     const newRows = response.newRows || 0;
@@ -1692,6 +1762,45 @@ async function appendColumnByKey(keyColumn, writeHeaders, writeData) {
     setTimeout(() => {
       window.removeEventListener('message', handler);
       reject(new Error('Timeout waiting for append column response'));
+    }, 15000);
+  });
+}
+
+// v11.1: Fill column directly (without key matching)
+// Writes values directly to a specific column by letter (e.g., "B")
+async function fillColumn(targetColumn, columnName, values) {
+  return new Promise((resolve, reject) => {
+    console.log('[Sidebar] fillColumn called:', { targetColumn, columnName, valuesCount: values?.length });
+
+    // Send message to content script to fill column
+    window.parent.postMessage({
+      type: 'FILL_COLUMN',
+      data: {
+        targetColumn: targetColumn,  // Column letter (e.g., "B")
+        columnName: columnName,      // Column header name (e.g., "Ответы")
+        values: values               // Array of values to write
+      }
+    }, '*');
+
+    const handler = (event) => {
+      if (event.data && event.data.type === 'FILL_COLUMN_RESPONSE') {
+        window.removeEventListener('message', handler);
+        if (event.data.success) {
+          console.log('[Sidebar] ✅ Column filled successfully');
+          resolve(event.data);
+        } else {
+          console.error('[Sidebar] ❌ Failed to fill column:', event.data.error);
+          reject(new Error(event.data.error || 'Failed to fill column'));
+        }
+      }
+    };
+
+    window.addEventListener('message', handler);
+
+    // Timeout after 15 seconds
+    setTimeout(() => {
+      window.removeEventListener('message', handler);
+      reject(new Error('Timeout waiting for fill column response'));
     }, 15000);
   });
 }
@@ -2186,6 +2295,39 @@ function transformAPIResponse(apiResponse, options = {}) {
       type: 'write_data',
       text: apiResponse.summary || 'Записываю данные в таблицу...',
       dataWritten: true
+    };
+  }
+
+  // If response is a fill_column action (direct column write without key matching)
+  if (apiResponse.action_type === 'fill_column' && apiResponse.fill_values) {
+    console.log('[Sidebar] ✅ Fill column condition met!');
+    console.log('[Sidebar] Target column:', apiResponse.target_column);
+    console.log('[Sidebar] Column name:', apiResponse.column_name);
+    console.log('[Sidebar] Values count:', apiResponse.fill_values?.length);
+
+    // Call fillColumn to write values directly to the specified column
+    fillColumn(
+      apiResponse.target_column,   // Target column letter (e.g., "B")
+      apiResponse.column_name,     // Column header name (e.g., "Ответы")
+      apiResponse.fill_values      // Array of values to write
+    ).then(() => {
+      console.log('[Sidebar] ✅ Column filled successfully');
+      addAIMessage({ type: 'success', text: apiResponse.summary || `✅ Колонка ${apiResponse.target_column} заполнена!` });
+    }).catch(err => {
+      console.error('[Sidebar] ❌ Fill column failed:', err);
+      addAIMessage({ type: 'error', text: `Ошибка заполнения колонки: ${err.message}` });
+    });
+
+    return {
+      type: 'fill_column',
+      text: apiResponse.summary || `Заполняю колонку ${apiResponse.target_column}...`,
+      dataWritten: true,
+      // v11.0: Pass full CleanAnalyst methodology for display
+      thinking: apiResponse.thinking,
+      methodology: apiResponse.methodology,
+      examples: apiResponse.examples,
+      warnings: apiResponse.warnings,
+      rowCount: apiResponse.fill_values?.length || 0
     };
   }
 
