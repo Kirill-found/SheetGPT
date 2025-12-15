@@ -884,6 +884,8 @@ async function createChart(spreadsheetId, sheetId, chartSpec) {
     }
 
     // Build series for each Y column
+    // Note: BAR charts require BOTTOM_AXIS, other charts use LEFT_AXIS
+    const seriesTargetAxis = chart_type === 'BAR' ? 'BOTTOM_AXIS' : 'LEFT_AXIS';
     const series = y_column_indices.map((yColIndex, idx) => ({
       series: {
         sourceRange: {
@@ -896,7 +898,7 @@ async function createChart(spreadsheetId, sheetId, chartSpec) {
           }]
         }
       },
-      targetAxis: 'LEFT_AXIS'
+      targetAxis: seriesTargetAxis
     }));
 
     // Build domain (X axis)
