@@ -118,16 +118,21 @@ class CleanAnalyst:
 ### fill_column - заполнить колонку (по порядку строк) ⭐ ПРЕДПОЧТИТЕЛЬНЫЙ
 Используй для ЛЮБОЙ записи данных в колонку когда нет явной ключевой колонки (Артикул, ID, SKU).
 **Используй для**: прогнозов, расчётов, ответов, любых новых значений.
-**target_column**: буква колонки куда писать (A, B, C...). Для новой колонки справа - следующая после последней.
+**ВАЖНО**:
+- target_column: буква НОВОЙ колонки справа от данных! Если колонки A-D заняты, пиши в E.
+- start_row: номер строки откуда начинать запись (2 = сразу после заголовка, 8 = строка 8 и т.д.)
+- values: ТОЛЬКО новые рассчитанные значения! НЕ включай старые данные из таблицы!
+- Количество values = количеству строк для которых считаешь
 ```json
 {
   "type": "fill_column",
   "target_column": "E",
   "column_name": "Прогноз",
+  "start_row": 8,
   "values": [474, 537, 600]
 }
 ```
-Пример: таблица с колонками [Месяц, Продажи, Выручка, Прибыль] (A-D), прогноз пишем в E.
+Пример: таблица [Месяц, Продажи, Выручка, Прибыль] (A-D) с данными до строки 7. Прогноз на Янв/Фев/Мар (строки 8-10) → start_row=8, 3 значения в колонку E.
 
 ### replace_data - полная перезапись данных (разбить CSV, структурировать)
 Используй когда данные в одной ячейке/колонке содержат CSV или нужно полностью заменить структуру таблицы.
@@ -504,8 +509,9 @@ class CleanAnalyst:
         elif action_type == "fill_column":
             # fill_column - write values directly to a specific column without key matching
             response["action_type"] = "fill_column"
-            response["target_column"] = action.get("target_column")  # e.g., "B"
-            response["column_name"] = action.get("column_name")  # e.g., "Ответы"
+            response["target_column"] = action.get("target_column")  # e.g., "E"
+            response["column_name"] = action.get("column_name")  # e.g., "Прогноз"
+            response["start_row"] = action.get("start_row", 2)  # Row to start writing (default: 2, after header)
             response["fill_values"] = action.get("values", [])  # List of values to write
 
         elif action_type == "replace_data":

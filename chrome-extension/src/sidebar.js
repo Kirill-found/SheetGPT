@@ -1796,17 +1796,18 @@ async function appendColumnByKey(keyColumn, writeHeaders, writeData) {
 }
 
 // v11.1: Fill column directly (without key matching)
-// Writes values directly to a specific column by letter (e.g., "B")
-async function fillColumn(targetColumn, columnName, values) {
+// Writes values directly to a specific column by letter (e.g., "E")
+async function fillColumn(targetColumn, columnName, startRow, values) {
   return new Promise((resolve, reject) => {
-    console.log('[Sidebar] fillColumn called:', { targetColumn, columnName, valuesCount: values?.length });
+    console.log('[Sidebar] fillColumn called:', { targetColumn, columnName, startRow, valuesCount: values?.length });
 
     // Send message to content script to fill column
     window.parent.postMessage({
       type: 'FILL_COLUMN',
       data: {
-        targetColumn: targetColumn,  // Column letter (e.g., "B")
-        columnName: columnName,      // Column header name (e.g., "Ответы")
+        targetColumn: targetColumn,  // Column letter (e.g., "E")
+        columnName: columnName,      // Column header name (e.g., "Прогноз")
+        startRow: startRow || 2,     // Row to start writing (default: 2)
         values: values               // Array of values to write
       }
     }, '*');
@@ -2111,12 +2112,14 @@ function transformAPIResponse(apiResponse, options = {}) {
     console.log('[Sidebar] 📝 Fill column condition met!');
     console.log('[Sidebar] Target column:', apiResponse.target_column);
     console.log('[Sidebar] Column name:', apiResponse.column_name);
+    console.log('[Sidebar] Start row:', apiResponse.start_row);
     console.log('[Sidebar] Values count:', apiResponse.fill_values?.length);
 
     // Call fillColumn to write values directly to the specified column
     fillColumn(
-      apiResponse.target_column,   // Target column letter (e.g., "B")
-      apiResponse.column_name,     // Column header name (e.g., "Ответы")
+      apiResponse.target_column,   // Target column letter (e.g., "E")
+      apiResponse.column_name,     // Column header name (e.g., "Прогноз")
+      apiResponse.start_row,       // Row to start writing (e.g., 8)
       apiResponse.fill_values      // Array of values to write
     ).then(() => {
       console.log('[Sidebar] ✅ Column filled successfully');

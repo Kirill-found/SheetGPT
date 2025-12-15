@@ -1980,9 +1980,9 @@ async function appendColumnByKey({ keyColumn, writeHeaders, writeData }) {
 }
 
 // v11.1: Fill column directly (without key matching)
-// Writes values directly to a specific column by letter (e.g., "B")
-async function fillColumnDirect({ targetColumn, columnName, values }) {
-  console.log('[SheetGPT] 📝 fillColumnDirect:', { targetColumn, columnName, valuesCount: values?.length });
+// Writes values directly to a specific column by letter (e.g., "E")
+async function fillColumnDirect({ targetColumn, columnName, startRow, values }) {
+  console.log('[SheetGPT] 📝 fillColumnDirect:', { targetColumn, columnName, startRow, valuesCount: values?.length });
   console.log('[SheetGPT] 📝 First value type:', typeof values?.[0], Array.isArray(values?.[0]) ? 'is array' : 'not array');
 
   try {
@@ -2003,13 +2003,22 @@ async function fillColumnDirect({ targetColumn, columnName, values }) {
     // 2. Convert column letter to uppercase
     const colLetter = targetColumn.toUpperCase();
 
-    // 3. Build values array: header + values
+    // 3. Determine the actual start row
+    // If startRow is provided, use it; otherwise default based on columnName presence
+    let actualStartRow = startRow || 2;
+
+    // 4. Build values array
     // Each row should be an array with one element (for single column write)
     const valuesToWrite = [];
 
-    // Add header row if column name is provided
-    if (columnName) {
+    // Add header row ONLY if this is a new column (writing to row 1)
+    if (columnName && actualStartRow === 1) {
       valuesToWrite.push([columnName]);
+      actualStartRow = 2; // Data starts from row 2
+    } else if (columnName && !startRow) {
+      // If columnName provided but no startRow, write header first
+      valuesToWrite.push([columnName]);
+      actualStartRow = 1; // Will write header at row 1
     }
 
     // Add all values - handle both flat array and nested array formats
@@ -2024,18 +2033,18 @@ async function fillColumnDirect({ targetColumn, columnName, values }) {
       }
     });
 
-    console.log('[SheetGPT] 📝 Writing', valuesToWrite.length, 'rows to column', colLetter);
+    // Recalculate startRow if we added header
+    const writeStartRow = (columnName && !startRow) ? 1 : (startRow || 2);
+
+    console.log('[SheetGPT] 📝 Writing', valuesToWrite.length, 'rows to column', colLetter, 'starting at row', writeStartRow);
     console.log('[SheetGPT] 📝 Sample values:', valuesToWrite.slice(0, 3));
 
-    // 4. Write values to the specified column
-    // Start from row 1 if header provided, otherwise row 2 (assuming row 1 is existing header)
-    const startRow = columnName ? 1 : 2;
     const response = await safeSendMessage({
       action: 'WRITE_SHEET_DATA',
       data: {
         sheetName: sheetName,
         values: valuesToWrite,
-        startCell: `${colLetter}${startRow}`,
+        startCell: `${colLetter}${writeStartRow}`,
         mode: 'overwrite'
       }
     });

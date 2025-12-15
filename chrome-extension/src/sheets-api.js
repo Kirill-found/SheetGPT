@@ -231,32 +231,47 @@ async function readSheetData(spreadsheetId, sheetName, range = 'A1:Z1000', _retr
       const row1NonEmpty = row1.filter(cell => cell && cell.toString().trim()).length;
       const row2NonEmpty = row2.filter(cell => cell && cell.toString().trim()).length;
 
-      // Check if row2 looks like headers (has month names, dates, or more specific values)
-      const monthPattern = /^(январ|феврал|март|апрел|май|июн|июл|август|сентябр|октябр|ноябр|декабр|jan|feb|mar|apr|may|jun|jul|aug|sep|oct|nov|dec)/i;
-      const row2HasMonths = row2.some(cell => cell && monthPattern.test(cell.toString()));
+      // Check if row1 looks like headers (text-only, no numbers)
+      const row1AllText = row1.every(cell => {
+        if (!cell || !cell.toString().trim()) return true;
+        const str = cell.toString().trim();
+        // If it's a pure number, it's not a header
+        return isNaN(parseFloat(str)) || str.match(/[а-яА-Яa-zA-Z]/);
+      });
 
-      // If row2 has more non-empty cells or has month names, it's likely the real header
-      if (row2NonEmpty > row1NonEmpty || row2HasMonths) {
-        console.log('[SheetsAPI] 📋 Detected two-row header, using row 2 as headers');
-        console.log('[SheetsAPI] Row 1:', row1, 'non-empty:', row1NonEmpty);
-        console.log('[SheetsAPI] Row 2:', row2, 'non-empty:', row2NonEmpty);
+      // Check if row2 has mostly numbers (indicating it's data, not headers)
+      const row2NumericCount = row2.filter(cell => {
+        if (!cell) return false;
+        const str = cell.toString().trim();
+        return !isNaN(parseFloat(str)) && !str.match(/[а-яА-Яa-zA-Z]/);
+      }).length;
+      const row2MostlyNumbers = row2NumericCount >= row2NonEmpty / 2;
 
-        // Merge headers: use row2, but fill empty cells from row1
+      console.log('[SheetsAPI] 📋 Header detection:', {
+        row1AllText,
+        row2MostlyNumbers,
+        row2NumericCount,
+        row1NonEmpty,
+        row2NonEmpty
+      });
+
+      // Row1 is headers if: it's all text AND row2 has mostly numbers
+      // This prevents "Июль 2024" from being treated as a header
+      if (row1AllText && row2MostlyNumbers) {
+        // Row 1 is the real header, row 2 is data
+        console.log('[SheetsAPI] ✅ Row 1 is headers (text), Row 2 is data (has numbers)');
+        headers = row1;
+        dataStartRow = 1;
+      } else if (row1NonEmpty === 0 || (row2NonEmpty > row1NonEmpty && !row2MostlyNumbers)) {
+        // Row 1 is empty or row 2 has more non-empty text cells - use row 2 as headers
+        console.log('[SheetsAPI] 📋 Using row 2 as headers');
         headers = row2.map((cell, i) => {
           if (cell && cell.toString().trim()) {
             return cell;
           }
-          // If row2 cell is empty, try row1
           return row1[i] || '';
         });
-
-        // Ensure we have at least as many headers as the widest row
-        const maxCols = Math.max(row1.length, row2.length);
-        while (headers.length < maxCols) {
-          headers.push('');
-        }
-
-        dataStartRow = 2; // Data starts from row 3 (index 2)
+        dataStartRow = 2;
       }
     }
 
