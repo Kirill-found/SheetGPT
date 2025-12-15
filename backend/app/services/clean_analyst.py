@@ -424,6 +424,10 @@ class CleanAnalyst:
 
         explanation = "\n".join(explanation_parts)
 
+        # Translate copyable_formula if present
+        if methodology.get('copyable_formula'):
+            methodology['copyable_formula'] = self._translate_formula(methodology['copyable_formula'])
+
         # Базовый ответ
         response = {
             "success": True,
@@ -504,7 +508,12 @@ class CleanAnalyst:
             'ROUND': 'ОКРУГЛ', 'IFERROR': 'ЕСЛИОШИБКА', 'ISBLANK': 'ЕПУСТО',
             'TODAY': 'СЕГОДНЯ', 'NOW': 'ТДАТА', 'YEAR': 'ГОД', 'MONTH': 'МЕСЯЦ', 'DAY': 'ДЕНЬ',
             'FILTER': 'ФИЛЬТР', 'SORT': 'СОРТ', 'UNIQUE': 'УНИК',
-            'SUMIFS': 'СУММЕСЛИМН', 'COUNTIFS': 'СЧЁТЕСЛИМН', 'AVERAGEIF': 'СРЗНАЧЕСЛИ'
+            'SUMIFS': 'СУММЕСЛИМН', 'COUNTIFS': 'СЧЁТЕСЛИМН', 'AVERAGEIF': 'СРЗНАЧЕСЛИ',
+            'SPLIT': 'РАЗДЕЛИТЬ', 'CONCATENATE': 'СЦЕПИТЬ', 'CONCAT': 'СЦЕП',
+            'TRIM': 'СЖПРОБЕЛЫ', 'UPPER': 'ПРОПИСН', 'LOWER': 'СТРОЧН', 'PROPER': 'ПРОПНАЧ',
+            'TEXT': 'ТЕКСТ', 'VALUE': 'ЗНАЧЕН', 'FIND': 'НАЙТИ', 'SEARCH': 'ПОИСК',
+            'REPLACE': 'ЗАМЕНИТЬ', 'SUBSTITUTE': 'ПОДСТАВИТЬ', 'TRANSPOSE': 'ТРАНСП',
+            'ARRAYFORMULA': 'МАССИВ', 'QUERY': 'QUERY', 'IMPORTRANGE': 'IMPORTRANGE'
         }
 
         result = formula
