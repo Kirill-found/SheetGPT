@@ -934,12 +934,15 @@ async function createChart(spreadsheetId, sheetId, chartSpec) {
 
     if (googleChartType === 'PIE') {
       // Pie charts have different structure
+      // For many items, use LABELED_LEGEND to show percentages on slices
+      const numItems = row_count || 10;
       spec = {
         pieChart: {
-          legendPosition: 'RIGHT_LEGEND',
+          legendPosition: numItems > 10 ? 'LABELED_LEGEND' : 'RIGHT_LEGEND',
           domain: domain.domain,
           series: series[0]?.series || series[0],
-          threeDimensional: false
+          threeDimensional: false,
+          pieHole: 0 // 0 for regular pie, 0.4-0.6 for donut
         }
       };
     } else {
@@ -985,6 +988,10 @@ async function createChart(spreadsheetId, sheetId, chartSpec) {
       }
     }
 
+    // Calculate chart position - place it to the right of data
+    // Use x_column_index + y_column_indices.length + 2 as fallback
+    const chartColumnIndex = (col_count && col_count > 0) ? col_count + 1 : Math.max(...y_column_indices) + 2;
+
     // Build the full chart request
     const chartRequest = {
       addChart: {
@@ -997,13 +1004,13 @@ async function createChart(spreadsheetId, sheetId, chartSpec) {
             overlayPosition: {
               anchorCell: {
                 sheetId: sheetId,
-                rowIndex: 1,
-                columnIndex: col_count + 1 // Place chart next to data
+                rowIndex: 0,
+                columnIndex: chartColumnIndex
               },
-              offsetXPixels: 20,
-              offsetYPixels: 20,
-              widthPixels: 600,
-              heightPixels: 400
+              offsetXPixels: 10,
+              offsetYPixels: 10,
+              widthPixels: 700,
+              heightPixels: 450
             }
           }
         }
