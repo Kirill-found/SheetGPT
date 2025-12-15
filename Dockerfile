@@ -2,7 +2,7 @@ FROM python:3.11-slim
 
 # ============ FORCE FULL REBUILD ============
 # Change this timestamp to bust ALL cache layers
-ENV FORCE_REBUILD="2025-12-15-02:00:00-v11.0.0-CLEAN-ANALYST"
+ENV FORCE_REBUILD="2025-12-15-11:55:00-v11.0.0-CLEAN-ANALYST-DEPLOY"
 RUN echo "=== FULL REBUILD: $FORCE_REBUILD ===" && date
 
 LABEL version="11.0.0"
