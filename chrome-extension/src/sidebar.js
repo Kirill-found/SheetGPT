@@ -1627,7 +1627,7 @@ async function appendColumnByKey(keyColumn, writeHeaders, writeData) {
 }
 
 async function callAPI(query, sheetData, history = []) {
-  // Format payload for /api/v1/formula endpoint
+  // Format payload for /api/v1/analyze endpoint (CleanAnalyst v1.0)
   const payload = {
     query: query,
     column_names: sheetData?.headers || [],
@@ -1636,13 +1636,13 @@ async function callAPI(query, sheetData, history = []) {
     history: history
   };
 
-  console.log('[API] Sending request:', payload);
+  console.log('[API] Sending request to CleanAnalyst:', payload);
 
   let lastError;
 
   for (let attempt = 0; attempt < CONFIG.MAX_RETRIES; attempt++) {
     try {
-      const response = await fetch(`${CONFIG.API_URL}/api/v1/formula`, {
+      const response = await fetch(`${CONFIG.API_URL}/api/v1/analyze`, {
         method: 'POST',
         headers: (() => {
         const h = { 'Content-Type': 'application/json', 'Accept': 'application/json' };
