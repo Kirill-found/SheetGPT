@@ -3942,7 +3942,18 @@ chat: {{"action_type": "chat", "message": "Уточните, пожалуйст�
             # SMART GPT - GPT сама понимает и выполняет ЛЮБОЙ запрос
             # Никакого хардкода - GPT формирует готовый ответ
             # =====================================================
-            smart_result = await self._gpt_smart_action(query, column_names, df, history=history, custom_context=custom_context, reference_df=reference_df, reference_sheet_name=reference_sheet_name)
+
+            # v10.3.0: ПРИНУДИТЕЛЬНО Python для прогнозов (SmartGPT не даёт детальных расчётов)
+            query_lower = query.lower()
+            force_python_keywords = ['прогноз', 'спрогнозир', 'forecast', 'предсказ', 'предскажи']
+            force_python = any(kw in query_lower for kw in force_python_keywords)
+
+            if force_python:
+                logger.info(f"[SimpleGPT] 🔄 FORECAST DETECTED - forcing Python path for detailed calculations")
+                smart_result = None  # Skip SmartGPT, go directly to Python
+            else:
+                smart_result = await self._gpt_smart_action(query, column_names, df, history=history, custom_context=custom_context, reference_df=reference_df, reference_sheet_name=reference_sheet_name)
+
             if smart_result:
                 elapsed = time.time() - start_time
                 logger.info(f"[SmartGPT] Action: {smart_result.get('action_type')}")
