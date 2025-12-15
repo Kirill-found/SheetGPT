@@ -141,10 +141,11 @@ async function handleGetSheetData(tabId, tabUrl) {
 
   try {
     // v9.2.1: Get all sheet names from API first (more reliable than DOM scraping)
+    // v11.0.1: Increased timeout from 5s to 15s for slow networks
     console.log('[Background] 📋 Getting all sheet names from API...');
     const allSheetNames = await withTimeout(
       getAllSheetNames(spreadsheetId),
-      5000,
+      15000,
       'Get all sheet names'
     );
     console.log('[Background] Available sheets:', allSheetNames);
@@ -153,7 +154,7 @@ async function handleGetSheetData(tabId, tabUrl) {
     console.log('[Background] 🎯 Getting ACTIVE sheet name from DOM...');
     const domSheetName = await withTimeout(
       getActiveSheetName(tabId),
-      5000,
+      10000,
       'Get active sheet name'
     );
     console.log(`[Background] DOM sheet name: "${domSheetName}"`);
@@ -177,10 +178,11 @@ async function handleGetSheetData(tabId, tabUrl) {
     console.log(`[Background] ✅ Active sheet: "${activeSheetName}"`);
 
     // Читаем данные из активного листа
+    // v11.0.1: Increased timeout from 8s to 20s for large spreadsheets
     console.log(`[Background] 📖 Reading data from sheet: "${activeSheetName}"...`);
     const data = await withTimeout(
       readSheetData(spreadsheetId, activeSheetName),
-      8000,
+      20000,
       `Read sheet data "${activeSheetName}"`
     );
 
@@ -222,10 +224,11 @@ async function handleGetReferenceSheetData(tabId, tabUrl, sheetNameHint) {
 
   try {
     // Get all sheet names from API
+    // v11.0.1: Increased timeout from 5s to 15s for slow networks
     console.log('[Background] 📋 Getting all sheet names...');
     const allSheetNames = await withTimeout(
       getAllSheetNames(spreadsheetId),
-      5000,
+      15000,
       'Get all sheet names'
     );
     console.log('[Background] Available sheets:', allSheetNames);
@@ -262,10 +265,11 @@ async function handleGetReferenceSheetData(tabId, tabUrl, sheetNameHint) {
     console.log(`[Background] ✅ Found reference sheet: "${targetSheetName}"`);
 
     // Read data from reference sheet
+    // v11.0.1: Increased timeout from 8s to 20s for large spreadsheets
     console.log(`[Background] 📖 Reading reference data from "${targetSheetName}"...`);
     const data = await withTimeout(
       readSheetData(spreadsheetId, targetSheetName),
-      8000,
+      20000,
       `Read reference sheet "${targetSheetName}"`
     );
 
