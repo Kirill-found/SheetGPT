@@ -39,6 +39,47 @@ function isExtensionContextValid() {
   }
 }
 
+// v11.2: Get current active sheet name from DOM (not cached)
+function getCurrentSheetNameFromDOM() {
+  // Method 1: Find active tab with specific class
+  const activeTab = document.querySelector('.docs-sheet-tab.docs-sheet-active-tab');
+  if (activeTab) {
+    const name = activeTab.textContent?.trim();
+    if (name) {
+      console.log('[SheetGPT] 📋 Active sheet from DOM:', name);
+      return name;
+    }
+  }
+
+  // Method 2: Find tab with aria-selected
+  const selectedTab = document.querySelector('[role="tab"][aria-selected="true"]');
+  if (selectedTab) {
+    const name = selectedTab.textContent?.trim();
+    if (name) {
+      console.log('[SheetGPT] 📋 Active sheet from aria-selected:', name);
+      return name;
+    }
+  }
+
+  // Method 3: Look in sheet tabs container
+  const tabsContainer = document.querySelector('.docs-sheet-tab-container');
+  if (tabsContainer) {
+    const tabs = tabsContainer.querySelectorAll('.docs-sheet-tab');
+    for (const tab of tabs) {
+      if (tab.classList.contains('docs-sheet-active-tab')) {
+        const name = tab.textContent?.trim();
+        if (name) {
+          console.log('[SheetGPT] 📋 Active sheet from tabs container:', name);
+          return name;
+        }
+      }
+    }
+  }
+
+  console.log('[SheetGPT] ⚠️ Could not determine active sheet from DOM');
+  return null;
+}
+
 // v7.9.4: Show reload notification when context is invalidated
 function showReloadNotification() {
   // Remove existing notification if present
@@ -878,12 +919,18 @@ async function createTableAndChart(structuredData) {
     }
     const spreadsheetId = match[1];
 
-    const storageKey = `sheetName_${spreadsheetId}`;
-    const storage = await chrome.storage.local.get([storageKey]);
-    const sheetName = storage[storageKey];
+    // v11.2: Get active sheet name from DOM (not cached) to ensure we write to correct sheet
+    let sheetName = getCurrentSheetNameFromDOM();
+    if (!sheetName) {
+      // Fallback to cached name if DOM detection fails
+      const storageKey = `sheetName_${spreadsheetId}`;
+      const storage = await chrome.storage.local.get([storageKey]);
+      sheetName = storage[storageKey];
+    }
     if (!sheetName) {
       throw new Error('Could not get active sheet name. Try refreshing the page.');
     }
+    console.log('[SheetGPT] 📋 Will write to sheet:', sheetName);
 
     // v10.0.4: Respect display_mode - create new sheet or overwrite current
     // 'create_sheet' and 'preview' both create new sheets (to avoid overwriting data)
@@ -1941,12 +1988,18 @@ async function appendColumnByKey({ keyColumn, writeHeaders, writeData }) {
     }
     const spreadsheetId = match[1];
 
-    const storageKey = `sheetName_${spreadsheetId}`;
-    const storage = await chrome.storage.local.get([storageKey]);
-    const sheetName = storage[storageKey];
+    // v11.2: Get active sheet name from DOM (not cached) to ensure we write to correct sheet
+    let sheetName = getCurrentSheetNameFromDOM();
+    if (!sheetName) {
+      // Fallback to cached name if DOM detection fails
+      const storageKey = `sheetName_${spreadsheetId}`;
+      const storage = await chrome.storage.local.get([storageKey]);
+      sheetName = storage[storageKey];
+    }
     if (!sheetName) {
       throw new Error('Could not get active sheet name');
     }
+    console.log('[SheetGPT] 📋 Will write to sheet:', sheetName);
 
     // 9. Write new column(s) to the sheet
     const startColLetter = String.fromCharCode(65 + nextColIndex); // A=0, B=1, etc.
@@ -1993,12 +2046,18 @@ async function fillColumnDirect({ targetColumn, columnName, startRow, values }) 
     }
     const spreadsheetId = match[1];
 
-    const storageKey = `sheetName_${spreadsheetId}`;
-    const storage = await chrome.storage.local.get([storageKey]);
-    const sheetName = storage[storageKey];
+    // v11.2: Get active sheet name from DOM (not cached) to ensure we write to correct sheet
+    let sheetName = getCurrentSheetNameFromDOM();
+    if (!sheetName) {
+      // Fallback to cached name if DOM detection fails
+      const storageKey = `sheetName_${spreadsheetId}`;
+      const storage = await chrome.storage.local.get([storageKey]);
+      sheetName = storage[storageKey];
+    }
     if (!sheetName) {
       throw new Error('Could not get active sheet name');
     }
+    console.log('[SheetGPT] 📋 Will write to sheet:', sheetName);
 
     // 2. Convert column letter to uppercase
     const colLetter = targetColumn.toUpperCase();
