@@ -39,14 +39,34 @@ function isExtensionContextValid() {
   }
 }
 
-// v11.2: Get current active sheet name from DOM (not cached)
+// v11.3: Get current active sheet name from DOM (not cached)
 function getCurrentSheetNameFromDOM() {
-  // Method 1: Find active tab with specific class
+  // Helper to clean sheet name from hidden characters
+  function cleanSheetName(name) {
+    if (!name) return null;
+    // Remove all non-printable characters and control characters
+    // Keep only letters, numbers, spaces, and common punctuation
+    const cleaned = name.replace(/[^\p{L}\p{N}\s\-_.,!()]/gu, '').trim();
+    console.log('[SheetGPT] 🧹 Cleaned sheet name:', JSON.stringify(name), '->', JSON.stringify(cleaned));
+    return cleaned || null;
+  }
+
+  // Method 1: Find active tab with specific class and get the tab name element
   const activeTab = document.querySelector('.docs-sheet-tab.docs-sheet-active-tab');
   if (activeTab) {
-    const name = activeTab.textContent?.trim();
+    // Look for the tab name element inside (it has the actual visible text)
+    const tabNameEl = activeTab.querySelector('.docs-sheet-tab-name');
+    if (tabNameEl) {
+      const name = cleanSheetName(tabNameEl.textContent);
+      if (name) {
+        console.log('[SheetGPT] 📋 Active sheet from tab-name element:', name);
+        return name;
+      }
+    }
+    // Fallback: get innerText which excludes hidden elements
+    const name = cleanSheetName(activeTab.innerText);
     if (name) {
-      console.log('[SheetGPT] 📋 Active sheet from DOM:', name);
+      console.log('[SheetGPT] 📋 Active sheet from innerText:', name);
       return name;
     }
   }
@@ -54,9 +74,17 @@ function getCurrentSheetNameFromDOM() {
   // Method 2: Find tab with aria-selected
   const selectedTab = document.querySelector('[role="tab"][aria-selected="true"]');
   if (selectedTab) {
-    const name = selectedTab.textContent?.trim();
+    const tabNameEl = selectedTab.querySelector('.docs-sheet-tab-name');
+    if (tabNameEl) {
+      const name = cleanSheetName(tabNameEl.textContent);
+      if (name) {
+        console.log('[SheetGPT] 📋 Active sheet from aria-selected tab-name:', name);
+        return name;
+      }
+    }
+    const name = cleanSheetName(selectedTab.innerText);
     if (name) {
-      console.log('[SheetGPT] 📋 Active sheet from aria-selected:', name);
+      console.log('[SheetGPT] 📋 Active sheet from aria-selected innerText:', name);
       return name;
     }
   }
@@ -67,9 +95,17 @@ function getCurrentSheetNameFromDOM() {
     const tabs = tabsContainer.querySelectorAll('.docs-sheet-tab');
     for (const tab of tabs) {
       if (tab.classList.contains('docs-sheet-active-tab')) {
-        const name = tab.textContent?.trim();
+        const tabNameEl = tab.querySelector('.docs-sheet-tab-name');
+        if (tabNameEl) {
+          const name = cleanSheetName(tabNameEl.textContent);
+          if (name) {
+            console.log('[SheetGPT] 📋 Active sheet from container tab-name:', name);
+            return name;
+          }
+        }
+        const name = cleanSheetName(tab.innerText);
         if (name) {
-          console.log('[SheetGPT] 📋 Active sheet from tabs container:', name);
+          console.log('[SheetGPT] 📋 Active sheet from container innerText:', name);
           return name;
         }
       }
