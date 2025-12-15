@@ -410,6 +410,7 @@ class CleanAnalyst:
             "summary": result.get("summary", ""),
             "methodology": methodology,
             "thinking": gpt_response.get("thinking", ""),
+            "examples": examples,  # v11.0: Pass examples for frontend display
             "insights": [],
             "key_findings": [result.get("details", "")] if result.get("details") else [],
             "warnings": gpt_response.get("warnings", []),
