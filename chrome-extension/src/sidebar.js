@@ -2077,6 +2077,39 @@ function transformAPIResponse(apiResponse, options = {}) {
     };
   }
 
+  // v11.1: If response is a fill_column action (direct column write without key matching)
+  if (apiResponse.action_type === 'fill_column' && apiResponse.fill_values) {
+    console.log('[Sidebar] 📝 Fill column condition met!');
+    console.log('[Sidebar] Target column:', apiResponse.target_column);
+    console.log('[Sidebar] Column name:', apiResponse.column_name);
+    console.log('[Sidebar] Values count:', apiResponse.fill_values?.length);
+
+    // Call fillColumn to write values directly to the specified column
+    fillColumn(
+      apiResponse.target_column,   // Target column letter (e.g., "B")
+      apiResponse.column_name,     // Column header name (e.g., "Ответы")
+      apiResponse.fill_values      // Array of values to write
+    ).then(() => {
+      console.log('[Sidebar] ✅ Column filled successfully');
+      addAIMessage({ type: 'success', text: apiResponse.summary || `✅ Колонка ${apiResponse.target_column} заполнена!` });
+    }).catch(err => {
+      console.error('[Sidebar] ❌ Fill column failed:', err);
+      addAIMessage({ type: 'error', text: `Ошибка заполнения колонки: ${err.message}` });
+    });
+
+    return {
+      type: 'fill_column',
+      text: apiResponse.summary || `Заполняю колонку ${apiResponse.target_column}...`,
+      dataWritten: true,
+      // v11.0: Pass full CleanAnalyst methodology for display
+      thinking: apiResponse.thinking,
+      methodology: apiResponse.methodology,
+      examples: apiResponse.examples,
+      warnings: apiResponse.warnings,
+      rowCount: apiResponse.fill_values?.length || 0
+    };
+  }
+
   // If response is a chat/clarification action (agent wants to ask a question)
   if (apiResponse.action_type === 'chat' && apiResponse.message) {
     console.log('[Sidebar] 💬 Chat action - agent asking:', apiResponse.message);
