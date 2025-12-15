@@ -48,7 +48,7 @@ logger = logging.getLogger(__name__)
 # Create FastAPI app with VERSION 9.0.0 - Hybrid Intelligence Architecture
 app = FastAPI(
     title="SheetGPT API",
-    version="10.2.7",  # v10.2.7: Forecast LOGIC template with trend detection
+    version="10.2.8",  # v10.2.8: Force forecast queries to Python analysis path
     description="AI-powered spreadsheet assistant with Hybrid Intelligence: Schema-aware processing, Smart query classification (SIMPLE/MEDIUM/COMPLEX), Self-correction loop. Expected 98-99% accuracy."
 )
 
