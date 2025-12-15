@@ -48,7 +48,7 @@ logger = logging.getLogger(__name__)
 # Create FastAPI app with VERSION 9.0.0 - Hybrid Intelligence Architecture
 app = FastAPI(
     title="SheetGPT API",
-    version="10.3.0",  # v10.3.0: Force Python path for forecast (bypass SmartGPT)
+    version="11.0.0",  # v11.0.0: CleanAnalyst - умный помощник без костылей
     description="AI-powered spreadsheet assistant with Hybrid Intelligence: Schema-aware processing, Smart query classification (SIMPLE/MEDIUM/COMPLEX), Self-correction loop. Expected 98-99% accuracy."
 )
 
@@ -721,6 +721,105 @@ async def process_formula(
                 "user_message": error_response["user_message"],
                 "retryable": error_response["retryable"]
             }
+        )
+
+
+# =============================================================================
+# NEW: CleanAnalyst endpoint - умный помощник без костылей
+# =============================================================================
+@app.post("/api/v1/analyze")
+async def analyze_clean(
+    request: FormulaRequest,
+    x_api_token: Optional[str] = Header(None, alias="X-API-Token"),
+    x_license_key: Optional[str] = Header(None, alias="X-License-Key")
+):
+    """
+    NEW: CleanAnalyst v1.0 - GPT-4o как полноценный аналитик
+
+    Чистый подход без костылей:
+    - Простой промпт (~200 строк вместо 2000+)
+    - GPT думает, считает, объясняет
+    - Прозрачная методология
+    - Примеры расчётов
+
+    A/B тест: сравниваем с /api/v1/formula
+    """
+    try:
+        logger.info("="*60)
+        logger.info(f"[CleanAnalyst] Query: {request.query}")
+        logger.info(f"[CleanAnalyst] Data: {len(request.sheet_data)} rows x {len(request.column_names)} cols")
+
+        import pandas as pd
+        from app.services.clean_analyst import CleanAnalyst
+
+        # Создаем DataFrame
+        num_cols = len(request.column_names)
+        padded_data = []
+        for row in request.sheet_data:
+            if len(row) < num_cols:
+                row = list(row) + [None] * (num_cols - len(row))
+            padded_data.append(row[:num_cols])
+
+        df = pd.DataFrame(padded_data, columns=request.column_names)
+
+        # Конвертируем числовые колонки
+        for col in df.columns:
+            try:
+                df[col] = pd.to_numeric(df[col], errors='ignore')
+            except:
+                pass
+
+        # Reference sheet если есть
+        reference_df = None
+        if request.reference_sheet_data and request.reference_sheet_headers:
+            ref_num_cols = len(request.reference_sheet_headers)
+            ref_padded_data = []
+            for row in request.reference_sheet_data:
+                if len(row) < ref_num_cols:
+                    row = list(row) + [None] * (ref_num_cols - len(row))
+                ref_padded_data.append(row[:ref_num_cols])
+            reference_df = pd.DataFrame(ref_padded_data, columns=request.reference_sheet_headers)
+
+        # Инициализируем CleanAnalyst
+        analyst = CleanAnalyst(api_key=settings.OPENAI_API_KEY)
+
+        # Анализируем
+        result = await analyst.analyze(
+            query=request.query,
+            df=df,
+            column_names=request.column_names,
+            context=request.custom_context,
+            history=request.history,
+            reference_df=reference_df,
+            reference_sheet_name=request.reference_sheet_name
+        )
+
+        if not result.get("success"):
+            logger.error(f"[CleanAnalyst] Error: {result.get('error')}")
+            return {
+                "success": False,
+                "error": result.get("error"),
+                "response_type": "error",
+                "summary": f"Ошибка: {result.get('error')}"
+            }
+
+        # Преобразуем в формат фронтенда
+        response = analyst.transform_to_frontend_format(
+            result["gpt_response"],
+            result["processing_time"]
+        )
+
+        logger.info(f"[CleanAnalyst] Success! Action: {response.get('action_type')}")
+        logger.info(f"[CleanAnalyst] Method: {response.get('methodology', {}).get('name', 'N/A')}")
+        logger.info("="*60)
+
+        return sanitize_for_json(response)
+
+    except Exception as e:
+        logger.error(f"[CleanAnalyst] Fatal error: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail={"error": str(e), "message": "Ошибка анализа"}
         )
 
 
