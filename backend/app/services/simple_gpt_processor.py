@@ -886,10 +886,13 @@ if id_col and len(value_cols) >= 2:
 
     forecasts = []
     methods_used = []
+    examples = []  # Примеры расчётов для explanation
+    all_growth_rates = []  # Все темпы роста для статистики
 
     for idx, row in df.iterrows():
         values = [row[col] for col in value_cols]
         values = [v for v in values if v > 0]  # Только положительные
+        item_id = row[id_col]
 
         if len(values) >= 2:
             first_val = values[0]
@@ -904,26 +907,41 @@ if id_col and len(value_cols) >= 2:
             # ВЫБОР МЕТОДА на основе тренда
             if abs(change_pct) > 10:
                 # Есть чёткий тренд - используем экстраполяцию
-                if len(values) >= 2:
-                    # Средний темп роста между периодами
-                    growth_rates = []
-                    for i in range(1, len(values)):
-                        if values[i-1] > 0:
-                            rate = (values[i] - values[i-1]) / values[i-1]
-                            growth_rates.append(rate)
-                    avg_growth = sum(growth_rates) / len(growth_rates) if growth_rates else 0
-                    forecast = last_val * (1 + avg_growth)
-                    method = 'trend'
-                    methods_used.append(f"тренд {change_pct:+.1f}%")
-                else:
-                    forecast = last_val
-                    method = 'last'
+                growth_rates = []
+                for i in range(1, len(values)):
+                    if values[i-1] > 0:
+                        rate = (values[i] - values[i-1]) / values[i-1]
+                        growth_rates.append(rate)
+                avg_growth = sum(growth_rates) / len(growth_rates) if growth_rates else 0
+                all_growth_rates.append(avg_growth * 100)
+                forecast = last_val * (1 + avg_growth)
+                method = 'trend'
+                methods_used.append(f"тренд {change_pct:+.1f}%")
+
+                # Сохраняем пример (первые 3 с трендом)
+                if len([e for e in examples if e['method'] == 'trend']) < 3:
+                    examples.append({
+                        'method': 'trend',
+                        'id': str(item_id)[:25],
+                        'values': values,
+                        'growth': avg_growth * 100,
+                        'forecast': round(forecast)
+                    })
             else:
                 # Стабильные данные - взвешенное среднее
-                weights = list(range(1, len(values) + 1))  # [1,2,3,...] - больший вес последним
+                weights = list(range(1, len(values) + 1))
                 forecast = sum(v * w for v, w in zip(values, weights)) / sum(weights)
                 method = 'weighted_avg'
                 methods_used.append('стабильно')
+
+                # Сохраняем пример (первые 2 стабильных)
+                if len([e for e in examples if e['method'] == 'stable']) < 2:
+                    examples.append({
+                        'method': 'stable',
+                        'id': str(item_id)[:25],
+                        'values': values,
+                        'forecast': round(forecast)
+                    })
 
             forecast = max(0, round(forecast))
         else:
@@ -934,20 +952,38 @@ if id_col and len(value_cols) >= 2:
 
     df['Прогноз'] = forecasts
 
-    # Возвращаем DataFrame с id и прогнозом - будет автоматически конвертирован в write_data
+    # Возвращаем DataFrame с id и прогнозом
     result = df[[id_col, 'Прогноз']].copy()
 
-    # Статистика по методам
+    # Статистика
     trend_count = sum(1 for m in methods_used if 'тренд' in m)
     stable_count = sum(1 for m in methods_used if 'стабильно' in m)
+    avg_total_growth = sum(all_growth_rates) / len(all_growth_rates) if all_growth_rates else 0
 
-    explanation = f"Прогноз рассчитан для {len(forecasts)} позиций\n\n"
-    explanation += f"Методы расчёта:\n"
+    # ДЕТАЛЬНОЕ ОБЪЯСНЕНИЕ
+    explanation = f"Прогноз на следующий период для {len(forecasts)} позиций\n\n"
+    explanation += f"Исходные данные: {', '.join(value_cols)}\n\n"
+
+    explanation += "МЕТОДОЛОГИЯ:\n"
     if trend_count > 0:
-        explanation += f"- Тренд (экстраполяция): {trend_count} позиций\n"
+        explanation += f"1. Тренд (экстраполяция): {trend_count} позиций\n"
+        explanation += f"   Формула: Прогноз = Последнее × (1 + средний_рост)\n"
+        explanation += f"   Средний рост по всем: {avg_total_growth:+.1f}% в месяц\n\n"
     if stable_count > 0:
-        explanation += f"- Взвешенное среднее: {stable_count} позиций\n"
-    explanation += f"\nИсходные периоды: {', '.join(value_cols)}"
+        explanation += f"2. Взвешенное среднее: {stable_count} позиций\n"
+        explanation += f"   (используется когда изменение < 10%)\n\n"
+
+    # Примеры расчётов
+    if examples:
+        explanation += "ПРИМЕРЫ РАСЧЁТОВ:\n"
+        for ex in examples[:3]:
+            vals_str = " → ".join(str(int(v)) for v in ex['values'])
+            if ex['method'] == 'trend':
+                explanation += f"• {ex['id']}: {vals_str}\n"
+                explanation += f"  Рост {ex['growth']:+.1f}% → Прогноз: {ex['forecast']}\n"
+            else:
+                explanation += f"• {ex['id']}: {vals_str}\n"
+                explanation += f"  Стабильно → Прогноз: {ex['forecast']}\n"
 else:
     result = "Не найдены колонки для прогнозирования"
     explanation = result

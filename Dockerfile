@@ -2,11 +2,11 @@ FROM python:3.11-slim
 
 # ============ FORCE FULL REBUILD ============
 # Change this timestamp to bust ALL cache layers
-ENV FORCE_REBUILD="2025-12-15-01:00:00-v10.2.8-FORECAST-MUST-USE-PYTHON"
+ENV FORCE_REBUILD="2025-12-15-01:15:00-v10.2.9-FORECAST-DETAILED-EXPLANATION"
 RUN echo "=== FULL REBUILD: $FORCE_REBUILD ===" && date
 
-LABEL version="10.2.8"
-LABEL description="SheetGPT API v10.2.8 - Force forecast queries to Python analysis path"
+LABEL version="10.2.9"
+LABEL description="SheetGPT API v10.2.9 - Detailed forecast explanation with examples"
 
 WORKDIR /app
 
