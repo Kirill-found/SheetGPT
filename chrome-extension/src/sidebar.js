@@ -1333,6 +1333,66 @@ function addAIMessage(response) {
     `;
   }
 
+  // v11.0: Write data response with full methodology (CleanAnalyst)
+  else if (response.type === 'write_data') {
+    const rowCount = response.rowCount || 0;
+
+    // Build methodology section
+    let methodologyHtml = '';
+    if (response.methodology) {
+      methodologyHtml = `
+        <div class="methodology-section">
+          <div class="methodology-header">📊 Методология: ${escapeHtml(response.methodology.name || 'расчёт')}</div>
+          ${response.methodology.reason ? `<div class="methodology-reason">${escapeHtml(response.methodology.reason)}</div>` : ''}
+          ${response.methodology.formula ? `<div class="formula-block">${escapeHtml(response.methodology.formula)}</div>` : ''}
+        </div>
+      `;
+    }
+
+    // Build examples section (show 2-3 examples max)
+    let examplesHtml = '';
+    if (response.examples && response.examples.length > 0) {
+      const examplesToShow = response.examples.slice(0, 3);
+      examplesHtml = `
+        <div class="examples-section">
+          <div class="examples-header">📝 Примеры расчёта:</div>
+          ${examplesToShow.map(ex => `
+            <div class="example-item">
+              <div class="example-name">${escapeHtml(ex.item || '')}</div>
+              <div class="example-input">${escapeHtml(ex.input || '')}</div>
+              <div class="example-calc">${escapeHtml(ex.calculation || '')}</div>
+              <div class="example-result">= ${escapeHtml(String(ex.result || ''))}</div>
+            </div>
+          `).join('')}
+        </div>
+      `;
+    }
+
+    // Build warnings section
+    let warningsHtml = '';
+    if (response.warnings && response.warnings.length > 0) {
+      warningsHtml = `
+        <div class="warnings-section">
+          ${response.warnings.map(w => `<div class="warning-item">⚠️ ${escapeHtml(w)}</div>`).join('')}
+        </div>
+      `;
+    }
+
+    content = `
+      <div class="response-type">
+        <svg viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+        Прогноз / Расчёт
+      </div>
+      <div class="response-content">
+        <p>${escapeHtml(cleanResponseText(response.text) || 'Расчёт выполнен')}</p>
+      </div>
+      ${methodologyHtml}
+      ${examplesHtml}
+      ${warningsHtml}
+      <div class="summary-box">${rowCount} строк рассчитано</div>
+    `;
+  }
+
   // CSV split
   else if (response.type === 'csv_split') {
     const newRows = response.newRows || 0;
@@ -2089,7 +2149,13 @@ function transformAPIResponse(apiResponse, options = {}) {
         type: 'write_data',
         text: apiResponse.summary || 'Добавляю колонку...',
         dataWritten: true,
-        mergeMode: true
+        mergeMode: true,
+        // v11.0: Pass full CleanAnalyst methodology for display
+        thinking: apiResponse.thinking,
+        methodology: apiResponse.methodology,
+        examples: apiResponse.examples,
+        warnings: apiResponse.warnings,
+        rowCount: apiResponse.write_data?.length || 0
       };
     }
 
