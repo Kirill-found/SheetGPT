@@ -2761,10 +2761,35 @@ async function applyConditionalFormatInSheet(rule) {
 
   try {
     await saveSheetSnapshot('Условное форматирование');
+
+    // v11.5: Fix column index (GPT returns 1-based, API expects 0-based)
+    let columnIndex = rule.column_index;
+    if (columnIndex >= 1) {
+      console.log(`[Sidebar] 🔧 Correcting column_index from ${columnIndex} to ${columnIndex - 1}`);
+      columnIndex = columnIndex - 1;
+    }
+
+    // v11.5: Convert hex color to RGB format for Google Sheets API
+    let formatColor = null;
+    if (rule.color) {
+      const hex = rule.color.replace('#', '');
+      const r = parseInt(hex.substring(0, 2), 16) / 255;
+      const g = parseInt(hex.substring(2, 4), 16) / 255;
+      const b = parseInt(hex.substring(4, 6), 16) / 255;
+      formatColor = { red: r, green: g, blue: b };
+      console.log(`[Sidebar] 🎨 Converted color ${rule.color} to RGB:`, formatColor);
+    }
+
+    const correctedRule = {
+      ...rule,
+      column_index: columnIndex,
+      format_color: formatColor
+    };
+
     await sendToContentScript('APPLY_CONDITIONAL_FORMAT', {
-      rule: rule
+      rule: correctedRule
     });
-    console.log(`[Sidebar] Conditional format applied to column "${rule.column_name}"`);
+    console.log(`[Sidebar] Conditional format applied to column ${columnIndex}, condition: ${rule.condition_value}`);
   } catch (error) {
     console.error('[Sidebar] Error applying conditional format:', error);
   }
