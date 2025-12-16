@@ -1135,69 +1135,56 @@ async function applyConditionalFormat(spreadsheetId, sheetId, rule) {
 
     console.log(`[SheetsAPI] Applying conditional format to column ${column_index}, type: ${condition_type}, value: ${condition_value}`);
 
-    // Build the condition based on type
-    let booleanCondition;
+    // v11.5: Use CUSTOM_FORMULA to highlight ENTIRE ROW based on condition in specific column
+    // Convert column index to letter (0=A, 1=B, 2=C, etc.)
+    const columnLetter = String.fromCharCode(65 + column_index);
 
+    // Build formula based on condition type
+    // Use $column to lock column, row 2 is relative (first data row after header)
+    let formula;
     switch (condition_type) {
-      case 'NUMBER_GREATER':
-        booleanCondition = {
-          type: 'NUMBER_GREATER',
-          values: [{ userEnteredValue: String(condition_value) }]
-        };
-        break;
-      case 'NUMBER_LESS':
-        booleanCondition = {
-          type: 'NUMBER_LESS',
-          values: [{ userEnteredValue: String(condition_value) }]
-        };
-        break;
-      case 'NUMBER_EQ':
-        booleanCondition = {
-          type: 'NUMBER_EQ',
-          values: [{ userEnteredValue: String(condition_value) }]
-        };
-        break;
-      case 'BLANK':
-        booleanCondition = {
-          type: 'BLANK'
-        };
-        break;
-      case 'NOT_BLANK':
-        booleanCondition = {
-          type: 'NOT_BLANK'
-        };
+      case 'TEXT_EQ':
+        formula = `=$${columnLetter}2="${condition_value}"`;
         break;
       case 'TEXT_CONTAINS':
-        booleanCondition = {
-          type: 'TEXT_CONTAINS',
-          values: [{ userEnteredValue: String(condition_value) }]
-        };
+        formula = `=SEARCH("${condition_value}",$${columnLetter}2)>0`;
         break;
-      case 'TEXT_EQ':
-        booleanCondition = {
-          type: 'TEXT_EQ',
-          values: [{ userEnteredValue: String(condition_value) }]
-        };
+      case 'NUMBER_GREATER':
+        formula = `=$${columnLetter}2>${condition_value}`;
+        break;
+      case 'NUMBER_LESS':
+        formula = `=$${columnLetter}2<${condition_value}`;
+        break;
+      case 'NUMBER_EQ':
+        formula = `=$${columnLetter}2=${condition_value}`;
+        break;
+      case 'BLANK':
+        formula = `=ISBLANK($${columnLetter}2)`;
+        break;
+      case 'NOT_BLANK':
+        formula = `=NOT(ISBLANK($${columnLetter}2))`;
         break;
       default:
-        booleanCondition = {
-          type: 'NUMBER_GREATER',
-          values: [{ userEnteredValue: '0' }]
-        };
+        formula = `=$${columnLetter}2="${condition_value}"`;
     }
 
-    // Build the conditional format request
+    console.log(`[SheetsAPI] Using CUSTOM_FORMULA: ${formula}`);
+
+    // Build the conditional format request - apply to ALL columns (entire row)
     const request = {
       addConditionalFormatRule: {
         rule: {
           ranges: [{
             sheetId: sheetId,
             startRowIndex: 1, // Skip header row
-            startColumnIndex: column_index,
-            endColumnIndex: column_index + 1
+            startColumnIndex: 0, // Start from column A
+            endColumnIndex: 26 // Apply to columns A-Z (entire row)
           }],
           booleanRule: {
-            condition: booleanCondition,
+            condition: {
+              type: 'CUSTOM_FORMULA',
+              values: [{ userEnteredValue: formula }]
+            },
             format: {
               backgroundColor: format_color || { red: 1, green: 1, blue: 0.7 }
             }
