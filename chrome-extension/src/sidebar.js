@@ -2054,8 +2054,14 @@ function transformAPIResponse(apiResponse, options = {}) {
 
   // If response is a sort action
   if (apiResponse.action_type === 'sort' && apiResponse.sort_column_index !== undefined) {
+    // v11.5: Auto-correct 1-based index from GPT to 0-based
+    let sortIndex = apiResponse.sort_column_index;
+    if (sortIndex >= 1) {
+      console.log(`[Sidebar] 🔧 Correcting sort index from ${sortIndex} to ${sortIndex - 1}`);
+      sortIndex = sortIndex - 1;
+    }
     // Trigger sort action
-    sortRangeInSheet(apiResponse.sort_column_index, apiResponse.sort_order || 'ASCENDING');
+    sortRangeInSheet(sortIndex, apiResponse.sort_order || 'ASCENDING');
     return {
       type: 'action',
       text: apiResponse.summary || `Данные отсортированы по колонке "${apiResponse.sort_column}"`,
