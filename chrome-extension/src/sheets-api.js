@@ -818,6 +818,20 @@ async function createChart(spreadsheetId, sheetId, chartSpec) {
 
     let { chart_type, title, x_column_index, y_column_indices, row_count, col_count, aggregated_data } = chartSpec;
 
+    // v11.4: Auto-correct 1-based indices from GPT to 0-based
+    // GPT often returns 1-based indices (1=A, 2=B) but API expects 0-based (0=A, 1=B)
+    if (x_column_index >= 1 && y_column_indices && y_column_indices.length > 0) {
+      const maxYIndex = Math.max(...y_column_indices);
+      // If indices look 1-based (x=1 for first column, or y indices are too high), correct them
+      if (x_column_index === 1 || maxYIndex > 10) {
+        console.log(`[SheetsAPI] 🔧 Correcting 1-based indices to 0-based`);
+        console.log(`[SheetsAPI] Before: X=${x_column_index}, Y=${y_column_indices}`);
+        x_column_index = x_column_index - 1;
+        y_column_indices = y_column_indices.map(i => i - 1).filter(i => i >= 0);
+        console.log(`[SheetsAPI] After: X=${x_column_index}, Y=${y_column_indices}`);
+      }
+    }
+
     console.log(`[SheetsAPI] Creating ${chart_type} chart: "${title}"`);
     console.log(`[SheetsAPI] X column: ${x_column_index}, Y columns: ${y_column_indices}, rows: ${row_count}`);
 
