@@ -2134,16 +2134,31 @@ function transformAPIResponse(apiResponse, options = {}) {
   }
 
   // If response is a conditional format action
-  if (apiResponse.action_type === 'conditional_format' && (apiResponse.conditional_rule || apiResponse.rule)) {
-    const rule = apiResponse.conditional_rule || apiResponse.rule;
-    console.log('[Sidebar] ✅ Conditional format condition met! Applying...', rule);
-    // Trigger conditional format action
-    applyConditionalFormatInSheet(rule);
-    return {
-      type: 'conditional_format',
-      text: apiResponse.summary || 'Условное форматирование применено',
-      rule: rule
-    };
+  if (apiResponse.action_type === 'conditional_format') {
+    // v11.5: Support multiple rules array
+    const rules = apiResponse.conditional_rules ||
+                  (apiResponse.conditional_rule ? [apiResponse.conditional_rule] :
+                  (apiResponse.rule ? [apiResponse.rule] : []));
+
+    if (rules.length > 0) {
+      console.log('[Sidebar] ✅ Conditional format condition met! Applying', rules.length, 'rules...');
+
+      // Apply each rule sequentially
+      (async () => {
+        for (const rule of rules) {
+          console.log('[Sidebar] Applying rule:', rule);
+          await applyConditionalFormatInSheet(rule);
+        }
+        console.log('[Sidebar] ✅ All conditional format rules applied');
+        addAIMessage({ type: 'success', text: `✅ Применено ${rules.length} правил форматирования` });
+      })();
+
+      return {
+        type: 'conditional_format',
+        text: apiResponse.summary || `Условное форматирование: ${rules.length} правил`,
+        rules: rules
+      };
+    }
   }
 
   // If response is a convert to numbers action

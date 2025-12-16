@@ -174,7 +174,7 @@ class CleanAnalyst:
 }
 ```
 
-### highlight - выделить строки
+### highlight - выделить конкретные строки (если знаешь номера)
 ```json
 {
   "type": "highlight",
@@ -183,6 +183,30 @@ class CleanAnalyst:
   "reason": "Строки с отрицательными значениями"
 }
 ```
+
+### conditional_format - условное форматирование по значению ⭐ ДЛЯ ВЫДЕЛЕНИЯ ПО УСЛОВИЮ
+Используй когда нужно выделить строки ПО УСЛОВИЮ (бренд = Apple, сумма > 1000, и т.д.)
+Для НЕСКОЛЬКИХ условий с разными цветами - верни МАССИВ rules!
+```json
+{
+  "type": "conditional_format",
+  "rules": [
+    {
+      "column_index": 1,
+      "condition_type": "TEXT_EQ",
+      "condition_value": "Apple",
+      "color": "#90EE90"
+    },
+    {
+      "column_index": 1,
+      "condition_type": "TEXT_EQ",
+      "condition_value": "Realme",
+      "color": "#FF6347"
+    }
+  ]
+}
+```
+condition_type: TEXT_EQ (равно), TEXT_CONTAINS (содержит), NUMBER_GREATER (>), NUMBER_LESS (<), NUMBER_EQ (=)
 
 ### sort - сортировка
 ```json
@@ -508,6 +532,10 @@ class CleanAnalyst:
             response["highlight_rows"] = action.get("rows", [])
             response["highlight_color"] = action.get("color", "#FFCCCB")
             response["highlight_message"] = action.get("reason", "")
+
+        elif action_type == "conditional_format":
+            response["action_type"] = "conditional_format"
+            response["conditional_rules"] = action.get("rules", [])
 
         elif action_type == "sort":
             response["action_type"] = "sort"
