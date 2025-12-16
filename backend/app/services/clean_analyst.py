@@ -306,7 +306,7 @@ class CleanAnalyst:
     def __init__(self, api_key: str):
         self.client = AsyncOpenAI(api_key=api_key)
 
-    def format_data_as_table(self, df: pd.DataFrame, column_names: List[str], max_rows: int = 500) -> str:
+    def format_data_as_table(self, df: pd.DataFrame, column_names: List[str], max_rows: int = 1000) -> str:
         """Форматирует данные в читаемую таблицу"""
 
         lines = []
