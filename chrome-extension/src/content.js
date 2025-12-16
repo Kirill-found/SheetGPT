@@ -818,6 +818,46 @@ async function processQuery(query, history = [], licenseKey = null, referenceShe
   // Get data from active sheet (TODO: implement real sheet reading)
   const sheetData = await getActiveSheetData();
 
+  // v11.5: Detect CSV data and handle locally (avoid GPT token limits)
+  const csvSplitPatterns = ['разбей', 'разделить', 'split', 'разбить'];
+  const isCsvSplitQuery = csvSplitPatterns.some(p => query.toLowerCase().includes(p));
+
+  if (isCsvSplitQuery && sheetData.headers.length === 1 && sheetData.data.length > 0) {
+    // Check if data looks like CSV (single column with commas)
+    const firstRow = sheetData.data[0]?.[0] || '';
+    const headerRow = sheetData.headers[0] || '';
+
+    if (headerRow.includes(',') && firstRow.includes(',')) {
+      console.log('[SheetGPT] 🔧 Detected CSV data, processing locally...');
+
+      // Split header and data by comma
+      const newHeaders = headerRow.split(',').map(h => h.trim());
+      const newRows = sheetData.data.map(row => {
+        const cell = row[0] || '';
+        return cell.split(',').map(v => v.trim());
+      });
+
+      console.log('[SheetGPT] 📊 CSV split result:', newHeaders.length, 'columns,', newRows.length, 'rows');
+
+      // Return local result without calling API
+      return {
+        success: true,
+        response_type: 'action',
+        action_type: 'replace_data',
+        structured_data: {
+          headers: newHeaders,
+          rows: newRows
+        },
+        summary: `Данные разбиты: ${newHeaders.length} колонок × ${newRows.length} строк`,
+        methodology: {
+          name: 'csv_split',
+          reason: 'Данные были в формате CSV (разделитель - запятая). Разбивка выполнена локально.',
+          formula: 'SPLIT(A1, ",")'
+        }
+      };
+    }
+  }
+
   // Get custom context from storage (v7.9.4: with context check)
   let customContext = '';
   try {
