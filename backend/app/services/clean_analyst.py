@@ -415,14 +415,16 @@ condition_type: TEXT_EQ (равно), TEXT_CONTAINS (содержит), NUMBER_G
         # Контекст пользователя
         context_text = f"\nРОЛЬ ПОЛЬЗОВАТЕЛЯ: {context}\n" if context else ""
 
-        # История диалога
+        # История диалога - важно для follow-up вопросов типа "как ты это рассчитал?"
         history_text = ""
         if history:
-            history_text = "\nПРЕДЫДУЩИЕ ВОПРОСЫ:\n"
+            history_text = "\nИСТОРИЯ ДИАЛОГА (отвечай с учётом контекста!):\n"
             for h in history[-3:]:
                 q = h.get('query', '')
-                r = str(h.get('response', h.get('summary', '')))[:200]
-                history_text += f"В: {q}\nО: {r}\n"
+                # v11.5: Увеличили до 500 символов чтобы сохранить контекст
+                r = str(h.get('response', h.get('summary', '')))[:500]
+                history_text += f"Пользователь: {q}\nТвой ответ: {r}\n---\n"
+            history_text += "Если пользователь спрашивает 'как ты это рассчитал?' или 'почему?' - отвечай про ПРЕДЫДУЩИЙ вопрос!\n"
 
         # Формируем запрос
         user_prompt = f"""{context_text}{history_text}
