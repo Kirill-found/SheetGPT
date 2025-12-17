@@ -110,8 +110,11 @@ class CleanAnalyst:
 ## ТИПЫ ДЕЙСТВИЙ (action)
 
 ### write_column - добавить колонку (с привязкой по ключу)
-Используй ТОЛЬКО когда в таблице РЕАЛЬНО СУЩЕСТВУЕТ ключевая колонка для сопоставления (Артикул, ID, SKU).
-**КРИТИЧЕСКИ ВАЖНО**: key_column ДОЛЖНА существовать в column_names! НЕ придумывай колонки типа "№" если их нет!
+Используй ТОЛЬКО когда в таблице РЕАЛЬНО СУЩЕСТВУЕТ уникальная ключевая колонка (Артикул, ID, SKU, Email).
+**КРИТИЧЕСКИ ВАЖНО**:
+- key_column ДОЛЖНА существовать в column_names!
+- НЕ придумывай колонки типа "№", "Row", "Строка" - их НЕТ в данных!
+- Для РАСЧЁТОВ (ROMI, маржа, %) используй fill_column - он проще и надёжнее!
 ```json
 {
   "type": "write_column",
@@ -124,12 +127,13 @@ class CleanAnalyst:
 }
 ```
 
-### fill_column - заполнить ОДНУ колонку (по порядку строк)
-Используй когда нужно заполнить ОДНУ колонку.
+### fill_column - заполнить ОДНУ колонку (по порядку строк) ⭐ ДЛЯ РАСЧЁТОВ
+Используй для добавления РАССЧИТАННЫХ показателей (ROMI, маржа, %, конверсия и т.д.)
 **ВАЖНО**:
-- target_column: буква СУЩЕСТВУЮЩЕЙ колонки если она есть (B, C, D)! НОВУЮ колонку (E, F) только для новых метрик!
-- start_row: номер строки откуда начинать запись (2 = после заголовка, 8 = строка 8)
-- values: ТОЛЬКО новые рассчитанные значения! НЕ включай старые данные!
+- target_column: СЛЕДУЮЩАЯ буква после последней колонки! Если данные в A-L, новая колонка = M
+- column_name: название новой колонки ("ROMI %", "Маржа" и т.д.)
+- start_row: 2 (первая строка данных после заголовка)
+- values: расчёт для КАЖДОЙ строки данных! Если 42 строки - 42 значения!
 ```json
 {
   "type": "fill_column",
@@ -346,10 +350,17 @@ condition_type: TEXT_EQ (равно), TEXT_CONTAINS (содержит), NUMBER_G
 
         lines.append("")
 
-        # Заголовки с индексами колонок
-        header_with_idx = [f"{col} [Col {i}]" for i, col in enumerate(column_names)]
-        lines.append("| № | " + " | ".join(column_names) + " |")
-        lines.append("|---|" + "|".join(["---"] * len(column_names)) + "|")
+        # v11.5: Явное соответствие колонок и букв Excel
+        lines.append("КОЛОНКИ И БУКВЫ EXCEL:")
+        for i, col in enumerate(column_names):
+            letter = chr(65 + i)  # A, B, C, ...
+            lines.append(f"  {letter} = {col}")
+        lines.append("")
+
+        # Заголовки с буквами колонок (Row - номер строки, НЕ колонка данных!)
+        headers_with_letters = [f"{col} ({chr(65 + i)})" for i, col in enumerate(column_names)]
+        lines.append("| Row | " + " | ".join(headers_with_letters) + " |")
+        lines.append("|-----|" + "|".join(["---"] * len(column_names)) + "|")
 
         # Данные
         for idx, (_, row) in enumerate(df.head(show_rows).iterrows()):
