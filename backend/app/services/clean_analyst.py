@@ -374,7 +374,9 @@ condition_type: TEXT_EQ (равно), TEXT_CONTAINS (содержит), NUMBER_G
                     elif isinstance(val, float):
                         values.append(f"{val:.0f}" if val == int(val) else f"{val:.2f}")
                     else:
-                        values.append(str(val)[:30])  # Truncate long values
+                        # v11.5: Escape pipe character to prevent table parsing issues
+                        val_str = str(val)[:30].replace('|', '/')
+                        values.append(val_str)
                 else:
                     values.append("")
             lines.append(f"| {row_num} | " + " | ".join(values) + " |")
