@@ -519,11 +519,17 @@ condition_type: TEXT_EQ (равно), TEXT_CONTAINS (содержит), NUMBER_G
                     {"role": "user", "content": user_prompt}
                 ],
                 temperature=0.1,  # Низкая для стабильности
-                max_tokens=4000,
+                max_tokens=8000,
                 response_format={"type": "json_object"}
             )
 
             result_text = response.choices[0].message.content
+            finish_reason = response.choices[0].finish_reason
+            logger.info(f"[CleanAnalyst] Response length: {len(result_text)}, finish_reason: {finish_reason}")
+
+            # Если ответ обрезан - логируем предупреждение
+            if finish_reason == 'length':
+                logger.warning("[CleanAnalyst] ⚠️ Response truncated due to max_tokens limit!")
 
             # Попытка парсинга JSON с fallback
             try:
@@ -563,7 +569,12 @@ condition_type: TEXT_EQ (равно), TEXT_CONTAINS (содержит), NUMBER_G
 
         except json.JSONDecodeError as e:
             logger.error(f"[CleanAnalyst] JSON parse error: {e}")
-            logger.error(f"[CleanAnalyst] Raw response: {result_text[:500]}")
+            # Показываем контекст вокруг ошибки
+            err_pos = e.pos if hasattr(e, 'pos') else 0
+            err_start = max(0, err_pos - 200)
+            err_end = min(len(result_text), err_pos + 200)
+            logger.error(f"[CleanAnalyst] Response length: {len(result_text)}")
+            logger.error(f"[CleanAnalyst] Error context around pos {err_pos}: ...{result_text[err_start:err_end]}...")
             return {"success": False, "error": f"JSON parse error: {e}"}
         except Exception as e:
             logger.error(f"[CleanAnalyst] Error: {e}", exc_info=True)
