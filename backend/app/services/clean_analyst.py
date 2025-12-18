@@ -187,6 +187,9 @@ class CleanAnalyst:
 - column_name: название новой колонки ("ROMI %", "Маржа" и т.д.)
 - start_row: 2 (первая строка данных после заголовка)
 - values: расчёт для КАЖДОЙ строки данных! Если 42 строки - 42 значения!
+- ⚠️ БОЛЬШИЕ ТАБЛИЦЫ (>50 строк): ОБЯЗАТЕЛЬНО верни copyable_formula ВМЕСТО values!
+  - Пример: copyable_formula="=ОКРУГЛ((B2+C2+D2+E2)/4*0.95;0)" - пользователь скопирует и протянет
+  - values используй ТОЛЬКО если строк <= 50!
 - **ЧИСЛА ДОЛЖНЫ БЫТЬ ЧИСЛАМИ!** Возвращай 144, а НЕ "144"
 - **ЦЕЛЫЕ ЧИСЛА БЕЗ ДЕСЯТИЧНЫХ!** Возвращай 150, а НЕ 150.00 или "150,00"
 - **ДРОБНЫЕ ЧИСЛА С ТОЧКОЙ!** Возвращай 3.5, а НЕ "3,5" (JSON требует точку)
@@ -519,7 +522,7 @@ condition_type: TEXT_EQ (равно), TEXT_CONTAINS (содержит), NUMBER_G
                     {"role": "user", "content": user_prompt}
                 ],
                 temperature=0.1,  # Низкая для стабильности
-                max_tokens=8000,
+                max_tokens=16000,
                 response_format={"type": "json_object"}
             )
 
@@ -527,9 +530,17 @@ condition_type: TEXT_EQ (равно), TEXT_CONTAINS (содержит), NUMBER_G
             finish_reason = response.choices[0].finish_reason
             logger.info(f"[CleanAnalyst] Response length: {len(result_text)}, finish_reason: {finish_reason}")
 
-            # Если ответ обрезан - логируем предупреждение
+            # Если ответ обрезан - пробуем завершить JSON
             if finish_reason == 'length':
                 logger.warning("[CleanAnalyst] ⚠️ Response truncated due to max_tokens limit!")
+                # Пробуем закрыть обрезанный JSON
+                # Находим последнюю открывающую скобку и закрываем всё
+                open_braces = result_text.count('{') - result_text.count('}')
+                open_brackets = result_text.count('[') - result_text.count(']')
+                closing = ']' * open_brackets + '}' * open_braces
+                if closing:
+                    result_text = result_text.rstrip().rstrip(',') + closing
+                    logger.info(f"[CleanAnalyst] Appended closing brackets: {closing}")
 
             # Попытка парсинга JSON с fallback
             try:
