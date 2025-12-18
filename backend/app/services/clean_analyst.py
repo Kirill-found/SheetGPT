@@ -536,21 +536,37 @@ condition_type: TEXT_EQ (равно), TEXT_CONTAINS (содержит), NUMBER_G
                 result = json.loads(result_text)
             except json.JSONDecodeError as parse_err:
                 logger.warning(f"[CleanAnalyst] Initial JSON parse failed at pos {parse_err.pos}, trying to fix...")
-                # Попробуем извлечь JSON из текста (иногда GPT добавляет текст вокруг)
                 import re as re_mod
+
+                # Извлекаем JSON из текста
                 json_match = re_mod.search(r'\{[\s\S]*\}', result_text)
                 if json_match:
+                    fixed_json = json_match.group()
+
+                    # Fix 1: Убираем trailing commas перед } или ]
+                    fixed_json = re_mod.sub(r',\s*([}\]])', r'\1', fixed_json)
+
+                    # Fix 2: Добавляем пропущенные запятые между числами в массивах
+                    # [123 456] -> [123, 456]
+                    fixed_json = re_mod.sub(r'(\d)\s+(\d)', r'\1, \2', fixed_json)
+
+                    # Fix 3: Добавляем пропущенные запятые между строками в массивах
+                    # ["a" "b"] -> ["a", "b"]
+                    fixed_json = re_mod.sub(r'"\s+"', '", "', fixed_json)
+
+                    # Fix 4: Добавляем пропущенные запятые после ] или } перед "
+                    # }  "key" -> }, "key"
+                    fixed_json = re_mod.sub(r'([}\]])\s*"', r'\1, "', fixed_json)
+
                     try:
-                        # Убираем trailing commas перед } или ]
-                        fixed_json = re_mod.sub(r',\s*([}\]])', r'\1', json_match.group())
                         result = json.loads(fixed_json)
                         logger.info("[CleanAnalyst] JSON fixed successfully")
-                    except json.JSONDecodeError:
+                    except json.JSONDecodeError as fix_err:
                         # Логируем область вокруг ошибки
-                        err_start = max(0, parse_err.pos - 100)
-                        err_end = min(len(result_text), parse_err.pos + 100)
-                        logger.error(f"[CleanAnalyst] JSON error context: ...{result_text[err_start:err_end]}...")
-                        raise parse_err
+                        err_start = max(0, fix_err.pos - 150)
+                        err_end = min(len(fixed_json), fix_err.pos + 150)
+                        logger.error(f"[CleanAnalyst] JSON error at pos {fix_err.pos}: ...{fixed_json[err_start:err_end]}...")
+                        raise fix_err
                 else:
                     raise parse_err
 
