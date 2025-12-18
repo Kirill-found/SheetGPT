@@ -524,7 +524,29 @@ condition_type: TEXT_EQ (равно), TEXT_CONTAINS (содержит), NUMBER_G
             )
 
             result_text = response.choices[0].message.content
-            result = json.loads(result_text)
+
+            # Попытка парсинга JSON с fallback
+            try:
+                result = json.loads(result_text)
+            except json.JSONDecodeError as parse_err:
+                logger.warning(f"[CleanAnalyst] Initial JSON parse failed at pos {parse_err.pos}, trying to fix...")
+                # Попробуем извлечь JSON из текста (иногда GPT добавляет текст вокруг)
+                import re as re_mod
+                json_match = re_mod.search(r'\{[\s\S]*\}', result_text)
+                if json_match:
+                    try:
+                        # Убираем trailing commas перед } или ]
+                        fixed_json = re_mod.sub(r',\s*([}\]])', r'\1', json_match.group())
+                        result = json.loads(fixed_json)
+                        logger.info("[CleanAnalyst] JSON fixed successfully")
+                    except json.JSONDecodeError:
+                        # Логируем область вокруг ошибки
+                        err_start = max(0, parse_err.pos - 100)
+                        err_end = min(len(result_text), parse_err.pos + 100)
+                        logger.error(f"[CleanAnalyst] JSON error context: ...{result_text[err_start:err_end]}...")
+                        raise parse_err
+                else:
+                    raise parse_err
 
             elapsed = time.time() - start_time
 
