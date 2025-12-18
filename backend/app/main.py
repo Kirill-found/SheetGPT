@@ -804,8 +804,11 @@ async def analyze_clean(
             }
 
         # Преобразуем в формат фронтенда
+        # Добавляем количество строк для генерации формул
+        gpt_response = result["gpt_response"]
+        gpt_response["_row_count"] = len(df)
         response = analyst.transform_to_frontend_format(
-            result["gpt_response"],
+            gpt_response,
             result["processing_time"]
         )
 

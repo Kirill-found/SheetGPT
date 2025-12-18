@@ -713,6 +713,25 @@ condition_type: TEXT_EQ (равно), TEXT_CONTAINS (содержит), NUMBER_G
             response["start_row"] = action.get("start_row", 2)  # Row to start writing (default: 2, after header)
             response["fill_values"] = action.get("values", [])  # List of values to write
 
+            # Если values пустой, но есть copyable_formula - генерируем формулы для каждой строки
+            if not response["fill_values"] and methodology.get("copyable_formula"):
+                base_formula = methodology.get("copyable_formula")
+                start_row = response["start_row"]
+                # Получаем количество строк из данных (передано в transform)
+                row_count = gpt_response.get("_row_count", 100)
+                logger.info(f"[CleanAnalyst] Generating {row_count} formulas from: {base_formula}")
+
+                # Генерируем формулу для каждой строки (заменяем номер строки)
+                formulas = []
+                for i in range(row_count):
+                    row_num = start_row + i
+                    # Заменяем номера строк в формуле (B2->B3, C2->C3, и т.д.)
+                    row_formula = re.sub(r'([A-Z])2(?![0-9])', lambda m: f"{m.group(1)}{row_num}", base_formula)
+                    formulas.append(row_formula)
+
+                response["fill_values"] = formulas
+                logger.info(f"[CleanAnalyst] Generated {len(formulas)} formulas, first: {formulas[0] if formulas else 'none'}")
+
         elif action_type == "fill_columns":
             # fill_columns - write values to multiple columns at once
             response["action_type"] = "fill_columns"
