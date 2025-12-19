@@ -177,6 +177,11 @@ function detectCrossSheetQuery(query) {
     /(?:по|в|in)\s+(?:листе|листу|sheet)\s+([^\s,]+)/i,
     // Pattern 5: подтяни из листа "name"
     new RegExp('подтян[иьу]\\s+(?:из|с)\\s+(?:листа|sheet)\\s+' + anyQuote + '(' + notQuote + '+)' + anyQuote, 'i'),
+  
+    // Pattern 6: из "Лист1" (direct sheet name in quotes after из)
+    new RegExp('(?:из|с|from)\\s+' + anyQuote + '(' + notQuote + '+)' + anyQuote, 'i'),
+    // Pattern 7: данные из "name"
+    new RegExp('данные\\s+(?:из|с)\\s+' + anyQuote + '(' + notQuote + '+)' + anyQuote, 'i'),
   ];
   for (let i = 0; i < patterns.length; i++) {
     const pattern = patterns[i];
