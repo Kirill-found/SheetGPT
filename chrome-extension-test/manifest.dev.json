@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "SheetGPT AI Assistant",
-  "version": "11.5.1",
-  "description": "AI-powered assistant for Google Sheets - analyze data, create tables, generate insights",
+  "name": "SheetGPT AI Assistant [DEV]",
+  "version": "9.5.0",
+  "description": "AI-powered assistant for Google Sheets - analyze data, create tables, generate insights [DEVELOPMENT BUILD]",
   "default_locale": "ru",
   "permissions": [
     "activeTab",
@@ -16,7 +16,7 @@
     "https://sheets.googleapis.com/*"
   ],
   "oauth2": {
-    "client_id": "25268218961-fa5bdnq6s66d5k67jtk0e830nfv38jfm.apps.googleusercontent.com",
+    "client_id": "25268218961-htp0nqps974f207m9bgumart8nurmsoo.apps.googleusercontent.com",
     "scopes": [
       "https://www.googleapis.com/auth/spreadsheets"
     ]

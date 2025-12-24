@@ -227,7 +227,7 @@ class SmartAnalyst:
         )
 
         response = await self.client.chat.completions.create(
-            model="gpt-4o-mini",  # Быстрая модель для планирования
+            model="gpt-4o",  # Полная модель - понимает контекст
             messages=[{"role": "user", "content": prompt}],
             temperature=0,
             max_tokens=1000,
