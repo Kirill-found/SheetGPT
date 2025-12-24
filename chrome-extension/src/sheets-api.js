@@ -1144,7 +1144,7 @@ async function createPivotChart(spreadsheetId, sourceSheetId, pivotSpec) {
               },
               rows: [{
                 sourceColumnOffset: row_column_index,
-                showTotals: true,
+                showTotals: false,  // Don't show grand total - it would appear in chart as separate category
                 sortOrder: 'DESCENDING',
                 valueBucket: {}
               }],
