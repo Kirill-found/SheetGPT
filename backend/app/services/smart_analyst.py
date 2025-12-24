@@ -122,7 +122,25 @@ class SmartAnalyst:
 }}
 ```
 
+Запрос: "сколько мониторов было продано"
+```json
+{{
+  "intent": "aggregation",
+  "description": "Сумма количества проданных мониторов",
+  "aggregation": {{
+    "enabled": true,
+    "group_by": null,
+    "operations": [{{"column": "Кол-во", "operation": "sum", "alias": "Количество"}}]
+  }},
+  "filters": [{{"column": "Товар", "operator": "contains", "value": "Монитор"}}],
+  "output_format": "single_value",
+  "needs_gpt_analysis": false
+}}
+```
+
 ## ВАЖНО
+- "сколько продано/куплено" = SUM колонки количества (Кол-во, Количество, шт, qty)
+- НЕ добавляй фильтр по статусу если пользователь НЕ просил "оплаченные" или "выполненные"
 - Названия колонок должны ТОЧНО совпадать с column_names
 - Если не уверен какую колонку использовать - посмотри на sample_data
 - Для фильтра "оплачен" ищи колонку "Статус" и значение "Оплачен" (с большой буквы!)
@@ -280,7 +298,7 @@ class SmartAnalyst:
             group_col = agg_spec.get("group_by")
             operations = agg_spec.get("operations", [])
 
-            if group_col and group_col in work_df.columns and operations:
+            if operations:
                 agg_dict = {}
                 for op in operations:
                     col = op.get("column")
@@ -293,24 +311,45 @@ class SmartAnalyst:
                         agg_dict[col] = operation
 
                 if agg_dict:
-                    grouped = work_df.groupby(group_col).agg(agg_dict)
-                    grouped = grouped.sort_values(by=list(agg_dict.keys())[0], ascending=False)
+                    if group_col and group_col in work_df.columns:
+                        # С группировкой
+                        grouped = work_df.groupby(group_col).agg(agg_dict)
+                        grouped = grouped.sort_values(by=list(agg_dict.keys())[0], ascending=False)
 
-                    # Форматируем результат
-                    for idx, row in grouped.iterrows():
-                        item = {"group": str(idx)}
+                        # Форматируем результат
+                        for idx, row in grouped.iterrows():
+                            item = {"group": str(idx)}
+                            for col in agg_dict.keys():
+                                val = row[col]
+                                item[col] = float(val) if pd.notna(val) else 0
+                                item[f"{col}_formatted"] = f"{val:,.0f}".replace(",", " ") if pd.notna(val) else "0"
+                            result["data"].append(item)
+
+                        # Итого
+                        result["totals"] = {}
                         for col in agg_dict.keys():
-                            val = row[col]
-                            item[col] = float(val) if pd.notna(val) else 0
-                            item[f"{col}_formatted"] = f"{val:,.0f}".replace(",", " ") if pd.notna(val) else "0"
-                        result["data"].append(item)
+                            total = grouped[col].sum()
+                            result["totals"][col] = float(total)
+                            result["totals"][f"{col}_formatted"] = f"{total:,.0f}".replace(",", " ")
+                    else:
+                        # БЕЗ группировки - просто итог
+                        result["totals"] = {}
+                        for col, operation in agg_dict.items():
+                            if operation == "sum":
+                                total = work_df[col].sum()
+                            elif operation == "count":
+                                total = work_df[col].count()
+                            elif operation == "mean":
+                                total = work_df[col].mean()
+                            elif operation == "min":
+                                total = work_df[col].min()
+                            elif operation == "max":
+                                total = work_df[col].max()
+                            else:
+                                total = work_df[col].sum()
 
-                    # Итого
-                    result["totals"] = {}
-                    for col in agg_dict.keys():
-                        total = grouped[col].sum()
-                        result["totals"][col] = float(total)
-                        result["totals"][f"{col}_formatted"] = f"{total:,.0f}".replace(",", " ")
+                            result["totals"][col] = float(total) if pd.notna(total) else 0
+                            result["totals"][f"{col}_formatted"] = f"{total:,.0f}".replace(",", " ") if pd.notna(total) else "0"
 
         return result
 
