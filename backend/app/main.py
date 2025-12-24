@@ -826,6 +826,84 @@ async def analyze_clean(
         )
 
 
+# =============================================================================
+# NEW: SmartAnalyst v2 - GPT планирует, Pandas считает
+# =============================================================================
+@app.post("/api/v2/analyze")
+async def analyze_smart(
+    request: FormulaRequest,
+    x_api_token: Optional[str] = Header(None, alias="X-API-Token"),
+    x_license_key: Optional[str] = Header(None, alias="X-License-Key")
+):
+    """
+    SmartAnalyst v1.0 - Двухфазный подход:
+    1. GPT понимает запрос и генерирует спецификацию
+    2. Pandas выполняет ТОЧНЫЕ расчёты
+    3. GPT форматирует результат
+    """
+    try:
+        logger.info("="*60)
+        logger.info(f"[SmartAnalyst] Query: {request.query}")
+        logger.info(f"[SmartAnalyst] Data: {len(request.sheet_data)} rows x {len(request.column_names)} cols")
+
+        import pandas as pd
+        from app.services.smart_analyst import SmartAnalyst
+
+        # Создаем DataFrame
+        num_cols = len(request.column_names)
+        padded_data = []
+        for row in request.sheet_data:
+            if len(row) < num_cols:
+                row = list(row) + [None] * (num_cols - len(row))
+            padded_data.append(row[:num_cols])
+
+        df = pd.DataFrame(padded_data, columns=request.column_names)
+
+        # Конвертируем числовые колонки
+        for col in df.columns:
+            try:
+                df[col] = pd.to_numeric(df[col], errors='ignore')
+            except:
+                pass
+
+        # Инициализируем SmartAnalyst
+        analyst = SmartAnalyst(api_key=settings.OPENAI_API_KEY)
+
+        # Анализируем
+        result = await analyst.analyze(
+            query=request.query,
+            df=df,
+            column_names=request.column_names,
+            context=request.custom_context,
+            history=request.history
+        )
+
+        if not result.get("success"):
+            logger.error(f"[SmartAnalyst] Error: {result.get('error')}")
+            return {
+                "success": False,
+                "error": result.get("error"),
+                "response_type": "error",
+                "summary": f"Ошибка: {result.get('error')}"
+            }
+
+        response = result["gpt_response"]
+        response["success"] = True
+        response["processor_version"] = "SmartAnalyst v1.0"
+
+        logger.info(f"[SmartAnalyst] Success! python_executed: {response.get('python_executed')}")
+        logger.info("="*60)
+
+        return sanitize_for_json(response)
+
+    except Exception as e:
+        logger.error(f"[SmartAnalyst] Fatal error: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail={"error": str(e), "message": "Ошибка анализа"}
+        )
+
+
 def classify_backend_error(error_msg: str) -> dict:
     """Классификация ошибок для понятных сообщений пользователю"""
     error_lower = error_msg.lower()
