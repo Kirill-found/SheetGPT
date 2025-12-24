@@ -708,6 +708,12 @@ window.addEventListener('message', async (event) => {
         console.log('[SheetGPT] 📊 CREATE_CHART result:', result);
         break;
 
+      case 'CREATE_PIVOT_CHART':
+        console.log('[SheetGPT] 📊 CREATE_PIVOT_CHART received with spec:', JSON.stringify(data.pivotSpec));
+        result = await createPivotChartInSheet(data.pivotSpec);
+        console.log('[SheetGPT] 📊 CREATE_PIVOT_CHART result:', result);
+        break;
+
       case 'APPLY_CONDITIONAL_FORMAT':
         result = await applyConditionalFormat(data.rule);
         break;
@@ -1742,6 +1748,33 @@ async function createChartInSheet(chartSpec) {
     console.error('[SheetGPT] Error creating chart:', error);
     // Re-throw error so it's properly handled by the message handler
     throw new Error(`Ошибка создания диаграммы: ${error.message}`);
+  }
+}
+
+// v12: Create Pivot Table + Chart for aggregated data
+async function createPivotChartInSheet(pivotSpec) {
+  console.log('[SheetGPT] Create pivot chart:', pivotSpec);
+
+  try {
+    const response = await safeSendMessage({
+      action: 'CREATE_PIVOT_CHART',
+      data: {
+        pivotSpec: pivotSpec
+      }
+    });
+
+    if (!response || !response.success) {
+      throw new Error(response?.error || 'Неизвестная ошибка при создании сводной диаграммы');
+    }
+
+    console.log('[SheetGPT] ✅ Pivot chart created via API:', response.result);
+    return response.result || {
+      success: true,
+      message: `Сводная диаграмма "${pivotSpec.title || 'Сводная'}" создана`
+    };
+  } catch (error) {
+    console.error('[SheetGPT] Error creating pivot chart:', error);
+    throw new Error(`Ошибка создания сводной диаграммы: ${error.message}`);
   }
 }
 

@@ -70,6 +70,11 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           result = await handleCreateChart(sender.tab.id, sender.tab.url, data);
           break;
 
+        case 'CREATE_PIVOT_CHART':
+          console.log('[Background] 📊 CREATE_PIVOT_CHART received:', data);
+          result = await handleCreatePivotChart(sender.tab.id, sender.tab.url, data);
+          break;
+
         case 'APPLY_CONDITIONAL_FORMAT':
           result = await handleConditionalFormat(sender.tab.id, sender.tab.url, data);
           break;
@@ -623,6 +628,45 @@ async function handleCreateChart(tabId, tabUrl, data) {
   const result = await createChart(spreadsheetId, sheetId, chartSpec);
 
   console.log('[Background] ✅ Chart created successfully:', result);
+  return result;
+}
+
+/**
+ * v12: Create Pivot Table + Chart for aggregated data
+ * Creates a new sheet with pivot table and chart that auto-updates
+ */
+async function handleCreatePivotChart(tabId, tabUrl, data) {
+  console.log('[Background] 📊 Creating pivot chart, data:', JSON.stringify(data));
+
+  const spreadsheetId = getSpreadsheetIdFromUrl(tabUrl);
+  console.log('[Background] 📊 Spreadsheet ID:', spreadsheetId);
+  if (!spreadsheetId) {
+    throw new Error('Not a valid Google Sheets URL');
+  }
+
+  const { pivotSpec } = data;
+
+  if (!pivotSpec) {
+    throw new Error('Pivot specification is required');
+  }
+
+  // Get saved sheet name from storage (source sheet)
+  const storageKey = `sheetName_${spreadsheetId}`;
+  const storageData = await chrome.storage.local.get(storageKey);
+  const sheetName = storageData[storageKey] || 'Лист1';
+
+  console.log(`[Background] 📊 Using source sheet "${sheetName}" for pivot (storageKey: ${storageKey})`);
+
+  // Get source sheet ID
+  console.log('[Background] 📊 Getting source sheet ID...');
+  const sourceSheetId = await getSheetIdByName(spreadsheetId, sheetName);
+  console.log('[Background] 📊 Source sheet ID:', sourceSheetId);
+
+  // Create pivot chart
+  console.log('[Background] 📊 Calling createPivotChart API...');
+  const result = await createPivotChart(spreadsheetId, sourceSheetId, pivotSpec);
+
+  console.log('[Background] ✅ Pivot chart created successfully:', result);
   return result;
 }
 

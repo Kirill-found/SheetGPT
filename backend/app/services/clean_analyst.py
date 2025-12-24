@@ -370,9 +370,26 @@ condition_type: TEXT_EQ (равно), TEXT_CONTAINS (содержит), NUMBER_G
   "x_column": "Месяц",
   "x_column_index": 0,
   "y_columns": ["Продажи", "План"],
-  "y_column_indices": [1, 2]
+  "y_column_indices": [1, 2],
+  "needs_aggregation": false
 }
 ```
+
+**Если диаграмма требует АГРЕГАЦИИ по категориям** (например "по товарам", "по городам"):
+```json
+{
+  "type": "chart",
+  "chart_type": "COLUMN",
+  "title": "Сумма по товарам",
+  "needs_aggregation": true,
+  "group_by_column_index": 3,
+  "y_column_indices": [6],
+  "aggregate_function": "SUM",
+  "row_count": 100,
+  "col_count": 8
+}
+```
+**ВАЖНО**: Если пользователь просит диаграмму "по категориям/товарам/городам" с суммой/количеством - ОБЯЗАТЕЛЬНО ставь `needs_aggregation: true` и `group_by_column_index`!
 **ВАЖНО для chart**: индексы колонок начинаются с 0! Если колонки ["Артикул", "Декабрь"], то Артикул=0, Декабрь=1.
 
 ### formula - формула Google Sheets
@@ -991,14 +1008,33 @@ condition_type: TEXT_EQ (равно), TEXT_CONTAINS (содержит), NUMBER_G
             response["sort_order"] = action.get("order", "desc")
 
         elif action_type == "chart":
-            response["action_type"] = "chart"
-            response["chart_spec"] = {
-                "chart_type": action.get("chart_type", "COLUMN"),
-                "title": action.get("title", ""),
-                "x_column_index": action.get("x_column_index", 0),
-                "y_column_indices": action.get("y_column_indices", [1]),
-                "row_count": action.get("row_count", 100)
-            }
+            # v12: Check if chart needs aggregation (pivot chart)
+            needs_aggregation = action.get("needs_aggregation", False)
+            group_by_column = action.get("group_by_column_index")
+
+            if needs_aggregation and group_by_column is not None:
+                # Use pivot chart for aggregated data (auto-updates when data changes)
+                logger.info(f"[CleanAnalyst] Creating PIVOT chart: group_by={group_by_column}")
+                response["action_type"] = "pivot_chart"
+                response["pivot_spec"] = {
+                    "chart_type": action.get("chart_type", "COLUMN"),
+                    "title": action.get("title", ""),
+                    "row_column_index": group_by_column,  # Column to group by (e.g., Товар)
+                    "value_column_index": action.get("y_column_indices", [1])[0] if action.get("y_column_indices") else 1,  # Column to aggregate
+                    "aggregate_function": action.get("aggregate_function", "SUM"),
+                    "row_count": action.get("row_count", 100),
+                    "col_count": action.get("col_count", 10)
+                }
+            else:
+                # Regular chart (no aggregation)
+                response["action_type"] = "chart"
+                response["chart_spec"] = {
+                    "chart_type": action.get("chart_type", "COLUMN"),
+                    "title": action.get("title", ""),
+                    "x_column_index": action.get("x_column_index", 0),
+                    "y_column_indices": action.get("y_column_indices", [1]),
+                    "row_count": action.get("row_count", 100)
+                }
 
         elif action_type == "formula":
             response["response_type"] = "formula"

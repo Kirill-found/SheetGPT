@@ -1078,6 +1078,222 @@ async function createChart(spreadsheetId, sheetId, chartSpec) {
 }
 
 /**
+ * Create a Pivot Table + Chart for aggregated data
+ * This creates dynamic charts that update when source data changes
+ */
+async function createPivotChart(spreadsheetId, sourceSheetId, pivotSpec) {
+  try {
+    const token = await getAuthToken();
+
+    const {
+      title,
+      chart_type = 'COLUMN',
+      row_column_index,      // Column to group by (e.g., Товар = index 3)
+      value_column_index,    // Column to aggregate (e.g., Сумма = index 6)
+      aggregate_function = 'SUM',  // SUM, COUNT, AVERAGE, etc.
+      row_count,             // Total rows in source data
+      col_count              // Total columns in source data
+    } = pivotSpec;
+
+    console.log(`[SheetsAPI] Creating Pivot Chart: "${title}"`);
+    console.log(`[SheetsAPI] Group by column ${row_column_index}, aggregate column ${value_column_index} with ${aggregate_function}`);
+
+    // Step 1: Create a new sheet for the pivot table
+    const pivotSheetName = `Сводная_${Date.now()}`;
+    const createSheetResponse = await fetch(
+      `${SHEETS_API_BASE}/${spreadsheetId}:batchUpdate`,
+      {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          requests: [{
+            addSheet: {
+              properties: {
+                title: pivotSheetName
+              }
+            }
+          }]
+        })
+      }
+    );
+
+    if (!createSheetResponse.ok) {
+      const error = await createSheetResponse.json();
+      throw new Error(`Failed to create pivot sheet: ${error.error?.message}`);
+    }
+
+    const createSheetResult = await createSheetResponse.json();
+    const pivotSheetId = createSheetResult.replies[0].addSheet.properties.sheetId;
+    console.log(`[SheetsAPI] Created pivot sheet: ${pivotSheetName} (ID: ${pivotSheetId})`);
+
+    // Step 2: Create the pivot table
+    const pivotTableRequest = {
+      updateCells: {
+        rows: [{
+          values: [{
+            pivotTable: {
+              source: {
+                sheetId: sourceSheetId,
+                startRowIndex: 0,
+                endRowIndex: row_count + 1,  // +1 for header
+                startColumnIndex: 0,
+                endColumnIndex: col_count
+              },
+              rows: [{
+                sourceColumnOffset: row_column_index,
+                showTotals: true,
+                sortOrder: 'DESCENDING',
+                valueBucket: {}
+              }],
+              values: [{
+                sourceColumnOffset: value_column_index,
+                summarizeFunction: aggregate_function,
+                name: title || 'Сумма'
+              }],
+              valueLayout: 'HORIZONTAL'
+            }
+          }]
+        }],
+        start: {
+          sheetId: pivotSheetId,
+          rowIndex: 0,
+          columnIndex: 0
+        },
+        fields: 'pivotTable'
+      }
+    };
+
+    const pivotResponse = await fetch(
+      `${SHEETS_API_BASE}/${spreadsheetId}:batchUpdate`,
+      {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          requests: [pivotTableRequest]
+        })
+      }
+    );
+
+    if (!pivotResponse.ok) {
+      const error = await pivotResponse.json();
+      console.error('[SheetsAPI] Pivot table error:', error);
+      throw new Error(`Failed to create pivot table: ${error.error?.message}`);
+    }
+
+    console.log('[SheetsAPI] ✅ Pivot table created');
+
+    // Step 3: Wait a moment for pivot to render, then create chart
+    await new Promise(resolve => setTimeout(resolve, 500));
+
+    // Step 4: Create chart from pivot table (columns A:B on pivot sheet)
+    // Pivot creates: Column A = categories, Column B = aggregated values
+    const chartTypeMap = {
+      'BAR': 'BAR',
+      'COLUMN': 'COLUMN',
+      'LINE': 'LINE',
+      'PIE': 'PIE',
+      'AREA': 'AREA'
+    };
+
+    const googleChartType = chartTypeMap[chart_type] || 'COLUMN';
+
+    const chartRequest = {
+      addChart: {
+        chart: {
+          spec: {
+            title: title,
+            basicChart: {
+              chartType: googleChartType,
+              legendPosition: 'BOTTOM_LEGEND',
+              axis: [
+                { position: 'BOTTOM_AXIS', title: '' },
+                { position: 'LEFT_AXIS', title: '' }
+              ],
+              domains: [{
+                domain: {
+                  sourceRange: {
+                    sources: [{
+                      sheetId: pivotSheetId,
+                      startRowIndex: 1,      // Skip header
+                      endRowIndex: 100,      // Max rows (pivot will have fewer)
+                      startColumnIndex: 0,   // Category column
+                      endColumnIndex: 1
+                    }]
+                  }
+                }
+              }],
+              series: [{
+                series: {
+                  sourceRange: {
+                    sources: [{
+                      sheetId: pivotSheetId,
+                      startRowIndex: 1,
+                      endRowIndex: 100,
+                      startColumnIndex: 1,   // Value column
+                      endColumnIndex: 2
+                    }]
+                  }
+                },
+                targetAxis: 'LEFT_AXIS'
+              }],
+              headerCount: 1
+            }
+          },
+          position: {
+            overlayPosition: {
+              anchorCell: {
+                sheetId: pivotSheetId,
+                rowIndex: 0,
+                columnIndex: 3  // Place chart to the right of pivot
+              },
+              offsetXPixels: 10,
+              offsetYPixels: 10
+            }
+          }
+        }
+      }
+    };
+
+    const chartResponse = await fetch(
+      `${SHEETS_API_BASE}/${spreadsheetId}:batchUpdate`,
+      {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          requests: [chartRequest]
+        })
+      }
+    );
+
+    if (!chartResponse.ok) {
+      const error = await chartResponse.json();
+      console.error('[SheetsAPI] Chart on pivot error:', error);
+      throw new Error(`Failed to create chart on pivot: ${error.error?.message}`);
+    }
+
+    console.log('[SheetsAPI] ✅ Pivot chart created successfully!');
+    return {
+      success: true,
+      pivotSheetName,
+      pivotSheetId,
+      message: `Создана сводная таблица "${pivotSheetName}" с диаграммой`
+    };
+  } catch (error) {
+    console.error('[SheetsAPI] Error creating pivot chart:', error);
+    throw error;
+  }
+}
+
+/**
  * Get sheet ID by name
  */
 async function getSheetIdByName(spreadsheetId, sheetName) {
@@ -1492,6 +1708,7 @@ if (typeof module !== 'undefined' && module.exports) {
     freezeRowsColumns,
     formatRow,
     createChart,
+    createPivotChart,
     getSheetIdByName,
     applyConditionalFormat,
     applyColorScale,

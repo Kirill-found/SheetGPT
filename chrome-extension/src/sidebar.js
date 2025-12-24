@@ -2119,6 +2119,30 @@ function transformAPIResponse(apiResponse, options = {}) {
     };
   }
 
+  // v12: Pivot Chart - creates pivot table + chart for aggregated data
+  if (apiResponse.action_type === 'pivot_chart' && apiResponse.pivot_spec) {
+    console.log('[Sidebar] ✅ Pivot chart condition met! Creating pivot table + chart...');
+    console.log('[Sidebar] Pivot spec:', JSON.stringify(apiResponse.pivot_spec));
+
+    // Create pivot chart
+    createPivotChartInSheet(apiResponse.pivot_spec).then((result) => {
+      console.log('[Sidebar] ✅ Pivot chart created:', result);
+      addAIMessage({
+        type: 'success',
+        text: `✅ ${result.message || 'Сводная таблица с диаграммой создана!'}`
+      });
+    }).catch(err => {
+      console.error('[Sidebar] ❌ Pivot chart creation failed:', err);
+      addAIMessage({ type: 'error', text: `Ошибка создания сводной диаграммы: ${err.message}` });
+    });
+
+    return {
+      type: 'pivot_chart',
+      text: apiResponse.summary || `Создаю сводную таблицу с диаграммой "${apiResponse.pivot_spec.title || 'Сводная'}"...`,
+      pivotSpec: apiResponse.pivot_spec
+    };
+  }
+
   // If response is a color scale (gradient) action
   if (apiResponse.action_type === 'color_scale' && (apiResponse.color_scale_rule || apiResponse.rule)) {
     const rule = apiResponse.color_scale_rule || apiResponse.rule;
@@ -2755,6 +2779,32 @@ async function createChartInSheet(chartSpec) {
       type: 'error',
       text: `Ошибка создания диаграммы: ${error.message || error}. Попробуйте обновить страницу.`
     });
+  }
+}
+
+// v12: Create Pivot Table + Chart for aggregated data (auto-updates when data changes)
+async function createPivotChartInSheet(pivotSpec) {
+  if (!pivotSpec) {
+    console.error('[Sidebar] Pivot chart error: pivotSpec is required');
+    addAIMessage({ type: 'error', text: 'Ошибка: спецификация сводной диаграммы не найдена' });
+    return;
+  }
+
+  try {
+    await saveSheetSnapshot('Создание сводной диаграммы');
+    console.log('[Sidebar] Creating pivot chart with spec:', pivotSpec);
+    const result = await sendToContentScript('CREATE_PIVOT_CHART', {
+      pivotSpec: pivotSpec
+    });
+    console.log(`[Sidebar] Pivot chart "${pivotSpec.title}" created successfully:`, result);
+    return result;
+  } catch (error) {
+    console.error('[Sidebar] Error creating pivot chart:', error);
+    addAIMessage({
+      type: 'error',
+      text: `Ошибка создания сводной диаграммы: ${error.message || error}. Попробуйте обновить страницу.`
+    });
+    throw error;
   }
 }
 
