@@ -2817,12 +2817,10 @@ async function applyConditionalFormatInSheet(rule) {
   try {
     await saveSheetSnapshot('Условное форматирование');
 
-    // v11.5: Fix column index (GPT returns 1-based, API expects 0-based)
+    // GPT returns 0-based indices (column 0 = A, column 1 = B, etc.)
+    // API also expects 0-based, so no correction needed
     let columnIndex = rule.column_index;
-    if (columnIndex >= 1) {
-      console.log(`[Sidebar] 🔧 Correcting column_index from ${columnIndex} to ${columnIndex - 1}`);
-      columnIndex = columnIndex - 1;
-    }
+    console.log(`[Sidebar] 📍 Using column_index: ${columnIndex}`);
 
     // v11.5: Convert hex color to RGB format for Google Sheets API
     let formatColor = null;
