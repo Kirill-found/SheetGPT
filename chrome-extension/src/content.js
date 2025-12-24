@@ -2263,10 +2263,13 @@ async function fillColumnsDirect({ startRow, columns }) {
 
     // v11.4: Get current headers to auto-correct column letters
     let headers = [];
+    let dataRowCount = 0;
     try {
       const sheetData = await getActiveSheetData();
       headers = sheetData?.headers || [];
+      dataRowCount = sheetData?.data?.length || 0;
       console.log('[SheetGPT] 📋 Current headers for column correction:', headers);
+      console.log('[SheetGPT] 📋 Data rows count:', dataRowCount);
     } catch (e) {
       console.log('[SheetGPT] ⚠️ Could not get headers for correction:', e.message);
     }
@@ -2274,7 +2277,18 @@ async function fillColumnsDirect({ startRow, columns }) {
     const writeStartRow = startRow || 2;
     const results = [];
 
+    // v11.5: Check if this is a SUMMARY (start_row is below data)
+    // Summary = writing below existing data, don't apply column correction
+    const isSummary = writeStartRow > dataRowCount + 1;
+    if (isSummary) {
+      console.log('[SheetGPT] 📊 SUMMARY mode detected: start_row', writeStartRow, '> data rows', dataRowCount + 1);
+    }
+
+    // For summary, calculate first column after existing data
+    const firstSummaryColumn = headers.length > 0 ? headers.length : 0;
+
     // Process each column
+    let summaryColOffset = 0;
     for (const col of columns) {
       const { target, name, values } = col;
       if (!target || !values || values.length === 0) {
@@ -2282,18 +2296,27 @@ async function fillColumnsDirect({ startRow, columns }) {
         continue;
       }
 
-      // v11.4: Auto-correct column letter based on header name
-      let colLetter = target.toUpperCase();
-      if (name && headers.length > 0) {
-        const headerIndex = headers.findIndex(h =>
-          h && h.toString().toLowerCase().includes(name.toLowerCase()) ||
-          name.toLowerCase().includes(h?.toString().toLowerCase() || '')
-        );
-        if (headerIndex >= 0) {
-          const correctLetter = String.fromCharCode(65 + headerIndex); // A=65
-          if (correctLetter !== colLetter) {
-            console.log('[SheetGPT] 🔧 Column correction:', name, colLetter, '→', correctLetter);
-            colLetter = correctLetter;
+      let colLetter;
+
+      if (isSummary) {
+        // v11.5: For summary, write to columns AFTER existing data (I, J, K...)
+        colLetter = String.fromCharCode(65 + firstSummaryColumn + summaryColOffset);
+        console.log('[SheetGPT] 📊 Summary column:', name, '→', colLetter, '(after existing data)');
+        summaryColOffset++;
+      } else {
+        // v11.4: Auto-correct column letter based on header name (for regular fill)
+        colLetter = target.toUpperCase();
+        if (name && headers.length > 0) {
+          const headerIndex = headers.findIndex(h =>
+            h && h.toString().toLowerCase().includes(name.toLowerCase()) ||
+            name.toLowerCase().includes(h?.toString().toLowerCase() || '')
+          );
+          if (headerIndex >= 0) {
+            const correctLetter = String.fromCharCode(65 + headerIndex); // A=65
+            if (correctLetter !== colLetter) {
+              console.log('[SheetGPT] 🔧 Column correction:', name, colLetter, '→', correctLetter);
+              colLetter = correctLetter;
+            }
           }
         }
       }
