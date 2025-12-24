@@ -809,7 +809,9 @@ async def analyze_clean(
         gpt_response["_row_count"] = len(df)
         response = analyst.transform_to_frontend_format(
             gpt_response,
-            result["processing_time"]
+            result["processing_time"],
+            query=request.query,
+            column_names=request.column_names
         )
 
         logger.info(f"[CleanAnalyst] Success! Action: {response.get('action_type')}")

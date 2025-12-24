@@ -925,10 +925,79 @@ condition_type: TEXT_EQ (равно), TEXT_CONTAINS (содержит), NUMBER_G
             logger.error(f"[CleanAnalyst] Error: {e}", exc_info=True)
             return {"success": False, "error": str(e)}
 
-    def transform_to_frontend_format(self, gpt_response: Dict, processing_time: str) -> Dict[str, Any]:
+    def _detect_chart_aggregation(self, query: str, column_names: List[str]) -> Optional[Dict]:
+        """
+        Определяет, нужна ли агрегация для диаграммы.
+        Возвращает {group_by_column_index, value_column_index} если нужна.
+        """
+        query_lower = query.lower()
+
+        # Паттерны запросов на агрегированные диаграммы
+        aggregation_patterns = [
+            r'диаграмм[ау]?\s+по\s+',  # "диаграмма по городам"
+            r'график\s+по\s+',          # "график по товарам"
+            r'по\s+(?:город|товар|категори|менеджер|клиент|продукт)',
+            r'(?:сумм[ау]|количеств|итог)\s+по\s+',
+        ]
+
+        is_aggregation_chart = any(re.search(p, query_lower) for p in aggregation_patterns)
+
+        if not is_aggregation_chart:
+            return None
+
+        # Определяем колонку для группировки
+        group_keywords = {
+            'город': ['город', 'city', 'регион'],
+            'товар': ['товар', 'продукт', 'наименование', 'product', 'item'],
+            'категория': ['категория', 'category', 'тип'],
+            'менеджер': ['менеджер', 'продавец', 'manager'],
+            'клиент': ['клиент', 'покупатель', 'customer'],
+        }
+
+        group_col_index = None
+        for key, synonyms in group_keywords.items():
+            if any(s in query_lower for s in synonyms):
+                # Ищем соответствующую колонку
+                for i, col in enumerate(column_names):
+                    col_lower = col.lower()
+                    if any(s in col_lower for s in synonyms):
+                        group_col_index = i
+                        logger.info(f"[CleanAnalyst] Chart aggregation: group by '{col}' (index {i})")
+                        break
+            if group_col_index is not None:
+                break
+
+        if group_col_index is None:
+            return None
+
+        # Определяем колонку для значений (сумма, количество и т.д.)
+        value_keywords = ['сумма', 'выручка', 'количество', 'продажи', 'итого', 'заказ', 'amount', 'total', 'sum', 'qty']
+        value_col_index = None
+
+        for i, col in enumerate(column_names):
+            col_lower = col.lower()
+            if any(s in col_lower for s in value_keywords):
+                value_col_index = i
+                logger.info(f"[CleanAnalyst] Chart aggregation: value from '{col}' (index {i})")
+                break
+
+        # Если не нашли по названию, ищем первую числовую колонку после group
+        if value_col_index is None:
+            # Берём первую колонку после group_col_index или просто последнюю
+            value_col_index = min(group_col_index + 1, len(column_names) - 1)
+            logger.info(f"[CleanAnalyst] Chart aggregation: fallback value column index {value_col_index}")
+
+        return {
+            "group_by_column_index": group_col_index,
+            "value_column_index": value_col_index
+        }
+
+    def transform_to_frontend_format(self, gpt_response: Dict, processing_time: str, query: str = "", column_names: List[str] = None) -> Dict[str, Any]:
         """
         Преобразует ответ GPT в формат для фронтенда
         """
+        if column_names is None:
+            column_names = []
 
         action = gpt_response.get("action", {})
         action_type = action.get("type", "answer")
@@ -1011,6 +1080,16 @@ condition_type: TEXT_EQ (равно), TEXT_CONTAINS (содержит), NUMBER_G
             # v12: Check if chart needs aggregation (pivot chart)
             needs_aggregation = action.get("needs_aggregation", False)
             group_by_column = action.get("group_by_column_index")
+
+            # v12.1: Auto-detect aggregation if GPT missed it
+            if not needs_aggregation and query and column_names:
+                auto_agg = self._detect_chart_aggregation(query, column_names)
+                if auto_agg:
+                    logger.info(f"[CleanAnalyst] AUTO-detected chart aggregation: {auto_agg}")
+                    needs_aggregation = True
+                    group_by_column = auto_agg["group_by_column_index"]
+                    # Also override value column if GPT chose wrong one
+                    action["y_column_indices"] = [auto_agg["value_column_index"]]
 
             if needs_aggregation and group_by_column is not None:
                 # Use pivot chart for aggregated data (auto-updates when data changes)
