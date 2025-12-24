@@ -569,6 +569,21 @@ condition_type: TEXT_EQ (равно), TEXT_CONTAINS (содержит), NUMBER_G
             if group_col:
                 break
 
+        # v12.1: Если не нашли по запросу - ищем подходящую колонку в данных
+        if not group_col:
+            logger.info("[CleanAnalyst] No group column in query, searching in columns...")
+            for col in column_names:
+                col_lower = col.lower()
+                # Ищем типичные колонки для группировки
+                for key, synonyms in group_keywords.items():
+                    if any(s in col_lower for s in synonyms):
+                        if col in df.columns:
+                            group_col = col
+                            logger.info(f"[CleanAnalyst] Auto-detected group column: {col}")
+                            break
+                if group_col:
+                    break
+
         if not group_col:
             logger.info("[CleanAnalyst] No group column found for aggregation")
             return None
