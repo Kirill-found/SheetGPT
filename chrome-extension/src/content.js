@@ -369,7 +369,7 @@ async function handleSendMessage() {
     const sheetData = await getActiveSheetData();
 
     // Отправляем запрос в SheetGPT API (CleanAnalyst v1.0)
-    const response = await fetch('https://sheetgpt-production.up.railway.app/api/v1/analyze', {
+    const response = await fetch('https://sheetgpt-production.up.railway.app/api/v2/analyze', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -811,8 +811,8 @@ function sendMessageToSidebar(data) {
 const API_MODE = 'production';  // Change to 'production' for Railway server
 
 const API_URLS = {
-  local: 'http://localhost:8000/api/v1/analyze',
-  production: 'https://sheetgpt-production.up.railway.app/api/v1/analyze'
+  local: 'http://localhost:8000/api/v2/analyze',
+  production: 'https://sheetgpt-production.up.railway.app/api/v2/analyze'
 };
 
 // ===== API HANDLERS =====
