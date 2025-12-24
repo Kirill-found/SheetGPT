@@ -753,7 +753,9 @@ condition_type: TEXT_EQ (равно), TEXT_CONTAINS (содержит), NUMBER_G
         pre_calc_text = ""
         python_executed = False
 
+        logger.info(f"[CleanAnalyst] Checking aggregation patterns for: {query}")
         aggregation_type = self._detect_aggregation_query(query)
+        logger.info(f"[CleanAnalyst] Aggregation detected: {aggregation_type}")
         if aggregation_type:
             logger.info(f"[CleanAnalyst] Detected aggregation query: {aggregation_type}")
             agg_result = self._calculate_aggregation(df, column_names, query)
