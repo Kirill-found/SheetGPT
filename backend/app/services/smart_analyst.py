@@ -188,6 +188,38 @@ class SmartAnalyst:
     def __init__(self, api_key: str):
         self.client = AsyncOpenAI(api_key=api_key)
 
+    def _requires_gpt_analysis(self, query: str) -> bool:
+        """
+        Определяет, требует ли запрос полного GPT анализа.
+        Эти типы запросов не могут быть обработаны pandas.
+        """
+        query_lower = query.lower()
+
+        # Паттерны, требующие GPT (действия с таблицей)
+        gpt_patterns = [
+            r'\bвыдел[иь]\b',           # выдели, выделить
+            r'\bпокрас[иь]\b',          # покрась, покрасить
+            r'\bподсвет[иь]\b',         # подсвети, подсветить
+            r'\bотмет[иь]\b',           # отметь, отметить
+            r'\bдиаграмм',              # диаграмма, диаграмму
+            r'\bграфик\b',              # график
+            r'\bchart\b',
+            r'\bдобавь\s+колонку\b',    # добавь колонку
+            r'\bсоздай\s+колонку\b',    # создай колонку
+            r'\bзапиши\b',              # запиши (в таблицу)
+            r'\bформул[ау]\b',          # формула, формулу
+            r'\bусловное\s+формат',     # условное форматирование
+            r'\bсортир',                # сортировка (с действием)
+            r'\bотсортируй\b',
+        ]
+
+        for pattern in gpt_patterns:
+            if re.search(pattern, query_lower):
+                logger.info(f"[SmartAnalyst] Query requires GPT analysis: matched '{pattern}'")
+                return True
+
+        return False
+
     async def analyze(
         self,
         query: str,
@@ -202,6 +234,17 @@ class SmartAnalyst:
         start_time = time.time()
 
         try:
+            # Pre-check: некоторые запросы ВСЕГДА требуют GPT
+            force_gpt = self._requires_gpt_analysis(query)
+            if force_gpt:
+                logger.info("[SmartAnalyst] ⚡ Forcing full GPT analysis (action query detected)")
+                result = await self._full_gpt_analysis(query, df, column_names, context, history)
+                result["python_executed"] = False
+                elapsed = time.time() - start_time
+                result["processing_time"] = f"{elapsed:.2f}s"
+                result["processor_version"] = "SmartAnalyst v1.0"
+                return {"success": True, "gpt_response": result, "processing_time": f"{elapsed:.2f}s"}
+
             # Phase 1: GPT планирует
             logger.info(f"[SmartAnalyst] Phase 1: Planning for query: {query[:50]}...")
             spec = await self._get_execution_spec(query, df, column_names, history)
@@ -404,6 +447,15 @@ class SmartAnalyst:
         result = await clean_analyst.analyze(query, df, column_names, context, history)
 
         if result.get("success"):
-            return result.get("gpt_response", {})
+            gpt_response = result.get("gpt_response", {})
+            # ВАЖНО: трансформируем в формат фронтенда
+            gpt_response["_row_count"] = len(df)
+            transformed = clean_analyst.transform_to_frontend_format(
+                gpt_response,
+                result.get("processing_time", "0s"),
+                query=query,
+                column_names=column_names
+            )
+            return transformed
         else:
             return {"summary": "Ошибка анализа", "error": result.get("error")}
