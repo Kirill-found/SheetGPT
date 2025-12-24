@@ -2277,20 +2277,21 @@ async function fillColumnsDirect({ startRow, columns }) {
     const writeStartRow = startRow || 2;
     const results = [];
 
-    // v11.5: Check if this is a SUMMARY
-    // Summary detection: if first target column is A/B and table already has data in those columns
-    // OR if start_row is significantly below data (gap of 2+ rows)
+    // v11.6: Skip column correction if target is already AFTER existing data
+    // e.g., GPT says target: "I" and we have 8 headers (A-H) → I is column 9, skip correction
     const firstTarget = columns[0]?.target?.toUpperCase() || '';
-    const hasExistingDataInTargets = headers.length > 0 && (firstTarget === 'A' || firstTarget === 'B');
+    const firstTargetIndex = firstTarget.charCodeAt(0) - 65; // A=0, B=1, I=8
+    const targetIsAfterExistingData = firstTargetIndex >= headers.length;
     const hasRowGap = writeStartRow > dataRowCount + 1;
-    const isSummary = hasExistingDataInTargets || hasRowGap;
+    const skipColumnCorrection = targetIsAfterExistingData || hasRowGap;
+    const isSummary = skipColumnCorrection;
     if (isSummary) {
-      console.log('[SheetGPT] 📊 SUMMARY mode detected:', {
+      console.log('[SheetGPT] 📊 Skip column correction:', {
         firstTarget,
-        hasExistingDataInTargets,
-        hasRowGap,
-        writeStartRow,
-        dataRowCount
+        firstTargetIndex,
+        headersCount: headers.length,
+        targetIsAfterExistingData,
+        hasRowGap
       });
     }
 
