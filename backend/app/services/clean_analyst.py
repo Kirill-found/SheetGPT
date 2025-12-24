@@ -507,6 +507,149 @@ condition_type: TEXT_EQ (равно), TEXT_CONTAINS (содержит), NUMBER_G
     def __init__(self, api_key: str):
         self.client = AsyncOpenAI(api_key=api_key)
 
+    def _detect_aggregation_query(self, query: str) -> Optional[Dict]:
+        """
+        Определяет запросы на агрегацию и извлекает параметры.
+        GPT плохо считает - лучше считать в pandas!
+        """
+        query_lower = query.lower()
+
+        # Паттерны запросов на сумму по группам
+        sum_patterns = [
+            r'(?:сумм[ау]|итог[и]?)\s+(?:по|для)\s+',
+            r'сколько\s+(?:продал[иа]?|заработал[иа]?|сделал[иа]?)',
+            r'(?:продажи|выручка|сумма)\s+(?:по|для|каждого)',
+            r'(?:сводк[ау]|итоги?|агрегац)',
+            r'на\s+какую\s+сумму',
+        ]
+
+        for pattern in sum_patterns:
+            if re.search(pattern, query_lower):
+                return {"type": "aggregation", "operation": "sum"}
+
+        return None
+
+    def _calculate_aggregation(
+        self,
+        df: pd.DataFrame,
+        column_names: List[str],
+        query: str
+    ) -> Optional[Dict]:
+        """
+        Выполняет агрегацию в pandas - точные расчёты!
+        Возвращает результаты для GPT чтобы он их отформатировал.
+        """
+        query_lower = query.lower()
+
+        # Определяем колонку для группировки
+        group_col = None
+        group_keywords = {
+            'менеджер': ['менеджер', 'продавец', 'сотрудник', 'manager'],
+            'город': ['город', 'регион', 'филиал', 'city'],
+            'статус': ['статус', 'состояние', 'status'],
+            'категория': ['категория', 'тип', 'группа', 'category'],
+            'клиент': ['клиент', 'покупатель', 'заказчик', 'customer'],
+        }
+
+        # Сначала ищем по ключевым словам в запросе
+        for key, synonyms in group_keywords.items():
+            if any(s in query_lower for s in synonyms):
+                # Нашли ключевое слово в запросе - ищем соответствующую колонку
+                for col in column_names:
+                    col_lower = col.lower()
+                    if any(s in col_lower for s in synonyms):
+                        if col in df.columns:
+                            group_col = col
+                            break
+            if group_col:
+                break
+
+        if not group_col:
+            logger.info("[CleanAnalyst] No group column found for aggregation")
+            return None
+
+        # Определяем колонку для суммирования (числовая)
+        sum_col = None
+        sum_keywords = ['сумма', 'выручка', 'продажи', 'итого', 'стоимость', 'цена', 'amount', 'total', 'price', 'sum']
+
+        for col in column_names:
+            col_lower = col.lower()
+            if any(s in col_lower for s in sum_keywords):
+                if col in df.columns and pd.api.types.is_numeric_dtype(df[col]):
+                    sum_col = col
+                    break
+
+        # Если не нашли по названию, берём первую числовую с большими значениями
+        if not sum_col:
+            for col in column_names:
+                if col in df.columns and pd.api.types.is_numeric_dtype(df[col]):
+                    # Пропускаем ID-шные колонки (обычно маленькие целые числа подряд)
+                    if df[col].max() > 100:  # Сумма обычно > 100
+                        sum_col = col
+                        break
+
+        if not sum_col:
+            logger.info("[CleanAnalyst] No numeric column found for aggregation")
+            return None
+
+        logger.info(f"[CleanAnalyst] Aggregation: group by '{group_col}', sum '{sum_col}'")
+
+        # Проверяем фильтр по статусу
+        status_filter = None
+        if 'оплачен' in query_lower or 'paid' in query_lower:
+            status_col = None
+            for col in column_names:
+                if 'статус' in col.lower() or 'status' in col.lower():
+                    status_col = col
+                    break
+            if status_col and status_col in df.columns:
+                # Ищем значения со словом "оплачен"
+                unique_statuses = df[status_col].dropna().unique()
+                for status in unique_statuses:
+                    if 'оплачен' in str(status).lower():
+                        status_filter = (status_col, status)
+                        break
+
+        # Фильтруем если нужно
+        work_df = df.copy()
+        filter_desc = ""
+        if status_filter:
+            col, val = status_filter
+            work_df = work_df[work_df[col] == val]
+            filter_desc = f" (фильтр: {col} = '{val}')"
+            logger.info(f"[CleanAnalyst] Applied filter: {col} = '{val}', rows: {len(work_df)}")
+
+        # Выполняем агрегацию
+        try:
+            result = work_df.groupby(group_col)[sum_col].sum().sort_values(ascending=False)
+
+            # Форматируем результат
+            aggregation_result = {
+                "group_column": group_col,
+                "sum_column": sum_col,
+                "filter": filter_desc,
+                "total_rows": len(work_df),
+                "groups": []
+            }
+
+            for group_name, value in result.items():
+                aggregation_result["groups"].append({
+                    "name": str(group_name),
+                    "value": float(value),
+                    "formatted": f"{value:,.0f}".replace(",", " ")
+                })
+
+            aggregation_result["grand_total"] = float(result.sum())
+            aggregation_result["grand_total_formatted"] = f"{result.sum():,.0f}".replace(",", " ")
+
+            logger.info(f"[CleanAnalyst] Aggregation complete: {len(result)} groups, total: {result.sum()}")
+            return aggregation_result
+
+        except Exception as e:
+            logger.error(f"[CleanAnalyst] Aggregation error: {e}")
+            return None
+
+
     def format_data_as_table(self, df: pd.DataFrame, column_names: List[str], max_rows: int = 1000) -> str:
         """Форматирует данные в читаемую таблицу"""
 
@@ -601,10 +744,44 @@ condition_type: TEXT_EQ (равно), TEXT_CONTAINS (содержит), NUMBER_G
                 history_text += f"Пользователь: {q}\nТвой ответ: {r}\n---\n"
             history_text += "Если пользователь спрашивает 'как ты это рассчитал?' или 'почему?' - отвечай про ПРЕДЫДУЩИЙ вопрос!\n"
 
+        # v12.0: Pre-calculate aggregations in pandas (GPT is bad at math!)
+        pre_calc_text = ""
+        python_executed = False
+
+        aggregation_type = self._detect_aggregation_query(query)
+        if aggregation_type:
+            logger.info(f"[CleanAnalyst] Detected aggregation query: {aggregation_type}")
+            agg_result = self._calculate_aggregation(df, column_names, query)
+            if agg_result:
+                python_executed = True
+                # Format pre-calculated results for GPT
+                groups_text = "\n".join([
+                    f"  - {g['name']}: {g['formatted']} руб"
+                    for g in agg_result['groups']
+                ])
+                pre_calc_text = f"""
+
+=== PRE_CALCULATED_RESULT (pandas, ТОЧНЫЕ ЧИСЛА!) ===
+Группировка по: {agg_result['group_column']}
+Суммирование: {agg_result['sum_column']}{agg_result['filter']}
+Количество строк: {agg_result['total_rows']}
+
+РЕЗУЛЬТАТЫ (ИСПОЛЬЗУЙ ЭТИ ЧИСЛА!):
+{groups_text}
+
+ИТОГО: {agg_result['grand_total_formatted']} руб
+
+ВАЖНО: Числа выше посчитаны Python/pandas - они ТОЧНЫЕ!
+НЕ пересчитывай их, просто используй в ответе!
+==============================================
+"""
+                logger.info(f"[CleanAnalyst] Pre-calculated: {len(agg_result['groups'])} groups, total: {agg_result['grand_total']}")
+
         # Формируем запрос
         user_prompt = f"""{context_text}{history_text}
 {data_text}
 {reference_text}
+{pre_calc_text}
 
 ВОПРОС: {query}
 
@@ -687,6 +864,9 @@ condition_type: TEXT_EQ (равно), TEXT_CONTAINS (содержит), NUMBER_G
             logger.info(f"[CleanAnalyst] Action: {result.get('action', {}).get('type', 'N/A')}")
             logger.info(f"[CleanAnalyst] Time: {elapsed:.2f}s")
 
+            # Pass python_executed flag to frontend
+            result["_python_executed"] = python_executed
+
             return {
                 "success": True,
                 "gpt_response": result,
@@ -762,7 +942,7 @@ condition_type: TEXT_EQ (равно), TEXT_CONTAINS (содержит), NUMBER_G
             "warnings": gpt_response.get("warnings", []),
             "processing_time": processing_time,
             "processor_version": "CleanAnalyst v1.0",
-            "python_executed": False  # GPT сам всё считает
+            "python_executed": gpt_response.get("_python_executed", False)
         }
 
         # Преобразуем action в формат фронтенда
