@@ -199,7 +199,7 @@ class SmartAnalyst:
         try:
             # Phase 1: GPT планирует
             logger.info(f"[SmartAnalyst] Phase 1: Planning for query: {query[:50]}...")
-            spec = await self._get_execution_spec(query, df, column_names)
+            spec = await self._get_execution_spec(query, df, column_names, history)
             logger.info(f"[SmartAnalyst] Spec: {json.dumps(spec, ensure_ascii=False)[:200]}")
 
             # Phase 2: Pandas выполняет (если нужно)
@@ -230,7 +230,7 @@ class SmartAnalyst:
             logger.error(f"[SmartAnalyst] Error: {e}", exc_info=True)
             return {"success": False, "error": str(e)}
 
-    async def _get_execution_spec(self, query: str, df: pd.DataFrame, column_names: List[str]) -> Dict:
+    async def _get_execution_spec(self, query: str, df: pd.DataFrame, column_names: List[str], history: Optional[List[Dict]] = None) -> Dict:
         """Phase 1: GPT генерирует спецификацию"""
 
         # Подготовим примеры данных
@@ -238,11 +238,21 @@ class SmartAnalyst:
         for idx, row in df.head(5).iterrows():
             sample_rows.append({col: str(row[col])[:30] for col in column_names if col in df.columns})
 
+        # Формируем контекст из истории
+        history_context = ""
+        if history and len(history) > 0:
+            history_lines = []
+            for h in history[-3:]:  # Последние 3 сообщения
+                role = "Пользователь" if h.get("role") == "user" else "Ассистент"
+                content = h.get("content", "")[:200]
+                history_lines.append(f"{role}: {content}")
+            history_context = f"\n\n## ИСТОРИЯ ДИАЛОГА (для понимания контекста)\n" + "\n".join(history_lines)
+
         prompt = self.PLANNER_PROMPT.format(
             columns=json.dumps(column_names, ensure_ascii=False),
             sample_data=json.dumps(sample_rows, ensure_ascii=False, indent=2),
             query=query
-        )
+        ) + history_context
 
         response = await self.client.chat.completions.create(
             model="gpt-4o",  # Полная модель - понимает контекст
