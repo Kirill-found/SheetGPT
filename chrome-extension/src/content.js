@@ -7,6 +7,10 @@
 
 console.log('[SheetGPT] Content script loaded');
 
+// v12.0: Deduplication - prevent processing same message twice
+const processedMessageIds = new Set();
+const MAX_PROCESSED_IDS = 100; // Limit memory usage
+
 // Debug: expose function to test activation from console
 window.testSheetGPTActivation = function(key) {
   const iframe = document.getElementById('sheetgpt-sidebar-iframe');
@@ -638,6 +642,20 @@ window.addEventListener('message', async (event) => {
   }
 
   const { action, data, messageId } = event.data;
+
+  // v12.0: Deduplication - skip if already processed
+  if (processedMessageIds.has(messageId)) {
+    console.log('[SheetGPT] ⏭️ Skipping duplicate message:', messageId);
+    return;
+  }
+  processedMessageIds.add(messageId);
+  // Cleanup old messageIds to prevent memory leak
+  if (processedMessageIds.size > MAX_PROCESSED_IDS) {
+    const idsArray = Array.from(processedMessageIds);
+    processedMessageIds.clear();
+    idsArray.slice(-50).forEach(id => processedMessageIds.add(id));
+  }
+
   console.log('[SheetGPT] ✅ Processing action:', action, 'messageId:', messageId, 'data:', data);
 
   try {
