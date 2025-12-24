@@ -891,7 +891,29 @@ async def analyze_smart(
         response["success"] = True
         response["processor_version"] = "SmartAnalyst v1.0"
 
+        # Нормализация формата для совместимости с sidebar
+        # action.type → action_type
+        if "action" in response and isinstance(response["action"], dict):
+            action = response["action"]
+            response["action_type"] = action.get("type")
+            response["formula_template"] = action.get("formula_template") or response.get("methodology", {}).get("copyable_formula")
+            response["column_name"] = action.get("column_name")
+            response["target_column"] = action.get("target_column")
+            response["values"] = action.get("values")
+            response["start_row"] = action.get("start_row")
+
+        # result.summary → summary
+        if "result" in response and isinstance(response["result"], dict):
+            if not response.get("summary"):
+                response["summary"] = response["result"].get("summary")
+
+        # methodology.copyable_formula доступна напрямую
+        if "methodology" in response and isinstance(response["methodology"], dict):
+            if not response.get("formula_template"):
+                response["formula_template"] = response["methodology"].get("copyable_formula")
+
         logger.info(f"[SmartAnalyst] Success! python_executed: {response.get('python_executed')}")
+        logger.info(f"[SmartAnalyst] action_type: {response.get('action_type')}")
         logger.info("="*60)
 
         return sanitize_for_json(response)
