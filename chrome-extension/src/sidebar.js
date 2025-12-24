@@ -86,6 +86,12 @@ async function undoLastAction() {
         rows: undoSnapshot.extraData.highlightedRows,
         sheetName: undoSnapshot.sheetName
       });
+    } else if (undoSnapshot.extraData?.conditionalFormatRule) {
+      // For conditional format, clear the last added rule
+      console.log('[Sidebar] ↩️ Clearing conditional format rule:', undoSnapshot.extraData.conditionalFormatRule);
+      response = await sendToContentScript('CLEAR_CONDITIONAL_FORMAT', {
+        sheetName: undoSnapshot.sheetName
+      });
     } else if (undoSnapshot.extraData?.addedColumn) {
       // For add_formula actions, delete the added column
       console.log('[Sidebar] ↩️ Deleting added column:', undoSnapshot.extraData.addedColumn);
@@ -2815,7 +2821,8 @@ async function applyConditionalFormatInSheet(rule) {
   }
 
   try {
-    await saveSheetSnapshot('Условное форматирование');
+    // Save the rule for undo - we'll need to clear this specific format
+    await saveSheetSnapshot('Условное форматирование', { conditionalFormatRule: rule });
 
     // GPT returns 0-based indices (column 0 = A, column 1 = B, etc.)
     // API also expects 0-based, so no correction needed

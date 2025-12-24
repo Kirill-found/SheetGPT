@@ -777,6 +777,11 @@ window.addEventListener('message', async (event) => {
         result = await deleteColumn(data.column, data.sheetName);
         break;
 
+      case 'CLEAR_CONDITIONAL_FORMAT':
+        console.log('[SheetGPT] ↩️ CLEAR_CONDITIONAL_FORMAT - removing last rule from:', data.sheetName);
+        result = await clearLastConditionalFormat(data.sheetName);
+        break;
+
       default:
         throw new Error(`Unknown action: ${action}`);
     }
@@ -1358,6 +1363,39 @@ async function deleteColumn(column, sheetName) {
     };
   } catch (error) {
     console.error('[SheetGPT] ❌ Error deleting column:', error);
+    return {
+      success: false,
+      message: error.message
+    };
+  }
+}
+
+/**
+ * Clear the last added conditional format rule
+ * @param {string} sheetName - Name of the sheet
+ */
+async function clearLastConditionalFormat(sheetName) {
+  console.log('[SheetGPT] ↩️ Clearing last conditional format from sheet:', sheetName);
+
+  try {
+    const response = await safeSendMessage({
+      action: 'CLEAR_CONDITIONAL_FORMAT',
+      data: {
+        sheetName: sheetName || 'Sheet1'
+      }
+    });
+
+    if (!response.success) {
+      throw new Error(response.error || 'Failed to clear conditional format');
+    }
+
+    console.log('[SheetGPT] ✅ Conditional format cleared');
+    return {
+      success: true,
+      message: 'Условное форматирование отменено'
+    };
+  } catch (error) {
+    console.error('[SheetGPT] ❌ Error clearing conditional format:', error);
     return {
       success: false,
       message: error.message

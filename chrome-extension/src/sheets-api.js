@@ -608,6 +608,82 @@ async function deleteColumn(spreadsheetId, sheetName, column) {
 }
 
 /**
+ * Clear the last conditional format rule from a sheet
+ * @param {string} spreadsheetId - The spreadsheet ID
+ * @param {string} sheetName - The sheet name
+ */
+async function clearLastConditionalFormatRule(spreadsheetId, sheetName) {
+  try {
+    const token = await getAuthToken();
+
+    // Get sheet ID from name
+    const sheetId = await getSheetIdByName(spreadsheetId, sheetName);
+    if (sheetId === null) {
+      throw new Error(`Sheet "${sheetName}" not found`);
+    }
+
+    // First, get current conditional format rules
+    const getResponse = await fetch(
+      `${SHEETS_API_BASE}/${spreadsheetId}?fields=sheets(properties,conditionalFormats)`,
+      {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      }
+    );
+
+    if (!getResponse.ok) {
+      const error = await getResponse.json();
+      throw new Error(`Sheets API error: ${error.error?.message || getResponse.statusText}`);
+    }
+
+    const spreadsheet = await getResponse.json();
+    const sheet = spreadsheet.sheets?.find(s => s.properties?.sheetId === sheetId);
+
+    if (!sheet?.conditionalFormats || sheet.conditionalFormats.length === 0) {
+      console.log('[SheetsAPI] No conditional formats to remove');
+      return { success: true, message: 'No conditional formats found' };
+    }
+
+    // Delete the last added rule (last in the array is most recently added)
+    const lastRuleIndex = sheet.conditionalFormats.length - 1;
+    console.log('[SheetsAPI] Deleting conditional format at index:', lastRuleIndex);
+
+    const requests = [{
+      deleteConditionalFormatRule: {
+        sheetId: sheetId,
+        index: lastRuleIndex
+      }
+    }];
+
+    const response = await fetch(
+      `${SHEETS_API_BASE}/${spreadsheetId}:batchUpdate`,
+      {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ requests })
+      }
+    );
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(`Sheets API error: ${error.error?.message || response.statusText}`);
+    }
+
+    const result = await response.json();
+    console.log('[SheetsAPI] ✅ Conditional format rule deleted:', result);
+    return { success: true, ...result };
+  } catch (error) {
+    console.error('[SheetsAPI] Error clearing conditional format:', error);
+    throw error;
+  }
+}
+
+/**
  * Sort data in a range by column
  * @param {string} spreadsheetId - The spreadsheet ID
  * @param {number} sheetId - The sheet ID (not name!)
@@ -1704,6 +1780,7 @@ if (typeof module !== 'undefined' && module.exports) {
     highlightRows,
     clearRowBackgrounds,
     deleteColumn,
+    clearLastConditionalFormatRule,
     sortRange,
     freezeRowsColumns,
     formatRow,
