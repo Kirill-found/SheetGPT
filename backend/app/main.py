@@ -899,7 +899,7 @@ async def analyze_smart(
             response["formula_template"] = action.get("formula_template") or response.get("methodology", {}).get("copyable_formula")
             response["column_name"] = action.get("column_name")
             response["target_column"] = action.get("target_column")
-            response["values"] = action.get("values")
+            response["fill_values"] = action.get("values")  # sidebar ожидает fill_values, не values
             response["start_row"] = action.get("start_row")
 
         # result.summary → summary
